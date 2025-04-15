@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,12 +37,10 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
@@ -55,12 +52,13 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
@@ -95,9 +93,12 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+  private final TableCache _tableCache;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      TableCache tableCache) {
     _tracker = tracker;
+    _tableCache = tableCache;
   }
 
   /**
@@ -106,8 +107,8 @@ public final class RelToPlanNodeConverter {
    */
   public PlanNode toPlanNode(RelNode node) {
     PlanNode result;
-    if (node instanceof LogicalTableScan) {
-      result = convertLogicalTableScan((LogicalTableScan) node);
+    if (node instanceof PinotLogicalTableScan) {
+      result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
     } else if (node instanceof LogicalProject) {
       result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
@@ -146,34 +147,42 @@ public final class RelToPlanNodeConverter {
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
+    RelDistribution distribution = node.getDistribution();
+    RelDistribution.Type distributionType = distribution.getType();
     PinotRelExchangeType exchangeType;
+    List<Integer> keys;
+    Boolean prePartitioned;
     List<RelFieldCollation> collations;
     boolean sortOnSender;
     boolean sortOnReceiver;
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
+      keys = distribution.getKeys();
+      prePartitioned = null;
       collations = sortExchange.getCollation().getFieldCollations();
       sortOnSender = sortExchange.isSortOnSender();
       sortOnReceiver = sortExchange.isSortOnReceiver();
     } else {
       assert node instanceof PinotLogicalExchange;
-      exchangeType = ((PinotLogicalExchange) node).getExchangeType();
+      PinotLogicalExchange exchange = (PinotLogicalExchange) node;
+      exchangeType = exchange.getExchangeType();
+      keys = exchange.getKeys();
+      prePartitioned = exchange.getPrePartitioned();
       collations = null;
       sortOnSender = false;
       sortOnReceiver = false;
     }
-    RelDistribution distribution = node.getDistribution();
-    RelDistribution.Type distributionType = distribution.getType();
-    List<Integer> keys;
-    boolean prePartitioned;
-    if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
-      keys = distribution.getKeys();
-      RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-      prePartitioned = distribution.equals(inputDistributionTrait);
-    } else {
+    if (keys.isEmpty()) {
       keys = null;
-      prePartitioned = false;
+    }
+    if (prePartitioned == null) {
+      if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
+        RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
+        prePartitioned = distribution.equals(inputDistributionTrait);
+      } else {
+        prePartitioned = false;
+      }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
         exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
@@ -211,18 +220,35 @@ public final class RelToPlanNodeConverter {
     WindowNode.WindowFrameType windowFrameType =
         windowGroup.isRows ? WindowNode.WindowFrameType.ROWS : WindowNode.WindowFrameType.RANGE;
 
-    // TODO: For now only the default frame is supported. Add support for custom frames including rows support.
-    //       Frame literals come in the constants from the LogicalWindow and the bound.getOffset() stores the
-    //       InputRef to the constants array offset by the input array length. These need to be extracted here and
-    //       set to the bounds.
-    // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
-    // Change PlanNodeToRelConverted once this limitation is removed here
-    int lowerBound = Integer.MIN_VALUE;
-    // Upper bound can only be unbounded following or current row for now
-    int upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
+    int lowerBound;
+    if (windowGroup.lowerBound.isUnbounded()) {
+      // Lower bound can't be unbounded following
+      lowerBound = Integer.MIN_VALUE;
+    } else if (windowGroup.lowerBound.isCurrentRow()) {
+      lowerBound = 0;
+    } else {
+      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
+      RexLiteral offset = (RexLiteral) windowGroup.lowerBound.getOffset();
+      lowerBound = offset == null ? Integer.MIN_VALUE
+          : (windowGroup.lowerBound.isPreceding() ? -1 * RexExpressionUtils.getValueAsInt(offset)
+              : RexExpressionUtils.getValueAsInt(offset));
+    }
+    int upperBound;
+    if (windowGroup.upperBound.isUnbounded()) {
+      // Upper bound can't be unbounded preceding
+      upperBound = Integer.MAX_VALUE;
+    } else if (windowGroup.upperBound.isCurrentRow()) {
+      upperBound = 0;
+    } else {
+      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
+      RexLiteral offset = (RexLiteral) windowGroup.upperBound.getOffset();
+      upperBound = offset == null ? Integer.MAX_VALUE
+          : (windowGroup.upperBound.isFollowing() ? RexExpressionUtils.getValueAsInt(offset)
+              : -1 * RexExpressionUtils.getValueAsInt(offset));
+    }
 
-    // TODO: Constants are used to store constants needed such as the frame literals. For now just save this, need to
-    //       extract the constant values into bounds as a part of frame support.
+    // TODO: The constants are already extracted in the PinotWindowExchangeNodeInsertRule, we can remove them from
+    // the WindowNode and plan serde.
     List<RexExpression.Literal> constants = new ArrayList<>(node.constants.size());
     for (RexLiteral constant : node.constants) {
       constants.add(RexExpressionUtils.fromRexLiteral(constant));
@@ -249,7 +275,8 @@ public final class RelToPlanNodeConverter {
       filterArgs.add(aggregateCall.filterArg);
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType());
+        convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
+        node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {
@@ -262,8 +289,8 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), RexExpressionUtils.fromRexNode(node.getCondition()));
   }
 
-  private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
-    String tableName = getTableNameFromTableScan(node);
+  private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
+    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
@@ -298,10 +325,7 @@ public final class RelToPlanNodeConverter {
 
     // Check if the join hint specifies the join strategy
     JoinNode.JoinStrategy joinStrategy;
-    ImmutableList<RelHint> relHints = join.getHints();
-    String joinStrategyHint = PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.JOIN_HINT_OPTIONS,
-        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
-    if (PinotHintOptions.JoinHintOptions.LOOKUP_JOIN_STRATEGY.equals(joinStrategyHint)) {
+    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       joinStrategy = JoinNode.JoinStrategy.LOOKUP;
 
       // Run some validations for lookup join
@@ -326,7 +350,7 @@ public final class RelToPlanNodeConverter {
       joinStrategy = JoinNode.JoinStrategy.HASH;
     }
 
-    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(relHints), inputs, joinType,
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy);
   }

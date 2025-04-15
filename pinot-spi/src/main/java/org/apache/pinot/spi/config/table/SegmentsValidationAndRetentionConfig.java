@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -37,26 +38,32 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replication;
   @Deprecated // Use _replication instead
   private String _replicasPerPartition;
-  @Deprecated // Schema name should be the same as raw table name
-  private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
   private String _segmentAssignmentStrategy;
+  @Deprecated  // Use SegmentAssignmentConfig instead
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
+  @Deprecated
   private boolean _minimizeDataMovement;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
+  private String _untrackedSegmentsDeletionBatchSize;
+
+  /**
+   * @deprecated Use {@link InstanceAssignmentConfig} instead
+   */
   @Deprecated
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
 
+  @Deprecated
   public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
     _segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
@@ -162,22 +169,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Schema name should be the same as raw table name
+   * @deprecated Use {@link InstanceAssignmentConfig} instead.
    */
   @Deprecated
-  public String getSchemaName() {
-    return _schemaName;
-  }
-
-  @Deprecated
-  public void setSchemaName(String schemaName) {
-    _schemaName = schemaName;
-  }
-
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
 
+  @Deprecated
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
@@ -226,11 +225,24 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _crypterClassName = crypterClassName;
   }
 
+  /**
+   * @deprecated Use {@link InstanceAssignmentConfig} instead
+   */
+  @Deprecated
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
 
+  @Deprecated
   public void setMinimizeDataMovement(boolean minimizeDataMovement) {
     _minimizeDataMovement = minimizeDataMovement;
+  }
+
+  public String getUntrackedSegmentsDeletionBatchSize() {
+    return _untrackedSegmentsDeletionBatchSize;
+  }
+
+  public void setUntrackedSegmentsDeletionBatchSize(String untrackedSegmentsDeletionBatchSize) {
+    _untrackedSegmentsDeletionBatchSize = untrackedSegmentsDeletionBatchSize;
   }
 }

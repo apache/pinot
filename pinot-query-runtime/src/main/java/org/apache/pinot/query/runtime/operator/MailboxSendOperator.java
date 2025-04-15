@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -35,18 +36,21 @@ import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
+ * This {@code MailboxSendOperator} is created to send {@link MseBlock}s to the receiving end.
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
@@ -64,9 +68,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
-    this(context, input,
-        statMap -> getBlockExchange(context, node.getReceiverStageId(), node.getDistributionType(), node.getKeys(),
-            statMap));
+    this(context, input, statMap -> getBlockExchange(context, node, statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
@@ -79,8 +81,80 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange = exchangeFactory.apply(_statMap);
   }
 
+  /**
+   * Creates a {@link BlockExchange} for the given {@link MailboxSendNode}.
+   *
+   * In normal cases, where the sender sends data to a single receiver stage, this method just delegates on
+   * {@link #getBlockExchange(OpChainExecutionContext, int, RelDistribution.Type, List, StatMap, BlockSplitter)}.
+   *
+   * In case of a multi-sender node, this method creates a two steps exchange:
+   * <ol>
+   *   <li>One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
+   *   distribution type specified in the {@link MailboxSendNode}.</li>
+   *   <li>Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges.</li>
+   * </ol>
+   *
+   * @see BlockExchange#asSendingMailbox(String)
+   */
+  private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
+      StatMap<StatKey> statMap) {
+    BlockSplitter mainSplitter = BlockSplitter.DEFAULT;
+    if (!node.isMultiSend()) {
+      // it is guaranteed that there is exactly one receiver stage
+      int receiverStageId = node.getReceiverStageIds().iterator().next();
+      return getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, mainSplitter);
+    }
+    List<SendingMailbox> perStageSendingMailboxes = new ArrayList<>();
+    // The inner splitter is a NO_OP because the outer splitter will take care of splitting the blocks
+    BlockSplitter innerSplitter = BlockSplitter.NO_OP;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      BlockExchange blockExchange =
+          getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
+      perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
+    }
+
+    Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
+    return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        Collections.emptyList(), mainSplitter, statsIndexChooser);
+  }
+
+  private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
+      MailboxSendNode node) {
+    // Stats must be sent to a single stage. That stage must also be one with a smaller stage id than the current stage.
+    // Ideally, the stage chosen should always be the same in order to have repeatable stats.
+    int minStageIndex = indexOfMinStageId(node);
+    Preconditions.checkState(minStageIndex >= 0, "Invalid minStageIndex: %s", minStageIndex);
+    Preconditions.checkArgument(minStageIndex < ctx.getStageId(),
+        "Min stage index %s should be smaller than current stage id %s",
+        minStageIndex, ctx.getStageId());
+    return sendingMailboxes -> {
+      Preconditions.checkState(minStageIndex <= sendingMailboxes.size(),
+          "Invalid minStageIndex: %s, sendingMailboxes.size(): %s", minStageIndex, sendingMailboxes.size());
+      return minStageIndex;
+    };
+  }
+
+  private static int indexOfMinStageId(MailboxSendNode node) {
+    int minStageId = Integer.MAX_VALUE;
+    int index = 0;
+    int minIndex = Integer.MAX_VALUE;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      if (receiverStageId < minStageId) {
+        minStageId = receiverStageId;
+        minIndex = index;
+      }
+      index++;
+    }
+    return minIndex;
+  }
+
+  /**
+   * Creates a {@link BlockExchange} that sends data to the given receiver stage.
+   *
+   * In case of a multi-sender node, this method will be called for each receiver stage.
+   */
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
-      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap) {
+      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap, BlockSplitter splitter) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
@@ -90,13 +164,13 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     List<RoutingInfo> routingInfos =
-        MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
-            mailboxInfos);
+          MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
+              mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, splitter);
   }
 
   @Override
@@ -126,20 +200,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     try {
-      TransferableBlock block = _input.nextBlock();
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        updateEosBlock(block, _statMap);
-        // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(block);
-        // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
-        // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
-        if (_context.getStageId() == 1) {
-          updateMetrics(block);
+      MseBlock block = _input.nextBlock();
+      if (block.isEos()) {
+        if (_context.isSendStats()) {
+          sendEos((MseBlock.Eos) block);
+        } else {
+          sendEos(SuccessMseBlock.INSTANCE);
         }
       } else {
-        if (sendTransferableBlock(block)) {
+        if (sendMseBlock(((MseBlock.Data) block))) {
           earlyTerminate();
         }
       }
@@ -147,15 +218,15 @@ public class MailboxSendOperator extends MultiStageOperator {
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return createLeafBlock();
+      return SuccessMseBlock.INSTANCE;
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      return ErrorMseBlock.fromException(e);
     } catch (Exception e) {
-      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
-        sendTransferableBlock(errorBlock);
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId());
+        sendEos(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
@@ -163,14 +234,44 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  protected TransferableBlock createLeafBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
+  private void sendEos(MseBlock.Eos eosBlockWithoutStats)
+      throws Exception {
+    MultiStageQueryStats stats = calculateStats();
+
+    List<DataBuffer> serializedStats;
+    try {
+      serializedStats = stats.serialize();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize stats", e);
+      serializedStats = Collections.emptyList();
+    }
+
+    // no need to check early terminate signal b/c the current block is already EOS
+    sendMseBlock(eosBlockWithoutStats, serializedStats);
+    // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
+    // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
+    if (_context.getStageId() == 1) {
+      updateMetrics(stats);
+    }
   }
 
-  private boolean sendTransferableBlock(TransferableBlock block)
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  private boolean sendMseBlock(MseBlock.Data block)
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
+    }
+    return isEarlyTerminated;
+  }
+
+  private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      throws Exception {
+    boolean isEarlyTerminated = _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
@@ -189,9 +290,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange.cancel(t);
   }
 
-  private void updateMetrics(TransferableBlock block) {
+  private void updateMetrics(MultiStageQueryStats queryStats) {
     ServerMetrics serverMetrics = ServerMetrics.get();
-    MultiStageQueryStats queryStats = block.getQueryStats();
     if (queryStats == null) {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {

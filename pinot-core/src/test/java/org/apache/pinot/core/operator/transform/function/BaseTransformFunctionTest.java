@@ -153,7 +153,8 @@ public abstract class BaseTransformFunctionTest {
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
-      _bigDecimalSVValues[i] = BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i]));
+      _bigDecimalSVValues[i] =
+          BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i])).stripTrailingZeros();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _jsonSVValues[i] = String.format(
           "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
@@ -310,18 +311,7 @@ public abstract class BaseTransformFunctionTest {
         .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
 
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    ObjectNode jsonIndexProps = JsonNodeFactory.instance.objectNode();
-    jsonIndexProps.put("disableCrossArrayUnnest", true);
-    ObjectNode indexNode = JsonNodeFactory.instance.objectNode();
-    indexNode.put("json", jsonIndexProps);
-    FieldConfig jsonFieldConfig =
-        new FieldConfig(JSON_STRING_SV_COLUMN, FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexNode,
-            null, null);
-    fieldConfigList.add(jsonFieldConfig);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
-            .setFieldConfigList(fieldConfigList).setNullHandlingEnabled(true).build();
+    TableConfig tableConfig = getTableConfig();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR_PATH);
@@ -339,6 +329,23 @@ public abstract class BaseTransformFunctionTest {
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+  }
+
+  // overridden in startree json index tests
+  protected TableConfig getTableConfig() {
+    List<FieldConfig> fieldConfigList = new ArrayList<>();
+    ObjectNode jsonIndexProps = JsonNodeFactory.instance.objectNode();
+    jsonIndexProps.put("disableCrossArrayUnnest", true);
+    ObjectNode indexNode = JsonNodeFactory.instance.objectNode();
+    indexNode.put("json", jsonIndexProps);
+    FieldConfig jsonFieldConfig =
+        new FieldConfig(JSON_STRING_SV_COLUMN, FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexNode,
+            null, null);
+    fieldConfigList.add(jsonFieldConfig);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
+            .setFieldConfigList(fieldConfigList).setNullHandlingEnabled(true).build();
+    return tableConfig;
   }
 
   protected boolean isNullRow(int i) {

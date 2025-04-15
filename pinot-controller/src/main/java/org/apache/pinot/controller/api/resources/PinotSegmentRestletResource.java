@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
@@ -36,9 +37,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -62,6 +65,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -73,7 +77,9 @@ import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckRespon
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -86,6 +92,7 @@ import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -296,8 +303,7 @@ public class PinotSegmentRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Exception while listing segment lineage: %s for table: %s.", e.getMessage(),
-              tableNameWithType),
-          Status.INTERNAL_SERVER_ERROR, e);
+              tableNameWithType), Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -360,8 +366,8 @@ public class PinotSegmentRestletResource {
 
   private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {
     try {
-      TableMetadataReader tableMetadataReader = new TableMetadataReader(_executor,
-          _connectionManager, _pinotHelixResourceManager);
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       return tableMetadataReader.getSegmentMetadata(tableName, segmentName, columns,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
@@ -390,19 +396,21 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers) {
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      String targetInstance, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
-        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
+        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, targetInstance);
     boolean zkJobMetaWriteSuccess = false;
-    if (msgInfo.getLeft() > 0) {
+    int numReloadMsgSent = msgInfo.getLeft();
+    if (numReloadMsgSent > 0) {
       try {
-        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
-            startTimeMs,
-            msgInfo.getLeft())) {
+        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, targetInstance,
+            msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
           zkJobMetaWriteSuccess = true;
         } else {
           LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}, segment: {}",
@@ -414,23 +422,24 @@ public class PinotSegmentRestletResource {
       }
       return new SuccessResponse(
           String.format("Submitted reload job id: %s, sent %d reload messages. Job meta ZK storage status: %s",
-              msgInfo.getRight(), msgInfo.getLeft(), zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED"));
-    } else {
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
+              msgInfo.getRight(), numReloadMsgSent, zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED"));
     }
+    throw new ControllerApplicationException(LOGGER,
+        String.format("Failed to find segment: %s in table: %s on %s", segmentName, tableName,
+            targetInstance == null ? "every instance" : targetInstance), Status.NOT_FOUND);
   }
 
   /**
    * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
    * name.
-   * TODO: Real-time table might also contain uploaded segments (not with LLC name), which is not handled here.
    */
   private String getExistingTable(String tableName, String segmentName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Derive table type from segment name if the given table name doesn't have type suffix
-      tableType = LLCSegmentName.isLLCSegment(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+      tableType = LLCSegmentName.isLLCSegment(segmentName) ? TableType.REALTIME
+          : (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) ? TableType.REALTIME
+              : TableType.OFFLINE);
     }
     return ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
   }
@@ -522,29 +531,19 @@ public class PinotSegmentRestletResource {
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
-    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.
-            getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
     }
 
-    String tableNameWithType =
-        controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
-    Map<String, List<String>> serverToSegments;
-
-    String singleSegmentName =
+    String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+    String segmentNames =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
-    if (singleSegmentName != null) {
-      // No need to query servers where this segment is not supposed to be hosted
-      serverToSegments = new TreeMap<>();
-      List<String> segmentList = Collections.singletonList(singleSegmentName);
-      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
-        serverToSegments.put(server, segmentList);
-      });
-    } else {
-      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    }
+    String instanceName =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME);
+    Map<String, List<String>> serverToSegments = getServerToSegments(tableNameWithType, segmentNames, instanceName);
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -552,13 +551,16 @@ public class PinotSegmentRestletResource {
         new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
 
     List<String> serverUrls = new ArrayList<>();
-    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
-    for (String endpoint : endpointsToServers.keySet()) {
+    for (Map.Entry<String, String> entry : serverEndPoints.entrySet()) {
+      String server = entry.getKey();
+      String endpoint = entry.getValue();
       String reloadTaskStatusEndpoint =
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
-      if (singleSegmentName != null) {
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
+      if (segmentNames != null) {
+        List<String> targetSegments = serverToSegments.get(server);
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
+            SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -571,7 +573,7 @@ public class PinotSegmentRestletResource {
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
 
     int totalSegments = 0;
-    for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
       totalSegments += entry.getValue().size();
     }
     serverReloadControllerJobStatusResponse.setTotalSegmentCount(totalSegments);
@@ -587,8 +589,7 @@ public class PinotSegmentRestletResource {
             serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
       } catch (Exception e) {
         serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
-            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
-        );
+            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1);
       }
     }
 
@@ -596,8 +597,7 @@ public class PinotSegmentRestletResource {
     serverReloadControllerJobStatusResponse.setMetadata(controllerJobZKMetadata);
 
     // Add derived fields
-    long submissionTime =
-        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
+    long submissionTime = Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
     double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
     int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
         - serverReloadControllerJobStatusResponse.getSuccessCount();
@@ -615,6 +615,31 @@ public class PinotSegmentRestletResource {
     return serverReloadControllerJobStatusResponse;
   }
 
+  @VisibleForTesting
+  Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNames,
+      @Nullable String instanceName) {
+    if (segmentNames == null) {
+      // instanceName can be null or not null, and this method below can handle both cases.
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+    }
+    // Skip servers and segments not involved in the segment reloading job.
+    List<String> segmnetNameList = new ArrayList<>();
+    Collections.addAll(segmnetNameList, StringUtils.split(segmentNames, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
+    if (instanceName != null) {
+      return Map.of(instanceName, segmnetNameList);
+    }
+    // If instance is null, then either one or all segments are being reloaded via current segment reload restful APIs.
+    // And the if-check at the beginning of this method has handled the case of reloading all segments. So here we
+    // expect only one segment name.
+    Preconditions.checkState(segmnetNameList.size() == 1, "Only one segment is expected but got: %s", segmnetNameList);
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNames);
+    for (String server : servers) {
+      serverToSegments.put(server, Collections.singletonList(segmentNames));
+    }
+    return serverToSegments;
+  }
+
   @POST
   @Path("segments/{tableName}/reload")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
@@ -625,10 +650,13 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers)
-      throws JsonProcessingException {
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      String targetInstance,
+      @ApiParam(value = "Map from instances to segments to reload. This param takes precedence over targetInstance")
+      @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
+      throws IOException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    long startTimeMs = System.currentTimeMillis();
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
@@ -642,17 +670,36 @@ public class PinotSegmentRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
+    if (instanceToSegmentsMapInJson != null) {
+      Map<String, List<String>> instanceToSegmentsMap =
+          JsonUtils.stringToObject(instanceToSegmentsMapInJson, new TypeReference<>() {
+          });
+      Map<String, Map<String, Map<String, String>>> tableInstanceMsgData =
+          reloadSegments(tableNamesWithType, forceDownload, instanceToSegmentsMap);
+      if (tableInstanceMsgData.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to find any segments in table: %s with instanceToSegmentsMap: %s", tableName,
+                instanceToSegmentsMap), Status.NOT_FOUND);
+      }
+      return new SuccessResponse(JsonUtils.objectToString(tableInstanceMsgData));
+    }
+    long startTimeMs = System.currentTimeMillis();
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
+      Pair<Integer, String> msgInfo =
+          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, targetInstance);
+      int numReloadMsgSent = msgInfo.getLeft();
+      if (numReloadMsgSent <= 0) {
+        continue;
+      }
       Map<String, String> tableReloadMeta = new HashMap<>();
-      tableReloadMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
+      tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
       tableReloadMeta.put("reloadJobId", msgInfo.getRight());
       perTableMsgData.put(tableNameWithType, tableReloadMeta);
       // Store in ZK
       try {
-        if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), startTimeMs,
-            msgInfo.getLeft())) {
+        if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, targetInstance, msgInfo.getRight(),
+            startTimeMs, numReloadMsgSent)) {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
         } else {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
@@ -663,7 +710,54 @@ public class PinotSegmentRestletResource {
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
+    if (perTableMsgData.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find any segments in table: %s on %s", tableName,
+              targetInstance == null ? "every instance" : targetInstance), Status.NOT_FOUND);
+    }
     return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
+  }
+
+  private Map<String, Map<String, Map<String, String>>> reloadSegments(List<String> tableNamesWithType,
+      boolean forceDownload, Map<String, List<String>> instanceToSegmentsMap) {
+    long startTimeMs = System.currentTimeMillis();
+    Map<String, Map<String, Map<String, String>>> tableInstanceMsgData = new LinkedHashMap<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      Map<String, Pair<Integer, String>> instanceMsgInfoMap =
+          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap);
+      Map<String, Map<String, String>> instanceMsgData =
+          tableInstanceMsgData.computeIfAbsent(tableNameWithType, t -> new HashMap<>());
+      for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
+        String instance = instanceMsgInfo.getKey();
+        Pair<Integer, String> msgInfo = instanceMsgInfo.getValue();
+        int numReloadMsgSent = msgInfo.getLeft();
+        if (numReloadMsgSent <= 0) {
+          continue;
+        }
+        Map<String, String> tableReloadMeta = new HashMap<>();
+        tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
+        tableReloadMeta.put("reloadJobId", msgInfo.getRight());
+        instanceMsgData.put(instance, tableReloadMeta);
+        // Store in ZK
+        try {
+          String segmentNames =
+              StringUtils.join(instanceToSegmentsMap.get(instance), SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
+          if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
+              msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
+            tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
+          } else {
+            tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
+            LOGGER.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
+                tableNameWithType, instance);
+          }
+        } catch (Exception e) {
+          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
+          LOGGER.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
+              tableNameWithType, instance, e);
+        }
+      }
+    }
+    return tableInstanceMsgData;
   }
 
   @DELETE
@@ -800,7 +894,8 @@ public class PinotSegmentRestletResource {
     return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableName);
   }
 
-  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments, String retentionPeriod) {
+  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
+      @Nullable String retentionPeriod) {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
         retentionPeriod);
     if (!response.isSuccessful()) {
@@ -857,7 +952,7 @@ public class PinotSegmentRestletResource {
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       Map<String, JsonNode> needReloadMetadata =
           tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType,
-              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000).getServerReloadJsonResponses();
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();
@@ -873,6 +968,31 @@ public class PinotSegmentRestletResource {
         tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);
       }
       return JsonUtils.objectToPrettyString(tableNeedReloadResponse);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+  }
+
+  @GET
+  @Path("segments/{tableNameWithType}/isStale")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Gets a list of segments that are stale from servers hosting the table",
+      notes = "Gets a list of segments that are stale from servers hosting the table")
+  public Map<String, TableStaleSegmentResponse> getStaleSegments(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    LOGGER.info("Received a request to check for segments requiring a refresh from all servers hosting segments for "
+        + "table {}", tableNameWithType);
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      return tableMetadataReader.getStaleSegments(tableNameWithType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
     } catch (IOException ioe) {
@@ -1057,6 +1177,156 @@ public class PinotSegmentRestletResource {
           Status.BAD_REQUEST);
     }
     return updateZKTimeIntervalInternal(tableNameWithType);
+  }
+
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/deleteSegmentsFromSequenceNum/{tableNameWithType}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DELETE_SEGMENT)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Delete segments from a pauseless enabled table", notes =
+      "Deletes segments from a pauseless-enabled table based on the provided segment names. "
+          + "For each segment provided, it identifies the partition and deletes all segments "
+          + "with sequence numbers >= the provided segment in that partition. "
+          + "When force flag is true, it bypasses checks for pauseless being enabled and table being paused. "
+          + "The retention period controls how long deleted segments are retained before permanent removal. "
+          + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
+          + "Use 0d or -1d for immediate deletion without retention.")
+  public SuccessResponse deleteSegmentsFromSequenceNum(
+      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "List of segment names. For each segment, all segments with higher sequence IDs in the same "
+          + "partition will be deleted", required = true, allowMultiple = true)
+      @QueryParam("segments") List<String> segments,
+      @ApiParam(value = "Force flag to bypass checks for pauseless being enabled and table being paused",
+          defaultValue = "false") @QueryParam("force") boolean force,
+      @Context HttpHeaders headers
+  ) {
+
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+
+    Preconditions.checkState(TableNameBuilder.isRealtimeTableResource(tableNameWithType),
+        "Table should be a realtime table.");
+
+    // Validate input segments
+    if (segments == null || segments.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Segment list must not be empty", Status.BAD_REQUEST);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+
+    if (!force) {
+      // Check if pauseless is enabled
+      Preconditions.checkState(PauselessConsumptionUtils.isPauselessEnabled(tableConfig),
+          "Pauseless is not enabled for the table " + tableNameWithType);
+      // Check if the ingestion has been paused
+      Preconditions.checkState(_pinotHelixResourceManager.getRealtimeSegmentManager()
+          .getPauseStatusDetails(tableNameWithType)
+          .getPauseFlag(), "Table " + tableNameWithType + " should be paused before deleting segments.");
+    }
+
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
+
+    Set<String> idealStateSegmentsSet = idealState.getRecord().getMapFields().keySet();
+    Map<Integer, LLCSegmentName> partitionToOldestSegment =
+        getPartitionIDToOldestSegment(segments, idealStateSegmentsSet);
+    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
+    Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
+        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
+            partitionIdToLatestSegment);
+    for (Integer partitionID : partitionToOldestSegment.keySet()) {
+      Set<String> segmentToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
+      LOGGER.info("Deleting : {} segments from segment: {} to segment: {} for partition: {}",
+          segmentToDeleteForPartition.size(), partitionToOldestSegment.get(partitionID),
+          partitionIdToLatestSegment.get(partitionID), partitionID);
+      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentToDeleteForPartition), null);
+    }
+
+    return new SuccessResponse("Successfully deleted segments for table: " + tableNameWithType);
+  }
+
+  /**
+   * Identifies segments that need to be deleted based on partition and sequence ID information.
+   *
+   * For each partition in the provided partitionToOldestSegment map, this method identifies
+   * all segments with sequence IDs greater than or equal to the oldest segment's sequence ID.
+   * It also tracks the latest segment (highest sequence ID) for each partition, which is useful
+   * for logging purposes.
+   *
+   * @param partitionToOldestSegment Map of partition IDs to their corresponding oldest segment (lowest sequence ID)
+   *                                that serves as the threshold for deletion. All segments with sequence IDs
+   *                                greater than or equal to this will be selected for deletion.
+   * @param idealStateSegmentsSet The segments present in the ideal state for the table
+   * @param partitionIdToLatestSegment A map that will be populated with the latest segment (highest sequence ID)
+   *                                  for each partition. This is passed by reference and modified by this method.
+   *
+   * @return A map from partition IDs to sets of segment names that should be deleted.
+   *         Each set contains all segments with sequence IDs >= the oldest segment's sequence ID
+   *         for that particular partition.
+   */
+  @VisibleForTesting
+  Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
+      Map<Integer, LLCSegmentName> partitionToOldestSegment,
+      Set<String> idealStateSegmentsSet, Map<Integer, LLCSegmentName> partitionIdToLatestSegment) {
+
+    // Find segments to delete (those with higher sequence numbers)
+    Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
+
+    for (String segmentName : idealStateSegmentsSet) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        LOGGER.info("Skip segment: {} not in low-level consumer format", segmentName);
+        continue;
+      }
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
+      if (oldestSegment == null) {
+        continue;
+      }
+
+      if (oldestSegment.getSequenceNumber() <= llcSegmentName.getSequenceNumber()) {
+        partitionToSegmentsToDelete
+            .computeIfAbsent(partitionId, k -> new HashSet<>())
+            .add(segmentName);
+      }
+
+      // Track latest segment (segment with highest sequence ID)
+      LLCSegmentName currentLatest = partitionIdToLatestSegment.get(partitionId);
+      if (currentLatest == null || llcSegmentName.getSequenceNumber() > currentLatest.getSequenceNumber()) {
+        partitionIdToLatestSegment.put(partitionId, llcSegmentName);
+      }
+    }
+
+    return partitionToSegmentsToDelete;
+  }
+
+  @VisibleForTesting
+  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments, Set<String> idealStateSegmentsSet) {
+    Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
+
+    for (String segment : segments) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      if (llcSegmentName == null) {
+        LOGGER.warn("Skip segment: {} not in low-level consumer format", segment);
+        continue;
+      }
+
+      // ignore segments that are not present in the ideal state
+      if (!idealStateSegmentsSet.contains(segment)) {
+        LOGGER.warn("Segment: {} is not present in the ideal state", segment);
+        continue;
+      }
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);
+      if (currentOldest == null || llcSegmentName.getSequenceNumber() < currentOldest.getSequenceNumber()) {
+        partitionToOldestSegment.put(partitionId, llcSegmentName);
+      }
+    }
+
+    return partitionToOldestSegment;
   }
 
   /**

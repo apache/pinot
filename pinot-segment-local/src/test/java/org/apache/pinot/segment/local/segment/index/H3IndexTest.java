@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
@@ -56,7 +57,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class H3IndexTest {
+public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "H3IndexCreatorTest");
   private static final Random RANDOM = new Random();
 
@@ -98,7 +99,7 @@ public class H3IndexTest {
           onHeapCreator.add(point);
           offHeapCreator.add(point);
           mutableH3Index.add(GeometrySerializer.serialize(point), -1, docId++);
-          long h3Id = H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+          long h3Id = H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
           expectedCardinalities.merge(h3Id, 1, Integer::sum);
         }
         onHeapCreator.seal();

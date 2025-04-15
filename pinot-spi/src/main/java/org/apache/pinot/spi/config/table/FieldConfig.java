@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -55,6 +54,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS = "luceneAnalyzerClassArgs";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES = "luceneAnalyzerClassArgTypes";
   public static final String TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS = "luceneQueryParserClass";
+  public static final String TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE = "luceneDocIdTranslatorMode";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS =
       "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS =
@@ -143,8 +143,12 @@ public class FieldConfig extends BaseJsonConfig {
     MV_ENTRY_DICT(false, true),
 
     // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a special
-    // handling for log lines (see {@link CLPForwardIndexCreatorV1})
-    CLP(false, false);
+    // handling for log lines (see {@link CLPForwardIndexCreatorV1} and {@link CLPForwardIndexCreatorV2)
+    CLP(false, false),
+    CLPV2(false, false),
+    CLPV2_ZSTD(false, false),
+    CLPV2_LZ4(false, false);
+
     //@formatter:on
 
     private final boolean _applicableToRawIndex;
@@ -175,7 +179,7 @@ public class FieldConfig extends BaseJsonConfig {
   @Nullable
   @Deprecated
   public IndexType getIndexType() {
-    return _indexTypes.size() > 0 ? _indexTypes.get(0) : null;
+    return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }
 
   public List<IndexType> getIndexTypes() {
@@ -206,7 +210,6 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public static class Builder {
-    @Nonnull
     private String _name;
     private EncodingType _encodingType;
     private List<IndexType> _indexTypes;
@@ -216,7 +219,7 @@ public class FieldConfig extends BaseJsonConfig {
     private TimestampConfig _timestampConfig;
     private JsonNode _tierOverwrites;
 
-    public Builder(@Nonnull String name) {
+    public Builder(String name) {
       _name = name;
     }
 

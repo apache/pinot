@@ -19,24 +19,47 @@
 package org.apache.pinot.query.runtime;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class MultiStageStatsTreeBuilder {
-  private final List<PlanNode> _planNodes;
+  private final Map<Integer, PlanNode> _planNodes;
   private final List<? extends MultiStageQueryStats.StageStats> _queryStats;
+  private final Map<Integer, DispatchablePlanFragment> _planFragments;
 
-  public MultiStageStatsTreeBuilder(List<PlanNode> planNodes,
+  public MultiStageStatsTreeBuilder(Map<Integer, DispatchablePlanFragment> planFragments,
       List<? extends MultiStageQueryStats.StageStats> queryStats) {
-    _planNodes = planNodes;
+    _planFragments = planFragments;
+    _planNodes = Maps.newHashMapWithExpectedSize(planFragments.size());
+    for (Map.Entry<Integer, DispatchablePlanFragment> entry : planFragments.entrySet()) {
+      _planNodes.put(entry.getKey(), entry.getValue().getPlanFragment().getFragmentRoot());
+    }
     _queryStats = queryStats;
   }
 
   public ObjectNode jsonStatsByStage(int stage) {
-    MultiStageQueryStats.StageStats stageStats = _queryStats.get(stage);
     PlanNode planNode = _planNodes.get(stage);
+
+    MultiStageQueryStats.StageStats stageStats = stage < _queryStats.size() ? _queryStats.get(stage) : null;
+    if (stageStats == null) {
+      // We don't have stats for this stage. This can happen when the stage is not executed. For example, when there
+      // are no segments for a table.
+      ObjectNode jsonNodes = JsonUtils.newObjectNode();
+      jsonNodes.put("type", "EMPTY_MAILBOX_SEND");
+      jsonNodes.put("stage", stage);
+      jsonNodes.put("description", "No stats available for this stage. They may have been pruned.");
+      String tableName = _planFragments.get(stage).getTableName();
+      if (tableName != null) {
+        jsonNodes.put("table", tableName);
+      }
+      return jsonNodes;
+    }
     InStageStatsTreeBuilder treeBuilder = new InStageStatsTreeBuilder(stageStats, this::jsonStatsByStage);
     return planNode.visit(treeBuilder, null);
   }

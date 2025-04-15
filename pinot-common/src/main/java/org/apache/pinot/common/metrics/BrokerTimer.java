@@ -29,7 +29,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
-  QUERY_TOTAL_TIME_MS(false),
+  QUERY_TOTAL_TIME_MS(true),
+
+  SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS(true),
 
   // The latency of sending the request from broker to server
   NETTY_CONNECTION_SEND_REQUEST_LATENCY(false),
@@ -51,7 +53,11 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   OFFLINE_TOTAL_CPU_TIME_NS(false),
   // aggregated total cpu time(thread + system activities + response serialization) in nanoseconds for query
   // processing from realtime servers
-  REALTIME_TOTAL_CPU_TIME_NS(false);
+  REALTIME_TOTAL_CPU_TIME_NS(false),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS(true),
+  // GRPC query execution time
+  GRPC_QUERY_EXECUTION_MS(true);
 
   private final String _timerName;
   private final boolean _global;

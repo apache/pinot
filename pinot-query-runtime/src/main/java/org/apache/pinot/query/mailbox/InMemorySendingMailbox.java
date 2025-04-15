@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +55,25 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(TransferableBlock block)
+  public boolean isLocal() {
+    return true;
+  }
+
+  @Override
+  public void send(MseBlock.Data data)
+      throws IOException, TimeoutException {
+    sendPrivate(data, Collections.emptyList());
+  }
+
+  @Override
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      throws IOException, TimeoutException {
+    sendPrivate(block, serializedStats);
+  }
+
+  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
       throws TimeoutException {
-    if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
+    if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       return;
     }
     if (_receivingMailbox == null) {
@@ -59,7 +81,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
     }
     _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, timeoutMs);
+    ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, serializedStats, timeoutMs);
 
     switch (status) {
       case SUCCESS:
@@ -67,9 +89,10 @@ public class InMemorySendingMailbox implements SendingMailbox {
       case CANCELLED:
         throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
       case ERROR:
-        throw new RuntimeException(String.format("Mailbox: %s already errored out (received error block before)", _id));
+        throw new QueryException(QueryErrorCode.INTERNAL, String.format(
+            "Mailbox: %s already errored out (received error block before)", _id));
       case TIMEOUT:
-        throw new TimeoutException(
+        throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
             String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
       case EARLY_TERMINATED:
         _isEarlyTerminated = true;
@@ -93,8 +116,9 @@ public class InMemorySendingMailbox implements SendingMailbox {
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
+    _receivingMailbox.setErrorBlock(
+        ErrorMseBlock.fromException(new QueryCancelledException(
+            "Cancelled by sender with exception: " + t.getMessage())), Collections.emptyList());
   }
 
   @Override
@@ -105,5 +129,10 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public boolean isTerminated() {
     return _isTerminated;
+  }
+
+  @Override
+  public String toString() {
+    return "m" + _id;
   }
 }

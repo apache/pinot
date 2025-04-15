@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,21 +33,37 @@ import org.slf4j.LoggerFactory;
  * This ensures that we take into account the history of the segment size and number rows
  */
 public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
-  public static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
-  private final SegmentFlushThresholdComputer _flushThresholdComputer;
+  private final SizeBasedSegmentFlushThresholdComputer _flushThresholdComputer;
+  private final String _realtimeTableName;
+  private final String _topicName;
 
-  public SegmentSizeBasedFlushThresholdUpdater() {
-    _flushThresholdComputer = new SegmentFlushThresholdComputer();
+  private final ControllerMetrics _controllerMetrics = ControllerMetrics.get();
+
+  public SegmentSizeBasedFlushThresholdUpdater(String realtimeTableName, String topicName) {
+    _flushThresholdComputer = new SizeBasedSegmentFlushThresholdComputer();
+    _realtimeTableName = realtimeTableName;
+    _topicName = topicName;
   }
 
-  // synchronized since this method could be called for multiple partitions of the same table in different threads
   @Override
-  public synchronized void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
+  public void onSegmentCommit(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
+      SegmentZKMetadata committingSegmentZKMetadata) {
+    long segmentSize = committingSegmentDescriptor.getSegmentSizeBytes();
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.COMMITTING_SEGMENT_SIZE, segmentSize);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.COMMITTING_SEGMENT_SIZE_WITH_TOPIC, segmentSize);
+
+    _flushThresholdComputer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+  }
+
+  @Override
+  public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
       int maxNumPartitionsPerInstance) {
-    int threshold =
-        _flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-            newSegmentZKMetadata.getSegmentName());
+    int threshold = _flushThresholdComputer.computeThreshold(streamConfig, newSegmentZKMetadata.getSegmentName());
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
+
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.NUM_ROWS_THRESHOLD, threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC, threshold);
   }
 }

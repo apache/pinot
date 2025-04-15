@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
@@ -40,7 +42,12 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -61,6 +68,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -76,10 +84,11 @@ public class DimensionTableDataManagerTest {
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
+  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
+      new SegmentAllIndexPreprocessThrottler(1, 2, true), new SegmentStarTreePreprocessThrottler(1, 2, true),
+      new SegmentDownloadThrottler(1, 2, true));
 
   private File _indexDir;
-  private IndexLoadingConfig _indexLoadingConfig;
-  private SegmentMetadata _segmentMetadata;
   private SegmentZKMetadata _segmentZKMetadata;
 
   @BeforeClass
@@ -110,10 +119,9 @@ public class DimensionTableDataManagerTest {
 
     String segmentName = driver.getSegmentName();
     _indexDir = new File(tableDataDir, segmentName);
-    _indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(_segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
   }
 
   @AfterClass
@@ -121,32 +129,52 @@ public class DimensionTableDataManagerTest {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private Schema getSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
-  }
-
   private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
     DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
-        .setDimensionTableConfig(dimensionTableConfig).build();
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("dimBaseballTeams")
+        .setDimensionTableConfig(dimensionTableConfig)
+        .build();
+  }
+
+  private Schema getSchema() {
+    return new Schema.SchemaBuilder()
+        .setSchemaName("dimBaseballTeams")
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .build();
   }
 
   private Schema getSchemaWithExtraColumn() {
     return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .addSingleValueDimension("teamCity", DataType.STRING).setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .addSingleValueDimension("teamCity", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
         .build();
   }
 
-  private DimensionTableDataManager makeTableDataManager(HelixManager helixManager) {
+  private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema)
+      throws IOException {
+    return makeTableDataManager(tableConfig, schema, mock(ZkHelixPropertyStore.class));
+  }
+
+  private DimensionTableDataManager makeTableDataManager(TableConfig tableConfig, Schema schema,
+      ZkHelixPropertyStore<ZNRecord> propertyStoreMock)
+      throws JsonProcessingException {
+    HelixManager helixManager = mock(HelixManager.class);
+    when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(tableConfig));
+    when(propertyStoreMock.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        SchemaUtils.toZNRecord(schema));
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableConfig tableConfig = getTableConfig(false, false);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
-    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, null, null);
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER);
     tableDataManager.start();
     return tableDataManager;
   }
@@ -154,12 +182,9 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testInstantiation()
       throws Exception {
-    HelixManager helixManager = mock(HelixManager.class);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(getSchema()));
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+    TableConfig tableConfig = getTableConfig(false, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
     assertEquals(tableDataManager.getTableName(), OFFLINE_TABLE_NAME);
 
     // fetch the same instance via static method
@@ -168,7 +193,8 @@ public class DimensionTableDataManagerTest {
     assertEquals(tableDataManager, returnedManager, "Manager should return already created instance");
 
     // assert that segments are released after loading data
-    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
     for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
       assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
           1, // Default ref count
@@ -185,12 +211,9 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookup()
       throws Exception {
-    HelixManager helixManager = mock(HelixManager.class);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(getSchema()));
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+    TableConfig tableConfig = getTableConfig(false, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
     // try fetching data BEFORE loading segment
     PrimaryKey key = new PrimaryKey(new String[]{"SF"});
@@ -200,7 +223,8 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupValue(key, "teamName"));
     assertNull(tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"}));
 
-    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -243,13 +267,12 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testReloadTable()
       throws Exception {
-    HelixManager helixManager = mock(HelixManager.class);
+    TableConfig tableConfig = getTableConfig(false, false);
+    Schema schema = getSchema();
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(getSchema()));
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
-    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema, propertyStore);
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     PrimaryKey key = new PrimaryKey(new String[]{"SF"});
@@ -270,8 +293,9 @@ public class DimensionTableDataManagerTest {
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(schemaWithExtraColumn));
-    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), _indexLoadingConfig, _segmentZKMetadata,
-        _segmentMetadata, schemaWithExtraColumn, false);
+    when(propertyStore.get("/SEGMENTS/dimBaseballTeams_OFFLINE/" + _segmentZKMetadata.getSegmentName(), null,
+        AccessOption.PERSISTENT)).thenReturn(_segmentZKMetadata.toZNRecord());
+    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), false);
 
     // Confirm the new column is available for lookup
     teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
@@ -292,21 +316,17 @@ public class DimensionTableDataManagerTest {
   @Test
   public void testLookupWithoutPreLoad()
       throws Exception {
-    HelixManager helixManager = mock(HelixManager.class);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(getSchema()));
-    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(getTableConfig(true, false)));
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+    TableConfig tableConfig = getTableConfig(true, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
     // try fetching data BEFORE loading segment
     PrimaryKey key = new PrimaryKey(new String[]{"SF"});
     assertFalse(tableDataManager.containsKey(key));
     assertNull(tableDataManager.lookupRow(key));
 
-    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -338,23 +358,39 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupRow(key));
   }
 
+  @DataProvider(name = "options")
+  private Object[] getOptions() {
+    return new Boolean[]{true, false};
+  }
+
+  @Test(dataProvider = "options")
+  public void testDeleteTableRemovesManagerFromMemory(boolean disablePreload)
+      throws Exception {
+    TableConfig tableConfig = getTableConfig(disablePreload, false);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
+
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER));
+
+    tableDataManager.shutDown();
+
+    Assert.assertNull(DimensionTableDataManager.getInstanceByTableName(tableDataManager.getTableName()));
+  }
+
   @Test
   public void testLookupErrorOnDuplicatePrimaryKey()
       throws Exception {
-    HelixManager helixManager = mock(HelixManager.class);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(getSchema()));
-    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(getTableConfig(false, true)));
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+    TableConfig tableConfig = getTableConfig(false, true);
+    Schema schema = getSchema();
+    DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
     // try fetching data BEFORE loading segment
     assertFalse(tableDataManager.containsKey(new PrimaryKey(new String[]{"SF"})));
 
     try {
-      tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
+      tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
+          SEGMENT_OPERATIONS_THROTTLER));
       fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;

@@ -29,15 +29,19 @@ public class HttpClientConfig {
   protected static final String MAX_CONNS_CONFIG_NAME = "http.client.maxConnTotal";
   protected static final String MAX_CONNS_PER_ROUTE_CONFIG_NAME = "http.client.maxConnPerRoute";
   protected static final String DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME = "http.client.disableDefaultUserAgent";
+  protected static final String CONNECTION_TIMEOUT = "http.client.connectionTimeoutMs";
 
   private final int _maxConnTotal;
   private final int _maxConnPerRoute;
   private final boolean _disableDefaultUserAgent;
+  private final int _connectionTimeoutMs;
 
-  private HttpClientConfig(int maxConnTotal, int maxConnPerRoute, boolean disableDefaultUserAgent) {
+  private HttpClientConfig(int maxConnTotal, int maxConnPerRoute, boolean disableDefaultUserAgent,
+      int connectionTimeout) {
     _maxConnTotal = maxConnTotal;
     _maxConnPerRoute = maxConnPerRoute;
     _disableDefaultUserAgent = disableDefaultUserAgent;
+    _connectionTimeoutMs = connectionTimeout;
   }
 
   public int getMaxConnTotal() {
@@ -50,6 +54,10 @@ public class HttpClientConfig {
 
   public boolean isDisableDefaultUserAgent() {
     return _disableDefaultUserAgent;
+  }
+
+  public int getConnectionTimeoutMs() {
+    return _connectionTimeoutMs;
   }
 
   /**
@@ -68,6 +76,10 @@ public class HttpClientConfig {
     if (StringUtils.isNotEmpty(maxConnsPerRoute)) {
       builder.withMaxConnsPerRoute(Integer.parseInt(maxConnsPerRoute));
     }
+    String connectionTimeout = pinotConfiguration.getProperty(CONNECTION_TIMEOUT);
+    if (StringUtils.isNotEmpty(connectionTimeout)) {
+      builder.withConnectionTimeoutMs(Integer.parseInt(connectionTimeout));
+    }
     boolean disableDefaultUserAgent = pinotConfiguration.getProperty(DISABLE_DEFAULT_USER_AGENT_CONFIG_NAME, false);
     builder.withDisableDefaultUserAgent(disableDefaultUserAgent);
     return builder;
@@ -81,6 +93,7 @@ public class HttpClientConfig {
     private int _maxConns = -1;
     private int _maxConnsPerRoute = -1;
     private boolean _disableDefaultUserAgent = false;
+    private int _connectionTimeoutMs = -1;
 
     private Builder() {
     }
@@ -100,8 +113,13 @@ public class HttpClientConfig {
       return this;
     }
 
+    public Builder withConnectionTimeoutMs(int connectionTimeout) {
+      _connectionTimeoutMs = connectionTimeout;
+      return this;
+    }
+
     public HttpClientConfig build() {
-      return new HttpClientConfig(_maxConns, _maxConnsPerRoute, _disableDefaultUserAgent);
+      return new HttpClientConfig(_maxConns, _maxConnsPerRoute, _disableDefaultUserAgent, _connectionTimeoutMs);
     }
   }
 }

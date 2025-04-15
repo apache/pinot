@@ -29,13 +29,16 @@ import org.apache.pinot.spi.config.table.Intern;
 
 
 public class DictionaryIndexConfig extends IndexConfig {
-
-  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false, false, Intern.DISABLED);
-  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true, false, false, Intern.DISABLED);
+  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false);
+  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true);
 
   private final boolean _onHeap;
   private final boolean _useVarLengthDictionary;
   private final Intern _intern;
+
+  public DictionaryIndexConfig(Boolean disabled) {
+    this(disabled, false, false, null);
+  }
 
   public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
     this(onHeap, useVarLengthDictionary, null);
@@ -43,6 +46,13 @@ public class DictionaryIndexConfig extends IndexConfig {
 
   public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary, Intern intern) {
     this(false, onHeap, useVarLengthDictionary, intern);
+  }
+
+  /**
+   * Constructor for patching an existing config, but overrides the useVarLengthDictionary property with the input
+   */
+  public DictionaryIndexConfig(DictionaryIndexConfig base, boolean useVarLengthDictionary) {
+    this(base.isEnabled(), base.isOnHeap(), useVarLengthDictionary, base.getIntern());
   }
 
   @JsonCreator
@@ -61,10 +71,6 @@ public class DictionaryIndexConfig extends IndexConfig {
     _onHeap = onHeap != null && onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
     _intern = intern;
-  }
-
-  public static DictionaryIndexConfig disabled() {
-    return DISABLED;
   }
 
   public boolean isOnHeap() {

@@ -31,10 +31,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
@@ -45,15 +45,11 @@ import picocli.CommandLine;
 /**
  * Class for command to stream Avro data into Kafka.
  */
-@CommandLine.Command(name = "StreamAvroIntoKafka")
+@CommandLine.Command(name = "StreamAvroIntoKafka", mixinStandardHelpOptions = true)
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
   @CommandLine.Option(names = {"-avroFile"}, required = true, description = "Avro file to stream.")
   private String _avroFile = null;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @CommandLine.Option(names = {"-kafkaBrokerList"}, required = false, description = "Kafka broker list.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
@@ -71,11 +67,6 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @CommandLine.Option(names = {"-millisBetweenMessages"}, required = false,
       description = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -143,7 +134,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
             break;
         }
         // Write the message to Kafka
-        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
+        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(MurmurHashFunctions.murmurHash2Bit64(bytes)), bytes);
 
         // Sleep between messages
         if (sleepRequired) {

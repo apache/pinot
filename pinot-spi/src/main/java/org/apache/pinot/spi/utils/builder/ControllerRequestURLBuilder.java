@@ -118,7 +118,7 @@ public class ControllerRequestURLBuilder {
     if (StringUtils.isNotBlank(username)) {
       params.append("?component=" + componentTypeStr);
     }
-    params.append(String.format("&&passwordChanged=%s", passwordChanged));
+    params.append("&&passwordChanged=" + passwordChanged);
     return StringUtil.join("/", _baseUrl, "users", username, params.toString());
   }
 
@@ -174,6 +174,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenant) + "?type=" + tenantType + "&state=" + state;
   }
 
+  public String forToggleTableState(String tableName, TableType type, boolean enable) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "state") + "?type=" + type
+        + "&state=" + (enable ? "enable" : "disable");
+  }
+
   public String forLiveBrokerTablesGet() {
     return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
   }
@@ -206,24 +211,13 @@ public class ControllerRequestURLBuilder {
 
   public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
-    StringBuilder stringBuilder =
-        new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
-    if (dryRun) {
-      stringBuilder.append("&dryRun=").append(dryRun);
-    }
-    if (reassignInstances) {
-      stringBuilder.append("&reassignInstances=").append(reassignInstances);
-    }
-    if (includeConsuming) {
-      stringBuilder.append("&includeConsuming=").append(includeConsuming);
-    }
-    if (downtime) {
-      stringBuilder.append("&downtime=").append(downtime);
-    }
-    if (minAvailableReplicas != 1) {
-      stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
-    }
-    return stringBuilder.toString();
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance")
+        + "?type=" + tableType
+        + "&dryRun=" + dryRun
+        + "&reassignInstances=" + reassignInstances
+        + "&includeConsuming=" + includeConsuming
+        + "&downtime=" + downtime
+        + "&minAvailableReplicas=" + minAvailableReplicas;
   }
 
   public String forTableForceCommit(String tableName) {
@@ -235,13 +229,17 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
-    String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
+    String query = "reload?type=" + tableType.name() + "&forceDownload=" + forceDownload;
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
   public String forTableNeedReload(String tableNameWithType, boolean verbose) {
-    String query = String.format("needReload?verbose=%s", verbose);
+    String query = "needReload?verbose=" + verbose;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
+  }
+
+  public String forStaleSegments(String tableNameWithType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "isStale");
   }
 
   public String forTableRebalanceStatus(String jobId) {
@@ -249,7 +247,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReset(String tableNameWithType, @Nullable String targetInstance) {
-    String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
+    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
@@ -278,7 +276,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableDelete(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableDelete(tableName, null);
+  }
+
+  public String forTableDelete(String tableName, String retention) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (retention != null) {
+      url += "?retention=" + retention;
+    }
+    return url;
   }
 
   public String forTableView(String tableName, String view, @Nullable String tableType) {
@@ -372,7 +378,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentReset(String tableNameWithType, String segmentName, String targetInstance) {
-    String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
+    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, encode(segmentName), query);
   }
 
@@ -425,6 +431,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
+  public String forServersToSegmentsMap(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "servers?type=" + tableType);
+  }
+
   public String forSegmentListAPI(String tableName) {
     return forSegmentListAPI(tableName, null, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
@@ -465,7 +475,7 @@ public class ControllerRequestURLBuilder {
       long endTimeInMilliSeconds) {
     StringBuilder url = new StringBuilder();
     url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
-        String.format("choose?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
+        "choose?startTimestamp=" + startTimeInMilliSeconds + "&endTimestamp=" + endTimeInMilliSeconds));
     return url.toString();
   }
 
@@ -522,28 +532,26 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr) {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
-        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8));
+    return StringUtil.join("/", _baseUrl, "ingestFromFile") + "?tableNameWithType=" + tableNameWithType
+        + "&batchConfigMapStr=" + URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8);
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap) {
     String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+        batchConfigMap.entrySet().stream().map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromFile(tableNameWithType, batchConfigMapStr);
   }
 
   public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr) {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s&sourceURIStr=%s",
-        StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8),
-        URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8));
+    return StringUtil.join("/", _baseUrl, "ingestFromURI") + "?tableNameWithType=" + tableNameWithType
+        + "&batchConfigMapStr=" + URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8) + "&sourceURIStr="
+        + URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8);
   }
 
   public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr) {
     String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+        batchConfigMap.entrySet().stream().map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
   }
@@ -598,7 +606,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forUpdateTagsValidation() {
-    return String.format("%s/instances/updateTags/validate", _baseUrl);
+    return _baseUrl + "/instances/updateTags/validate";
   }
 
   private static String encode(String s) {
@@ -607,5 +615,17 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentUpload() {
     return StringUtil.join("/", _baseUrl, "v2/segments");
+  }
+
+  public String forCancelQueryByClientId(String clientRequestId) {
+    return StringUtil.join("/", _baseUrl, "clientQuery", clientRequestId);
+  }
+
+  public String forExternalView(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
+
+  public String forIdealState(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "idealstate");
   }
 }

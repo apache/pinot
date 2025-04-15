@@ -32,6 +32,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -186,7 +187,7 @@ public class Tracing {
 
     @Override
     public void clear() {
-      _anchorThread.set(null);
+      _anchorThread.remove();
     }
 
     @Override
@@ -279,24 +280,20 @@ public class Tracing {
     /**
      * Setup metadata of query worker threads. This function assumes that the workers are for Single Stage Engine.
      * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
-     * @param threadResourceUsageProvider Object that measures resource usage.
      * @param threadExecutionContext Context holds metadata about the query.
      */
-    public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
-        ThreadExecutionContext threadExecutionContext) {
-      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
+    public static void setupWorker(int taskId, ThreadExecutionContext threadExecutionContext) {
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadExecutionContext);
     }
 
     /**
      * Setup metadata of query worker threads.
      * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
-     * @param threadResourceUsageProvider Object that measures resource usage.
      * @param threadExecutionContext Context holds metadata about the query.
      */
     public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-        ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
+      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       String queryId = null;
       if (threadExecutionContext != null) {
         queryId = threadExecutionContext.getQueryId();
@@ -319,7 +316,8 @@ public class Tracing {
       Tracing.getThreadAccountant().clear();
     }
 
-    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId) {
+    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       if (factoryName == null) {
         LOGGER.warn("No thread accountant factory provided, using default implementation");
@@ -328,7 +326,7 @@ public class Tracing {
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId));
+          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId, instanceType));
           LOGGER.info("Using accountant provided by {}", factoryName);
           if (!registered) {
             LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);

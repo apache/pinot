@@ -55,12 +55,15 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -113,6 +116,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String SCHEMA_PATH = "/schemas";
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";
+  private static final String REINGESTED_SEGMENT_UPLOAD_PATH = "/segments/reingested";
   private static final String BATCH_SEGMENT_UPLOAD_PATH = "/segments/batchUpload";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "type=";
@@ -364,6 +368,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
+  }
+
+  public static URI getReingestedSegmentUploadURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        REINGESTED_SEGMENT_UPLOAD_PATH);
   }
 
   public static URI getBatchSegmentUploadURI(URI controllerURI)
@@ -964,6 +974,56 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
+   * @param uri The uri to ask servers to upload segment to segment store
+   * @return {@link TableLLCSegmentUploadResponse} - segment download url, crc, other metadata
+   * @throws URISyntaxException
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    // sendRequest checks the response status code
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    TableLLCSegmentUploadResponse tableLLCSegmentUploadResponse = JsonUtils.stringToObject(response.getResponse(),
+        TableLLCSegmentUploadResponse.class);
+    if (tableLLCSegmentUploadResponse.getDownloadUrl() == null
+        || tableLLCSegmentUploadResponse.getDownloadUrl().isEmpty()) {
+      throw new HttpErrorStatusException(
+          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri), response.getStatusCode());
+    }
+    return tableLLCSegmentUploadResponse;
+  }
+
+  /**
+   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
+   * @param uri The uri to ask servers to upload segment to segment store
+   * @return {@link SegmentZKMetadata} - segment download url, crc, other metadata
+   * @throws URISyntaxException
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    // sendRequest checks the response status code
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    SegmentZKMetadata segmentZKMetadata = SegmentZKMetadata.fromJsonString(response.getResponse());
+    if (StringUtils.isEmpty(segmentZKMetadata.getDownloadUrl())) {
+      throw new HttpErrorStatusException(
+          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri), response.getStatusCode());
+    }
+    return segmentZKMetadata;
+  }
+
+  /**
    * Send segment uri.
    *
    * Note: table name has to be set as a parameter.
@@ -1202,6 +1262,25 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @param connectionRequestTimeoutMs Connection request timeout in milliseconds
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadFile(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders);
+  }
+
+  /**
    * Download and untar a file in a streamed way with rate limit
    *
    * @param uri URI
@@ -1222,6 +1301,26 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download and untar a file in a streamed way with rate limit
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth token
+   * @param httpHeaders http headers
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      long maxStreamRateInByte, int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadUntarFileStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider,
+        httpHeaders, maxStreamRateInByte);
+  }
+
+  /**
    * Generate a param list with a table name attribute.
    *
    * @param tableName table name
@@ -1235,6 +1334,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
       tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name()));
     }
     return tableParams;
+  }
+
+  public static NameValuePair makeParallelProtectionParam(PushJobSpec jobSpec) {
+    String enableParallelProtection = jobSpec.getPushParallelism() > 1 ? "true" : "false";
+    NameValuePair parallelProtectionParam =
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+            enableParallelProtection);
+    return parallelProtectionParam;
   }
 
   @Override

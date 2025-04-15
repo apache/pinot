@@ -37,6 +37,7 @@ public final class BasicAuthUtils {
   private static final String PASSWORD = "password";
   private static final String PERMISSIONS = "permissions";
   private static final String TABLES = "tables";
+  private static final String EXCLUDE_TABLES = "excludeTables";
   private static final String ALL = "*";
 
   private BasicAuthUtils() {
@@ -68,14 +69,15 @@ public final class BasicAuthUtils {
       String name = rawName.trim();
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
 
-      String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
+      String password = configuration.getProperty(prefix + "." + name + "." + PASSWORD);
       Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
 
-      Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
-      Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
+      Set<String> tables = extractSet(configuration, prefix + "." + name + "." + TABLES);
+      Set<String> excludeTables = extractSet(configuration, prefix + "." + name + "." + EXCLUDE_TABLES);
+      Set<String> permissions = extractSet(configuration, prefix + "." + name + "." + PERMISSIONS);
 
       return new BasicAuthPrincipal(name, org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password),
-          tables, permissions);
+          tables, excludeTables, permissions);
     }).collect(Collectors.toList());
   }
 
@@ -92,13 +94,16 @@ public final class BasicAuthUtils {
           Set<String> tables = Optional.ofNullable(user.getTables())
               .orElseGet(() -> Collections.emptyList())
               .stream().collect(Collectors.toSet());
+          Set<String> excludeTables = Optional.ofNullable(user.getExcludeTables())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().collect(Collectors.toSet());
           Set<String> permissions = Optional.ofNullable(user.getPermissios())
               .orElseGet(() -> Collections.emptyList())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
           return new ZkBasicAuthPrincipal(name,
               org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password,
-              component, role, tables, permissions);
+              component, role, tables, excludeTables, permissions);
         }).collect(Collectors.toList());
   }
 

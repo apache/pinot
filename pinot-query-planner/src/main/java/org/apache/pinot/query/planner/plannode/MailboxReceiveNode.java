@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -28,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class MailboxReceiveNode extends BasePlanNode {
-  private final int _senderStageId;
+  private int _senderStageId;
   private final PinotRelExchangeType _exchangeType;
   private RelDistribution.Type _distributionType;
   private final List<Integer> _keys;
@@ -37,14 +38,14 @@ public class MailboxReceiveNode extends BasePlanNode {
   private final boolean _sortedOnSender;
 
   // NOTE: This is only available during query planning, and should not be serialized.
-  private final transient MailboxSendNode _sender;
+  private transient MailboxSendNode _sender;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
-  public MailboxReceiveNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, int senderStageId,
+  public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
       PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
       @Nullable List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender,
       @Nullable MailboxSendNode sender) {
-    super(stageId, dataSchema, null, inputs);
+    super(stageId, dataSchema, null, List.of());
     _senderStageId = senderStageId;
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -56,6 +57,8 @@ public class MailboxReceiveNode extends BasePlanNode {
   }
 
   public int getSenderStageId() {
+    assert _sender == null || _sender.getStageId() == _senderStageId
+        : "_senderStageId should match _sender.getStageId()";
     return _senderStageId;
   }
 
@@ -92,6 +95,11 @@ public class MailboxReceiveNode extends BasePlanNode {
     return _sender;
   }
 
+  public void setSender(MailboxSendNode sender) {
+    _senderStageId = sender.getStageId();
+    _sender = sender;
+  }
+
   @Override
   public String explain() {
     return "MAIL_RECEIVE(" + _distributionType + ")";
@@ -104,8 +112,13 @@ public class MailboxReceiveNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new MailboxReceiveNode(_stageId, _dataSchema, inputs, _senderStageId, _exchangeType, _distributionType,
-        _keys, _collations, _sort, _sortedOnSender, _sender);
+    Preconditions.checkArgument(inputs.isEmpty(), "Cannot set inputs for MailboxReceiveNode");
+    return this;
+  }
+
+  public MailboxReceiveNode withSender(MailboxSendNode sender) {
+    return new MailboxReceiveNode(_stageId, _dataSchema, _senderStageId, _exchangeType, _distributionType, _keys,
+        _collations, _sort, _sortedOnSender, sender);
   }
 
   @Override

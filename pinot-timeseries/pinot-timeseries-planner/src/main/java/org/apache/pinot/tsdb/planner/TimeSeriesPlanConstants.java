@@ -32,6 +32,7 @@ public class TimeSeriesPlanConstants {
     public static final String START_TIME_SECONDS = "startTimeSeconds";
     public static final String WINDOW_SECONDS = "windowSeconds";
     public static final String NUM_ELEMENTS = "numElements";
+    public static final String DEADLINE_MS = "deadlineMs";
 
     public static boolean isKeySegmentList(String key) {
       return key.startsWith(SEGMENT_MAP_ENTRY_PREFIX);
@@ -50,6 +51,7 @@ public class TimeSeriesPlanConstants {
   }
 
   public static class WorkerResponseMetadataKeys {
+    public static final String PLAN_ID = "planId";
     public static final String ERROR_TYPE = "errorType";
     public static final String ERROR_MESSAGE = "error";
   }

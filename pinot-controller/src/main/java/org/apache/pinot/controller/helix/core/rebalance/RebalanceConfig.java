@@ -34,6 +34,12 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _dryRun = false;
 
+  // Whether to perform pre-checks for rebalance. This only returns the status of each pre-check and does not fail
+  // rebalance
+  @JsonProperty("preChecks")
+  @ApiModelProperty(example = "false")
+  private boolean _preChecks = false;
+
   // Whether to reassign instances before reassigning segments
   @JsonProperty("reassignInstances")
   @ApiModelProperty(example = "false")
@@ -77,6 +83,18 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
 
+  // Whether to run Minimal Data Movement Algorithm, overriding the minimizeDataMovement flag in table config. If set
+  // to default, the minimizeDataMovement flag in table config will be used to determine whether to run the Minimal
+  // Data Movement Algorithm.
+  @ApiModel
+  public enum MinimizeDataMovementOptions {
+    ENABLE, DISABLE, DEFAULT
+  }
+
+  @JsonProperty("minimizeDataMovement")
+  @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
+  private MinimizeDataMovementOptions _minimizeDataMovement = MinimizeDataMovementOptions.ENABLE;
+
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
   // check less frequently and bail out sooner to rebalance at best effort if configured so.
@@ -116,6 +134,14 @@ public class RebalanceConfig {
 
   public void setDryRun(boolean dryRun) {
     _dryRun = dryRun;
+  }
+
+  public boolean isPreChecks() {
+    return _preChecks;
+  }
+
+  public void setPreChecks(boolean preChecks) {
+    _preChecks = preChecks;
   }
 
   public boolean isReassignInstances() {
@@ -230,21 +256,30 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
+  public MinimizeDataMovementOptions getMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
+
+  public void setMinimizeDataMovement(MinimizeDataMovementOptions minimizeDataMovement) {
+    _minimizeDataMovement = minimizeDataMovement;
+  }
+
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
-        + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
-        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
-        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
-        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
-        + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
-        + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
-        + _retryInitialDelayInMs + '}';
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
+        + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
+        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs="
+        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
+        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
+        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
+        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
+    rc._preChecks = cfg._preChecks;
     rc._reassignInstances = cfg._reassignInstances;
     rc._includeConsuming = cfg._includeConsuming;
     rc._bootstrap = cfg._bootstrap;

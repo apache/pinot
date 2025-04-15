@@ -28,8 +28,10 @@ declare module 'Models' {
     customRenderer: JSX.Element
   }
 
+  export type MapRecord = Record<string, unknown>
+
   export type TableData = {
-    records: Array<Array<string | number | boolean | SegmentStatus | LoadingRecord>>;
+    records: Array<Array<string | number | boolean | MapRecord | SegmentStatus | LoadingRecord>>;
     columns: Array<string>;
     error?: string;
     isLoading? : boolean
@@ -130,6 +132,7 @@ declare module 'Models' {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
     dateTimeFieldSpecs?: Array<schema>;
+    complexFieldSpecs?: Array<schema>,
     error?: string;
     code?: number;
   };
@@ -145,6 +148,7 @@ declare module 'Models' {
     numDimensionFields: number
     numDateTimeFields: number
     numMetricFields: number
+    numComplexFields: number
   };
 
   export type SQLResult = {
@@ -167,6 +171,7 @@ declare module 'Models' {
     numEntriesScannedInFilter: number
     numEntriesScannedPostFilter: number
     numGroupsLimitReached: boolean
+    numGroupsWarningLimitReached: boolean
     partialResponse?: number
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number

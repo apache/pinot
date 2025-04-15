@@ -23,15 +23,18 @@ import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -62,7 +65,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class PercentileKLLAggregationFunction
     extends NullableSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
-  protected static final int DEFAULT_K_VALUE = 200;
 
   protected final double _percentile;
   protected int _kValue;
@@ -79,7 +81,9 @@ public class PercentileKLLAggregationFunction
     Preconditions.checkArgument(_percentile >= 0 && _percentile <= 100,
         "Percentile value needs to be in range 0-100, inclusive");
 
-    _kValue = numArguments == 3 ? arguments.get(2).getLiteral().getIntValue() : DEFAULT_K_VALUE;
+    _kValue = (numArguments == 3)
+        ? arguments.get(2).getLiteral().getIntValue()
+        : CommonConstants.Helix.DEFAULT_KLL_SKETCH_K;
   }
 
   @Override
@@ -239,6 +243,17 @@ public class PercentileKLLAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(KllDoublesSketch kllDoublesSketch) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.KllDataSketch.getValue(),
+        ObjectSerDeUtils.KLL_SKETCH_SER_DE.serialize(kllDoublesSketch));
+  }
+
+  @Override
+  public KllDoublesSketch deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

@@ -72,6 +72,7 @@ public class Actions {
     public static final String GET_USER = "GetUser";
     public static final String GET_VERSION = "GetVersion";
     public static final String GET_ZNODE = "GetZnode";
+    public static final String GET_APPLICATION_QUERY_QUOTA = "GetApplicationQueryQuota";
     public static final String GET_DATABASE_QUOTA = "GetDatabaseQuota";
     public static final String GET_DATABASE_QUERY_QUOTA = "GetDatabaseQueryQuota";
     public static final String INGEST_FILE = "IngestFile";
@@ -91,10 +92,15 @@ public class Actions {
     public static final String UPDATE_TIME_INTERVAL = "UpdateTimeInterval";
     public static final String UPDATE_USER = "UpdateUser";
     public static final String UPDATE_DATABASE_QUOTA = "UpdateDatabaseQuota";
+    public static final String UPDATE_APPLICATION_QUOTA = "UpdateApplicationQuota";
     public static final String UPDATE_ZNODE = "UpdateZnode";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
+    public static final String GET_RESPONSE_STORE = "GetResponseStore";
+    public static final String DELETE_RESPONSE_STORE = "DeleteResponseStore";
+    public static final String GET_GROOVY_STATIC_ANALYZER_CONFIG = "GetGroovyStaticAnalyzerConfig";
+    public static final String UPDATE_GROOVY_STATIC_ANALYZER_CONFIG = "UpdateGroovyStaticAnalyzerConfig";
   }
 
   // Action names for table

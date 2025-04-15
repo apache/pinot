@@ -23,8 +23,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
@@ -37,6 +35,9 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,11 +82,12 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
             _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
-          LOGGER.error("Timed out while polling results block (query: {})", _queryContext);
-          return new ExceptionResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-              new TimeoutException("Timed out while polling results block")));
+          String userMsg = "Timed out while polling results block";
+          String logMsg = userMsg + " (query: " + _queryContext + ")";
+          LOGGER.error(logMsg);
+          return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.EXECUTION_TIMEOUT, userMsg, logMsg));
         }
-        if (resultsBlock.getProcessingExceptions() != null) {
+        if (resultsBlock.getErrorMessages() != null) {
           // Caught exception while processing segment, skip streaming the remaining results blocks and directly return
           // the exception
           return resultsBlock;
@@ -101,8 +103,10 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
       } catch (InterruptedException e) {
         throw new EarlyTerminationException("Interrupted while streaming results blocks", e);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while streaming results blocks (query: {})", _queryContext, e);
-        return new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+        String userMsg = "Caught exception while streaming results block";
+        String logMsg = userMsg + " (query: " + _queryContext + ")";
+        LOGGER.error(logMsg, e);
+        return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.INTERNAL, userMsg, logMsg));
       }
     }
     // Setting the execution stats for the final return
@@ -142,6 +146,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
             }
           }
         }
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -169,7 +175,13 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     _processingException.compareAndSet(null, t);
     // Clear the blocking queue and add the exception results block to terminate the main thread
     _blockingQueue.clear();
-    _blockingQueue.offer(new ExceptionResultsBlock(t));
+    QueryErrorMessage errorMsg;
+    if (t instanceof QueryException) {
+      errorMsg = QueryErrorMessage.safeMsg(((QueryException) t).getErrorCode(), t.getMessage());
+    } else {
+      errorMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());
+    }
+    _blockingQueue.offer(new ExceptionResultsBlock(errorMsg));
   }
 
   @Override

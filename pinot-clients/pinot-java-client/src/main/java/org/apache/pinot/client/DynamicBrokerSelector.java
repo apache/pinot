@@ -47,18 +47,26 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   protected final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
   protected final ZkClient _zkClient;
   protected final ExternalViewReader _evReader;
-  //The preferTlsPort will be mapped to client config in the future, when we support full TLS
+
+  public DynamicBrokerSelector(String zkServers) {
+    this(zkServers, false);
+  }
+
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
+    this(zkServers, preferTlsPort, false);
+  }
+
+  //The preferTlsPort will be mapped to client config in the future, when we support full TLS
+  public DynamicBrokerSelector(String zkServers, boolean preferTlsPort, boolean useGrpcPort) {
     _zkClient = getZkClient(zkServers);
     _zkClient.setZkSerializer(new BytesPushThroughSerializer());
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
-    _evReader = getEvReader(_zkClient, preferTlsPort);
+    _evReader = getEvReader(_zkClient, preferTlsPort, useGrpcPort);
     refresh();
   }
-  public DynamicBrokerSelector(String zkServers) {
-    this(zkServers, false);
-  }
+
+
 
   @VisibleForTesting
   protected ZkClient getZkClient(String zkServers) {
@@ -73,6 +81,11 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @VisibleForTesting
   protected ExternalViewReader getEvReader(ZkClient zkClient, boolean preferTlsPort) {
     return new ExternalViewReader(zkClient, preferTlsPort);
+  }
+
+  @VisibleForTesting
+  protected ExternalViewReader getEvReader(ZkClient zkClient, boolean preferTlsPort, boolean useGrpcPort) {
+    return new ExternalViewReader(zkClient, preferTlsPort, useGrpcPort);
   }
 
   private void refresh() {
@@ -91,10 +104,10 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   public String selectBroker(String... tableNames) {
     if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
-      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+      String randomBroker = BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
-      if (list != null && !list.isEmpty()) {
-        return list.get(ThreadLocalRandom.current().nextInt(list.size()));
+      if (randomBroker != null) {
+        return randomBroker;
       }
     }
 

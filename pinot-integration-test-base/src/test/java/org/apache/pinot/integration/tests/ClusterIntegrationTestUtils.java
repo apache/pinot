@@ -61,7 +61,6 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.PinotQuery;
@@ -76,6 +75,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -138,8 +138,7 @@ public class ClusterIntegrationTestUtils {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
-            Assert.fail(
-                String.format("Unsupported UNION Avro field: %s with underlying types: %s", fieldName, typesInUnion));
+            Assert.fail("Unsupported UNION Avro field: " + fieldName + " with underlying types: " + typesInUnion);
             break;
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
@@ -151,21 +150,21 @@ public class ClusterIntegrationTestUtils {
             if (isSingleValueAvroFieldType(fieldType)) {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false));
             } else {
-              Assert.fail(String.format("Unsupported Avro field: %s with underlying types: %s", fieldName, fieldType));
+              Assert.fail("Unsupported Avro field: " + fieldName + " with underlying types: " + fieldType);
             }
             break;
         }
       }
 
-      h2Connection.prepareCall(String.format("DROP TABLE IF EXISTS %s", tableName)).execute();
+      h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
       String columnsStr = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
-      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)", tableName, columnsStr)).execute();
+      h2Connection.prepareCall("CREATE TABLE " + tableName + " (" + columnsStr + ")").execute();
     }
 
     // Insert Avro records into H2 table
     String params = "?" + StringUtils.repeat(",?", h2FieldNameAndTypes.size() - 1);
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement(String.format("INSERT INTO %s VALUES (%s)", tableName, params));
+        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -216,7 +215,7 @@ public class ClusterIntegrationTestUtils {
       Assert.assertTrue(isSingleValueAvroFieldType(type1));
       return type1;
     }
-    Assert.fail(String.format("Unsupported UNION Avro field with underlying types: %s, %s", type1, type2));
+    Assert.fail("Unsupported UNION Avro field with underlying types: " + type1 + ", " + type2);
     return null;
   }
 
@@ -270,12 +269,12 @@ public class ClusterIntegrationTestUtils {
     }
     // if column is array data type, add Array with size.
     if (arrayType) {
-      h2FieldType = String.format("%s  ARRAY[%d]", h2FieldType, MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
+      h2FieldType = h2FieldType + "  ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
     }
     if (nullable) {
-      return String.format("`%s` %s", fieldName, h2FieldType);
+      return "`" + fieldName + "` " + h2FieldType;
     } else {
-      return String.format("`%s` %s not null", fieldName, h2FieldType);
+      return "`" + fieldName + "` " + h2FieldType + " not null";
     }
   }
 
@@ -343,8 +342,15 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
       throws Exception {
+    buildSegmentFromFile(avroFile, tableConfig, schema, segmentNamePostfix, segmentDir, tarDir, FileFormat.AVRO);
+  }
+
+  public static void buildSegmentFromFile(File file, TableConfig tableConfig, org.apache.pinot.spi.data.Schema schema,
+      String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setFormat(fileFormat);
+    segmentGeneratorConfig.setInputFilePath(file.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
@@ -361,16 +367,32 @@ public class ClusterIntegrationTestUtils {
     TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
   }
 
+  public static StreamDataProducer getKafkaProducer(String kafkaBroker)
+      throws Exception {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
+    return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+  }
+
   /**
-   * Push the records from the given Avro files into a Kafka stream.
-   *
-   * @param csvFile CSV File name
-   * @param kafkaTopic Kafka topic
-   * @param partitionColumnIndex Optional Index of the partition column
-   * @throws Exception
+   * Push the records from the given CSV file into a Kafka stream.
    */
-  public static void pushCsvIntoKafka(File csvFile, String kafkaTopic,
-      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+  public static void pushCsvIntoKafka(File csvFile, String kafkaBroker, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones)
+      throws Exception {
+    try (StreamDataProducer producer = getKafkaProducer(kafkaBroker)) {
+      pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones, producer);
+    }
+  }
+
+  /**
+   * Push the records from the given CSV file into a Kafka stream.
+   */
+  public static void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex,
+      boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
     long counter = 0;
     if (injectTombstones) {
@@ -380,7 +402,7 @@ public class ClusterIntegrationTestUtils {
         producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
       }
     }
-    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    CSVFormat csvFormat = CSVFormat.Builder.create().setSkipHeaderRecord(true).build();
     try (CSVParser parser = CSVParser.parse(csvFile, StandardCharsets.UTF_8, csvFormat)) {
       for (CSVRecord csv : parser) {
         byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(counter++)
@@ -396,12 +418,18 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Push the records from the given Avro files into a Kafka stream.
-   *
-   * @param csvRecords List of CSV record string
-   * @param kafkaTopic Kafka topic
-   * @param partitionColumnIndex Optional Index of the partition column
-   * @throws Exception
+   * Push the records from the given CSV file into a Kafka stream.
+   */
+  public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaBroker, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones)
+      throws Exception {
+    try (StreamDataProducer producer = getKafkaProducer(kafkaBroker)) {
+      pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones, producer);
+    }
+  }
+
+  /**
+   * Push the CSV records into a Kafka stream.
    */
   public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
       @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
@@ -414,7 +442,7 @@ public class ClusterIntegrationTestUtils {
         producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
       }
     }
-    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    CSVFormat csvFormat = CSVFormat.Builder.create().setSkipHeaderRecord(true).build();
     for (String recordCsv : csvRecords) {
       try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
         for (CSVRecord csv : parser) {
@@ -433,28 +461,23 @@ public class ClusterIntegrationTestUtils {
 
   /**
    * Push the records from the given Avro files into a Kafka stream.
-   *
-   * @param avroFiles List of Avro files
-   * @param kafkaBroker Kafka broker config
-   * @param kafkaTopic Kafka topic
-   * @param maxNumKafkaMessagesPerBatch Maximum number of Kafka messages per batch
-   * @param header Optional Kafka message header
-   * @param partitionColumn Optional partition column
-   * @throws Exception
    */
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn,
       boolean injectTombstones)
       throws Exception {
-    Properties properties = new Properties();
-    properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    properties.put("request.required.acks", "1");
-    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
+    try (StreamDataProducer producer = getKafkaProducer(kafkaBroker)) {
+      pushAvroIntoKafka(avroFiles, kafkaTopic, maxNumKafkaMessagesPerBatch, header, partitionColumn, injectTombstones,
+          producer);
+    }
+  }
 
-    StreamDataProducer producer =
-        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
-
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   */
+  public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaTopic, int maxNumKafkaMessagesPerBatch,
+      @Nullable byte[] header, @Nullable String partitionColumn, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
     long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       if (injectTombstones) {
@@ -487,29 +510,31 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Push the records from the given Avro files into a Kafka stream.
-   *
-   * @param avroFiles List of Avro files
-   * @param kafkaBroker Kafka broker config
-   * @param kafkaTopic Kafka topic
-   * @param header Optional Kafka message header
-   * @param partitionColumn Optional partition column
-   * @param commit if the transaction commits or aborts
-   * @throws Exception
+   * Push the records from the given Avro files into a Kafka stream with transaction.
    */
   public static void pushAvroIntoKafkaWithTransaction(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit)
       throws Exception {
-    Properties props = new Properties();
-    props.put("bootstrap.servers", kafkaBroker);
-    props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
-    props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
-    props.put("request.required.acks", "1");
-    props.put("transactional.id", "test-transaction");
-    props.put("transaction.state.log.replication.factor", "2");
+    Properties properties = new Properties();
+    properties.put("bootstrap.servers", kafkaBroker);
+    properties.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+    properties.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+    properties.put("request.required.acks", "1");
+    properties.put("transactional.id", "test-transaction");
+    properties.put("transaction.state.log.replication.factor", "2");
+    try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
+      pushAvroIntoKafkaWithTransaction(avroFiles, kafkaTopic, maxNumKafkaMessagesPerBatch, header, partitionColumn,
+          commit, producer);
+    }
+  }
 
-    Producer<byte[], byte[]> producer = new KafkaProducer<>(props);
-    // initiate transaction.
+  /**
+   * Push the records from the given Avro files into a Kafka stream with transaction.
+   */
+  public static void pushAvroIntoKafkaWithTransaction(List<File> avroFiles, String kafkaTopic,
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit,
+      KafkaProducer<byte[], byte[]> producer)
+      throws Exception {
     producer.initTransactions();
     producer.beginTransaction();
     long counter = 0;
@@ -543,31 +568,26 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Push random generated
-   *
-   * @param avroFile Sample Avro file used to extract the Avro schema
-   * @param kafkaBroker Kafka broker config
-   * @param kafkaTopic Kafka topic
-   * @param numKafkaMessagesToPush Number of Kafka messages to push
-   * @param maxNumKafkaMessagesPerBatch Maximum number of Kafka messages per batch
-   * @param header Optional Kafka message header
-   * @param partitionColumn Optional partition column
-   * @throws Exception
+   * Push random generated records with the given Avro file schema into a Kafka stream.
    */
-  @SuppressWarnings("unused")
   public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic,
       int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
       @Nullable String partitionColumn)
       throws Exception {
-    Properties properties = new Properties();
-    properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    properties.put("request.required.acks", "1");
-    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
+    try (StreamDataProducer producer = getKafkaProducer(kafkaBroker)) {
+      pushRandomAvroIntoKafka(avroFile, kafkaTopic, numKafkaMessagesToPush, maxNumKafkaMessagesPerBatch, header,
+          partitionColumn, producer);
+    }
+  }
 
+  /**
+   * Push random generated records with the given Avro file schema into a Kafka stream.
+   */
+  public static void pushRandomAvroIntoKafka(File avroFile, String kafkaTopic, int numKafkaMessagesToPush,
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn,
+      StreamDataProducer producer)
+      throws Exception {
     long counter = 0;
-    StreamDataProducer producer =
-        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
@@ -786,7 +806,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
                   + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, queryResourceUrl, headers,
-                  extraJsonProperties));
+                  extraJsonProperties, useMultiStageQueryEngine));
             }
 
             // Skip further comparison
@@ -809,7 +829,7 @@ public class ClusterIntegrationTestUtils {
             throw new RuntimeException(
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                    queryResourceUrl, headers, extraJsonProperties));
+                    queryResourceUrl, headers, extraJsonProperties, useMultiStageQueryEngine));
           }
         }
       } else {
@@ -833,7 +853,7 @@ public class ClusterIntegrationTestUtils {
                   throw new RuntimeException(
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                          queryResourceUrl, headers, extraJsonProperties));
+                          queryResourceUrl, headers, extraJsonProperties, useMultiStageQueryEngine));
                 }
               }
               if (!h2ResultSet.next()) {
@@ -847,16 +867,21 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static String getExplainPlan(@Language("sql") String pinotQuery, String brokerUrl,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine)
       throws Exception {
-    JsonNode explainPlanForResponse =
-        ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
-            extraJsonProperties);
-    return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
+    JsonNode explainPlanForResponse = ClusterTest.postQuery("explain plan for " + pinotQuery,
+        getBrokerQueryApiUrl(brokerUrl, useMultiStageQueryEngine), headers, extraJsonProperties);
+    return useMultiStageQueryEngine ? ExplainPlanUtils.formatMultiStageExplainPlan(explainPlanForResponse)
+        : ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
   }
 
   public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
     return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
+  }
+
+  public static String getBrokerQueryCancelUrl(String brokerBaseApiUrl, String brokerId, String clientQueryId) {
+    return brokerBaseApiUrl + "/clientQuery/" + brokerId + "/" + clientQueryId;
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
@@ -988,17 +1013,15 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          throw new RuntimeException(String.format(
-              "Selection result differ in Pinot from H2: Pinot row: [ %s ] not found in H2 result set: [%s].",
-              actualValue, expectedValues)
-          );
+          throw new RuntimeException("Selection result differ in Pinot from H2: Pinot row: [ " + actualValue
+              + " ] not found in H2 result set: [" + expectedValues + "].");
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
           if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
-            throw new RuntimeException(String.format(
-                "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
-                rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex)));
+            throw new RuntimeException("Selection Order by result at row index: " + rowIndex + " in Pinot: [ "
+                + actualOrderByValue + " ] is different than result in H2: [ " + expectedOrderByValues.get(rowIndex)
+                + " ].");
           }
         }
       }

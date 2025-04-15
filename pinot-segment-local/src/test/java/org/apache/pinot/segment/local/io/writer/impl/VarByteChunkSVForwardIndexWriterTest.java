@@ -30,6 +30,7 @@ import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -45,7 +46,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 
 
-public class VarByteChunkSVForwardIndexWriterTest {
+public class VarByteChunkSVForwardIndexWriterTest implements PinotBuffersAfterMethodCheckRule {
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), VarByteChunkSVForwardIndexWriterTest.class.getSimpleName());
 

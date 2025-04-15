@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-input-format</artifactId>
@@ -41,6 +41,8 @@
     <module>pinot-avro-base</module>
     <module>pinot-clp-log</module>
     <module>pinot-confluent-avro</module>
+    <module>pinot-confluent-json</module>
+    <module>pinot-confluent-protobuf</module>
     <module>pinot-orc</module>
     <module>pinot-json</module>
     <module>pinot-parquet</module>

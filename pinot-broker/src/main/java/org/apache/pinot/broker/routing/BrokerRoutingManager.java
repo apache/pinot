@@ -61,6 +61,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -387,6 +388,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     LOGGER.info("Including server: {} to routing", instanceId);
     if (!_excludedServers.remove(instanceId)) {
       LOGGER.info("Server: {} is not previously excluded, skipping updating the routing", instanceId);
+      return;
     }
     if (!_enabledServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);
@@ -533,7 +535,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs);
+            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -604,6 +606,20 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
+   * Returns whether the given table is enabled
+   * @param tableNameWithType Table name with type
+   * @return Whether the given table is enabled
+   */
+  public boolean isTableDisabled(String tableNameWithType) {
+    RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
+    if (routingEntry == null) {
+      return false;
+    } else {
+      return routingEntry.isDisabled();
+    }
+  }
+
+  /**
    * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
    * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
@@ -621,15 +637,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
-  private Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap(String tableNameWithType,
+  private Map<ServerInstance, ServerRouteInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    Map<ServerInstance, ServerRouteInfo> merged = new HashMap<>();
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair =
-            merged.computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), new ArrayList<>()));
-        pair.getLeft().add(entry.getKey());
+        ServerRouteInfo serverRouteInfoInfo =
+            merged.computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), new ArrayList<>()));
+        serverRouteInfoInfo.getSegments().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
@@ -638,17 +654,25 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair = merged.get(serverInstance);
+        ServerRouteInfo serverRouteInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
-        if (pair != null) {
-          pair.getRight().add(entry.getKey());
+        if (serverRouteInfo != null) {
+          serverRouteInfo.getOptionalSegments().add(entry.getKey());
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.
     }
     return merged;
+  }
+
+  @Nullable
+  @Override
+  public List<String> getSegments(BrokerRequest brokerRequest) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    return routingEntry != null ? routingEntry.getSegments(brokerRequest) : null;
   }
 
   @Override
@@ -729,11 +753,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
+    transient boolean _disabled;
+
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
-        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs) {
+        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
+        boolean disabled) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -747,6 +774,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
+      _disabled = disabled;
     }
 
     String getTableNameWithType() {
@@ -779,6 +807,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return _queryTimeoutMs;
     }
 
+    boolean isDisabled() {
+      return _disabled;
+    }
+
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
@@ -793,6 +825,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
       _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
+      _disabled = !idealState.isEnabled();
     }
 
     void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
@@ -824,6 +857,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
             Collections.emptyList(), numPrunedSegments);
       }
+    }
+
+    List<String> getSegments(BrokerRequest brokerRequest) {
+      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+        }
+      }
+      return new ArrayList<>(selectedSegments);
     }
   }
 }

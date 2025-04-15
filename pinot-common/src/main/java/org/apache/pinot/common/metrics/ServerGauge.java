@@ -41,6 +41,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN("bytes", false),
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics
@@ -52,6 +54,19 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_DIRECT("arenas", true),
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
   STREAM_DATA_LOSS("streamDataLoss", false),
+
+  // Segment operation throttle metrics - threshold is the upper limit of the throttle and is set whenever the
+  // throttle configs are modified
+  SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD("segmentTableDownloadThrottleThreshold", false),
+  SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD("segmentDownloadThrottleThreshold", true),
+  SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD("segmentAllPreprocessThrottleThreshold", true),
+  SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD("segmentStartreePreprocessThreshold", true),
+  // Segment operation metrics - count is the current number of segments undergoing the given operation.
+  // Incremented when the semaphore is acquired and decremented when the semaphore is released
+  SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),
+  SEGMENT_DOWNLOAD_COUNT("segmentDownloadCount", true),
+  SEGMENT_ALL_PREPROCESS_COUNT("segmentAllPreprocessCount", true),
+  SEGMENT_STARTREE_PREPROCESS_COUNT("segmentStartreePreprocessCount", true),
 
   /**
    * The size of the small cache.
@@ -76,7 +91,13 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Needed to track if valid doc id snapshots are present for faster restarts
   UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT("upsertValidDocIdSnapshotCount", false),
   UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false),
-  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false);
+  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false),
+  REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false),
+  REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false),
+  REALTIME_CONSUMER_DIR_USAGE("bytes", true),
+  SEGMENT_DOWNLOAD_SPEED("bytes", true),
+  PREDOWNLOAD_SPEED("bytes", true),
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
 
   private final String _gaugeName;
   private final String _unit;

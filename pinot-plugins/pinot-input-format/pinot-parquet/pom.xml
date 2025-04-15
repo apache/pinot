@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-parquet</artifactId>
@@ -63,7 +63,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
 
     <!-- Used for Parquet Writer in tests -->

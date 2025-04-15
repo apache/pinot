@@ -24,11 +24,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -42,7 +41,12 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -98,6 +102,9 @@ public class BaseTableDataManagerTest {
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
+  static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
+      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2, 4, true),
+      new SegmentDownloadThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()
@@ -144,7 +151,7 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tableDataManager = createTableManager();
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, null, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
@@ -165,14 +172,14 @@ public class BaseTableDataManagerTest {
     File defaultDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(defaultDataDir.exists());
     tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG), zkMetadata,
-        localMetadata, null, false);
+        localMetadata, false);
     assertTrue(defaultDataDir.exists());
     assertEquals(new SegmentMetadataImpl(defaultDataDir).getTotalDocs(), 5);
 
     // Configured dataDir for coolTier, thus move to new dir.
     tableDataManager = createTableManager();
     tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(TIER_TABLE_CONFIG), zkMetadata,
-        localMetadata, null, false);
+        localMetadata, false);
     File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
     assertTrue(tierDataDir.exists());
     assertFalse(defaultDataDir.exists());
@@ -192,14 +199,14 @@ public class BaseTableDataManagerTest {
     when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
 
     BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, null, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
 
     FileUtils.deleteQuietly(indexDir);
     try {
-      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, null, false);
+      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
@@ -222,7 +229,7 @@ public class BaseTableDataManagerTest {
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tableDataManager = createTableManager();
     tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG), zkMetadata,
-        localMetadata, null, false);
+        localMetadata, false);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
@@ -230,7 +237,7 @@ public class BaseTableDataManagerTest {
     // Configured dataDir for coolTier, thus move to new dir.
     tableDataManager = createTableManager();
     tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(TIER_TABLE_CONFIG), zkMetadata,
-        localMetadata, null, false);
+        localMetadata, false);
     File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
     assertTrue(tierDataDir.exists());
     assertFalse(indexDir.exists());
@@ -254,7 +261,7 @@ public class BaseTableDataManagerTest {
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
 
     BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, false);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -277,11 +284,12 @@ public class BaseTableDataManagerTest {
     when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
 
     // Require to add indices.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN, LONG_COLUMN)).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, false);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
@@ -294,7 +302,8 @@ public class BaseTableDataManagerTest {
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);
     SegmentZKMetadata zkMetadata =
-        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), false);
+        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
+            false);
 
     // Same CRC but force to download.
     BaseTableDataManager tableDataManager = createTableManager();
@@ -304,13 +313,13 @@ public class BaseTableDataManagerTest {
     // Remove the local segment dir. Segment reloading fails unless force to download.
     FileUtils.deleteQuietly(indexDir);
     try {
-      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, null, false);
+      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, false);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
     }
 
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, null, true);
+    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, true);
     assertTrue(indexDir.exists());
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
@@ -547,9 +556,10 @@ public class BaseTableDataManagerTest {
     when(zkMetadata.getCrc()).thenReturn(crc);
 
     // Require to add indices.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN, LONG_COLUMN)).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
 
     BaseTableDataManager tableDataManager = createTableManager();
     tableDataManager.addNewOnlineSegment(zkMetadata, indexLoadingConfig);
@@ -567,7 +577,7 @@ public class BaseTableDataManagerTest {
     File tempDir = new File(TEMP_DIR, "testDownloadAndDecrypt");
     String fileName = "tmp.txt";
     FileUtils.write(new File(tempDir, fileName), "this is from somewhere remote");
-    String tarFileName = SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
+    String tarFileName = SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
     File tempTarFile = new File(TEMP_DIR, tarFileName);
     TarCompressionUtils.createCompressedTarFile(tempDir, tempTarFile);
 
@@ -607,7 +617,7 @@ public class BaseTableDataManagerTest {
     File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-untar-move");
 
     // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     File tempInputDir = new File(tempRootDir, "input");
     FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir");
     TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
@@ -647,15 +657,15 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  private static OfflineTableDataManager createTableManager() {
+  static OfflineTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
 
   private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
-    HelixManager helixManager = mock(HelixManager.class);
-    SegmentLocks segmentLocks = new SegmentLocks();
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, helixManager, segmentLocks, DEFAULT_TABLE_CONFIG, null, null);
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
+        SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
+        SEGMENT_OPERATIONS_THROTTLER);
     return tableDataManager;
   }
 
@@ -687,7 +697,8 @@ public class BaseTableDataManagerTest {
   private static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
     File indexDir = createSegment(segmentVersion, numRows);
-    return makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
+    return makeRawSegment(indexDir,
+        new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION), true);
   }
 
   private static SegmentZKMetadata makeRawSegment(File indexDir, File rawSegmentFile, boolean deleteIndexDir)
@@ -718,7 +729,6 @@ public class BaseTableDataManagerTest {
     when(instanceDataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, null);
     indexLoadingConfig.setTableDataDir(TEMP_DIR.getAbsolutePath() + File.separator + tableConfig.getTableName());
-    indexLoadingConfig.setInstanceTierConfigs(Map.of());
     indexLoadingConfig.setSegmentTier(TIER_NAME);
     return indexLoadingConfig;
   }

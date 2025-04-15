@@ -22,11 +22,14 @@ import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -36,12 +39,15 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -53,6 +59,7 @@ public class QueryDispatcherTest extends QueryTestSet {
 
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
+  private QueryThreadContext.CloseableContext _closeMe;
 
   @BeforeClass
   public void setUp()
@@ -70,7 +77,20 @@ public class QueryDispatcherTest extends QueryTestSet {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
-    _queryDispatcher = new QueryDispatcher(Mockito.mock(MailboxService.class));
+    _queryDispatcher = new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class));
+  }
+
+  @BeforeMethod
+  public void createThreadContext() {
+    _closeMe = QueryThreadContext.open();
+    QueryThreadContext.setIds(1234, "test");
+  }
+
+  @AfterMethod
+  public void closeThreadContext() {
+    if (QueryThreadContext.isInitialized()) {
+      _closeMe.close();
+    }
   }
 
   @AfterClass
@@ -85,7 +105,8 @@ public class QueryDispatcherTest extends QueryTestSet {
   public void testQueryDispatcherCanSendCorrectPayload(String sql)
       throws Exception {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
-    _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, Collections.emptyMap());
+    _queryDispatcher.submit(
+        REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(), Collections.emptyMap());
   }
 
   @Test
@@ -95,7 +116,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.doThrow(new RuntimeException("foo")).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
-      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, Collections.emptyMap());
+      _queryDispatcher.submit(
+          REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(), Collections.emptyMap());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -111,7 +133,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.doAnswer(invocationOnMock -> {
       StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
       observer.onError(new RuntimeException("foo"));
-      return null;
+      return Set.of();
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     RequestContext context = new DefaultRequestContext();
@@ -166,7 +188,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
-      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, Collections.emptyMap());
+      _queryDispatcher.submit(
+          REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, new HashSet<>(), Collections.emptyMap());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -187,7 +210,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
-      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 200L, Collections.emptyMap());
+      _queryDispatcher.submit(
+          REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 200L, new HashSet<>(), Collections.emptyMap());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       String message = e.getMessage();
@@ -203,6 +227,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       throws Exception {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
-    _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, Collections.emptyMap());
+    _queryDispatcher.submit(
+        REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, new HashSet<>(), Collections.emptyMap());
   }
 }

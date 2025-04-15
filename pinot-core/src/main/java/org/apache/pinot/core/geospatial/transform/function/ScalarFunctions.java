@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
+import java.util.List;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -84,6 +85,24 @@ public class ScalarFunctions {
   }
 
   /**
+   * Reads a geometry object from the GeoJSON format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromGeoJson(String geoJson)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_GEO_JSON_READER.read(geoJson));
+  }
+
+  /**
+   * Reads a geography object from the GeoJSon format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromGeoJson(String geoJson)
+      throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_GEO_JSON_READER.read(geoJson));
+  }
+
+  /**
    * Reads a geometry object from the WKB format.
    */
   @ScalarFunction
@@ -110,6 +129,17 @@ public class ScalarFunctions {
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
     return GeometryUtils.WKT_WRITER.write(GeometrySerializer.deserialize(bytes));
+  }
+
+  /**
+   * Saves the geometry object in GeoJSON format.
+   *
+   * @param bytes the serialized geometry object
+   * @return the geometry in GeoJSON
+   */
+  @ScalarFunction
+  public static String stAsGeoJson(byte[] bytes) {
+    return GeometryUtils.GEO_JSON_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
   /**
@@ -158,7 +188,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static long geoToH3(double longitude, double latitude, int resolution) {
-    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+    return H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
   }
 
   /**
@@ -172,7 +202,7 @@ public class ScalarFunctions {
     Geometry geometry = GeometrySerializer.deserialize(geoBytes);
     double latitude = geometry.getCoordinate().y;
     double longitude = geometry.getCoordinate().x;
-    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+    return H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
   }
 
   @ScalarFunction
@@ -223,5 +253,38 @@ public class ScalarFunctions {
     }
     // TODO: to fully support Geography within operation.
     return firstGeometry.within(secondGeometry) ? 1 : 0;
+  }
+
+  /**
+   * Gets the grid distance between two H3 indexes by finding the minimum number of grid cells that must be traversed
+   * @param firstH3Index first H3 index
+   * @param secondH3Index second H3 index
+   * @return the grid distance between the two H3 indexes
+   */
+  @ScalarFunction
+  public static long gridDistance(long firstH3Index, long secondH3Index) {
+    if (firstH3Index == secondH3Index) {
+      return 0;
+    }
+    return H3Utils.H3_CORE.gridDistance(firstH3Index, secondH3Index);
+  }
+
+  /**
+   * Returns all H3 indexes within a specified hexagonal grid distance from a given origin index. The function considers
+   * hexagonal traversal rules and accounts for wrapping around pentagons.
+   *
+   * @param origin The starting H3 index from which to compute the grid disk.
+   * @param k      The radius of the disk in hexagonal grid steps.
+   * @return An array of H3 indexes within the specified distance from the origin.
+   */
+  @ScalarFunction
+  public static long[] gridDisk(long origin, int k) {
+    List<Long> diskCells = H3Utils.H3_CORE.gridDisk(origin, k);
+    long[] result = new long[diskCells.size()];
+    int index = 0;
+    for (Long cell : diskCells) {
+      result[index++] = cell;
+    }
+    return result;
   }
 }

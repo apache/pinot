@@ -152,8 +152,8 @@ public class IngestionDelayTracker {
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
     // Handle negative timer values
     if (scheduledExecutorThreadTickIntervalMs <= 0) {
-      throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
-          scheduledExecutorThreadTickIntervalMs, _tableNameWithType));
+      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got="
+          + scheduledExecutorThreadTickIntervalMs + " for table=" + _tableNameWithType);
     }
 
     // ThreadFactory to set the thread's name
@@ -210,6 +210,8 @@ public class IngestionDelayTracker {
         _serverMetrics.removePartitionGauge(_metricName, partitionId,
             ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
       }
       return null;
     });
@@ -288,6 +290,16 @@ public class IngestionDelayTracker {
         if (currentOffset != null && latestOffset != null) {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
               () -> getPartitionIngestionOffsetLag(partitionId));
+        }
+
+        if (currentOffset != null) {
+          _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+              ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
+        }
+
+        if (latestOffset != null) {
+          _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
+              ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getPartitionIngestionUpstreamOffset(partitionId));
         }
       }
       return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, latestOffset);
@@ -414,6 +426,40 @@ public class IngestionDelayTracker {
       return 0;
     }
     return ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
+  }
+
+  // Get the consuming offset for a given partition
+  public long getPartitionIngestionConsumingOffset(int partitionId) {
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    if (ingestionInfo == null) {
+      return 0;
+    }
+    StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
+    if (currentOffset == null) {
+      return 0;
+    }
+    // TODO: Support other types of offsets
+    if (!(currentOffset instanceof LongMsgOffset)) {
+      return 0;
+    }
+    return ((LongMsgOffset) currentOffset).getOffset();
+  }
+
+  // Get the latest offset in upstream data source for a given partition
+  public long getPartitionIngestionUpstreamOffset(int partitionId) {
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    if (ingestionInfo == null) {
+      return 0;
+    }
+    StreamPartitionMsgOffset latestOffset = ingestionInfo._latestOffset;
+    if (latestOffset == null) {
+      return 0;
+    }
+    // TODO: Support other types of offsets
+    if (!(latestOffset instanceof LongMsgOffset)) {
+      return 0;
+    }
+    return ((LongMsgOffset) latestOffset).getOffset();
   }
 
   /*

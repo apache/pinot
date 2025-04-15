@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -51,6 +50,8 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.thrift.TDeserializer;
@@ -125,9 +126,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
     String tableNameWithType = null;
 
-    try {
+    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
       // Put all code inside try block to catch all exceptions.
       int requestSize = msg.readableBytes();
+      QueryThreadContext.setQueryEngine("sse");
 
       instanceRequest = new InstanceRequest();
       ServerQueryRequest queryRequest;
@@ -141,6 +143,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       msg.readBytes(requestBytes);
       _deserializer.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+      queryRequest.registerOnQueryThreadLocal();
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
       tableNameWithType = queryRequest.getTableNameWithType();
@@ -183,7 +186,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
   private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType,
       long queryArrivalTimeMs, InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
-    return new FutureCallback<byte[]>() {
+    return new FutureCallback<>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
         if (_queryFuturesById != null) {
@@ -195,7 +198,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         }
         if (responseBytes != null) {
           // responseBytes contains either query results or exception.
-          sendResponse(ctx, queryRequest.getTableNameWithType(), queryArrivalTimeMs, responseBytes);
+          sendResponse(ctx, queryRequest.getRequestId(), queryRequest.getTableNameWithType(), queryArrivalTimeMs,
+              responseBytes);
         } else {
           // Send exception response.
           sendErrorResponse(ctx, queryRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
@@ -283,14 +287,14 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       if (cancelled) {
-        dataTable.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceName + " " + e));
+        dataTable.addException(QueryErrorCode.QUERY_CANCELLATION.getId(),
+            "Query cancelled on: " + _instanceName + " " + e.getMessage());
       } else {
-        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
-            "Query execution error on: " + _instanceName + " " + e));
+        dataTable.addException(QueryErrorCode.QUERY_EXECUTION.getId(),
+            "Query execution error on: " + _instanceName + " " + e.getMessage());
       }
       byte[] serializedDataTable = dataTable.toBytes();
-      sendResponse(ctx, tableNameWithType, queryArrivalTimeMs, serializedDataTable);
+      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, serializedDataTable);
     } catch (Exception exception) {
       LOGGER.error("Exception while sending query processing error to Broker.", exception);
     } finally {
@@ -305,8 +309,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   /**
    * Send a response (either query results or exception) back to broker as response to the query request.
    */
-  private void sendResponse(ChannelHandlerContext ctx, String tableNameWithType, long queryArrivalTimeMs,
-      byte[] serializedDataTable) {
+  private void sendResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
+      long queryArrivalTimeMs, byte[] serializedDataTable) {
     long sendResponseStartTimeMs = System.currentTimeMillis();
     int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
     ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
@@ -319,11 +323,12 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       int totalQueryTimeMs = (int) (sendResponseEndTimeMs - queryArrivalTimeMs);
       if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
-        LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle "
-            + "request: {}", queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+        LOGGER.info(
+            "Slow query ({}): request handler processing time: {}, send response latency: {}, total time to handle "
+                + "request: {}", requestId, queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
       }
       if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
-        LOGGER.warn("Large query: response size in bytes: {}, table name {}",
+        LOGGER.warn("Large query ({}): response size in bytes: {}, table name {}", requestId,
             serializedDataTable.length, tableNameWithType);
         ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
       }

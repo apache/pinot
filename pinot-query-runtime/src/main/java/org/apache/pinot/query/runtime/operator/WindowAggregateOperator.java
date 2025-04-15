@@ -19,8 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,10 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -39,12 +34,15 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +111,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
-  private TransferableBlock _eosBlock;
+  private MseBlock.Eos _eosBlock;
 
   public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
       WindowNode node) {
@@ -128,20 +126,20 @@ public class WindowAggregateOperator extends MultiStageOperator {
       _keys[i] = keys.get(i);
     }
     _windowFrame = new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound());
-    Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
-        "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
-    Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
-        "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW");
+    Preconditions.checkState(
+        _windowFrame.isRowType() || ((_windowFrame.isUnboundedPreceding() || _windowFrame.isLowerBoundCurrentRow()) && (
+            _windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow())),
+        "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    Preconditions.checkState(_windowFrame.getLowerBound() <= _windowFrame.getUpperBound(),
+        "Window frame lower bound can't be greater than upper bound");
     List<RelFieldCollation> collations = node.getCollations();
-    boolean partitionByOnly = isPartitionByOnlyQuery(_keys, collations);
     List<RexExpression.FunctionCall> aggCalls = node.getAggCalls();
     int numAggCalls = aggCalls.size();
     _windowFunctions = new WindowFunction[numAggCalls];
     for (int i = 0; i < numAggCalls; i++) {
       RexExpression.FunctionCall aggCall = aggCalls.get(i);
-      validateAggregationCalls(aggCall.getFunctionName());
       _windowFunctions[i] =
-          WindowFunctionFactory.construnctWindowFunction(aggCall, inputSchema, collations, partitionByOnly);
+          WindowFunctionFactory.constructWindowFunction(aggCall, inputSchema, collations, _windowFrame);
     }
 
     Map<String, String> metadata = context.getOpChainMetadata();
@@ -201,59 +199,26 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
-      throws ProcessingException {
+  protected MseBlock getNextBlock() {
     if (_hasReturnedWindowAggregateBlock) {
       return _eosBlock;
     }
     return computeBlocks();
   }
 
-  private void validateAggregationCalls(String functionName) {
-    if (ROWS_ONLY_FUNCTION_NAMES.contains(functionName)) {
-      Preconditions.checkState(
-          _windowFrame._type == WindowNode.WindowFrameType.ROWS && _windowFrame.isUpperBoundCurrentRow(),
-          String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
-    } else {
-      Preconditions.checkState(_windowFrame._type == WindowNode.WindowFrameType.RANGE,
-          String.format("Only RANGE type frames are supported at present for function: %s", functionName));
-    }
-  }
-
-  private boolean isPartitionByOnlyQuery(int[] keys, List<RelFieldCollation> collations) {
-    if (collations.isEmpty()) {
-      return true;
-    }
-    int numKeys = keys.length;
-    if (numKeys != collations.size()) {
-      return false;
-    }
-    IntSet keyIndices = new IntOpenHashSet(numKeys);
-    IntSet orderFieldIndices = new IntOpenHashSet(numKeys);
-    for (int i = 0; i < numKeys; i++) {
-      keyIndices.add(keys[i]);
-      orderFieldIndices.add(collations.get(i).getFieldIndex());
-    }
-    return keyIndices.equals(orderFieldIndices);
-  }
-
   /**
    * @return the final block, which must be either an end of stream or an error.
    */
-  private TransferableBlock computeBlocks()
-      throws ProcessingException {
-    TransferableBlock block = _input.nextBlock();
-    while (block.isDataBlock()) {
-      List<Object[]> container = block.getContainer();
+  private MseBlock computeBlocks() {
+    MseBlock block = _input.nextBlock();
+    while (block.isData()) {
+      List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
-          ProcessingException resourceLimitExceededException =
-              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-          resourceLimitExceededException.setMessage(
+          throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
               "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
                   + _maxRowsInWindowCache);
-          throw resourceLimitExceededException;
         } else {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInWindowCache - _numRows;
@@ -272,12 +237,12 @@ public class WindowAggregateOperator extends MultiStageOperator {
       sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
+    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
+    _eosBlock = eosBlock;
     // Early termination if the block is an error block
-    if (block.isErrorBlock()) {
+    if (eosBlock.isError()) {
       return block;
     }
-    assert block.isSuccessfulEndOfStreamBlock();
-    _eosBlock = updateEosBlock(block, _statMap);
 
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
@@ -309,39 +274,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
     if (rows.isEmpty()) {
       return _eosBlock;
     } else {
-      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      return new RowHeapDataBlock(rows, _resultSchema);
     }
   }
 
-  /**
-   * Defines the Frame to be used for the window query. The 'lowerBound' and 'upperBound' indicate the frame
-   * boundaries to be used. Whereas, 'isRows' is used to differentiate between RANGE and ROWS type frames.
-   */
-  private static class WindowFrame {
-    // Enum to denote the FRAME type, can be either ROW or RANGE types
-    final WindowNode.WindowFrameType _type;
-    // The lower bound of the frame. Set to Integer.MIN_VALUE if UNBOUNDED PRECEDING
-    final int _lowerBound;
-    // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
-    final int _upperBound;
-
-    WindowFrame(WindowNode.WindowFrameType type, int lowerBound, int upperBound) {
-      _type = type;
-      _lowerBound = lowerBound;
-      _upperBound = upperBound;
-    }
-
-    boolean isUnboundedPreceding() {
-      return _lowerBound == Integer.MIN_VALUE;
-    }
-
-    boolean isUnboundedFollowing() {
-      return _upperBound == Integer.MAX_VALUE;
-    }
-
-    boolean isUpperBoundCurrentRow() {
-      return _upperBound == 0;
-    }
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   public enum StatKey implements StatMap.Key {

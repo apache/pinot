@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
@@ -64,7 +65,7 @@ public class GcsPinotFS extends BasePinotFS {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
   // See https://cloud.google.com/storage/docs/json_api/v1/how-tos/batch
-  private static final int BATCH_LIMIT = 100;
+  private static final int DELETE_BATCH_LIMIT = 100;
   private Storage _storage;
 
   @Override
@@ -132,6 +133,28 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
     return delete(new GcsUri(segmentUri), forceDelete);
+  }
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    boolean result = true;
+    List<BlobId> blobIds = new ArrayList<>();
+    Iterator<URI> iterator = segmentUris.iterator();
+    while (iterator.hasNext()) {
+      GcsUri gcsUri = new GcsUri(iterator.next());
+      if (existsDirectoryOrBucket(gcsUri)) {
+        result &= delete(gcsUri, forceDelete);
+      } else {
+        blobIds.add(getBlob(gcsUri).getBlobId());
+        if (blobIds.size() >= DELETE_BATCH_LIMIT || !iterator.hasNext()) {
+          List<Boolean> deleted = _storage.delete(blobIds);
+          result &= deleted.stream().allMatch(Boolean::booleanValue);
+          blobIds.clear();
+        }
+      }
+    }
+    return result;
   }
 
   @Override
@@ -395,7 +418,7 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     try {
       if (!exists(segmentUri)) {
-        return forceDelete;
+        return false;
       }
       if (existsDirectoryOrBucket(segmentUri)) {
         if (!forceDelete && !isEmptyDirectory(segmentUri)) {
@@ -428,7 +451,7 @@ public class GcsPinotFS extends BasePinotFS {
     for (Blob blob : page.iterateAll()) {
       results.add(batch.delete(blob.getBlobId()));
       batchSize++;
-      if (batchSize >= BATCH_LIMIT) {
+      if (batchSize >= DELETE_BATCH_LIMIT) {
         batch.submit();
         deleteSucceeded &= results.stream().allMatch(r -> r != null && r.get());
         results = new ArrayList<>();

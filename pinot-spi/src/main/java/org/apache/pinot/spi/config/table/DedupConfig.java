@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
+
 public class DedupConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether dedup is enabled or not.")
   private final boolean _dedupEnabled;
@@ -43,9 +44,17 @@ public class DedupConfig extends BaseJsonConfig {
       + " from the table config will be used.")
   private final String _dedupTimeColumn;
 
+  @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery")
+  private boolean _enablePreload;
+
+  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  @Deprecated
+  @JsonPropertyDescription("Whether to pause dedup table's partition consumption during commit")
+  private boolean _allowDedupConsumptionDuringCommit;
+
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
-    this(dedupEnabled, hashFunction, null, null, 0, null);
+    this(dedupEnabled, hashFunction, null, null, 0, null, false);
   }
 
   @JsonCreator
@@ -54,13 +63,15 @@ public class DedupConfig extends BaseJsonConfig {
       @JsonProperty(value = "metadataManagerClass") String metadataManagerClass,
       @JsonProperty(value = "metadataManagerConfigs") Map<String, String> metadataManagerConfigs,
       @JsonProperty(value = "metadataTTL") double metadataTTL,
-      @JsonProperty(value = "dedupTimeColumn") String dedupTimeColumn) {
+      @JsonProperty(value = "dedupTimeColumn") String dedupTimeColumn,
+      @JsonProperty(value = "enablePreload") boolean enablePreload) {
     _dedupEnabled = dedupEnabled;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
     _metadataManagerClass = metadataManagerClass;
     _metadataManagerConfigs = metadataManagerConfigs;
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
+    _enablePreload = enablePreload;
   }
 
   public HashFunction getHashFunction() {
@@ -85,5 +96,23 @@ public class DedupConfig extends BaseJsonConfig {
 
   public String getDedupTimeColumn() {
     return _dedupTimeColumn;
+  }
+
+  public boolean isEnablePreload() {
+    return _enablePreload;
+  }
+
+  public void setEnablePreload(boolean enablePreload) {
+    _enablePreload = enablePreload;
+  }
+
+  @Deprecated
+  public boolean isAllowDedupConsumptionDuringCommit() {
+    return _allowDedupConsumptionDuringCommit;
+  }
+
+  @Deprecated
+  public void setAllowDedupConsumptionDuringCommit(boolean allowDedupConsumptionDuringCommit) {
+    _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
   }
 }

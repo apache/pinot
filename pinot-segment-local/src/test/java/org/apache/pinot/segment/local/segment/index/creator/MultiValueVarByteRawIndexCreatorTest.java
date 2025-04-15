@@ -29,22 +29,25 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 
-public class MultiValueVarByteRawIndexCreatorTest {
+
+public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), MultiValueVarByteRawIndexCreatorTest.class.getSimpleName());
@@ -57,10 +60,13 @@ public class MultiValueVarByteRawIndexCreatorTest {
 
   @DataProvider
   public Object[][] params() {
-    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(2, 4).boxed()
-            .flatMap(writerVersion -> IntStream.of(10, 15, 20, 1000).boxed().flatMap(maxLength -> Stream.of(true, false)
-                .flatMap(
-                    useFullSize -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed().map(maxNumEntries -> new Object[]{
+    return Arrays.stream(ChunkCompressionType.values())
+        .flatMap(chunkCompressionType -> IntStream.rangeClosed(2, 5)
+            .boxed()
+            .flatMap(writerVersion -> IntStream.of(10, 100)
+                .boxed()
+                .flatMap(maxLength -> Stream.of(true, false)
+                    .flatMap(useFullSize -> IntStream.of(1, 10, 20).boxed().map(maxNumEntries -> new Object[]{
                         chunkCompressionType, useFullSize, writerVersion, maxLength, maxNumEntries
                     })))))
         .toArray(Object[][]::new);
@@ -74,16 +80,18 @@ public class MultiValueVarByteRawIndexCreatorTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowElementCount()
       throws IOException {
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
-        "column", 10000, DataType.STRING, 1, Integer.MAX_VALUE / 2);
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+        DataType.STRING, 1, Integer.MAX_VALUE / 2);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowMaxLengthInBytes()
       throws IOException {
-    // contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
-        "column", 10000, DataType.STRING, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2);
+    // Contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
+    // This check only applies to v2/v3
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+        DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   @Test(dataProvider = "params")
@@ -125,15 +133,15 @@ public class MultiValueVarByteRawIndexCreatorTest {
       }
     }
 
-    //read
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
         ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       String[] values = new String[maxElements];
       for (int i = 0; i < numDocs; i++) {
+        String[] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
         int length = reader.getStringMV(i, values, context);
-        String[] readValue = Arrays.copyOf(values, length);
-        Assert.assertEquals(inputs.get(i), readValue);
+        assertEquals(Arrays.copyOf(values, length), input);
       }
     }
   }
@@ -177,17 +185,15 @@ public class MultiValueVarByteRawIndexCreatorTest {
       }
     }
 
-    //read
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
         ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       byte[][] values = new byte[maxElements][];
       for (int i = 0; i < numDocs; i++) {
+        byte[][] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
         int length = reader.getBytesMV(i, values, context);
-        byte[][] readValue = Arrays.copyOf(values, length);
-        for (int j = 0; j < length; j++) {
-          Assert.assertTrue(Arrays.equals(inputs.get(i)[j], readValue[j]));
-        }
+        assertEquals(Arrays.copyOf(values, length), input);
       }
     }
   }

@@ -25,8 +25,8 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,9 +36,11 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public interface DataTable {
 
-  void addException(ProcessingException processingException);
-
   void addException(int exceptionCode, String exceptionMsg);
+
+  default void addException(QueryErrorCode exceptionCode, String exceptionMsg) {
+    addException(exceptionCode.getId(), exceptionMsg);
+  }
 
   Map<Integer, String> getExceptions();
 
@@ -139,11 +141,12 @@ public interface DataTable {
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
-    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
+    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING),
+    NUM_GROUPS_WARNING_LIMIT_REACHED(35, "numGroupsWarningLimitReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = 34;
+    private static final int MAX_ID = 35;
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();

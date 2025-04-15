@@ -25,6 +25,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -48,6 +50,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -56,6 +60,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 @SuppressWarnings("rawtypes")
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilteredGroupByOperator.class);
   private static final String EXPLAIN_NAME = "GROUP_BY_FILTERED";
 
   private final QueryContext _queryContext;
@@ -124,33 +129,24 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
-      if (groupKeyGenerator == null) {
-        // The group key generator should be shared across all AggregationFunctions so that agg results can be
-        // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
-        // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
-        // aggs are all non-filtered, sharing a GroupKeyGenerator across all aggs cannot be accomplished by allowing
-        // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
-        // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
-        // loop iterations i.e. across all aggs.
-        if (aggregationInfo.isUseStarTree()) {
-          groupByExecutor =
-              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
-        } else {
-          groupByExecutor =
-              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
-        }
-        groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
+
+      if (aggregationInfo.isUseStarTree()) {
+        groupByExecutor =
+            new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                groupKeyGenerator);
       } else {
-        if (aggregationInfo.isUseStarTree()) {
-          groupByExecutor =
-              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                  groupKeyGenerator);
-        } else {
-          groupByExecutor =
-              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                  groupKeyGenerator);
-        }
+        groupByExecutor =
+            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                groupKeyGenerator);
       }
+      // The group key generator should be shared across all AggregationFunctions so that agg results can be
+      // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
+      // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
+      // aggs are all non-filtered, sharing a GroupKeyGenerator across all aggs cannot be accomplished by allowing
+      // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
+      // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
+      // loop iterations i.e. across all aggs.
+      groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
 
       int numDocsScanned = 0;
       ValueBlock valueBlock;
@@ -174,7 +170,17 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
+    if (numGroupsLimitReached) {
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
+    }
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
+
+    boolean numGroupsWarningLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
+      LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+          _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+    }
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -191,6 +197,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
@@ -199,6 +206,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

@@ -206,15 +206,18 @@ public class PinotSchemaRestletResource {
   })
   public ConfigSuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload, @Context HttpHeaders headers, FormDataMultiPart multiPart) {
+      @ApiParam(value = "Whether to reload the table after updating the schema") @DefaultValue("false")
+      @QueryParam("reload") boolean reload,
+      @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
+      @DefaultValue("false") @QueryParam("force") boolean force, @Context HttpHeaders headers,
+      FormDataMultiPart multiPart) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     validateSchemaName(schema);
     schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
-    SuccessResponse successResponse = updateSchema(schemaName, schema, reload);
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -233,15 +236,18 @@ public class PinotSchemaRestletResource {
   })
   public ConfigSuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload, @Context HttpHeaders headers, String schemaJsonString) {
+      @ApiParam(value = "Whether to reload the table after updating the schema") @DefaultValue("false")
+      @QueryParam("reload") boolean reload,
+      @ApiParam(value = "Whether to force update the schema even if the new schema is backward incompatible")
+      @DefaultValue("false") @QueryParam("force") boolean force, @Context HttpHeaders headers,
+      String schemaJsonString) {
     schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromJson(schemaJsonString);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     validateSchemaName(schema);
     schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
-    SuccessResponse successResponse = updateSchema(schemaName, schema, reload);
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -392,6 +398,10 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema. Reason: 'schemaName' should not be null or empty", Response.Status.BAD_REQUEST);
     }
+    if (schema.getSchemaName().contains(TableConfig.TABLE_NAME_FORBIDDEN_SUBSTRING)) {
+      throw new ControllerApplicationException(LOGGER, "'schemaName' cannot contain double underscore ('__')",
+          Response.Status.BAD_REQUEST);
+    }
   }
 
   private void validateSchemaInternal(Schema schema) {
@@ -430,8 +440,8 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s.", schemaName),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s. Reason: %s",
+          schemaName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -442,7 +452,7 @@ public class PinotSchemaRestletResource {
    * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return SuccessResponse
    */
-  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
+  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload, boolean force) {
     validateSchemaInternal(schema);
 
     if (!schemaName.equals(schema.getSchemaName())) {
@@ -453,7 +463,7 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload, false);
+      _pinotHelixResourceManager.updateSchema(schema, reload, force);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
@@ -474,8 +484,8 @@ public class PinotSchemaRestletResource {
           Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s. Reason: %s",
+          schemaName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -516,11 +526,10 @@ public class PinotSchemaRestletResource {
    */
   private Pair<Schema, Map<String, Object>> getSchemaAndUnrecognizedPropertiesFromJson(String schemaJsonString)
       throws ControllerApplicationException {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
     try {
       return JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
     } catch (Exception e) {
-      String msg = String.format("Invalid schema config json string: %s", schemaJsonString);
+      String msg = String.format("Invalid schema config json string: %s. Reason: %s", schemaJsonString, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }
@@ -533,23 +542,13 @@ public class PinotSchemaRestletResource {
     }
 
     // If the schema is associated with a table, we should not delete it.
-    // TODO: Check OFFLINE tables as well. There are 2 side effects:
-    //       - Increases ZK read when there are lots of OFFLINE tables
-    //       - Behavior change since we don't allow deleting schema for OFFLINE tables
-    List<String> realtimeTables = _pinotHelixResourceManager.getAllRealtimeTables();
-    for (String realtimeTableName : realtimeTables) {
-      if (schemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(schemaName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(schemaName);
+    for (String tableNameWithType : new String[]{offlineTableName, realtimeTableName}) {
+      if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
-            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, realtimeTableName),
+            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, tableNameWithType),
             Response.Status.CONFLICT);
-      }
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
-      if (tableConfig != null) {
-        if (schemaName.equals(tableConfig.getValidationConfig().getSchemaName())) {
-          throw new ControllerApplicationException(LOGGER,
-              String.format("Cannot delete schema %s, as it is associated with table %s", schemaName,
-                  realtimeTableName), Response.Status.CONFLICT);
-        }
       }
     }
 

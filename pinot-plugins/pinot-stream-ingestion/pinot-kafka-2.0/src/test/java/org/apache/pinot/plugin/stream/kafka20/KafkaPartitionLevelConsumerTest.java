@@ -20,9 +20,11 @@ package org.apache.pinot.plugin.stream.kafka20;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -39,6 +41,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -113,7 +116,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -121,7 +123,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
@@ -155,7 +156,6 @@ public class KafkaPartitionLevelConsumerTest {
   public void testGetPartitionCount() {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -163,7 +163,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -175,7 +174,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -189,7 +187,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -197,7 +194,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -217,7 +213,6 @@ public class KafkaPartitionLevelConsumerTest {
   private void testFetchOffsets(String topic) {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -225,7 +220,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -258,7 +252,6 @@ public class KafkaPartitionLevelConsumerTest {
       throws TimeoutException {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -266,7 +259,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -379,7 +371,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_3);
     streamConfigMap.put("stream.kafka.broker.list", _kafkaBrokerAddress);
-    streamConfigMap.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("auto.offset.reset", "earliest");
@@ -398,5 +389,28 @@ public class KafkaPartitionLevelConsumerTest {
       assertEquals(new String((byte[]) messageBatch.getStreamMessage(i).getValue()), "sample_msg_" + (200 + i));
     }
     assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "700");
+  }
+
+  @Test
+  public void testGetTopics() {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", "NON_EXISTING_TOPIC");
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
+    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.getTopics();
+    List<String> topicNames = topics.stream()
+        .map(StreamMetadataProvider.TopicMetadata::getName)
+        .collect(Collectors.toList());
+    assertTrue(topicNames.containsAll(List.of(TEST_TOPIC_1, TEST_TOPIC_2, TEST_TOPIC_3)));
   }
 }

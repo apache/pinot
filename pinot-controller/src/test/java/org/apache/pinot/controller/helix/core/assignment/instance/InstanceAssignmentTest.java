@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
@@ -52,6 +53,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -115,15 +118,15 @@ public class InstanceAssignmentTest {
     // Instance of index 7 is not assigned because of the hash-based rotation
     // Math.abs("myTable_OFFLINE".hashCode()) % 10 = 8
     // [i8, i9, i0, i1, i2, i3, i4, i5, i6, i7]
-    //  r0, r1, r2, r0, r1, r2, r0, r1, r2
+    //  r0  r1  r2  r0  r1  r2  r0  r1  r2
     // r0: [i8, i1, i4]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     // r1: [i9, i2, i5]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     // r2: [i0, i3, i6]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
@@ -137,31 +140,52 @@ public class InstanceAssignmentTest {
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(1, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 6, SERVER_INSTANCE_ID_PREFIX + 0));
+  }
 
-    // ===== Test against the cases when the existing instancePartitions isn't null,
-    //       and minimizeDataMovement is set to true. =====
-    // Put the existing instancePartitions as the parameter to the InstanceAssignmentDriver.
-    // The returned instance partition should be the same as the last computed one.
-    tableConfig.getValidationConfig().setMinimizeDataMovement(true);
+  @Test
+  public void testMinimizeDataMovement() {
+    int numReplicas = 3;
+    int numPartitions = 2;
+    int numInstancesPerPartition = 2;
+    String partitionColumn = "partition";
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(numReplicas)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig))
+        .build();
 
+    int numInstances = 10;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Start without existing InstancePartitions:
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 3 instances, then these 3
     // instances should be assigned to 2 partitions, each with 2 instances
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
     // Instance of index 7 is not assigned because of the hash-based rotation
     // Math.abs("myTable_OFFLINE".hashCode()) % 10 = 8
     // [i8, i9, i0, i1, i2, i3, i4, i5, i6, i7]
-    //  r0, r1, r2, r0, r1, r2, r0, r1, r2
+    //  r0  r1  r2  r0  r1  r2  r0  r1  r2
     // r0: [i8, i1, i4]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     // r1: [i9, i2, i5]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     // r2: [i0, i3, i6]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
@@ -196,15 +220,15 @@ public class InstanceAssignmentTest {
     // Instance of index 7 is not assigned because of the hash-based rotation
     // Math.abs("myTable_OFFLINE".hashCode()) % 10 = 8
     // [i8, i9, i0, i1, i10, i3, i4, i5, i11, i7]
-    //  r0, r1, r2, r0, r1, r2, r0, r1, r2
+    //  r0  r1  r2  r0   r1  r2  r0  r1   r2
     // r0: [i8, i1, i4]
-    //      p0, p0, p1
+    //      p0  p0  p1
     //      p1
     // r1: [i9, i5, i10]
-    //      p0, p1, p0
+    //      p0  p1   p0
     //      p1
     // r2: [i0, i3, i11]
-    //      p0, p0, p1
+    //      p0  p0   p1
     //      p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
@@ -226,24 +250,28 @@ public class InstanceAssignmentTest {
       instanceConfigs.add(instanceConfig);
     }
     numInstancesPerPartition = 3;
-    tableConfig.getValidationConfig()
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(partitionColumnName, numInstancesPerPartition));
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
     instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
     // Math.abs("myTable_OFFLINE".hashCode()) % 12 = 2
-    // [i10, i11, i12, i13, i3, i4, i5, i11, i7, i8, i9, i0, i1]
+    // [i10, i11, i12, i13, i3, i4, i5, i7, i8, i9, i0, i1]
+    //   r1   r2   r0   r1  r2  r0  r1  r2  r0  r1  r2  r0
     // r0: [i8, i1, i4, i12]
-    //      p0, p0, p1, p0
-    //      p1, p1
+    //      p0  p0  p1   p0
+    //      p1  p1
     // r1: [i9, i5, i10, i13]
-    //      p0, p1, p0,  p0
-    //      p1,     p1
+    //      p0  p1   p0   p0
+    //      p1       p1
     // r2: [i0, i3, i11, i7]
-    //      p0, p0, p1,  p0
-    //      p1, p1
+    //      p0  p0   p1  p0
+    //      p1  p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(1, 0),
@@ -251,93 +279,447 @@ public class InstanceAssignmentTest {
     assertEquals(instancePartitions.getInstances(0, 1),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10, SERVER_INSTANCE_ID_PREFIX + 13));
     assertEquals(instancePartitions.getInstances(1, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 10, SERVER_INSTANCE_ID_PREFIX + 9));
     assertEquals(instancePartitions.getInstances(0, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 7));
     assertEquals(instancePartitions.getInstances(1, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 0));
 
     // Reduce the number of instances per partition from 3 to 2.
     numInstancesPerPartition = 2;
-    tableConfig.getValidationConfig()
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(partitionColumnName, numInstancesPerPartition));
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
     instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
-    // The instance assignment should be the same as the one without the newly added instances.
+    // r0: [i8, i1, i4, i12]
+    //      p0  p0  p1   p1
+    // r1: [i9, i5, i10, i13]
+    //      p0  p1   p0   p1
+    // r2: [i0, i3, i11, i7]
+    //      p0  p0   p1  p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
     assertEquals(instancePartitions.getInstances(1, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 8));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(0, 1),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10));
     assertEquals(instancePartitions.getInstances(1, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 13));
     assertEquals(instancePartitions.getInstances(0, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(1, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 7));
 
     // Add one more replica group (from 3 to 4).
     numReplicas = 4;
     tableConfig.getValidationConfig().setReplication(Integer.toString(numReplicas));
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
     instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
     // Math.abs("myTable_OFFLINE".hashCode()) % 12 = 2
-    // [i10, i11, i12, i13, i3, i4, i5, i11, i7, i8, i9, i0, i1]
-    // The existing replica groups remain unchanged.
-    // For the new replica group r3, the candidate instances become [i12, i13, i7].
-    // r3: [i12, i13, i7]
-    //       p0, p0, p1
-    //       p1
+    // [i10, i11, i12, i13, i3, i4, i5, i7, i8, i9, i0, i1]
+    //   r1   r2   r0   r1  r2  r0  r1  r2  r0  r3  r3  r3
+    // r0: [i8, i4, i12]
+    //      p0  p1   p1
+    //               p0
+    // r1: [i5, i10, i13]
+    //      p1   p0   p1
+    //                p0
+    // r2: [i3, i11, i7]
+    //      p0   p1  p1
+    //           p0
+    // r3: [i9, i0, i1]
+    //      p0  p0  p1
+    //      p1
     assertEquals(instancePartitions.getInstances(0, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(1, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 8));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(0, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 13, SERVER_INSTANCE_ID_PREFIX + 10));
     assertEquals(instancePartitions.getInstances(1, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 13));
     assertEquals(instancePartitions.getInstances(0, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(1, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 7));
     assertEquals(instancePartitions.getInstances(0, 3),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 12, SERVER_INSTANCE_ID_PREFIX + 13));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 0));
     assertEquals(instancePartitions.getInstances(1, 3),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 7, SERVER_INSTANCE_ID_PREFIX + 12));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 1, SERVER_INSTANCE_ID_PREFIX + 9));
 
     // Remove one replica group (from 4 to 3).
     numReplicas = 3;
     tableConfig.getValidationConfig().setReplication(Integer.toString(numReplicas));
+    tableConfig.getValidationConfig().setReplication(Integer.toString(numReplicas));
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
     instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
-    // The output should be the same as the one before adding one replica group.
+    // Math.abs("myTable_OFFLINE".hashCode()) % 12 = 2
+    // [i10, i11, i12, i13, i3, i4, i5, i7, i8, i9, i0, i1]
+    //   r1   r2   r0   r1  r2  r0  r1  r2  r0  r0  r1  r2
+    // r0: [i8, i4, i12, i9]
+    //      p0  p1   p0  p1
+    // r1: [i5, i10, i13, i0]
+    //      p1   p0   p0  p1
+    // r2: [i3, i11, i7, i1]
+    //      p0   p0  p1  p1
     assertEquals(instancePartitions.getInstances(0, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(1, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 8));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 9));
     assertEquals(instancePartitions.getInstances(0, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 13, SERVER_INSTANCE_ID_PREFIX + 10));
     assertEquals(instancePartitions.getInstances(1, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 0));
     assertEquals(instancePartitions.getInstances(0, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(1, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 1, SERVER_INSTANCE_ID_PREFIX + 7));
   }
 
-  public void testMirrorServerSetBasedRandom() throws FileNotFoundException {
+  @Test
+  public void testMinimizeDataMovementPoolBasedSingleInstancePartitions() {
+    int numReplicas = 2;
+    int numPartitions = 10;
+    int numInstancesPerPartition = 1;
+    String partitionColumn = "partition";
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), true, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
+            partitionColumn), null, true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(numReplicas)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig))
+        .build();
+
+    int numPools = 2;
+    int numInstances = 6;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfig.getRecord()
+          .setMapField(InstanceUtils.POOL_KEY, Map.of(OFFLINE_TAG, Integer.toString(i % numPools)));
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Start without existing InstancePartitions:
+    // Instances from each pool should be assigned to 1 replica-group, each with 3 instances, then these 3 instances
+    // should be assigned to 10 partitions, each with 1 instance
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // Math.abs("myTable_OFFLINE".hashCode()) % 2 = 0
+    // Math.abs("myTable_OFFLINE".hashCode()) % 3 = 2
+    // [i4, i0, i2]
+    // [i5, i1, i3]
+    //  p0  p1  p2
+    //  p3  p4  p5
+    //  p6  p7  p8
+    //  p9
+    assertEquals(instancePartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(2, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(2, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(3, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(3, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(4, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(4, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(5, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(5, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(6, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(6, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(7, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(7, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(8, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(9, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(9, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+
+    // Add 2 new instances
+    // Each existing instance should keep 3 partitions unmoved, and only 1 partition should be moved to the new instance
+    for (int i = numInstances; i < numInstances + 2; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfig.getRecord()
+          .setMapField(InstanceUtils.POOL_KEY, Map.of(OFFLINE_TAG, Integer.toString(i % numPools)));
+      instanceConfigs.add(instanceConfig);
+    }
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // Math.abs("myTable_OFFLINE".hashCode()) % 2 = 0
+    // Math.abs("myTable_OFFLINE".hashCode()) % 4 = 2
+    // [i4, i6, i0, i2]
+    // [i5, i7, i1, i3]
+    //  p0  p9  p1  p2
+    //  p3      p4  p5
+    //  p6      p7  p8
+    assertEquals(instancePartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(2, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(2, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(3, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(3, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(4, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(4, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(5, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(5, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(6, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(6, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(7, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(7, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(8, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(9, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 6));
+    assertEquals(instancePartitions.getInstances(9, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 7));
+  }
+
+  public void testMirrorServerSetBasedRandom()
+      throws FileNotFoundException {
     testMirrorServerSetBasedRandomInner(10000000);
   }
 
-  public void testMirrorServerSetBasedRandomInner(int loopCount) throws FileNotFoundException {
+  @Test
+  public void testForceMinimizeDataMovement() {
+    // This test case is using the same instance rebalance plot as testMinimizeDataMovement, and test whether
+    // forceMinimizeDataMovement flag in InstanceAssignmentDriver works as the minimizeDataMovement flag in
+    // TableConfig does.
+    int numReplicas = 3;
+    int numPartitions = 2;
+    int numInstancesPerPartition = 2;
+    String partitionColumn = "partition";
+
+    // Configs and driver that minimize data movement
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(numReplicas)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig))
+        .build();
+    assertTrue(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+        .isMinimizeDataMovement());
+
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    // Configs and driver that DO NOT minimize data movement
+    InstanceAssignmentConfig instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+
+    TableConfig tableConfigNotMinimized = new TableConfig(tableConfig);
+    tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+    assertFalse(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfigNotMinimized,
+        InstancePartitionsType.OFFLINE).isMinimizeDataMovement());
+    InstanceAssignmentDriver driverNotMinimized = new InstanceAssignmentDriver(tableConfigNotMinimized);
+
+    int numInstances = 10;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 2 instances
+    InstancePartitions instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, (Boolean) null);
+
+    InstancePartitions instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, true);
+
+    InstancePartitions instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
+
+    // Initial assignment should be the same for all scenarios
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    assertEquals(instancePartitionsForcedMinimize, instancePartitionsNotMinimize);
+
+    // Remove two instances (i2, i6) and add two new instances (i10, i11).
+    instanceConfigs.remove(6);
+    instanceConfigs.remove(2);
+    for (int i = numInstances; i < numInstances + 2; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 3 instances, then these 3
+    // instances should be assigned to 2 partitions, each with 2 instances
+    // Leverage the latest instancePartitions from last computation as the parameter.
+    // Data movement is minimized so that: i2 -> i10, i6 -> i11
+    instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+
+    instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsForcedMinimize, true);
+
+    // Data movement here is not minimized
+    instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsNotMinimize, false);
+
+    // Forced minimized data movement should be the same as minimized data movement
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    // Without minimizeDataMovement set to true, the data movement is not minimized and should be different
+    assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
+
+    // Add 2 more instances to the ZK and increase the number of instances per partition from 2 to 3.
+    for (int i = numInstances + 2; i < numInstances + 4; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(OFFLINE_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+    numInstancesPerPartition = 3;
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+
+    instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+    tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+
+    instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+
+    instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsForcedMinimize, true);
+
+    instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsNotMinimize, false);
+
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
+
+    // Reduce the number of instances per partition from 3 to 2.
+    numInstancesPerPartition = 2;
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+
+    instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+    tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+
+    instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+
+    instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsForcedMinimize, true);
+
+    instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsNotMinimize, false);
+
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
+
+    // Add one more replica group (from 3 to 4).
+    numReplicas = 4;
+    tableConfig.getValidationConfig().setReplication(Integer.toString(numReplicas));
+    tableConfigNotMinimized.getValidationConfig().setReplication(Integer.toString(numReplicas));
+
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+
+    instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+    tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+
+    instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+
+    instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsForcedMinimize, true);
+
+    instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsNotMinimize, false);
+
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
+
+    // Remove one replica group (from 4 to 3).
+    numReplicas = 3;
+    tableConfig.getValidationConfig().setReplication(Integer.toString(numReplicas));
+    tableConfigNotMinimized.getValidationConfig().setReplication(Integer.toString(numReplicas));
+
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, true);
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+
+    instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, false,
+            partitionColumn), null, false);
+    tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+
+    instancePartitions =
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+
+    instancePartitionsForcedMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsForcedMinimize, true);
+
+    instancePartitionsNotMinimize =
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+            instancePartitionsNotMinimize, false);
+
+    assertEquals(instancePartitionsForcedMinimize, instancePartitions);
+    assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
+  }
+
+  public void testMirrorServerSetBasedRandomInner(int loopCount)
+      throws FileNotFoundException {
     PrintStream o = new PrintStream("output.txt");
     System.setOut(o);
     for (int iter = 0; iter < loopCount; iter++) {
@@ -1044,7 +1426,6 @@ public class InstanceAssignmentTest {
             SERVER_INSTANCE_ID_PREFIX + 21,
             SERVER_INSTANCE_ID_PREFIX + 20,
             SERVER_INSTANCE_ID_PREFIX + 23));
-
 
     // upscale 3*3 to 3*5
     numPartitions = 0;
@@ -2042,9 +2423,9 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup,
             0, 0, false, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
-            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
-                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+            Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+                new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                    InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
@@ -2076,9 +2457,9 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
             numInstancesPerReplicaGroup, 0, 0, false, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
-            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
-                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+            Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+                new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                    InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
@@ -2118,9 +2499,9 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
             numInstancesPerReplicaGroup, 0, 0, false, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
-            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
-                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
+            Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+                new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                    InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), false)))
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
@@ -2230,9 +2611,9 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, numInstancesPerReplicaGroup, numPartitions,
             numInstancesPerPartition, true, null);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
-            new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
-                InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), true)))
+            Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+                new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig,
+                    InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.toString(), true)))
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     // existingInstancePartitions = instancePartitions

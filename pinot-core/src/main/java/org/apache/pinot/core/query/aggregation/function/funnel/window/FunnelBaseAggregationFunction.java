@@ -21,19 +21,23 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 import com.google.common.base.Preconditions;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
@@ -43,6 +47,8 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   protected final List<ExpressionContext> _stepExpressions;
   protected final FunnelModes _modes = new FunnelModes();
   protected final int _numSteps;
+  protected long _maxStepDuration = 0L;
+  protected final Map<String, String> _extraArguments = new HashMap<>();
 
   public FunnelBaseAggregationFunction(List<ExpressionContext> arguments) {
     int numArguments = arguments.size();
@@ -58,12 +64,35 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     Preconditions.checkArgument(numArguments >= 3 + _numSteps,
         "FUNNEL_AGG_FUNC expects >= " + (3 + _numSteps) + " arguments, got: %s. The function can be used as "
             + getType().getName() + "(timestampExpression, windowSize, numberSteps, stepExpression, "
-            + "[stepExpression, ..], [mode, [mode, ... ]])",
+            + "[stepExpression, ..], [extraArgument/mode, [extraArgument/mode, ... ]])",
         numArguments);
     _stepExpressions = arguments.subList(3, 3 + _numSteps);
-    if (numArguments > 3 + _numSteps) {
-      arguments.subList(3 + _numSteps, numArguments)
-          .forEach(arg -> _modes.add(Mode.valueOf(arg.getLiteral().getStringValue().toUpperCase())));
+    for (int i = 3 + _numSteps; i < numArguments; i++) {
+      String extraArgument = arguments.get(i).getLiteral().getStringValue().toUpperCase();
+      String[] parsedExtraArguments = extraArgument.split("=");
+      if (parsedExtraArguments.length == 2) {
+        String key = parsedExtraArguments[0].toUpperCase();
+        switch (key) {
+          case FunnelConfigs.MAX_STEP_DURATION:
+            _maxStepDuration = Long.parseLong(parsedExtraArguments[1]);
+            Preconditions.checkArgument(_maxStepDuration > 0, "MaxStepDuration must be > 0");
+            break;
+          case FunnelConfigs.MODE:
+            for (String modeStr : parsedExtraArguments[1].split(",")) {
+              _modes.add(Mode.valueOf(modeStr.trim()));
+            }
+            break;
+          default:
+            _extraArguments.put(key, parsedExtraArguments[1]);
+            break;
+        }
+        continue;
+      }
+      try {
+        _modes.add(Mode.valueOf(extraArgument));
+      } catch (Exception e) {
+        throw new RuntimeException("Unrecognized extra argument for funnel function: " + extraArgument, e);
+      }
     }
   }
 
@@ -207,13 +236,27 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     if (intermediateResult2 == null) {
       return intermediateResult1;
     }
+
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator.getValue(),
+        ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.serialize(funnelStepEvents));
+  }
+
+  @Override
+  public PriorityQueue<FunnelStepEvent> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   /**
@@ -241,6 +284,13 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     long windowStart = slidingWindow.peek().getTimestamp();
     long windowEnd = windowStart + _windowSize;
     while (!stepEvents.isEmpty() && (stepEvents.peek().getTimestamp() < windowEnd)) {
+      if (_maxStepDuration > 0) {
+        // When maxStepDuration > 0, we need to check if the event_to_add has a timestamp within the max duration
+        // from the last event in the sliding window. If not, we break the loop.
+        if (stepEvents.peek().getTimestamp() - slidingWindow.getLast().getTimestamp() > _maxStepDuration) {
+          break;
+        }
+      }
       slidingWindow.addLast(stepEvents.poll());
     }
   }
@@ -300,5 +350,10 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     public boolean hasKeepAll() {
       return contains(Mode.KEEP_ALL);
     }
+  }
+
+  protected static class FunnelConfigs {
+    public static final String MODE = "MODE";
+    static final String MAX_STEP_DURATION = "MAXSTEPDURATION";
   }
 }

@@ -81,9 +81,6 @@ public class TableCache implements PinotConfigProvider {
   private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
   // Key is table name with type suffix, value is table config info
   private final Map<String, TableConfigInfo> _tableConfigInfoMap = new ConcurrentHashMap<>();
-  // Key is table name (with or without type suffix), value is schema name
-  // It only stores table with schema name not matching the raw table name
-  private final Map<String, String> _schemaNameMap = new ConcurrentHashMap<>();
   // Key is lower case table name (with or without type suffix), value is actual table name
   // For case-insensitive mode only
   private final Map<String, String> _tableNameMap = new ConcurrentHashMap<>();
@@ -175,8 +172,7 @@ public class TableCache implements PinotConfigProvider {
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
-    String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
-    SchemaInfo schemaInfo = _schemaInfoMap.getOrDefault(schemaName, _schemaInfoMap.get(rawTableName));
+    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 
@@ -225,8 +221,7 @@ public class TableCache implements PinotConfigProvider {
   @Nullable
   @Override
   public Schema getSchema(String rawTableName) {
-    String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
-    SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
+    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._schema : null;
   }
 
@@ -262,17 +257,8 @@ public class TableCache implements PinotConfigProvider {
       throws IOException {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
-    _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
-
-    String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    if (schemaName != null && !schemaName.equals(rawTableName)) {
-      _schemaNameMap.put(tableNameWithType, schemaName);
-      _schemaNameMap.put(rawTableName, schemaName);
-    } else {
-      removeSchemaName(tableNameWithType);
-    }
-
+    _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
     if (_ignoreCase) {
       _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);
       _tableNameMap.put(rawTableName.toLowerCase(), rawTableName);
@@ -287,7 +273,6 @@ public class TableCache implements PinotConfigProvider {
     String tableNameWithType = path.substring(TABLE_CONFIG_PATH_PREFIX.length());
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.remove(tableNameWithType);
-    removeSchemaName(tableNameWithType);
     if (_ignoreCase) {
       _tableNameMap.remove(tableNameWithType.toLowerCase());
       String lowerCaseRawTableName = rawTableName.toLowerCase();
@@ -309,21 +294,6 @@ public class TableCache implements PinotConfigProvider {
       } else {
         if (!_tableNameMap.containsKey(rawTableName + OFFLINE_TABLE_SUFFIX)) {
           _tableNameMap.remove(rawTableName);
-        }
-      }
-    }
-  }
-
-  private void removeSchemaName(String tableNameWithType) {
-    if (_schemaNameMap.remove(tableNameWithType) != null) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-        if (!_schemaNameMap.containsKey(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))) {
-          _schemaNameMap.remove(rawTableName);
-        }
-      } else {
-        if (!_schemaNameMap.containsKey(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
-          _schemaNameMap.remove(rawTableName);
         }
       }
     }

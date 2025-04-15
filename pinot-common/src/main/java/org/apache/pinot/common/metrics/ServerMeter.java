@@ -39,11 +39,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
+  REALTIME_BYTES_CONSUMED("bytes", true),
+  REALTIME_BYTES_DROPPED("bytes", true),
   REALTIME_ROWS_SANITIZED("rows", true),
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
+  REALTIME_CLP_TOO_MANY_ENCODED_VARS("rows", false),
+  REALTIME_CLP_UNENCODABLE("rows", false),
+  REALTIME_CLP_ENCODED_NON_STRINGS("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE("bytes", false),
   REALTIME_OFFSET_COMMITS("commits", true),
@@ -52,6 +57,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
+  DEDUP_PRELOAD_FAILURE("count", false),
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
@@ -92,6 +98,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
@@ -126,6 +133,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
 
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.
@@ -136,12 +145,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
   /**
    * Number of times the max number of groups has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
-   * by 2.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+  /**
+   * Number of times the warning threshold for number of groups has been reached.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
   /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.
@@ -163,7 +176,25 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
    * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
    */
-  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
+
+  /// Number of tasks started by the MSE query runner
+  MULTI_STAGE_RUNNER_STARTED_TASKS("tasks", true),
+  /// Number of stats completed by the MSE query runner
+  MULTI_STAGE_RUNNER_COMPLETED_TASKS("tasks", true),
+  /// Number of tasks started by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
+  /// Number of tasks completed by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+
+  // predownload metrics
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
+  PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
+  PREDOWNLOAD_FAILED("predownloadFailed", true),
+
+  // reingestion metrics
+  SEGMENT_REINGESTION_FAILURE("segments", false);
 
   private final String _meterName;
   private final String _unit;

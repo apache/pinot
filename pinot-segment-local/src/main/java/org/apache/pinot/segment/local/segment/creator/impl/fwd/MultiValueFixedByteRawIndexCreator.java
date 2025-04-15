@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -65,26 +66,36 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     this(indexFile, compressionType, totalDocs, valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk,
-        writerVersion, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+        writerVersion, ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(),
+        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
-    // Store the length followed by the values
-    int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
+      // Store the length followed by the values
+      int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
       int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(targetMaxChunkSizeBytes / (totalMaxLength
           + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : targetDocsPerChunk;
       _indexWriter =
           new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
     } else {
-      int chunkSize =
-          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
+      if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
+        // Store only the values
+        int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV5(indexFile, compressionType, chunkSize);
+      } else {
+        // Store the length followed by the values
+        int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
+      }
     }
     _valueType = valueType;
   }

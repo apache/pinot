@@ -44,9 +44,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -108,7 +106,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     ingestionConfig.setRowTimeValueCheck(false);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-            .setIngestionConfig(ingestionConfig).build();
+            .setInvertedIndexColumns(List.of("column6", "column7", "column11", "column17", "column18"))
+            .setCreateInvertedIndexDuringSegmentGeneration(true).setIngestionConfig(ingestionConfig).build();
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
@@ -116,8 +115,6 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, "column6", "column7", "column11",
-        "column17", "column18");
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -181,13 +178,18 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     entries.add(new Object[]{
         "select * from testTable where daysSinceEpoch > 100", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
-    // COUNT from metadata (via fast filtered count which knows the number of docs in the segment)
+    // COUNT from metadata (via non-scan-based aggregation because it is an all-match)
     entries.add(new Object[]{
-        "select count(*) from testTable", FastFilteredCountOperator.class, FastFilteredCountOperator.class
+        "select count(*) from testTable", NonScanBasedAggregationOperator.class, FastFilteredCountOperator.class
+    });
+    // COUNT from metadata with a non-match-all filter, fast filtered count is to be used
+    entries.add(new Object[]{
+        "select count(*) from testTable where column1 <= 10", FastFilteredCountOperator.class,
+        FastFilteredCountOperator.class
     });
     // COUNT from metadata with match all filter
     entries.add(new Object[]{
-        "select count(*) from testTable where column1 > 10", FastFilteredCountOperator.class,
+        "select count(*) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
         FastFilteredCountOperator.class
     });
     // MIN/MAX from dictionary

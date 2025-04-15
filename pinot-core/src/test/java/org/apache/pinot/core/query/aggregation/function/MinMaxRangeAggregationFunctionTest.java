@@ -20,7 +20,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -76,6 +78,21 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "null"
         ).whenQuery("select minmaxrange(myField) from testTable")
         .thenResultIs("DOUBLE", "8");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggrWithAllNulls(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select minmaxrange(myField) from testTable")
+        .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
@@ -173,5 +190,39 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "2"
         ).whenQuery("select myField, minmaxrange(myField) from testTable group by myField order by myField")
         .thenResultIs(pinotDataType + " | DOUBLE", "1 | 0", "2 | 0", "null | null");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", scenario.getDataType())
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, minmaxrange(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1",
+            "tag2    | 2",
+            "tag3    | 0"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, minmaxrange(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1",
+            "tag2    | 1",
+            "tag3    | null"
+        );
   }
 }

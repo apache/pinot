@@ -22,11 +22,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -38,6 +36,9 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +104,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         public void runJob() {
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
 
-          Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
+          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
@@ -155,10 +156,12 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   protected ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
-    LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-        _queryContext);
-    return new ExceptionResultsBlock(QueryException.EXECUTION_TIMEOUT_ERROR,
-        new TimeoutException("Timed out while polling results block"));
+    String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "
+        + _queryContext + ")";
+    LOGGER.error(logMsg);
+    QueryErrorCode errCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    QueryErrorMessage errMsg = new QueryErrorMessage(errCode, "Timed out while polling results block", logMsg);
+    return new ExceptionResultsBlock(errMsg);
   }
 
   @Override
@@ -180,4 +183,29 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected abstract void onProcessSegmentsFinish();
+
+  protected static RuntimeException wrapOperatorException(Operator operator, RuntimeException e) {
+    // Skip early termination as that's not quite related to the segments.
+    if (e instanceof EarlyTerminationException) {
+      return e;
+    }
+    // Otherwise, try to get the segment name to help locate the segment when debugging query errors.
+    // Not all operators have associated segment, so do this at best effort.
+    // TODO: Do not use class name here but the operator name explain plan. To do so, that method must be moved from
+    //  multi and single stage operators to the base operator
+    String errorMessage = operator.getIndexSegment() != null
+        ? "Caught exception while doing operator: " + operator.getClass()
+            + " on segment " + operator.getIndexSegment().getSegmentName()
+        : "Caught exception while doing operator: " + operator.getClass();
+
+    QueryErrorCode errorCode;
+    if (e instanceof QueryException) {
+      QueryException queryException = (QueryException) e;
+      errorCode = queryException.getErrorCode();
+    } else {
+      errorCode = QueryErrorCode.QUERY_EXECUTION;
+    }
+    // TODO: Only include exception message if it is a QueryException. Otherwise, it might expose sensitive information
+    throw errorCode.asException(errorMessage + ": " + e.getMessage(), e);
+  }
 }

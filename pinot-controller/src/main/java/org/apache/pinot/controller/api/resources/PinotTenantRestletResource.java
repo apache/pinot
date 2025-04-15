@@ -369,8 +369,8 @@ public class PinotTenantRestletResource {
       InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
           instancePartitions);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
+          + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -388,10 +388,27 @@ public class PinotTenantRestletResource {
       if (tenantName.equals(tableConfigTenant)) {
         tables.add(table);
       }
+      if (tableConfig.getTenantConfig().getTagOverrideConfig() != null) {
+        String completed = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted();
+        if (completed != null && getRawTenantName(completed).equals(tenantName)) {
+          tables.add(table);
+        }
+        String consuming = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming();
+        if (consuming != null && getRawTenantName(consuming).equals(tenantName)) {
+          tables.add(table);
+        }
+      }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
+  }
+
+  private String getRawTenantName(String tenantName) {
+    if (tenantName.lastIndexOf("_") > 0) {
+      return tenantName.substring(0, tenantName.lastIndexOf("_"));
+    }
+    return tenantName;
   }
 
   private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
@@ -605,7 +622,7 @@ public class PinotTenantRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Error during %s operation for instance: %s", type, instance),
+          String.format("Error during %s operation for instance: %s. Reason: %s", type, instance, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     return instanceResult.toString();
@@ -661,7 +678,8 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Successfully deleted tenant " + tenantName);
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
-    throw new ControllerApplicationException(LOGGER, "Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
+    throw new ControllerApplicationException(LOGGER, "Error deleting tenant. Reason: " + res.getMessage(),
+        Response.Status.INTERNAL_SERVER_ERROR);
   }
 
   @POST

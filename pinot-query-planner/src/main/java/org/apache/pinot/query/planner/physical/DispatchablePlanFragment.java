@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -111,5 +112,9 @@ public class DispatchablePlanFragment {
   public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap) {
     _serverInstanceToWorkerIdMap.clear();
     _serverInstanceToWorkerIdMap.putAll(serverInstanceToWorkerIdMap);
+  }
+
+  public Set<QueryServerInstance> getServerInstances() {
+    return _serverInstanceToWorkerIdMap.keySet();
   }
 }

@@ -1,17 +1,6 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.version\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_minion_version"
-  cache: true
-  labels:
-    version: "$1"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.numberOfTasks\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_minion_numberOfTasks_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(taskExecution|taskQueueing|numberTasks|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed|segmentBytesDownloaded|segmentDownloadCount|segmentBytesUploaded|segmentUploadCount|recordsPurgedCount|recordsProcessedCount)\"><>(\\w+)"
+# Meters/timers that accept tableNameWithType and minion taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$6_$7"
   cache: true
   labels:
@@ -19,46 +8,13 @@ rules:
     table: "$1$3"
     tableType: "$4"
     taskType: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(segmentBytesDownloaded|segmentDownloadCount|segmentBytesUploaded|segmentUploadCount|recordsPurgedCount|recordsProcessedCount)\"><>(\\w+)"
-  name: "pinot_minion_$4_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_minion_$1_$2"
-  cache: true
+# Meters that accept either rawTableName or tableNameWithType ($1). $2 is the metric name
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$2_$3"
   cache: true
   labels:
     id: "$1"
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_version"
-  cache: true
-  labels:
-    version: "$2"
-
-  ## Metrics that fit the catch-all patterns above should not be added to this file.
-  ## In case a metric does not fit the catch-all patterns, add them before this comment
-
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix.
-  # Patterns after this line may be skipped.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$6_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$5_$6"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+# All global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true

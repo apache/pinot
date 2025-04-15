@@ -22,9 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 
@@ -33,7 +33,7 @@ import org.apache.pinot.common.utils.PinotDataType;
  * Post-aggregation function on the annotated scalar function.
  */
 public class PostAggregationFunction {
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
   @Nullable
   private PinotDataType[] _argumentTypes;
@@ -43,14 +43,13 @@ public class PostAggregationFunction {
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
-        throw new IllegalArgumentException(
-            String.format("Unsupported function: %s with argument types: %s", functionName,
-                Arrays.toString(argumentTypes)));
+        throw new IllegalArgumentException("Unsupported function: " + functionName + " with argument types: "
+            + Arrays.toString(argumentTypes));
       } else {
-        throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
+        throw new IllegalArgumentException("Unsupported function: " + functionName);
       }
     }
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
     _resultType = resultType != null ? resultType : ColumnDataType.STRING;

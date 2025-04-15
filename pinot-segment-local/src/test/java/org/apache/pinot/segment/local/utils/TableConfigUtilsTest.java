@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -30,6 +32,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -44,7 +47,6 @@ import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -74,6 +76,8 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertThrows;
+
 
 /**
  * Tests for the validations in {@link TableConfigUtils}
@@ -92,7 +96,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail for null timeColumnName and null schema in REALTIME table");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -102,7 +106,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail for null schema in REALTIME table");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -150,12 +154,22 @@ public class TableConfigUtilsTest {
     // OFFLINE table
     // null timeColumnName and schema - allowed in OFFLINE
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    TableConfigUtils.validate(tableConfig, null);
+    try {
+      TableConfigUtils.validate(tableConfig, null);
+      Assert.fail("Should fail for null timeColumnName and null schema in OFFLINE table");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
 
     // null schema only - allowed in OFFLINE
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
-    TableConfigUtils.validate(tableConfig, null);
+    try {
+      TableConfigUtils.validate(tableConfig, null);
+      Assert.fail("Should fail for null schema in OFFLINE table");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
 
     // null timeColumnName only - allowed in OFFLINE
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
@@ -173,7 +187,7 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // non-null schema nd timeColumnName, but timeColumnName not present as a time spec in schema
+    // non-null schema and timeColumnName, but timeColumnName not present as a time spec in schema
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
     tableConfig =
@@ -184,11 +198,6 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
-
-    // empty timeColumnName - valid
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName("").build();
-    TableConfigUtils.validate(tableConfig, schema);
 
     // valid
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -218,7 +227,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail with a Dimension table without a schema");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -328,7 +337,7 @@ public class TableConfigUtilsTest {
     // invalid transform config since Groovy is disabled
     try {
       TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema, null);
+      TableConfigUtils.validate(tableConfig, schema);
       // Reset to false
       TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in transform config");
@@ -364,7 +373,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
       TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema, null);
+      TableConfigUtils.validate(tableConfig, schema);
       // Reset to false
       TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in filter config");
@@ -678,24 +687,27 @@ public class TableConfigUtilsTest {
 
   @Test
   public void ingestionStreamConfigsTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
     Map<String, String> streamConfigs = getStreamConfigs();
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs)));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .build();
 
-    // only 1 stream config allowed
+    // Multiple stream configs are allowed
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for more than 1 stream config");
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
-      // expected
+      Assert.fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigs)));
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // validate the proto decoder
     streamConfigs = getKafkaStreamConfigs();
@@ -761,6 +773,8 @@ public class TableConfigUtilsTest {
 
   @Test
   public void ingestionBatchConfigsTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
@@ -775,11 +789,14 @@ public class TableConfigUtilsTest {
         new BatchIngestionConfig(Arrays.asList(batchConfigMap, batchConfigMap), null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
   }
 
   @Test
   public void ingestionConfigForDimensionTableTest() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(List.of("pk")).build();
+
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
@@ -794,12 +811,12 @@ public class TableConfigUtilsTest {
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "REFRESH", null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
         .setIngestionConfig(ingestionConfig).build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // dimension tables should have batch ingestion config
     ingestionConfig.setBatchIngestionConfig(null);
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should fail for Dimension table without batch ingestion config");
     } catch (IllegalStateException e) {
       // expected
@@ -809,7 +826,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", null));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should fail for Dimension table with ingestion type APPEND (should be REFRESH)");
     } catch (IllegalStateException e) {
       // expected
@@ -1307,6 +1324,31 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(),
           "Cannot disable forward index for column intCol, as the table type is REALTIME.");
     }
+  }
+
+  @Test
+  public void testValidateBFOnBoolean() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("mycol2", FieldSpec.DataType.STRING).build();
+
+    TableConfig tableconfig1 = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setBloomFilterColumns(Arrays.asList("mycol")).build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig1, schema));
+
+    TableConfig tableconfig2 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    tableconfig2.getIndexingConfig().setBloomFilterConfigs(
+        Collections.singletonMap("myCol", new BloomFilterConfig(0.01, 1000, true)));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig2, schema));
+
+    TableConfig tableconfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
+    indexesNode.putObject("bloom");
+    FieldConfig fieldConfig = new FieldConfig(
+        "MyCol", FieldConfig.EncodingType.DICTIONARY, null, null, null,
+        null, indexesNode, null, null);
+    tableconfig3.setFieldConfigList(Arrays.asList(fieldConfig));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig3, schema));
   }
 
   @Test
@@ -1850,7 +1892,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
         .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(stringTypeDelCol);
@@ -1973,7 +2014,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.BOOLEAN).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDropOutOfOrderRecord(dropOutOfOrderRecord);
@@ -1994,7 +2034,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setOutOfOrderRecordColumn(outOfOrderRecordColumn);
@@ -2069,7 +2108,7 @@ public class TableConfigUtilsTest {
           "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
     }
 
-    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMerge task
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2082,7 +2121,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask "
+              + "/ UpsertCompactMergeTask for upsert table");
     }
   }
 
@@ -2095,7 +2135,6 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol1")).build();
 
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.IGNORE);
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -2192,7 +2231,6 @@ public class TableConfigUtilsTest {
    */
   private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.IGNORE);
@@ -2271,147 +2309,6 @@ public class TableConfigUtilsTest {
       tableConfigBuilder.setNullHandlingEnabled(true);
       schemaBuilder.setEnableColumnBasedNullHandling(true);
     });
-  }
-
-  @Test
-  public void testTaskConfig() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    Map<String, String> realtimeToOfflineTaskConfig =
-        ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
-            "rollup", "myCol.aggregationType", "max");
-    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of("schedule", "0 */10 * ? * * *");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
-
-    // validate valid config
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // invalid schedule
-    HashMap<String, String> invalidScheduleConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
-    invalidScheduleConfig.put("schedule", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
-            invalidScheduleConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("contains an invalid cron schedule"));
-    }
-
-    // invalid allowDownloadFromServer config
-    HashMap<String, String> invalidAllowDownloadFromServerConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
-    invalidAllowDownloadFromServerConfig.put("allowDownloadFromServer", "true");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
-            invalidAllowDownloadFromServerConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("allowDownloadFromServer set to true, but "
-          + "peerSegmentDownloadScheme is not set in the table config"));
-    }
-
-    // invalid Upsert config with RealtimeToOfflineTask
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs()).setTaskConfig(
-            new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-                "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
-    }
-
-    // validate that TASK config will be skipped with skip string.
-    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
-
-    // invalid period
-    HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidPeriodConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      Assert.assertTrue(e.getMessage().contains("Invalid time spec"));
-    }
-
-    // invalid mergeType
-    HashMap<String, String> invalidMergeType = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidMergeType.put("mergeType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidMergeType, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("MergeType must be one of"));
-    }
-
-    // invalid column
-    HashMap<String, String> invalidColumnConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidColumnConfig.put("score.aggregationType", "max");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidColumnConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("not found in schema"));
-    }
-
-    // invalid agg
-    HashMap<String, String> invalidAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidAggConfig.put("myCol.aggregationType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAggConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
-    }
-
-    // aggregation function that exists but has no ValueAggregator available
-    HashMap<String, String> invalidAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidAgg2Config.put("myCol.aggregationType", "Histogram");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAgg2Config, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
-    }
-
-    // valid agg
-    HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // valid agg
-    HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
-    validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }
 
   @Test
@@ -2549,67 +2446,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testUpsertCompactionTaskConfig() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    Map<String, String> upsertCompactionTaskConfig =
-        ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "invalidRecordsThresholdCount",
-            "1");
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableSnapshot(true);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // test with invalidRecordsThresholdPercents as 0
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
-    TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema);
-
-    // test with invalid invalidRecordsThresholdPercents as -1 and 110
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
-    TableConfig negativePercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(negativePercentTableConfig, schema));
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "110");
-    TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
-
-    // test with invalid invalidRecordsThresholdCount
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "0");
-    TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(invalidCountTableConfig, schema));
-
-    // test without invalidRecordsThresholdPercent or invalidRecordsThresholdCount
-    upsertCompactionTaskConfig = ImmutableMap.of("bufferTimePeriod", "5d");
-    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(invalidTableConfig, schema));
-  }
-
-  @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(partitionColumn, 2);
@@ -2650,7 +2486,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
@@ -2660,7 +2495,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getKafkaStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
@@ -2672,7 +2506,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getPulsarStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "pulsar");
-    streamConfigs.put("stream.pulsar.consumer.type", "lowlevel");
     streamConfigs.put("stream.pulsar.topic.name", "test");
     streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
     streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");

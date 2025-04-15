@@ -41,6 +41,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -56,15 +58,22 @@ import software.amazon.awssdk.services.s3.model.StorageClass;
 public class S3PinotFSTest {
   private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "2.12.2");
   private static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "S3PinotFSTest");
+
+  private static final String S3_SCHEME = "s3";
+  private static final String S3A_SCHEME = "s3a";
   private static final String DELIMITER = "/";
   private static final String BUCKET = "test-bucket";
-  private static final String SCHEME = "s3";
   private static final String FILE_FORMAT = "%s://%s/%s";
   private static final String DIR_FORMAT = "%s://%s";
 
   private S3MockContainer _s3MockContainer;
   private S3PinotFS _s3PinotFS;
   private S3Client _s3Client;
+
+  @DataProvider(name = "scheme")
+  public static Object[][] schemes() {
+    return new Object[][]{{S3_SCHEME}, {S3A_SCHEME}};
+  }
 
   @BeforeClass
   public void setUp() {
@@ -97,14 +106,14 @@ public class S3PinotFSTest {
         RequestBody.fromBytes(new byte[0]));
   }
 
-  @Test
-  public void testTouchFileInBucket()
+  @Test(dataProvider = "scheme")
+  public void testTouchFileInBucket(String scheme)
       throws Exception {
 
     String[] originalFiles = new String[]{"a-touch.txt", "b-touch.txt", "c-touch.txt"};
 
     for (String fileName : originalFiles) {
-      _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
+      _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)));
     }
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
@@ -116,8 +125,8 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(response, originalFiles));
   }
 
-  @Test
-  public void testTouchFilesInFolder()
+  @Test(dataProvider = "scheme")
+  public void testTouchFilesInFolder(String scheme)
       throws Exception {
 
     String folder = "my-files";
@@ -125,7 +134,7 @@ public class S3PinotFSTest {
 
     for (String fileName : originalFiles) {
       String fileNameWithFolder = folder + DELIMITER + fileName;
-      _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileNameWithFolder)));
+      _s3PinotFS.touch(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileNameWithFolder)));
     }
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, folder, false));
@@ -137,18 +146,18 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(response, Arrays.stream(originalFiles).map(x -> folder + DELIMITER + x).toArray()));
   }
 
-  @Test
-  public void testListFilesInBucketNonRecursive()
+  @Test(dataProvider = "scheme")
+  public void testListFilesInBucketNonRecursive(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-list.txt", "b-list.txt", "c-list.txt"};
     List<String> expectedFileNames = new ArrayList<>();
 
     for (String fileName : originalFiles) {
       createEmptyFile("", fileName);
-      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName));
+      expectedFileNames.add(String.format(FILE_FORMAT, scheme, BUCKET, fileName));
     }
 
-    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)), false);
+    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(DIR_FORMAT, scheme, BUCKET)), false);
 
     actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, originalFiles.length);
@@ -156,8 +165,8 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(actualFiles, expectedFileNames.toArray()));
   }
 
-  @Test
-  public void testListFilesInFolderNonRecursive()
+  @Test(dataProvider = "scheme")
+  public void testListFilesInFolderNonRecursive(String scheme)
       throws Exception {
     String folder = "list-files";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
@@ -165,21 +174,21 @@ public class S3PinotFSTest {
 
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
-      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName));
+      expectedFileNames.add(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + fileName));
     }
 
     String[] subfolders = new String[]{"subfolder1", "subfolder2"};
     for (String subfolder : subfolders) {
       createEmptyFile(folder + DELIMITER + subfolder, "a-sub-file.txt");
-      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + subfolder));
+      expectedFileNames.add(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + subfolder));
     }
 
-    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
+    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)), false);
     Assert.assertEquals(actualFiles, expectedFileNames.toArray());
   }
 
-  @Test
-  public void testListFilesInFolderRecursive()
+  @Test(dataProvider = "scheme")
+  public void testListFilesInFolderRecursive(String scheme)
       throws Exception {
     String folder = "list-files-rec";
     String[] nestedFolders = new String[]{"", "list-files-child-1", "list-files-child-2"};
@@ -190,18 +199,18 @@ public class S3PinotFSTest {
       String folderName = folder + (childFolder.length() == 0 ? "" : DELIMITER + childFolder);
       for (String fileName : originalFiles) {
         createEmptyFile(folderName, fileName);
-        expectedResultList.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName + DELIMITER + fileName));
+        expectedResultList.add(String.format(FILE_FORMAT, scheme, BUCKET, folderName + DELIMITER + fileName));
       }
     }
-    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), true);
+    String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)), true);
     Assert.assertEquals(actualFiles.length, expectedResultList.size());
     actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-3")).toArray(String[]::new);
     Assert.assertEquals(actualFiles.length, expectedResultList.size());
     Assert.assertTrue(Arrays.equals(expectedResultList.toArray(), actualFiles));
   }
 
-  @Test
-  public void testListFilesWithMetadataInFolderNonRecursive()
+  @Test(dataProvider = "scheme")
+  public void testListFilesWithMetadataInFolderNonRecursive(String scheme)
       throws Exception {
     String folder = "list-files-with-md";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
@@ -210,19 +219,19 @@ public class S3PinotFSTest {
 
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
-      expectedFilePaths.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName));
+      expectedFilePaths.add(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + fileName));
       expectedIsDirectories.add(false);
     }
 
     String[] subfolders = new String[]{"subfolder1", "subfolder2"};
     for (String subfolder : subfolders) {
       createEmptyFile(folder + DELIMITER + subfolder, "a-sub-file.txt");
-      expectedFilePaths.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + subfolder));
+      expectedFilePaths.add(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + subfolder));
       expectedIsDirectories.add(true);
     }
 
     List<FileMetadata> actualFiles =
-        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
+        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)), false);
 
     List<String> actualFilePaths = actualFiles.stream().map(FileMetadata::getFilePath).collect(Collectors.toList());
     List<Boolean> actualIsDirectories = actualFiles.stream().map(FileMetadata::isDirectory)
@@ -231,8 +240,8 @@ public class S3PinotFSTest {
     Assert.assertEquals(actualIsDirectories, expectedIsDirectories);
   }
 
-  @Test
-  public void testListFilesWithMetadataInFolderRecursive()
+  @Test(dataProvider = "scheme")
+  public void testListFilesWithMetadataInFolderRecursive(String scheme)
       throws Exception {
     String folder = "list-files-rec-with-md";
     String[] nestedFolders = new String[]{"", "list-files-child-1", "list-files-child-2"};
@@ -243,11 +252,11 @@ public class S3PinotFSTest {
       String folderName = folder + (childFolder.length() == 0 ? "" : DELIMITER + childFolder);
       for (String fileName : originalFiles) {
         createEmptyFile(folderName, fileName);
-        expectedResultList.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName + DELIMITER + fileName));
+        expectedResultList.add(String.format(FILE_FORMAT, scheme, BUCKET, folderName + DELIMITER + fileName));
       }
     }
     List<FileMetadata> actualFiles =
-        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), true);
+        _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)), true);
     Assert.assertEquals(actualFiles.size(), expectedResultList.size());
     List<String> actualFilePaths =
         actualFiles.stream().map(FileMetadata::getFilePath).filter(fp -> fp.contains("list-3"))
@@ -256,8 +265,8 @@ public class S3PinotFSTest {
     Assert.assertEquals(expectedResultList, actualFilePaths);
   }
 
-  @Test
-  public void testDeleteFile()
+  @Test(dataProvider = "scheme")
+  public void testDeleteFile(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-delete.txt", "b-delete.txt", "c-delete.txt"};
     String fileToDelete = "a-delete.txt";
@@ -271,7 +280,7 @@ public class S3PinotFSTest {
     }
 
     boolean deleteResult = _s3PinotFS.delete(
-        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
+        URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileToDelete)), false);
 
     Assert.assertTrue(deleteResult);
 
@@ -285,8 +294,8 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(actualResponse, expectedResultList.toArray()));
   }
 
-  @Test
-  public void testDeleteFolder()
+  @Test(dataProvider = "scheme")
+  public void testDeleteFolder(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-delete-2.txt", "b-delete-2.txt", "c-delete-2.txt"};
     String folderName = "my-files";
@@ -296,7 +305,7 @@ public class S3PinotFSTest {
     }
 
     boolean deleteResult = _s3PinotFS.delete(
-        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
+        URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folderName)), true);
 
     Assert.assertTrue(deleteResult);
 
@@ -309,8 +318,8 @@ public class S3PinotFSTest {
     Assert.assertEquals(0, actualResponse.length);
   }
 
-  @Test
-  public void testIsDirectory()
+  @Test(dataProvider = "scheme")
+  public void testIsDirectory(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-dir.txt", "b-dir.txt", "c-dir.txt"};
     String folder = "my-files-dir";
@@ -320,12 +329,12 @@ public class S3PinotFSTest {
       createEmptyFile(folderName, fileName);
     }
 
-    boolean isBucketDir = _s3PinotFS.isDirectory(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)));
-    boolean isDir = _s3PinotFS.isDirectory(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)));
+    boolean isBucketDir = _s3PinotFS.isDirectory(URI.create(String.format(DIR_FORMAT, scheme, BUCKET)));
+    boolean isDir = _s3PinotFS.isDirectory(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)));
     boolean isDirChild = _s3PinotFS.isDirectory(
-        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
+        URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + childFolder)));
     boolean notIsDir = _s3PinotFS.isDirectory(URI.create(
-        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-delete.txt")));
+        String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-delete.txt")));
 
     Assert.assertTrue(isBucketDir);
     Assert.assertTrue(isDir);
@@ -333,8 +342,8 @@ public class S3PinotFSTest {
     Assert.assertFalse(notIsDir);
   }
 
-  @Test
-  public void testExists()
+  @Test(dataProvider = "scheme")
+  public void testExists(String scheme)
       throws Exception {
     String[] originalFiles = new String[]{"a-ex.txt", "b-ex.txt", "c-ex.txt"};
     String folder = "my-files-dir";
@@ -345,14 +354,14 @@ public class S3PinotFSTest {
       createEmptyFile(folderName, fileName);
     }
 
-    boolean bucketExists = _s3PinotFS.exists(URI.create(String.format(DIR_FORMAT, SCHEME, BUCKET)));
-    boolean dirExists = _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)));
+    boolean bucketExists = _s3PinotFS.exists(URI.create(String.format(DIR_FORMAT, scheme, BUCKET)));
+    boolean dirExists = _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder)));
     boolean childDirExists =
-        _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder)));
+        _s3PinotFS.exists(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + childFolder)));
     boolean fileExists = _s3PinotFS.exists(URI.create(
-        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-ex.txt")));
+        String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "a-ex.txt")));
     boolean fileNotExists = _s3PinotFS.exists(URI.create(
-        String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "d-ex.txt")));
+        String.format(FILE_FORMAT, scheme, BUCKET, folder + DELIMITER + childFolder + DELIMITER + "d-ex.txt")));
 
     Assert.assertTrue(bucketExists);
     Assert.assertTrue(dirExists);
@@ -362,7 +371,7 @@ public class S3PinotFSTest {
   }
 
   @Test(dataProvider = "storageClasses")
-  public void testCopyFromAndToLocal(StorageClass storageClass)
+  public void testCopyFromAndToLocal(StorageClass storageClass, String scheme)
       throws Exception {
 
     _s3PinotFS.setStorageClass(storageClass);
@@ -372,10 +381,10 @@ public class S3PinotFSTest {
     File fileToDownload = new File(TEMP_FILE, "copyFile_download.txt").getAbsoluteFile();
     try {
       createDummyFile(fileToCopy, 1024);
-      _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
+      _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)));
       HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
       Assert.assertEquals(headObjectResponse.contentLength(), (Long) fileToCopy.length());
-      _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)), fileToDownload);
+      _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)), fileToDownload);
       Assert.assertEquals(fileToCopy.length(), fileToDownload.length());
     } finally {
       FileUtils.deleteQuietly(fileToCopy);
@@ -384,7 +393,7 @@ public class S3PinotFSTest {
   }
 
   @Test(dataProvider = "storageClasses")
-  public void testMultiPartUpload(StorageClass storageClass)
+  public void testMultiPartUpload(StorageClass storageClass, String scheme)
       throws Exception {
 
     _s3PinotFS.setStorageClass(storageClass);
@@ -397,14 +406,14 @@ public class S3PinotFSTest {
       createDummyFile(fileToCopy, 11 * 1024 * 1024);
       _s3PinotFS.setMultiPartUploadConfigs(1, 5 * 1024 * 1024);
       try {
-        _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
+        _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)));
       } finally {
         // disable multipart upload again for the other UT cases.
         _s3PinotFS.setMultiPartUploadConfigs(-1, 128 * 1024 * 1024);
       }
       HeadObjectResponse headObjectResponse = _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
       Assert.assertEquals(headObjectResponse.contentLength(), (Long) fileToCopy.length());
-      _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)), fileToDownload);
+      _s3PinotFS.copyToLocalFile(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)), fileToDownload);
       Assert.assertEquals(fileToCopy.length(), fileToDownload.length());
     } finally {
       FileUtils.deleteQuietly(fileToCopy);
@@ -412,8 +421,8 @@ public class S3PinotFSTest {
     }
   }
 
-  @Test
-  public void testOpenFile()
+  @Test(dataProvider = "scheme")
+  public void testOpenFile(String scheme)
       throws Exception {
     String fileName = "sample.txt";
     String fileContent = "Hello, World";
@@ -422,17 +431,17 @@ public class S3PinotFSTest {
         S3TestUtils.getPutObjectRequest(BUCKET, fileName, _s3PinotFS.getStorageClass()),
         RequestBody.fromString(fileContent));
 
-    InputStream is = _s3PinotFS.open(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
+    InputStream is = _s3PinotFS.open(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, fileName)));
     String actualContents = IOUtils.toString(is, StandardCharsets.UTF_8);
     Assert.assertEquals(actualContents, fileContent);
   }
 
-  @Test
-  public void testMkdir()
+  @Test(dataProvider = "scheme")
+  public void testMkdir(String scheme)
       throws Exception {
     String folderName = "my-test-folder";
 
-    _s3PinotFS.mkdir(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)));
+    _s3PinotFS.mkdir(URI.create(String.format(FILE_FORMAT, scheme, BUCKET, folderName)));
 
     HeadObjectResponse headObjectResponse =
         _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, folderName + "/"));
@@ -440,7 +449,7 @@ public class S3PinotFSTest {
   }
 
   @Test(dataProvider = "storageClasses")
-  public void testMoveFile(StorageClass storageClass)
+  public void testMoveFile(StorageClass storageClass, String scheme)
       throws Exception {
 
     _s3PinotFS.setStorageClass(storageClass);
@@ -453,14 +462,14 @@ public class S3PinotFSTest {
 
     try {
       createDummyFile(file, fileSize);
-      URI sourceUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, sourceFilename));
+      URI sourceUri = URI.create(String.format(FILE_FORMAT, scheme, BUCKET, sourceFilename));
 
       _s3PinotFS.copyFromLocalFile(file, sourceUri);
 
       HeadObjectResponse sourceHeadObjectResponse =
           _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, sourceFilename));
 
-      URI targetUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, targetFilename));
+      URI targetUri = URI.create(String.format(FILE_FORMAT, scheme, BUCKET, targetFilename));
 
       boolean moveResult = _s3PinotFS.move(sourceUri, targetUri, false);
       Assert.assertTrue(moveResult);
@@ -493,12 +502,48 @@ public class S3PinotFSTest {
     }
   }
 
+  public void testDeleteBatch()
+      throws IOException {
+    String[] originalFiles = new String[]{"a-delete-batch.txt", "b-delete-batch.txt", "c-delete-batch.txt"};
+    String folderName = "my-files-batch";
+
+    for (String fileName : originalFiles) {
+      createEmptyFile(folderName, fileName);
+    }
+    // Create a sub folder to delete
+    String subFolderName = folderName + DELIMITER + "subfolder";
+    for (String fileName : new String[] {"subfolder-a-delete-batch.txt", "subfolder-b-delete-batch.txt"}) {
+      createEmptyFile(subFolderName, fileName);
+    }
+
+    // Create a list of URIs to delete
+    List<URI> filesToDelete = Arrays.stream(originalFiles)
+        .map(fileName -> URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, folderName + DELIMITER + fileName)))
+        .collect(Collectors.toList());
+    filesToDelete.add(URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, subFolderName)));
+
+    boolean deleteResult = _s3PinotFS.deleteBatch(filesToDelete, true);
+
+    Assert.assertTrue(deleteResult);
+
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    String[] actualResponse =
+        listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("delete-batch"))
+            .toArray(String[]::new);
+
+    Assert.assertEquals(actualResponse.length, 0);
+  }
+
   @DataProvider(name = "storageClasses")
   public Object[][] createStorageClasses() {
-    return new Object[][] {
-      { null },
-      { StorageClass.STANDARD },
-      { StorageClass.INTELLIGENT_TIERING }
+    return new Object[][]{
+        {null, S3_SCHEME},
+        {StorageClass.STANDARD, S3_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3_SCHEME},
+        {null, S3A_SCHEME},
+        {StorageClass.STANDARD, S3A_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3A_SCHEME},
     };
   }
 
@@ -517,6 +562,9 @@ public class S3PinotFSTest {
     return S3Client.builder().region(Region.of("us-east-1"))
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("foo", "bar")))
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .endpointOverride(URI.create(endpoint)).build();
+        .endpointOverride(URI.create(endpoint))
+        .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+        .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+        .build();
   }
 }

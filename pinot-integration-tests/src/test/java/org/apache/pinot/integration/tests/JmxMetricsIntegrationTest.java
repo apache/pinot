@@ -24,14 +24,20 @@ import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -44,6 +50,7 @@ import static org.testng.Assert.assertTrue;
  * Tests that verify JMX metrics emitted by various Pinot components.
  */
 public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JmxMetricsIntegrationTest.class);
 
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -51,6 +58,7 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final MBeanServer MBEAN_SERVER = ManagementFactory.getPlatformMBeanServer();
   private static final String PINOT_JMX_METRICS_DOMAIN = "\"org.apache.pinot.common.metrics\"";
   private static final String BROKER_METRICS_TYPE = "\"BrokerMetrics\"";
+  private static final String SERVER_METRICS_TYPE = "\"ServerMetrics\"";
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -59,6 +67,14 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     // Start the Pinot cluster
     startZk();
     startController();
+
+    // Enable query throttling
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "30");
+
     startBrokers(NUM_BROKERS);
     startServers(NUM_SERVERS);
 
@@ -138,8 +154,61 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNumGroupsLimitMetrics(boolean useMultiStageEngine) throws Exception {
+    ObjectName aggregateTimesNumGroupsLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
+            "name", "\"pinot.server.aggregateTimesNumGroupsLimitReached\"")));
+
+    ObjectName aggregateTimesNumGroupsWarningLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
+            "name", "\"pinot.server.aggregateTimesNumGroupsWarningLimitReached\"")));
+
+    postQuery("SET useMultiStageEngine=" + useMultiStageEngine + ";SET numGroupsLimit=100;"
+        + "SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
+    assertTrue((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitReachedMetric, "Count") > 0L);
+    assertTrue((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsWarningLimitReachedMetric, "Count") > 0L);
+  }
+
+  @Test
+  public void testEstimatedMseServerThreadsBrokerMetric() throws Exception {
+    ObjectName estimatedMseServerThreadsMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", BROKER_METRICS_TYPE,
+            "name", "\"pinot.broker.estimatedMseServerThreads\"")));
+
+    assertEquals((Long) MBEAN_SERVER.getAttribute(estimatedMseServerThreadsMetric, "Value"), 0L);
+
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+    executorService.submit(() -> {
+      while (true) {
+        try {
+          postQuery("SET useMultiStageEngine=true; "
+              + "SELECT sleep(ActualElapsedTime+60000) FROM mytable WHERE ActualElapsedTime > 0 limit 1");
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while running query", e);
+          break;
+        }
+      }
+    });
+
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        return (Long) MBEAN_SERVER.getAttribute(estimatedMseServerThreadsMetric, "Value") > 0;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 5000, "Expected value of MBean 'pinot.broker.estimatedMseServerThreads' to be non-zero");
+    executorService.shutdownNow();
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC, "true");
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT, 1);
   }
 }

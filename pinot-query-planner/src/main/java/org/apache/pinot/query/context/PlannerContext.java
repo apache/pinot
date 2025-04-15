@@ -19,6 +19,7 @@
 package org.apache.pinot.query.context;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -27,8 +28,10 @@ import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
@@ -47,15 +50,21 @@ public class PlannerContext implements AutoCloseable {
   private final RelOptPlanner _relOptPlanner;
   private final LogicalPlanner _relTraitPlanner;
 
-  private Map<String, String> _options;
+  private final Map<String, String> _options;
+  private final Map<String, String> _plannerOutput;
+  private final SqlExplainFormat _sqlExplainFormat;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
-      HepProgram optProgram, HepProgram traitProgram) {
+      HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
+      SqlExplainFormat sqlExplainFormat) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
-    _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.EMPTY_CONTEXT,
+    _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.of(envConfig),
         Collections.singletonList(RelDistributionTraitDef.INSTANCE));
+    _options = options;
+    _plannerOutput = new HashMap<>();
+    _sqlExplainFormat = sqlExplainFormat;
   }
 
   public PlannerImpl getPlanner() {
@@ -74,10 +83,6 @@ public class PlannerContext implements AutoCloseable {
     return _relTraitPlanner;
   }
 
-  public void setOptions(Map<String, String> options) {
-    _options = options;
-  }
-
   public Map<String, String> getOptions() {
     return _options;
   }
@@ -85,5 +90,13 @@ public class PlannerContext implements AutoCloseable {
   @Override
   public void close() {
     _planner.close();
+  }
+
+  public Map<String, String> getPlannerOutput() {
+    return _plannerOutput;
+  }
+
+  public SqlExplainFormat getSqlExplainFormat() {
+    return _sqlExplainFormat;
   }
 }

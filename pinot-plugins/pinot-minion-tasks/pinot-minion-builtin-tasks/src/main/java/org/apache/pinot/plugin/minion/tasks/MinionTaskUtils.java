@@ -19,10 +19,14 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -53,6 +57,9 @@ public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
+
+  public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
+  public static final String UTC = "UTC";
 
   private MinionTaskUtils() {
   }
@@ -208,9 +215,8 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn(
-            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
-                endpoint), e);
+        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: "
+            + endpoint, e);
         continue;
       }
 
@@ -224,9 +230,9 @@ public class MinionTaskUtils {
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
         // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
         // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
-                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName, expectedCrc, endpoint,
-            crcFromValidDocIdsBitmap);
+        String message = "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: "
+            + expectedCrc + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
+            + crcFromValidDocIdsBitmap;
         LOGGER.warn(message);
         continue;
       }
@@ -234,5 +240,16 @@ public class MinionTaskUtils {
       break;
     }
     return validDocIds;
+  }
+
+  public static String toUTCString(long epochMillis) {
+    Date date = new Date(epochMillis);
+    SimpleDateFormat isoFormat = new SimpleDateFormat(DATETIME_PATTERN);
+    isoFormat.setTimeZone(TimeZone.getTimeZone(UTC));
+    return isoFormat.format(date);
+  }
+
+  public static long fromUTCString(String utcString) {
+    return Instant.parse(utcString).toEpochMilli();
   }
 }

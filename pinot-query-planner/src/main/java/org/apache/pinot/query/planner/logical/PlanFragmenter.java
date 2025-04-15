@@ -56,7 +56,8 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
  * 3. Assign current PlanFragment ID to {@link MailboxReceiveNode};
  * 4. Increment current PlanFragment ID by one and assign it to the {@link MailboxSendNode}.
  */
-public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context> {
+public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context>,
+                                       EquivalentStagesReplacer.OnSubstitution {
   private final Int2ObjectOpenHashMap<PlanFragment> _planFragmentMap = new Int2ObjectOpenHashMap<>();
   private final Int2ObjectOpenHashMap<IntList> _childPlanFragmentIdsMap = new Int2ObjectOpenHashMap<>();
 
@@ -84,6 +85,30 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     node.setStageId(context._currentPlanFragmentId);
     node.getInputs().replaceAll(planNode -> planNode.visit(this, context));
     return node;
+  }
+
+  @Override
+  public void onSubstitution(int receiver, int oldSender, int newSender) {
+    // Change the sender of the receiver to the new sender
+    IntList senders = _childPlanFragmentIdsMap.get(receiver);
+    senders.rem(oldSender);
+    if (!senders.contains(newSender)) {
+      senders.add(newSender);
+    }
+
+    // Remove the old sender and its children from the plan fragment map
+    _planFragmentMap.remove(oldSender);
+
+    IntList fragmentsToRemove = new IntArrayList();
+    fragmentsToRemove.add(oldSender);
+    while (!fragmentsToRemove.isEmpty()) {
+      int orphan = fragmentsToRemove.removeInt(fragmentsToRemove.size() - 1);
+      IntList children = _childPlanFragmentIdsMap.remove(orphan);
+      if (children != null) {
+        fragmentsToRemove.addAll(children);
+      }
+      _planFragmentMap.remove(orphan);
+    }
   }
 
   @Override
@@ -168,7 +193,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
     MailboxReceiveNode mailboxReceiveNode =
-        new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), List.of(),
+        new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);

@@ -36,7 +36,7 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public enum Strategy {
     // Todo: add CUSTOM strategies
-    APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
+    APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, FORCE_OVERWRITE, UNION
   }
 
   public enum ConsistencyMode {
@@ -101,6 +101,8 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to drop out-of-order record")
   private boolean _dropOutOfOrderRecord;
 
+  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  @Deprecated
   @JsonPropertyDescription("Whether to pause partial upsert table's partition consumption during commit")
   private boolean _allowPartialUpsertConsumptionDuringCommit;
 
@@ -301,10 +303,12 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
+  @Deprecated
   public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
     _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
   }
 
+  @Deprecated
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
   }

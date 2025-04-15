@@ -23,10 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
@@ -44,13 +46,18 @@ public class SegmentProcessorConfig {
   private final List<PartitionerConfig> _partitionerConfigs;
   private final MergeType _mergeType;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
+  private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final SegmentConfig _segmentConfig;
   private final Consumer<Object> _progressObserver;
+  private final SegmentNameGenerator _segmentNameGenerator;
+  private final Long _customCreationTime;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
-      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
-      Consumer<Object> progressObserver) {
+      Map<String, AggregationFunctionType> aggregationTypes,
+      Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
+      Consumer<Object> progressObserver, @Nullable SegmentNameGenerator segmentNameGenerator,
+      @Nullable Long customCreationTime) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -58,10 +65,13 @@ public class SegmentProcessorConfig {
     _partitionerConfigs = partitionerConfigs;
     _mergeType = mergeType;
     _aggregationTypes = aggregationTypes;
+    _aggregationFunctionParameters = aggregationFunctionParameters;
     _segmentConfig = segmentConfig;
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
     };
+    _segmentNameGenerator = segmentNameGenerator;
+    _customCreationTime = customCreationTime;
   }
 
   /**
@@ -107,6 +117,13 @@ public class SegmentProcessorConfig {
   }
 
   /**
+   * The aggregation function parameters for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
+   */
+  public Map<String, Map<String, String>> getAggregationFunctionParameters() {
+    return _aggregationFunctionParameters;
+  }
+
+  /**
    * The SegmentConfig for the SegmentProcessorFramework's reduce phase
    */
   public SegmentConfig getSegmentConfig() {
@@ -117,11 +134,20 @@ public class SegmentProcessorConfig {
     return _progressObserver;
   }
 
+  public SegmentNameGenerator getSegmentNameGenerator() {
+    return _segmentNameGenerator;
+  }
+
+  public long getCustomCreationTime() {
+    return _customCreationTime != null ? _customCreationTime : System.currentTimeMillis();
+  }
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
         + _timeHandlerConfig + ", _partitionerConfigs=" + _partitionerConfigs + ", _mergeType=" + _mergeType
-        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + '}';
+        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig
+        + ", _segmentNameGenerator=" + _segmentNameGenerator + ", _customCreationTime=" + _customCreationTime + '}';
   }
 
   /**
@@ -134,8 +160,11 @@ public class SegmentProcessorConfig {
     private List<PartitionerConfig> _partitionerConfigs;
     private MergeType _mergeType;
     private Map<String, AggregationFunctionType> _aggregationTypes;
+    private Map<String, Map<String, String>> _aggregationFunctionParameters;
     private SegmentConfig _segmentConfig;
     private Consumer<Object> _progressObserver;
+    private SegmentNameGenerator _segmentNameGenerator;
+    private Long _customCreationTime;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -167,6 +196,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setAggregationFunctionParameters(Map<String, Map<String, String>> aggregationFunctionParameters) {
+      _aggregationFunctionParameters = aggregationFunctionParameters;
+      return this;
+    }
+
     public Builder setSegmentConfig(SegmentConfig segmentConfig) {
       _segmentConfig = segmentConfig;
       return this;
@@ -174,6 +208,16 @@ public class SegmentProcessorConfig {
 
     public Builder setProgressObserver(Consumer<Object> progressObserver) {
       _progressObserver = progressObserver;
+      return this;
+    }
+
+    public Builder setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
+      _segmentNameGenerator = segmentNameGenerator;
+      return this;
+    }
+
+    public Builder setCustomCreationTime(Long customCreationTime) {
+      _customCreationTime = customCreationTime;
       return this;
     }
 
@@ -193,11 +237,15 @@ public class SegmentProcessorConfig {
       if (_aggregationTypes == null) {
         _aggregationTypes = Collections.emptyMap();
       }
+      if (_aggregationFunctionParameters == null) {
+        _aggregationFunctionParameters = Collections.emptyMap();
+      }
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig, _progressObserver);
+          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver,
+              _segmentNameGenerator, _customCreationTime);
     }
   }
 }

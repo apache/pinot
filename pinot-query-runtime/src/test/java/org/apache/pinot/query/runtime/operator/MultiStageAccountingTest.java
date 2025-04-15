@@ -25,7 +25,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -35,13 +34,15 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -90,14 +91,13 @@ public class MultiStageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy");
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
+        InstanceType.SERVER);
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE);
     ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
-        threadExecutionContext);
+    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadExecutionContext);
   }
 
   @BeforeMethod
@@ -114,7 +114,7 @@ public class MultiStageAccountingTest implements ITest {
 
   @Test
   public void testOperatorAccounting() {
-    _operator.nextBlock().getContainer();
+    ((MseBlock.Data) _operator.nextBlock()).asRowHeap().getRows();
 
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     Collection<? extends QueryResourceTracker> queryResourceTrackers = threadAccountant.getQueryResources().values();
@@ -125,7 +125,7 @@ public class MultiStageAccountingTest implements ITest {
     assertEquals(threadResourceTrackers.size(), 1);
     assertTrue(queryResourceTrackers.iterator().next().getAllocatedBytes() > 0);
     assertTrue(threadResourceTrackers.iterator().next().getAllocatedBytes() > 0);
-    assertTrue(_operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(_operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @DataProvider(name = "operatorProvider")
@@ -147,12 +147,12 @@ public class MultiStageAccountingTest implements ITest {
     List<Integer> groupKeys = List.of(0);
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, DOUBLE});
     when(input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "sum"}, new DataSchema.ColumnDataType[]{INT, DOUBLE});
     return new AggregateOperator(OperatorTestUtil.getTracingContext(), input,
         new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, filterArgs, groupKeys,
-            AggregateNode.AggType.DIRECT));
+            AggregateNode.AggType.DIRECT, false, null, 0));
   }
 
   private static MultiStageOperator getHashJoinOperator() {
@@ -167,10 +167,10 @@ public class MultiStageAccountingTest implements ITest {
     });
     when(leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     when(rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"},
         new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
@@ -185,9 +185,9 @@ public class MultiStageAccountingTest implements ITest {
     MultiStageOperator input = Mockito.mock();
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    when(input.nextBlock()).thenReturn(
-            new TransferableBlock(List.of(new Object[]{2}, new Object[]{1}), schema, DataBlock.Type.ROW))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(input.nextBlock())
+        .thenReturn(new RowHeapDataBlock(List.of(new Object[]{2}, new Object[]{1}), schema))
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(0, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
     return new SortOperator(OperatorTestUtil.getTracingContext(), input,
@@ -199,7 +199,7 @@ public class MultiStageAccountingTest implements ITest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
     when(input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -219,10 +219,10 @@ public class MultiStageAccountingTest implements ITest {
     });
     Mockito.when(leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(rightOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     return new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
         schema);

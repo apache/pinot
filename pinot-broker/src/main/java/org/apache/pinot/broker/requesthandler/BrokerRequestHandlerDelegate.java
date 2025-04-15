@@ -19,18 +19,22 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -46,13 +50,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
+  private final AbstractResponseStore _responseStore;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
-      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler) {
+      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
+    _responseStore = responseStore;
   }
 
   @Override
@@ -94,23 +100,27 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
       }
     }
 
+    BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
     if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
       if (_multiStageBrokerRequestHandler != null) {
-        return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-            requestContext, httpHeaders);
+        requestHandler = _multiStageBrokerRequestHandler;
       } else {
-        return new BrokerResponseNative(QueryException.getException(QueryException.INTERNAL_ERROR,
-            "V2 Multi-Stage query engine not enabled."));
+        return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
       }
-    } else {
-      return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext, httpHeaders);
     }
+
+    BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+        requestContext, httpHeaders);
+
+    if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
+      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+    }
+    return response;
   }
 
   @Override
@@ -124,18 +134,59 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    // TODO: add support for multiStaged engine: track running queries for multiStaged engine and combine its
-    //       running queries with those from singleStaged engine. Both engines share the same request Id generator, so
-    //       the query will have unique ids across the two engines.
-    return _singleStageBrokerRequestHandler.getRunningQueries();
+    // Both engines share the same request ID generator, so the query will have unique IDs across the two engines.
+    Map<Long, String> queries = new HashMap<>(_singleStageBrokerRequestHandler.getRunningQueries());
+    if (_multiStageBrokerRequestHandler != null) {
+      queries.putAll(_multiStageBrokerRequestHandler.getRunningQueries());
+    }
+    return queries;
   }
 
   @Override
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
-    //       not found, try on the singleStaged engine.
+    if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
+        queryId, timeoutMs, executor, connMgr, serverResponses)) {
+        return true;
+    }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQueryByClientId(
+        clientQueryId, timeoutMs, executor, connMgr, serverResponses)) {
+      return true;
+    }
+    return _singleStageBrokerRequestHandler.cancelQueryByClientId(
+        clientQueryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
+  @Override
+  public OptionalLong getRequestIdByClientId(String clientQueryId) {
+    if (_multiStageBrokerRequestHandler != null) {
+      OptionalLong mseReqId = _multiStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
+      if (mseReqId.isPresent()) {
+        return mseReqId;
+      }
+    }
+    return _singleStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
+  }
+
+  private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
+      throws Exception {
+    if (numRows == null) {
+      throw new RuntimeException(
+          "numRows not specified when requesting a cursor for request id: " + response.getRequestId());
+    }
+    long cursorStoreStartTimeMs = System.currentTimeMillis();
+    _responseStore.storeResponse(response);
+    long cursorStoreTimeMs = System.currentTimeMillis() - cursorStoreStartTimeMs;
+    CursorResponse cursorResponse = _responseStore.handleCursorRequest(response.getRequestId(), 0, numRows);
+    cursorResponse.setCursorResultWriteTimeMs(cursorStoreTimeMs);
+    return cursorResponse;
   }
 }

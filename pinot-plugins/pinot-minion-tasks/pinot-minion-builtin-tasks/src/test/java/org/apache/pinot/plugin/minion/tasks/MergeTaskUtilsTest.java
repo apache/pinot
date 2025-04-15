@@ -49,8 +49,9 @@ public class MergeTaskUtilsTest {
   public void testGetTimeHandlerConfig() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
-    Schema schema = new Schema.SchemaBuilder()
-        .addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss", "1:SECONDS").build();
+    Schema schema =
+        new Schema.SchemaBuilder().addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss",
+            "1:SECONDS").build();
     Map<String, String> taskConfig = new HashMap<>();
     long expectedWindowStartMs = 1625097600000L;
     long expectedWindowEndMs = 1625184000000L;
@@ -206,12 +207,12 @@ public class MergeTaskUtilsTest {
     segmentZKMetadata.setCustomMap(Collections.emptyMap());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata
-        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+    segmentZKMetadata.setCustomMap(
+        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata
-        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+    segmentZKMetadata.setCustomMap(
+        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

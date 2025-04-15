@@ -59,6 +59,7 @@ type Props = {
   addLinks?: boolean,
   cellClickCallback?: Function,
   isCellClickable?: boolean,
+  makeOnlyFirstCellClickable?: boolean,
   highlightBackground?: boolean,
   isSticky?: boolean,
   baseURL?: string,
@@ -271,6 +272,7 @@ export default function CustomizedTables({
   addLinks,
   cellClickCallback,
   isCellClickable,
+  makeOnlyFirstCellClickable,
   highlightBackground,
   isSticky,
   baseURL,
@@ -326,7 +328,16 @@ export default function CustomizedTables({
     } else {
       const filteredRescords = initialData.records.filter((record) => {
         const searchFound = record.find(
-          (cell) => cell.toString().toLowerCase().indexOf(str) > -1
+          (cell) => {
+            let strigifiedData;
+            try {
+             strigifiedData = JSON.stringify(get(cell, 'value') || cell)
+            } catch(e) {
+             strigifiedData =  cell.toString()
+            }
+
+           return strigifiedData.toLowerCase().indexOf(str) > -1
+         }
         );
         if (searchFound) {
           return true;
@@ -462,8 +473,17 @@ export default function CustomizedTables({
               {styleCell(cellData.value)}
             </Tooltip>
         );
-      } else {
+      } else if(has(cellData, 'value') && cellData.value) {
         return styleCell(cellData.value);
+      } else {
+          try {
+            const stringifiedJSON = JSON.stringify(cellData)
+            return stringifiedJSON
+          } catch(e) {
+            // If the data is corrupted and not recognizable by JSON.stringify, fallback to below error message instead
+            // of crashing the whole page for the user.
+            return '<DATA COULD NOT BE PARSED TO DISPLAY>'
+          }
       }
     }
     return styleCell(cellData.toString());
@@ -544,7 +564,7 @@ export default function CustomizedTables({
                         ) : (
                           <StyledTableCell
                             key={idx}
-                            className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
+                            className={isCellClickable && (!makeOnlyFirstCellClickable || !idx) ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
                             {makeCell(cell ?? '--', index)}

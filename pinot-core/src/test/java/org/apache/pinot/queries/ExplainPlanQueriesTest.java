@@ -41,7 +41,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
@@ -276,9 +277,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Mock the instance data manager
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
-            new SegmentLocks()).getTableDataManager(TABLE_CONFIG);
+    TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(TABLE_CONFIG, SCHEMA);
     tableDataManager.start();
     for (IndexSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment((ImmutableSegment) indexSegment);
@@ -1744,8 +1745,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result1.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     // No scan required as metadata is sufficient to answer teh query for all segments
@@ -1857,8 +1857,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result1.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
 
     // No scan required as metadata is sufficient to answer teh query for all segments
@@ -2088,8 +2087,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result7.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result7.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result7.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     check(query7, new ResultTable(DATA_SCHEMA, result7));
 
     // Segment 1 has an EmptyFilterOperator plan for this query as '2' is within the segment range but not present
@@ -2300,13 +2298,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result7.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result7.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result7.add(new Object[]{"FILTER_EMPTY", 4, 3});
+    result7.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     result7.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result7.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result7.add(new Object[]{"FILTER_EMPTY", 4, 3});
     check(query7, new ResultTable(DATA_SCHEMA, result7));
 
     // Segment 1 has an EmptyFilterOperator plan for this query as '2' is within the segment range but not present
@@ -2347,13 +2344,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result9.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result9.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result9.add(new Object[]{"FILTER_EMPTY", 4, 3});
+    result9.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
     result9.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:1)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result9.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
-    result9.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
+    result9.add(new Object[]{"FILTER_EMPTY", 4, 3});
     check(query9, new ResultTable(DATA_SCHEMA, result9));
 
     // All segments are pruned

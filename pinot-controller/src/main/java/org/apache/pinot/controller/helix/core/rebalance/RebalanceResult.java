@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -30,6 +31,8 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonPropertyOrder({"jobId", "status", "description", "preChecksResult", "rebalanceSummaryResult",
+    "instanceAssignment", "tierInstanceAssignment", "segmentAssignment"})
 public class RebalanceResult {
   private final String _jobId;
   private final Status _status;
@@ -40,6 +43,10 @@ public class RebalanceResult {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Map<String, RebalancePreCheckerResult> _preChecksResult;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final RebalanceSummaryResult _rebalanceSummaryResult;
 
   @JsonCreator
   public RebalanceResult(@JsonProperty(value = "jobId", required = true) String jobId,
@@ -47,13 +54,17 @@ public class RebalanceResult {
       @JsonProperty(value = "description", required = true) String description,
       @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
       @JsonProperty("tierInstanceAssignment") @Nullable Map<String, InstancePartitions> tierInstanceAssignment,
-      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment) {
+      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment,
+      @JsonProperty("preChecksResult") @Nullable Map<String, RebalancePreCheckerResult> preChecksResult,
+      @JsonProperty("rebalanceSummaryResult") @Nullable RebalanceSummaryResult rebalanceSummaryResult) {
     _jobId = jobId;
     _status = status;
     _description = description;
     _instanceAssignment = instanceAssignment;
     _tierInstanceAssignment = tierInstanceAssignment;
     _segmentAssignment = segmentAssignment;
+    _preChecksResult = preChecksResult;
+    _rebalanceSummaryResult = rebalanceSummaryResult;
   }
 
   @JsonProperty
@@ -84,6 +95,16 @@ public class RebalanceResult {
   @JsonProperty
   public Map<String, Map<String, String>> getSegmentAssignment() {
     return _segmentAssignment;
+  }
+
+  @JsonProperty
+  public Map<String, RebalancePreCheckerResult> getPreChecksResult() {
+    return _preChecksResult;
+  }
+
+  @JsonProperty
+  public RebalanceSummaryResult getRebalanceSummaryResult() {
+    return _rebalanceSummaryResult;
   }
 
   public enum Status {

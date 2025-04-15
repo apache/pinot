@@ -137,7 +137,7 @@ public class PinotDatabaseRestletResource {
   @Path("/databases/{databaseName}/quotas")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
   @ApiOperation(value = "Update database quotas", notes = "Update database quotas")
-  public SuccessResponse addTable(
+  public SuccessResponse setDatabaseQuota(
       @PathParam("databaseName") String databaseName, @QueryParam("maxQueriesPerSecond") String queryQuota,
       @Context HttpHeaders httpHeaders) {
     if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {

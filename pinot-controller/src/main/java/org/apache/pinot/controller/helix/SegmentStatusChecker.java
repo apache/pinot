@@ -27,6 +27,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -47,6 +49,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.util.ServerQueryInfoFetcher;
+import org.apache.pinot.controller.util.ServerQueryInfoFetcher.ServerQueryInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -91,7 +95,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
-
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader = tableSizeReader;
   }
@@ -209,6 +212,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
+    ServerQueryInfoFetcher serverQueryInfoFetcher = new ServerQueryInfoFetcher(_pinotHelixResourceManager);
+
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
     if (idealState == null) {
@@ -241,6 +246,21 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+    if (propertyStore != null) {
+      String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
+      List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
+      long segmentNamesBytesSize = 0;
+      if (segmentNames != null) {
+        for (String segmentName : segmentNames) {
+          segmentNamesBytesSize += segmentName.getBytes().length;
+        }
+      }
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
+          segmentNamesBytesSize);
+    }
+
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
       segments = Set.of();
@@ -268,11 +288,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    if (externalView != null) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_SIZE,
+          externalView.toString().length());
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_BYTE_SIZE,
+          externalView.serialize(RECORD_SERIALIZER).length);
+    }
 
-    // Maximum number of replicas in ideal state
-    int maxISReplicas = Integer.MIN_VALUE;
-    // Minimum number of replicas in external view
-    int minEVReplicas = Integer.MAX_VALUE;
+    // Maximum number of replicas that is up (ONLINE/CONSUMING) in ideal state
+    int maxISReplicasUp = Integer.MIN_VALUE;
+    // Minimum number of replicas that is up (ONLINE/CONSUMING) in external view
+    int minEVReplicasUp = Integer.MAX_VALUE;
+    // Minimum percentage of replicas that is up (ONLINE/CONSUMING) in external view
+    int minEVReplicasUpPercent = 100;
     // Total compressed segment size in deep store
     long tableCompressedSize = 0;
     // Segments without ZK metadata
@@ -286,18 +314,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
     for (String segment : segments) {
-      int numISReplicas = 0;
+      // Number of replicas in ideal state that is in ONLINE/CONSUMING state
+      int numISReplicasUp = 0;
       for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
         String state = entry.getValue();
         if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-          numISReplicas++;
+          numISReplicasUp++;
         }
       }
-      // Skip segments not ONLINE/CONSUMING in ideal state
-      if (numISReplicas == 0) {
+      // Skip segments with no ONLINE/CONSUMING in ideal state
+      if (numISReplicasUp == 0) {
         continue;
       }
-      maxISReplicas = Math.max(maxISReplicas, numISReplicas);
+      maxISReplicasUp = Math.max(maxISReplicasUp, numISReplicasUp);
 
       SegmentZKMetadata segmentZKMetadata = _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segment);
       // Skip the segment when it doesn't have ZK metadata. Most likely the segment is just deleted.
@@ -330,46 +359,49 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         }
       }
 
-      int numEVReplicas = 0;
+      int numEVReplicasUp = 0;
       if (externalView != null) {
         Map<String, String> stateMap = externalView.getStateMap(segment);
         if (stateMap != null) {
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
-            String state = entry.getValue();
-            if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-              numEVReplicas++;
+            String serverInstanceId = entry.getKey();
+            String segmentState = entry.getValue();
+            if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
+                && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
+              numEVReplicasUp++;
             }
-            if (state.equals(SegmentStateModel.ERROR)) {
+            if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
             }
           }
         }
       }
-      if (numEVReplicas == 0) {
+      if (numEVReplicasUp == 0) {
         offlineSegments.add(segment);
-      } else if (numEVReplicas < numISReplicas) {
+      } else if (numEVReplicasUp < numISReplicasUp) {
         partialOnlineSegments.add(segment);
       } else {
-        // Do not allow nReplicasEV to be larger than nReplicasIS
-        numEVReplicas = numISReplicas;
+        // Do not allow numEVReplicasUp to be larger than numISReplicasUp
+        numEVReplicasUp = numISReplicasUp;
       }
-      minEVReplicas = Math.min(minEVReplicas, numEVReplicas);
+
+      minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
+      // Total number of replicas in ideal state (including ERROR/OFFLINE states)
+      int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
+      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
     }
 
-    if (maxISReplicas == Integer.MIN_VALUE) {
+    if (maxISReplicasUp == Integer.MIN_VALUE) {
       try {
-        maxISReplicas = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
+        maxISReplicasUp = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
       } catch (NumberFormatException e) {
-        maxISReplicas = 1;
+        maxISReplicasUp = 1;
       }
     }
-    // Do not allow minEVReplicas to be larger than maxISReplicas
-    minEVReplicas = Math.min(minEVReplicas, maxISReplicas);
 
-    if (minEVReplicas < maxISReplicas) {
-      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
-          tableNameWithType, minEVReplicas, maxISReplicas);
-    }
+    // Do not allow minEVReplicasUp to be larger than maxISReplicasUp
+    minEVReplicasUp = Math.min(minEVReplicasUp, maxISReplicasUp);
+
     int numSegmentsWithoutZKMetadata = segmentsWithoutZKMetadata.size();
     if (numSegmentsWithoutZKMetadata > 0) {
       LOGGER.warn("Table {} has {} segments without ZK metadata: {}", tableNameWithType, numSegmentsWithoutZKMetadata,
@@ -402,9 +434,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicasUp);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
-        minEVReplicas * 100L / maxISReplicas);
+        minEVReplicasUpPercent);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
@@ -419,11 +451,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      StreamConfig streamConfig =
-          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
-          streamConfig).findAndEmitMetrics(idealState);
+          streamConfigs).findAndEmitMetrics(idealState);
     }
+  }
+
+  private boolean isServerQueryable(ServerQueryInfo serverInfo) {
+    return serverInfo != null
+        && serverInfo.isHelixEnabled()
+        && !serverInfo.isQueriesDisabled()
+        && !serverInfo.isShutdownInProgress();
   }
 
   private static String logSegments(List<?> segments) {

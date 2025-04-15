@@ -24,7 +24,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -65,25 +67,29 @@ public class MissingConsumingSegmentFinder {
   private ControllerMetrics _controllerMetrics;
 
   public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      ControllerMetrics controllerMetrics, StreamConfig streamConfig) {
+      ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs) {
     _realtimeTableName = realtimeTableName;
     _controllerMetrics = controllerMetrics;
     _segmentMetadataFetcher = new SegmentMetadataFetcher(propertyStore, controllerMetrics);
     _streamPartitionMsgOffsetFactory =
-        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
+        StreamConsumerFactoryProvider.create(streamConfigs.get(0)).createStreamMsgOffsetFactory();
 
     // create partition group id to largest stream offset map
     _partitionGroupIdToLargestStreamOffsetMap = new HashMap<>();
-    streamConfig.setOffsetCriteria(OffsetCriteria.LARGEST_OFFSET_CRITERIA);
+    streamConfigs.stream().map(streamConfig -> {
+      streamConfig.setOffsetCriteria(OffsetCriteria.LARGEST_OFFSET_CRITERIA);
+      return streamConfig;
+    });
     try {
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfig, Collections.emptyList())
+      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList())
           .forEach(metadata -> {
             _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
           });
     } catch (Exception e) {
-      LOGGER.warn("Problem encountered in fetching stream metadata for topic: {} of table: {}. "
+      LOGGER.warn("Problem encountered in fetching stream metadata for topics: {} of table: {}. "
               + "Continue finding missing consuming segment only with ideal state information.",
-          streamConfig.getTopicName(), streamConfig.getTableNameWithType());
+          streamConfigs.stream().map(streamConfig -> streamConfig.getTopicName()).collect(Collectors.toList()),
+          streamConfigs.get(0).getTableNameWithType());
     }
   }
 

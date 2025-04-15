@@ -133,6 +133,10 @@ public class ServerChannels {
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
+  public boolean hasChannel(ServerRoutingInstance serverRoutingInstance) {
+    return _serverToChannelMap.containsKey(serverRoutingInstance);
+  }
+
   public void connect(ServerRoutingInstance serverRoutingInstance)
       throws InterruptedException, TimeoutException {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
@@ -155,6 +159,9 @@ public class ServerChannels {
       _serverRoutingInstance = serverRoutingInstance;
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      PooledByteBufAllocator bufAllocatorWithLimits =
+          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
+      metric = bufAllocatorWithLimits.metric();
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
@@ -165,26 +172,25 @@ public class ServerChannels {
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
 
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .option(ChannelOption.ALLOCATOR, bufAllocator)
-          .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
-          .handler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
+          .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
-                ch.pipeline().addLast(
-                    ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
+                ch.pipeline()
+                    .addLast(ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
               }
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
               ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
-              );
+                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap,
+                      null, null));
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
-              ch.pipeline().addLast(ChannelHandlerFactory
-                      .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(
+                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
     }

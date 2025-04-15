@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -43,13 +45,16 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>GroupByOperator</code> class provides the operator for group-by query on a single segment.
+ * The <code>GroupByOperator</code> class implements keyed aggregation on a single segment in V1/SSQE.
  */
 @SuppressWarnings("rawtypes")
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOperator.class);
   private static final String EXPLAIN_NAME = "GROUP_BY";
 
   private final QueryContext _queryContext;
@@ -114,7 +119,17 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
+    if (numGroupsLimitReached) {
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
+    }
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
+
+    boolean numGroupsWarningLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
+      LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+          _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+    }
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -130,12 +145,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

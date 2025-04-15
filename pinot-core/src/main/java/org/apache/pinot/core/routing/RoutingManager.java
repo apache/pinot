@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.routing;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -54,6 +55,13 @@ public interface RoutingManager {
    */
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /**
+   * Returns the segments that are relevant for the given broker request. Returns {@code null} if the table does not
+   * exist.
+   */
+  @Nullable
+  List<String> getSegments(BrokerRequest brokerRequest);
 
   /**
    * Validate routing exist for a table

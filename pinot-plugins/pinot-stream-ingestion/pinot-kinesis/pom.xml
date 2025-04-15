@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kinesis</artifactId>
@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <localstack-utils.version>0.2.23</localstack-utils.version>
   </properties>
 
   <dependencies>

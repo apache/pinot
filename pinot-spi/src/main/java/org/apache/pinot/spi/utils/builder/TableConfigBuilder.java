@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -55,8 +57,9 @@ public class TableConfigBuilder {
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
-  private static final String DEFAULT_LOAD_MODE = "HEAP";
   private static final String MMAP_LOAD_MODE = "MMAP";
+  private static final String HEAP_LOAD_MODE = "HEAP";
+  private static final String DEFAULT_LOAD_MODE = MMAP_LOAD_MODE;
 
   private final TableType _tableType;
   private String _tableName;
@@ -78,6 +81,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
+  @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -105,10 +109,13 @@ public class TableConfigBuilder {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _optimizeDictionary;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
   // only when _optimizeDictionaryForMetrics is set to true.
+  private boolean _optimizeDictionaryType;
   private double _noDictionarySizeRatioThreshold;
+  private double _noDictionaryCardinalityRatioThreshold;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -127,6 +134,7 @@ public class TableConfigBuilder {
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
   private JsonNode _tierOverwrites;
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -139,6 +147,14 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setIsDimTable(boolean isDimTable) {
     _isDimTable = isDimTable;
+    return this;
+  }
+
+  public TableConfigBuilder addFieldConfig(FieldConfig config) {
+    if (_fieldConfigList == null) {
+      _fieldConfigList = new ArrayList<>();
+    }
+    _fieldConfigList.add(config);
     return this;
   }
 
@@ -236,8 +252,8 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setLoadMode(String loadMode) {
-    if (MMAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
-      _loadMode = MMAP_LOAD_MODE;
+    if (HEAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
+      _loadMode = HEAP_LOAD_MODE;
     } else {
       _loadMode = DEFAULT_LOAD_MODE;
     }
@@ -259,13 +275,28 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setOptimizeDictionary(boolean optimizeDictionary) {
+    _optimizeDictionary = optimizeDictionary;
+    return this;
+  }
+
   public TableConfigBuilder setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
     _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
     return this;
   }
 
+  public TableConfigBuilder setOptimizeDictionaryType(boolean optimizeDictionaryType) {
+    _optimizeDictionaryType = optimizeDictionaryType;
+    return this;
+  }
+
   public TableConfigBuilder setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
     _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
+    return this;
+  }
+
+  public TableConfigBuilder setNoDictionaryCardinalityRatioThreshold(double noDictionaryCardinalityRatioThreshold) {
+    _noDictionaryCardinalityRatioThreshold = noDictionaryCardinalityRatioThreshold;
     return this;
   }
 
@@ -423,6 +454,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setJsonIndexConfigs(Map<String, JsonIndexConfig> jsonIndexConfigs) {
+    _jsonIndexConfigs = jsonIndexConfigs;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -464,9 +500,13 @@ public class TableConfigBuilder {
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setOptimizeDictionary(_optimizeDictionary);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
+    indexingConfig.setOptimizeDictionaryType(_optimizeDictionaryType);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
+    indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

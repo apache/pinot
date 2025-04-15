@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -199,6 +200,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     brokerConf.clearProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT);
     brokerConf.setProperty("pinot.broker.nettytls.enabled", "true");
+
+    brokerConf.setProperty("pinot.multistage.engine.tls.enabled", "true");
   }
 
   @Override
@@ -226,6 +229,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     serverConf.setProperty("pinot.server.nettytls.port", nettyTlsPort);
     _nextServerPort = nettyTlsPort + 1;
     serverConf.setProperty("pinot.server.segment.uploader.protocol", "https");
+
+    serverConf.setProperty("pinot.multistage.engine.tls.enabled", "true");
   }
 
   @Override
@@ -474,7 +479,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
-    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleAllTasksForAllTables(null));
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks(new TaskSchedulingContext()));
 
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
@@ -526,6 +531,19 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
         .map(ExtraInstanceConfig::getComponentUrl).filter(Objects::nonNull).collect(Collectors.toList());
 
     Assert.assertFalse(httpsComponentUrls.isEmpty());
+  }
+
+  @Test
+  public void testMultiStageEngineWithTlsEnabled()
+      throws Exception {
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_EMPTY_JKS, TLS_STORE_JKS);
+        CloseableHttpResponse response = client.execute(
+            makeMultiStageQueryBroker(_externalBrokerPort,
+                "SELECT COUNT(*) FROM (SELECT AirlineID FROM mytable WHERE ArrDelay >= 0 LIMIT 1000000)"))) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+      Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 40000);
+    }
   }
 
   private java.sql.Connection getValidJDBCConnection(int controllerPort)
@@ -583,6 +601,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
     request.addHeader(CLIENT_HEADER);
     request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+    return request;
+  }
+
+  private static HttpPost makeMultiStageQueryBroker(int port, String query) {
+    HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
+    request.addHeader(CLIENT_HEADER);
+    request.setEntity(
+        new StringEntity("{\"sql\":\"" + query + "\", \"queryOptions\": \"useMultistageEngine=true\"}"));
     return request;
   }
 

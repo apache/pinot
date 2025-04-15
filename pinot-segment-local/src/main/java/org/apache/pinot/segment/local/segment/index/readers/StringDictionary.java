@@ -74,6 +74,17 @@ public class StringDictionary extends BaseImmutableDictionary {
     return getUnpaddedString(dictId, getBuffer());
   }
 
+  /** Same as getStringValue(int) but allows reusing buffer, instead of allocating on each call. */
+  public String getStringValue(int dictId, byte[] buffer) {
+    return getUnpaddedString(dictId, buffer);
+  }
+
+  /** Allocate buffer to use with getString(int, byte[]) method. */
+  @Override
+  public byte[] getBuffer() {
+    return super.getBuffer();
+  }
+
   @Override
   public byte[] getBytesValue(int dictId) {
     return getUnpaddedBytes(dictId, getBuffer());
@@ -156,6 +167,30 @@ public class StringDictionary extends BaseImmutableDictionary {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
       outValues[i] = getUnpaddedBytes(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get32BitsMurmur3Hash(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get64BitsMurmur3Hash(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get128BitsMurmur3HashValue(dictIds[i], buffer);
     }
   }
 }

@@ -55,6 +55,8 @@ object ExampleSparkPinotConnectorWriteTest extends Logging {
       .option("noDictionaryColumns", "airport,state")
       .option("bloomFilterColumns", "airport")
       .option("timeColumnName", "ts")
+      .option("timeFormat", "EPOCH|SECONDS")
+      .option("timeGranularity", "1:SECONDS")
       .save("myPath")
   }
 }

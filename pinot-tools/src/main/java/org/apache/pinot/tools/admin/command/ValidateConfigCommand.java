@@ -47,7 +47,7 @@ import picocli.CommandLine;
  *   <li>Schema</li>
  * </ul>
  */
-@CommandLine.Command(name = "ValidateConfig")
+@CommandLine.Command(name = "ValidateConfig", mixinStandardHelpOptions = true)
 public class ValidateConfigCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidateConfigCommand.class);
 
@@ -75,15 +75,6 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   @CommandLine.Option(names = {"-schemaNames"}, required = false,
       description = "Space separated schema names to be validated (default to validate ALL)")
   private String _schemaNames;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

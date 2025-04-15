@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -657,7 +658,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         nullValueVectorCreator.seal();
       }
 
-      boolean createDictionary = !_indexLoadingConfig.getNoDictionaryColumns().contains(column);
+      FieldIndexConfigs fieldIndexConfigs = _indexLoadingConfig.getFieldIndexConfig(column);
+      DictionaryIndexConfig dictionaryIndexConfig =
+          fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(StandardIndexes.dictionary())
+              : DictionaryIndexConfig.DEFAULT;
+      boolean createDictionary = dictionaryIndexConfig.isEnabled();
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
@@ -761,8 +766,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary,
-              _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
-              fieldSpec.getDefaultNullValue());
+              dictionaryIndexConfig.getUseVarLengthDictionary(), true, fieldSpec.getDefaultNullValue());
           break;
         }
         case BYTES: {
@@ -780,10 +784,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           if (!statsCollector.isFixedLength()) {
             useVarLengthDictionary = true;
           } else {
-            useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
+            useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary();
           }
-          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary,
-              true, new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary, true,
+                  new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
           break;
         }
         default:

@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -40,6 +39,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -121,13 +121,13 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
-      String errorMessage =
-          String.format("%s: responses for table: %s from servers: %s got dropped due to data schema inconsistency.",
-              QueryException.MERGE_RESPONSE_ERROR.getMessage(), tableName, serversWithConflictingDataSchema);
+      QueryErrorCode errorCode = QueryErrorCode.MERGE_RESPONSE;
+      String errorMessage = errorCode.getDefaultMessage() + ": responses for table: " + tableName
+          + " from servers: " + serversWithConflictingDataSchema + " got dropped due to data schema inconsistency.";
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
       brokerResponseNative.addException(
-          new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+          new QueryProcessingException(errorCode, errorMessage));
     }
 
     // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
@@ -143,21 +143,26 @@ public class BrokerReduceService extends BaseReduceService {
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
+    Integer minInitialIndexedTableCapacityQueryOption = null;
     if (queryOptions != null) {
       minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
       groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+      minInitialIndexedTableCapacityQueryOption = QueryOptionsUtils.getMinInitialIndexedTableCapacity(queryOptions);
     }
     int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSize;
     int groupTrimThreshold =
         groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThreshold;
+    int minInitialIndexedTableCapacity =
+        minInitialIndexedTableCapacityQueryOption != null ? minInitialIndexedTableCapacityQueryOption
+            : _minInitialIndexedTableCapacity;
 
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              groupTrimThreshold, minGroupTrimSize), brokerMetrics);
+              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
-          new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
+          new QueryProcessingException(QueryErrorCode.QUERY_CANCELLATION, e.toString()));
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

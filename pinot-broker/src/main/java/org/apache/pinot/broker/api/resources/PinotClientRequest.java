@@ -60,7 +60,6 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -77,9 +76,13 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -87,6 +90,9 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -99,6 +105,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
+  private static final Marker RESPONSE_EXCEPTION_MARKER = MarkerFactory.getMarker("QUERY_RESPONSE_EXCEPTION");
+
+  @Inject
+  PinotConfiguration _brokerConf;
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -136,8 +146,10 @@ public class PinotClientRequest {
         requestJson.put(Request.TRACE, traceEnabled);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -157,6 +169,10 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
+      @ApiParam(value = "Return a cursor instead of complete result set") @QueryParam("getCursor")
+      @DefaultValue("false") boolean getCursor,
+      @ApiParam(value = "Number of rows to fetch. Applicable only when getCursor is true") @QueryParam("numRows")
+      @DefaultValue("0") int numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
@@ -165,9 +181,12 @@ public class PinotClientRequest {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
+              getCursor, numRows);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -200,8 +219,10 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -221,6 +242,10 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlWithMultiStageQueryEnginePost(String query, @Suspended AsyncResponse asyncResponse,
+      @ApiParam(value = "Return a cursor instead of complete result set") @QueryParam("getCursor")
+      @DefaultValue("false") boolean getCursor,
+      @ApiParam(value = "Number of rows to fetch. Applicable only getCursor is true") @QueryParam("numRows")
+      @DefaultValue("0") int numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
@@ -229,9 +254,12 @@ public class PinotClientRequest {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
+              getCursor, numRows);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -365,38 +393,56 @@ public class PinotClientRequest {
   }
 
   @DELETE
-  @Path("query/{queryId}")
+  @Path("query/{id}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
-      + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "
+  @ApiOperation(value = "Cancel a query as identified by the id", notes = "No effect if no query exists for the "
+      + "given id on the requested broker. Query may continue to run for a short while after calling cancel as "
       + "it's done in a non-blocking manner. The cancel method can be called multiple times.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Query not found on the requested broker")
   })
   public String cancelQuery(
-      @ApiParam(value = "QueryId as assigned by the broker", required = true) @PathParam("queryId") long queryId,
+      @ApiParam(value = "Query id", required = true) @PathParam("id") String id,
+      @ApiParam(value = "Determines is query id is internal or provided by the client") @QueryParam("client")
+      @DefaultValue("false") boolean isClient,
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try {
+    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
-      if (_requestHandler.cancelQuery(queryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        String resp = "Cancelled query: " + queryId;
-        if (verbose) {
-          resp += " with responses from servers: " + serverResponses;
+      if (isClient) {
+        long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
+        QueryThreadContext.setIds(reqId, id);
+        if (_requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+          String resp = "Cancelled client query: " + id;
+          if (verbose) {
+            resp += " with responses from servers: " + serverResponses;
+          }
+          return resp;
         }
-        return resp;
+      } else {
+        long reqId = Long.parseLong(id);
+        if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+          QueryThreadContext.setIds(reqId, id);
+          String resp = "Cancelled query: " + id;
+          if (verbose) {
+            resp += " with responses from servers: " + serverResponses;
+          }
+          return resp;
+        }
       }
+    } catch (NumberFormatException e) {
+      Response.status(Response.Status.BAD_REQUEST).entity(String.format("Invalid internal query id: %s", id));
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", queryId, e.getMessage()))
+          .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", id, e.getMessage()))
           .build());
     }
     throw new WebApplicationException(
-        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", queryId))
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", id))
             .build());
   }
 
@@ -427,20 +473,36 @@ public class PinotClientRequest {
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
       boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
       throws Exception {
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
+  }
+
+  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
+      throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
+    if (getCursor) {
+      if (numRows == 0) {
+        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
+            CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
+      }
+      sqlNodeAndOptions.setExtraOptions(
+          ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
+              Integer.toString(numRows)));
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
+    }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
-          new UnsupportedOperationException("Unsupported SQL type - " + sqlType + ", this API only supports DQL.")));
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
     }
     switch (sqlType) {
       case DQL:
@@ -449,8 +511,7 @@ public class PinotClientRequest {
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
               httpHeaders);
         } catch (Exception e) {
-          LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
-              QueryException.getTruncatedStackTrace(e));
+          LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
           throw e;
         }
       case DML:
@@ -460,13 +521,11 @@ public class PinotClientRequest {
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
-          LOGGER.error("Error handling DML request:\n{}\nException: {}", sqlRequestJson,
-              QueryException.getTruncatedStackTrace(e));
+          LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
-            new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
     }
   }
 
@@ -475,7 +534,7 @@ public class PinotClientRequest {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
   }
 
-  private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
+  public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
     Multimap<String, String> headers = ArrayListMultimap.create();
     context.getHeaderNames().forEach(key -> context.getHeaders(key).forEach(value -> headers.put(key, value)));
 
@@ -497,13 +556,23 @@ public class PinotClientRequest {
    * @throws Exception
    */
   @VisibleForTesting
-  static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
     List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
     if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+
+      // do log with the exception flagged with a particular marker for filtering
+      MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
+      StringBuilder sb = new StringBuilder();
+      sb.append("Query processing exceptions:");
+      for (QueryProcessingException exception : exceptions) {
+        sb.append(" ").append(exception.toString());
+      }
+      LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
+      MDC.remove("queryErrorCode");
     }
 
     // returning the Response with OK status and header value.

@@ -12,10 +12,10 @@
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], ts=[$6])",
-          "\n            LogicalTableScan(table=[[default, a]])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -30,10 +30,10 @@
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], ts=[$6])",
-          "\n            LogicalTableScan(table=[[default, a]])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -42,11 +42,11 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
+          "\nLogicalJoin(condition=[=($0, $9)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
-          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[1]])",
-          "\n    LogicalTableScan(table=[[default, b]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -55,12 +55,12 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
+          "\nLogicalJoin(condition=[=($0, $9)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
-          "\n      LogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[1]])",
-          "\n    LogicalTableScan(table=[[default, b]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -69,12 +69,12 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[AND(=($0, $8), >($2, $9))], joinType=[inner])",
+          "\nLogicalJoin(condition=[AND(=($0, $9), >($2, $10))], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
-          "\n      LogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[1]])",
-          "\n    LogicalTableScan(table=[[default, b]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -83,11 +83,11 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[AND(=($0, $7), =($1, $8))], joinType=[inner])",
+          "\nLogicalJoin(condition=[AND(=($0, $8), =($1, $9))], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    LogicalTableScan(table=[[default, b]])",
+          "\n    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -101,32 +101,32 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], ts=[$6])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[<($2, 0)])",
-          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
       {
         "description": "Inner join with group by",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0])",
           "\n              LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n                LogicalTableScan(table=[[default, a]])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col2=[$1], col3=[$2])",
           "\n              LogicalFilter(condition=[<($2, 0)])",
-          "\n                LogicalTableScan(table=[[default, b]])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -139,10 +139,10 @@
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",
-          "\n        LogicalTableScan(table=[[default, b]])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -151,17 +151,17 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{0, 1}])",
+          "\nPinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    PinotLogicalAggregate(group=[{1, 2}])",
+          "\n    PinotLogicalAggregate(group=[{1, 2}], aggType=[LEAF])",
           "\n      LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            LogicalFilter(condition=[>=($2, 0)])",
-          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0])",
-          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -170,17 +170,17 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3 as value3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{0, 1}])",
+          "\nPinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    PinotLogicalAggregate(group=[{1, 2}])",
+          "\n    PinotLogicalAggregate(group=[{1, 2}], aggType=[LEAF])",
           "\n      LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n            LogicalFilter(condition=[>=($2, 0)])",
-          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0])",
-          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -193,12 +193,12 @@
           "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0])",
-          "\n        LogicalFilter(condition=[OR(=($1, _UTF-8'bar'), =($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'bar', _UTF-8'foo']:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\"), <>($1, _UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"))])",
-          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\"), (_UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\".._UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"), (_UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR(7) CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -211,34 +211,119 @@
           "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0])",
-          "\n        LogicalFilter(condition=[OR(=($1, _UTF-8'bar'), =($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'bar', _UTF-8'foo']:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\"), <>($1, _UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"))])",
-          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\"), (_UTF-8'alice':VARCHAR(7) CHARACTER SET \"UTF-8\".._UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"), (_UTF-8'charlie':VARCHAR(7) CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR(7) CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
       {
         "description": "Semi join with IN clause",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash_table') */ col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1])",
+          "\n  LogicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      LogicalProject(col3=[$2])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Semi join with IN clause and join strategy override",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash') */ col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
           "\n  LogicalJoin(condition=[=($2, $3)], joinType=[semi])",
           "\n    PinotLogicalExchange(distribution=[hash[2]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$2])",
-          "\n        LogicalTableScan(table=[[default, b]])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
       {
-        "description": "Semi join with multiple IN clause",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash_table') */ col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
+        "description": "Semi join with IN clause and append distinct to semi join project side",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(append_distinct_to_semi_join_project = 'true') */ col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1])",
+          "\n  LogicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Semi join with IN clause on distinct values",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT DISTINCT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1])",
+          "\n  LogicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Semi join with IN clause then aggregate with group by",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, SUM(col6) FROM a WHERE col3 IN (SELECT col3 FROM b) GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
+          "\n        LogicalProject(col1=[$0], col3=[$2], col6=[$5])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n          LogicalProject(col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Semi join with IN clause of distinct values then aggregate with group by",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, SUM(col6) FROM a WHERE col3 IN (SELECT DISTINCT col3 FROM b) GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
+          "\n        LogicalProject(col1=[$0], col3=[$2], col6=[$5])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Semi join with multiple IN clause and join strategy override",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash') */ col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
@@ -250,19 +335,19 @@
           "\n            PinotLogicalExchange(distribution=[hash[2]])",
           "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n                LogicalFilter(condition=[=($1, _UTF-8'test')])",
-          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n                  PinotLogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col3=[$2])",
           "\n                LogicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n                  LogicalTableScan(table=[[default, b]])",
+          "\n                  PinotLogicalTableScan(table=[[default, b]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col3=[$2])",
           "\n            LogicalFilter(condition=[=($0, _UTF-8'bar')])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$2])",
           "\n        LogicalFilter(condition=[=($0, _UTF-8'foobar')])",
-          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -272,41 +357,43 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
-          "\n  LogicalFilter(condition=[IS NOT TRUE($8)])",
-          "\n    LogicalJoin(condition=[=($6, $7)], joinType=[left])",
-          "\n      PinotLogicalExchange(distribution=[hash[6]])",
-          "\n        LogicalProject(col1=[$0], col2=[$1], col30=[$3], $f1=[$4], col32=[$5], $f10=[$7], col34=[$2])",
-          "\n          LogicalFilter(condition=[IS NOT TRUE($7)])",
-          "\n            LogicalJoin(condition=[=($5, $6)], joinType=[left])",
-          "\n              PinotLogicalExchange(distribution=[hash[5]])",
-          "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2], col30=[$3], $f1=[$5], col32=[$2])",
+          "\n  LogicalFilter(condition=[IS NOT TRUE($4)])",
+          "\n    LogicalJoin(condition=[=($2, $3)], joinType=[left])",
+          "\n      PinotLogicalExchange(distribution=[hash[2]])",
+          "\n        LogicalProject(col1=[$0], col2=[$1], col34=[$2])",
+          "\n          LogicalFilter(condition=[IS NOT TRUE($5)])",
+          "\n            LogicalJoin(condition=[=($3, $4)], joinType=[left])",
+          "\n              PinotLogicalExchange(distribution=[hash[3]])",
+          "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2], col32=[$2])",
           "\n                  LogicalFilter(condition=[IS NOT TRUE($5)])",
           "\n                    LogicalJoin(condition=[=($3, $4)], joinType=[left])",
           "\n                      PinotLogicalExchange(distribution=[hash[3]])",
           "\n                        LogicalProject(col1=[$0], col2=[$1], col3=[$2], col30=[$2])",
           "\n                          LogicalFilter(condition=[=($1, _UTF-8'test')])",
-          "\n                            LogicalTableScan(table=[[default, a]])",
+          "\n                            PinotLogicalTableScan(table=[[default, a]])",
           "\n                      PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n                        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
           "\n                          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                            PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n                            PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
           "\n                              LogicalProject(col3=[$2], $f1=[true])",
           "\n                                LogicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n                                  LogicalTableScan(table=[[default, b]])",
+          "\n                                  PinotLogicalTableScan(table=[[default, b]])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
-          "\n                  PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                    PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
-          "\n                      LogicalProject(col3=[$2], $f1=[true])",
-          "\n                        LogicalFilter(condition=[=($0, _UTF-8'bar')])",
-          "\n                          LogicalTableScan(table=[[default, b]])",
+          "\n                LogicalProject(col3=[$0], $f1=[$1])",
+          "\n                  PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n                    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                      PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n                        LogicalProject(col3=[$2], $f1=[true])",
+          "\n                          LogicalFilter(condition=[=($0, _UTF-8'bar')])",
+          "\n                            PinotLogicalTableScan(table=[[default, b]])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
-          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
-          "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)])",
-          "\n              LogicalProject(col3=[$2], $f1=[true])",
-          "\n                LogicalFilter(condition=[=($0, _UTF-8'foobar')])",
-          "\n                  LogicalTableScan(table=[[default, b]])",
+          "\n        LogicalProject(col3=[$0], $f1=[$1])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n                LogicalProject(col3=[$2], $f1=[true])",
+          "\n                  LogicalFilter(condition=[=($0, _UTF-8'foobar')])",
+          "\n                    PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -319,13 +406,13 @@
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4), >($2, $5))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col4=[$3])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[*(0.5:DECIMAL(2, 1), $2)])",
-          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -338,13 +425,13 @@
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4), >($2, $5))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col4=[$3])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n            LogicalProject(col1=[$0], col2=[$1], $f0=[*(0.5:DECIMAL(2, 1), $2)])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -357,14 +444,14 @@
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4), >($2, $5))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col4=[$3])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST(/($2, $3)):DECIMAL(12, 1) NOT NULL])",
-          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n              LogicalProject(col1=[$0], col2=[$1], $f0=[*(0.5:DECIMAL(2, 1), $2)])",
-          "\n                LogicalTableScan(table=[[default, b]])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -377,13 +464,13 @@
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4), >($2, $5))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col4=[$3])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[*(0.5:DECIMAL(2, 1), /(CAST($2):DOUBLE NOT NULL, $3))])",
-          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)])",
+          "\n        PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n            PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -396,12 +483,12 @@
           "\n  LogicalJoin(condition=[=($1, $2)], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{1}], agg#0=[$SUM0($2)])",
-          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n          PinotLogicalAggregate(group=[{1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -417,10 +504,10 @@
           "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], ts=[$6])",
-          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -429,22 +516,22 @@
         "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ) SELECT * FROM a WHERE col2 IN (SELECT col1 FROM tmp1) AND col2 IN (SELECT col1 FROM b WHERE col3 > 100) AND col3 IN (SELECT col3 from b WHERE col3 < 100)",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($2, $7)], joinType=[semi])",
-          "\n  LogicalJoin(condition=[=($1, $7)], joinType=[semi])",
-          "\n    LogicalJoin(condition=[=($1, $7)], joinType=[semi])",
-          "\n      LogicalTableScan(table=[[default, a]])",
+          "\nLogicalJoin(condition=[=($2, $8)], joinType=[semi])",
+          "\n  LogicalJoin(condition=[=($1, $8)], joinType=[semi])",
+          "\n    LogicalJoin(condition=[=($1, $8)], joinType=[semi])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n        LogicalProject(col1=[$0])",
-          "\n          LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'foo'))])",
-          "\n            LogicalTableScan(table=[[default, a]])",
+          "\n          LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col1=[$0])",
           "\n        LogicalFilter(condition=[>($2, 100)])",
-          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n    LogicalProject(col3=[$2])",
           "\n      LogicalFilter(condition=[<($2, 100)])",
-          "\n        LogicalTableScan(table=[[default, b]])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -453,22 +540,22 @@
         "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ) SELECT COUNT(*) FROM a WHERE col2 IN (SELECT col1 FROM tmp1) AND col3 IN (SELECT col3 from b WHERE col3 < 100)",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)])",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
-          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n      LogicalJoin(condition=[=($0, $1)], joinType=[semi])",
           "\n        LogicalProject(col3=[$1])",
           "\n          LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n            LogicalProject(col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n              LogicalProject(col1=[$0])",
-          "\n                LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'foo'))])",
-          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n                LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n                  PinotLogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col3=[$2])",
           "\n            LogicalFilter(condition=[<($2, 100)])",
-          "\n              LogicalTableScan(table=[[default, b]])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -479,22 +566,22 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1])",
           "\n  LogicalFilter(condition=[>($2, 10)])",
-          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)], aggType=[FINAL])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
-          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n          LogicalJoin(condition=[=($1, $2)], joinType=[semi])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
           "\n              LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n                  PinotLogicalTableScan(table=[[default, a]])",
           "\n                PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n                  LogicalProject(col1=[$0])",
-          "\n                    LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'foo'))])",
-          "\n                      LogicalTableScan(table=[[default, a]])",
+          "\n                    LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n                      PinotLogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n              LogicalProject(col3=[$2])",
           "\n                LogicalFilter(condition=[<($2, 100)])",
-          "\n                  LogicalTableScan(table=[[default, b]])",
+          "\n                  PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -503,18 +590,277 @@
         "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ), tmp2 AS ( SELECT * FROM b WHERE col1 IN (SELECT col1 FROM tmp1) AND col3 < 100 ) SELECT * FROM tmp2 WHERE col3 IN (SELECT col3 from tmp1)",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($2, $7)], joinType=[semi])",
-          "\n  LogicalJoin(condition=[=($0, $7)], joinType=[semi])",
+          "\nLogicalJoin(condition=[=($2, $8)], joinType=[semi])",
+          "\n  LogicalJoin(condition=[=($0, $8)], joinType=[semi])",
           "\n    LogicalFilter(condition=[<($2, 100)])",
-          "\n      LogicalTableScan(table=[[default, b]])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col1=[$0])",
-          "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n    LogicalProject(col3=[$2])",
-          "\n      LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'foo'))])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n      LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Multiple IN and NOT IN joins while selecting count at top",
+        "sql": "EXPLAIN PLAN FOR SELECT count(*) FROM a WHERE a.col1 = 'foo' AND col2 = 'xylo' AND a.col4 = 12 AND a.col5 = false AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foo') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='bar') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foobar') AND col3 IN (SELECT col3 FROM b WHERE col1 = 'fork')",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($0, $1)], joinType=[semi])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col3=[$0])",
+          "\n            LogicalFilter(condition=[IS NOT TRUE($3)])",
+          "\n              LogicalJoin(condition=[=($1, $2)], joinType=[left])",
+          "\n                PinotLogicalExchange(distribution=[hash[1]])",
+          "\n                  LogicalProject(col3=[$0], col34=[$0])",
+          "\n                    LogicalFilter(condition=[IS NOT TRUE($3)])",
+          "\n                      LogicalJoin(condition=[=($1, $2)], joinType=[left])",
+          "\n                        PinotLogicalExchange(distribution=[hash[1]])",
+          "\n                          LogicalProject(col3=[$0], col32=[$0])",
+          "\n                            LogicalFilter(condition=[IS NOT TRUE($3)])",
+          "\n                              LogicalJoin(condition=[=($1, $2)], joinType=[left])",
+          "\n                                PinotLogicalExchange(distribution=[hash[1]])",
+          "\n                                  LogicalProject(col3=[$2], col30=[$2])",
+          "\n                                    LogicalFilter(condition=[AND(=($0, _UTF-8'foo'), =($1, _UTF-8'xylo'), =($3, 12), NOT($4))])",
+          "\n                                      PinotLogicalTableScan(table=[[default, a]])",
+          "\n                                PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                                  LogicalProject(col3=[$0], $f1=[$1])",
+          "\n                                    PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n                                      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                                        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n                                          LogicalProject(col3=[$2], $f1=[true])",
+          "\n                                            LogicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n                                              PinotLogicalTableScan(table=[[default, b]])",
+          "\n                        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                          LogicalProject(col3=[$0], $f1=[$1])",
+          "\n                            PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n                              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                                PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n                                  LogicalProject(col3=[$2], $f1=[true])",
+          "\n                                    LogicalFilter(condition=[=($0, _UTF-8'bar')])",
+          "\n                                      PinotLogicalTableScan(table=[[default, b]])",
+          "\n                PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                  LogicalProject(col3=[$0], $f1=[$1])",
+          "\n                    PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n                      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n                          LogicalProject(col3=[$2], $f1=[true])",
+          "\n                            LogicalFilter(condition=[=($0, _UTF-8'foobar')])",
+          "\n                              PinotLogicalTableScan(table=[[default, b]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalProject(col3=[$2])",
+          "\n            LogicalFilter(condition=[=($0, _UTF-8'fork')])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "lookup_join_planning_tests": {
+    "queries": [
+      {
+        "description": "Simple lookup join",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Lookup join with filter on left table",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$3])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Lookup join with filter on right table",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE b.col2 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), =($2, _UTF-8'foo'))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Lookup join with filter on right table in join condition",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 AND b.col2 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), =($2, _UTF-8'foo'))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Lookup join with filter on right table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE b.col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[AND(=($0, $1), =($1, _UTF-8'foo'))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Lookup join with transformation on left table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON upper(a.col1) = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$3])",
+          "\n  LogicalJoin(condition=[=($1, $2)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], $f8=[UPPER($0)])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    LogicalProject(col1=[$0], col2=[$1])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "broadcast_join_planning_tests": {
+    "queries": [
+      {
+        "description": "Simple broadcast join",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with filter on both left and right table",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 = 'foo' AND b.col2 = 'bar'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with transformation on both left and right table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON upper(a.col1) = upper(b.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($1, $3)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], $f8=[UPPER($0)])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col2=[$1], $f8=[UPPER($0)])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "local_replicated_join_planning_test": {
+    "queries": [
+      {
+        "description": "Simple local replicated join",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with filter on both left and right table",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON a.col1 = b.col1 WHERE a.col2 = 'foo' AND b.col2 = 'bar'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with transformation on both left and right table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ a.col1, b.col2 FROM a JOIN b /*+ tableOptions(is_replicated = 'true') */ ON upper(a.col1) = upper(b.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($1, $3)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], $f8=[UPPER($0)])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col2=[$1], $f8=[UPPER($0)])",
+          "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       }
@@ -526,6 +872,11 @@
         "description": "Incorrect table",
         "sql": "EXPLAIN PLAN FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
         "expectedException": ".*Table 'b' not found.*"
+      },
+      {
+        "description": "Lookup join with transformation on right table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'lookup') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = upper(b.col1)",
+        "expectedException": "Right input for lookup join must be an identifier.*"
       }
     ]
   }

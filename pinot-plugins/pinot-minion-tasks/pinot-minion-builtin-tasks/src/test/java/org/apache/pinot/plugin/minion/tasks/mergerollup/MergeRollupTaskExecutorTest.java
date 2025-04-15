@@ -33,10 +33,11 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -107,7 +108,7 @@ public class MergeRollupTaskExecutorTest {
   public void testConvert()
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
-    mergeRollupTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
@@ -121,6 +122,31 @@ public class MergeRollupTaskExecutorTest {
     File mergedSegment = conversionResults.get(0).getFile();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(mergedSegment);
     Assert.assertEquals(segmentMetadata.getTotalDocs(), NUM_SEGMENTS * NUM_ROWS);
+  }
+
+  @Test
+  public void testDimensionErasure()
+      throws Exception {
+    MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
+    configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
+    configs.put(MinionConstants.MergeTask.MERGE_TYPE_KEY, "rollup");
+    configs.put("daily." + MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, D1);
+
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
+    List<SegmentConversionResult> conversionResults =
+        mergeRollupTaskExecutor.convert(pinotTaskConfig, _segmentIndexDirList, WORKING_DIR);
+
+    Assert.assertEquals(conversionResults.size(), 1);
+    Assert.assertEquals(conversionResults.get(0).getSegmentName(), MERGED_SEGMENT_NAME);
+    File mergedSegment = conversionResults.get(0).getFile();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(mergedSegment);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(D1);
+    Assert.assertEquals(segmentMetadata.getTotalDocs(), 1);
+    Assert.assertEquals(columnMetadata.getMinValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    Assert.assertEquals(columnMetadata.getMaxValue(), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
   }
 
   @AfterClass

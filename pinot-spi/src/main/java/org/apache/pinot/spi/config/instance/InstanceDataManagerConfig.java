@@ -35,7 +35,7 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceSegmentTarDir();
 
-  String getInstanceBootstrapSegmentDir();
+  String getTableDataManagerProviderClass();
 
   String getSegmentStoreUri();
 
@@ -51,6 +51,12 @@ public interface InstanceDataManagerConfig {
 
   boolean isDirectRealtimeOffHeapAllocation();
 
+  boolean shouldReloadConsumingSegment();
+
+  int getMaxParallelRefreshThreads();
+
+  int getMaxSegmentPreloadThreads();
+
   int getMaxParallelSegmentBuilds();
 
   int getMaxParallelSegmentDownloads();
@@ -63,17 +69,17 @@ public interface InstanceDataManagerConfig {
 
   long getStreamSegmentDownloadUntarRateLimit();
 
+  int getDeletedTablesCacheTtlMinutes();
+
   int getDeletedSegmentsCacheSize();
 
   int getDeletedSegmentsCacheTtlMinutes();
 
   String getSegmentPeerDownloadScheme();
 
-  long getExternalViewDroppedMaxWaitMs();
-
-  long getExternalViewDroppedCheckIntervalMs();
-
   PinotConfiguration getUpsertConfig();
+
+  PinotConfiguration getDedupConfig();
 
   PinotConfiguration getAuthConfig();
 

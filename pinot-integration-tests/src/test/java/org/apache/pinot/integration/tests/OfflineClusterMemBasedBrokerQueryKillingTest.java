@@ -36,16 +36,15 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactoryForTest;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -156,8 +155,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.0025f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE, InstanceType.BROKER);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
             + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
@@ -246,7 +243,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains(
         "Interrupted in broker reduce phase"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
-        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
+        + QueryErrorCode.QUERY_CANCELLATION.getId()));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));

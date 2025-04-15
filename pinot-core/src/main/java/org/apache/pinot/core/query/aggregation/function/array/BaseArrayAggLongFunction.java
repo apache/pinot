@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.longs.AbstractLongCollection;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongCollection;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
+public abstract class BaseArrayAggLongFunction<I extends LongCollection>
     extends BaseArrayAggFunction<I, LongArrayList> {
   public BaseArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
       boolean nullHandlingEnabled) {
@@ -78,10 +78,10 @@ public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
   }
 
   @Override
-  public LongArrayList extractFinalResult(I arrayList) {
-    if (arrayList == null) {
+  public LongArrayList extractFinalResult(I longs) {
+    if (longs == null) {
       return new LongArrayList();
     }
-    return new LongArrayList(arrayList);
+    return new LongArrayList(longs);
   }
 }

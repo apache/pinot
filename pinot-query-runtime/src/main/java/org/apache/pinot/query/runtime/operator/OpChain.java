@@ -19,8 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.function.Consumer;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
@@ -35,6 +33,7 @@ public class OpChain implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChain.class);
 
   private final OpChainId _id;
+  private final OpChainExecutionContext _context;
   private final MultiStageOperator _root;
   private final Consumer<OpChainId> _finishCallback;
   private final ThreadExecutionContext _parentContext;
@@ -45,17 +44,22 @@ public class OpChain implements AutoCloseable {
   }
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback) {
+    _context = context;
     _id = context.getId();
     _root = root;
     _finishCallback = finishCallback;
     _parentContext = context.getParentContext();
   }
 
+  public OpChainExecutionContext getContext() {
+    return _context;
+  }
+
   public OpChainId getId() {
     return _id;
   }
 
-  public Operator<TransferableBlock> getRoot() {
+  public MultiStageOperator getRoot() {
     return _root;
   }
 

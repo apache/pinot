@@ -33,8 +33,9 @@ public class TwoKeysGroupIdGenerator implements GroupIdGenerator {
   private final ValueToIdMap _secondKeyToIdMap;
   private final int _numGroupsLimit;
 
-  public TwoKeysGroupIdGenerator(ColumnDataType firstKeyType, ColumnDataType secondKeyType, int numGroupsLimit) {
-    _groupIdMap = new Long2IntOpenHashMap();
+  public TwoKeysGroupIdGenerator(ColumnDataType firstKeyType,
+      ColumnDataType secondKeyType, int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Long2IntOpenHashMap(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _firstKeyToIdMap = ValueToIdMapFactory.get(firstKeyType.toDataType());
     _secondKeyToIdMap = ValueToIdMapFactory.get(secondKeyType.toDataType());

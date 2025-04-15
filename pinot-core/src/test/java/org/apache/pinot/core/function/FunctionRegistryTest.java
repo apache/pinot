@@ -37,7 +37,8 @@ public class FunctionRegistryTest {
       // Special placeholder functions without implementation
       TransformFunctionType.SCALAR,
       // Special functions that requires index
-      TransformFunctionType.JSON_EXTRACT_INDEX, TransformFunctionType.MAP_VALUE, TransformFunctionType.LOOKUP,
+      TransformFunctionType.JSON_EXTRACT_INDEX, TransformFunctionType.MAP_VALUE,
+      TransformFunctionType.LOOKUP, TransformFunctionType.TEXT_MATCH,
       // TODO: Support these functions
       TransformFunctionType.IN, TransformFunctionType.NOT_IN, TransformFunctionType.IS_TRUE,
       TransformFunctionType.IS_NOT_TRUE, TransformFunctionType.IS_FALSE, TransformFunctionType.IS_NOT_FALSE,
@@ -47,7 +48,8 @@ public class FunctionRegistryTest {
       TransformFunctionType.ARRAY_AVERAGE, TransformFunctionType.ARRAY_MIN, TransformFunctionType.ARRAY_MAX,
       TransformFunctionType.ARRAY_SUM, TransformFunctionType.VALUE_IN, TransformFunctionType.IN_ID_SET,
       TransformFunctionType.GROOVY, TransformFunctionType.CLP_DECODE, TransformFunctionType.CLP_ENCODED_VARS_MATCH,
-      TransformFunctionType.ST_POLYGON, TransformFunctionType.ST_AREA, TransformFunctionType.ITEM);
+      TransformFunctionType.ST_POLYGON, TransformFunctionType.ST_AREA, TransformFunctionType.ITEM,
+      TransformFunctionType.TIME_SERIES_BUCKET);
   private static final EnumSet<FilterKind> IGNORED_FILTER_KINDS = EnumSet.of(
       // Special filter functions without implementation
       FilterKind.TEXT_MATCH, FilterKind.TEXT_CONTAINS, FilterKind.JSON_MATCH, FilterKind.VECTOR_SIMILARITY,

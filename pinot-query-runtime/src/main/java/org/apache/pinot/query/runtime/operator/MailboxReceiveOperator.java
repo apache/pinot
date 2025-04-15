@@ -20,7 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,19 +49,19 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _multiConsumer.readBlockBlocking();
+  protected MseBlock getNextBlock() {
+    MseBlock block = _multiConsumer.readMseBlockBlocking();
     // When early termination flag is set, caller is expecting an EOS block to be returned, however since the 2 stages
     // between sending/receiving mailbox are setting early termination flag asynchronously, there's chances that the
     // next block pulled out of the ReceivingMailbox to be an already buffered normal data block. This requires the
     // MailboxReceiveOperator to continue pulling and dropping data block until an EOS block is observed.
-    while (_isEarlyTerminated && !block.isEndOfStreamBlock()) {
-      block = _multiConsumer.readBlockBlocking();
+    while (_isEarlyTerminated && block.isData()) {
+      block = _multiConsumer.readMseBlockBlocking();
     }
-    if (block.isSuccessfulEndOfStreamBlock()) {
-      updateEosBlock(block, _statMap);
-    } else if (block.isDataBlock()) {
+    if (block.isData()) {
       sampleAndCheckInterruption();
+    } else {
+      onEos();
     }
     return block;
   }

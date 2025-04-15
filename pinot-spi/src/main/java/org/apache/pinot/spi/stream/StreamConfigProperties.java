@@ -38,8 +38,6 @@ public class StreamConfigProperties {
    */
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_TOPIC_NAME = "topic.name";
-  @Deprecated
-  public static final String STREAM_CONSUMER_TYPES = "consumer.type";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
   public static final String STREAM_FETCH_TIMEOUT_MILLIS = "fetch.timeout.millis";
@@ -122,13 +120,28 @@ public class StreamConfigProperties {
    * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
    */
   public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";
-  // Time threshold that controller will wait for the segment to be built by the server
+
+  /**
+   * Time threshold that controller will wait for the segment to be built by the server.
+   */
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
   /**
    * Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
    */
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
+
+  /**
+   * Config used to indicate which segment commit protocol implementation controller should use for this table
+   */
+  public static final String SEGMENT_COMPLETION_FSM_SCHEME = "segment.completion.fsm.scheme";
+
+  /**
+   * For pauseless consumption, the time in seconds that the server will wait for a segment to be ready for download.
+   * 600 seconds (10 minutes) by default.
+   */
+  public static final String PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS =
+      "realtime.segment.pauseless.download.timeoutSeconds";
 
   /**
    * Helper method to create a stream specific property

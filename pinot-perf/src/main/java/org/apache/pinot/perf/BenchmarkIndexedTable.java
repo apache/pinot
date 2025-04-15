@@ -118,7 +118,8 @@ public class BenchmarkIndexedTable {
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+        new ConcurrentIndexedTable(_dataSchema, false, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD,
+            TRIM_THRESHOLD, _executorService);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -167,7 +168,8 @@ public class BenchmarkIndexedTable {
 
       // make 10 indexed tables
       IndexedTable simpleIndexedTable =
-          new SimpleIndexedTable(_dataSchema, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD);
+          new SimpleIndexedTable(_dataSchema, false, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD,
+              TRIM_THRESHOLD, _executorService);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel

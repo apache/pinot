@@ -30,11 +30,11 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -54,6 +54,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -133,9 +134,9 @@ public class QueryExecutorExceptionsTest {
     // Mock the instance data manager
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
-    TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
-            new SegmentLocks()).getTableDataManager(tableConfig);
+    TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig, schema);
     tableDataManager.start();
     //we don't add index segments to the data manager to simulate numSegmentsAcquired < numSegmentsQueried
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -161,9 +162,9 @@ public class QueryExecutorExceptionsTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Map<Integer, String> exceptions = instanceResponse.getExceptions();
-    assertTrue(exceptions.containsKey(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE));
+    assertTrue(exceptions.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
 
-    String errorMessage = exceptions.get(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE);
+    String errorMessage = exceptions.get(QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
     String[] actualMissingSegments = StringUtils.splitByWholeSeparator(
         errorMessage.substring(1 + errorMessage.indexOf('['), errorMessage.indexOf(']')), ", ");
     String[] expectedMissingSegments = new String[]{"testTable_0", "testTable_1", "testTable_2", "testTable_3"};

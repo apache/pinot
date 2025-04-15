@@ -35,6 +35,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -160,6 +161,13 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         indexWriterConfig.setMergePolicy(new LuceneNRTCachingMergePolicy(dir));
         _indexDirectory = dir;
       } else {
+        // LogByteSizeMergePolicy doesn't seem to guarantee that document order is preserved,
+        // but it produces sequential ids way more often than default TieredMergePolicy
+        // This is used by StarTree Json index
+        if (config.isUseLogByteSizeMergePolicy()) {
+          indexWriterConfig.setMergePolicy(new LogByteSizeMergePolicy());
+        }
+
         _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
@@ -353,14 +361,14 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 
   private File getMutableIndexDir(File indexDir, File consumerDir) {
     String segmentName = getSegmentName(indexDir);
     return new File(new File(consumerDir, segmentName),
-        _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+        _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
   }
 
   private String getSegmentName(File indexDir) {

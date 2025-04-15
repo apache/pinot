@@ -19,20 +19,24 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
+import org.apache.pinot.core.util.trace.TraceCallable;
 
 
 /**
@@ -40,8 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexedTable.class);
-
+  private final ExecutorService _executorService;
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -51,6 +54,8 @@ public abstract class IndexedTable extends BaseTable {
   protected final TableResizer _tableResizer;
   protected final int _trimSize;
   protected final int _trimThreshold;
+  protected final int _numThreadsExtractFinalResult;
+  protected final int _chunkSizeExtractFinalResult;
 
   protected Collection<Record> _topRecords;
   private int _numResizes;
@@ -68,13 +73,14 @@ public abstract class IndexedTable extends BaseTable {
    * @param lookupMap     Map from keys to records
    */
   protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, Map<Key, Record> lookupMap) {
+      int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
     super(dataSchema);
 
     Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
     Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
     Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
 
+    _executorService = executorService;
     _lookupMap = lookupMap;
     _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
@@ -83,31 +89,16 @@ public abstract class IndexedTable extends BaseTable {
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    if (orderByExpressions != null) {
-      // GROUP BY with ORDER BY
-      _hasOrderBy = true;
-      _tableResizer = new TableResizer(dataSchema, hasFinalInput, queryContext);
-      _trimSize = trimSize;
-      // trimThreshold is lower bounded by (2 * trimSize) in order to avoid excessive trimming. We don't modify trimSize
-      // in order to maintain the desired accuracy
-      if (trimSize > trimThreshold / 2) {
-        // Handle potential overflow
-        _trimThreshold = (2 * trimSize) > 0 ? 2 * trimSize : Integer.MAX_VALUE;
-        LOGGER.debug("Overriding group trim threshold to {}, since the configured value {} is less than twice the "
-            + "trim size ({})", _trimThreshold, trimThreshold, trimSize);
-      } else {
-        _trimThreshold = trimThreshold;
-      }
-    } else {
-      // GROUP BY without ORDER BY
-      // NOTE: The indexed table stops accepting records once the map size reaches resultSize, and there is no
-      //       resize/trim during upsert.
-      _hasOrderBy = false;
-      _tableResizer = null;
-      _trimSize = Integer.MAX_VALUE;
-      _trimThreshold = Integer.MAX_VALUE;
-    }
+    _hasOrderBy = queryContext.getOrderByExpressions() != null;
+    _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
+    // NOTE: Trim should be disabled when there is no ORDER BY
+    assert _hasOrderBy || (trimSize == Integer.MAX_VALUE && trimThreshold == Integer.MAX_VALUE);
+    _trimSize = trimSize;
+    _trimThreshold = trimThreshold;
+    // NOTE: The upper limit of threads number for final reduce is set to 2 * number of available processors by default
+    _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
+        Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
+    _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
   }
 
   @Override
@@ -181,14 +172,88 @@ public abstract class IndexedTable extends BaseTable {
       for (int i = 0; i < numAggregationFunctions; i++) {
         columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
       }
-      for (Record record : _topRecords) {
-        Object[] values = record.getValues();
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          int colId = i + _numKeyColumns;
-          values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+      int numThreadsExtractFinalResult = inferNumThreadsExtractFinalResult();
+      // Submit task when the EXECUTOR_SERVICE is not overloaded
+      if (numThreadsExtractFinalResult > 1) {
+        // Multi-threaded final reduce
+        List<Future<Void>> futures = new ArrayList<>(numThreadsExtractFinalResult);
+        try {
+          List<Record> topRecordsList = new ArrayList<>(_topRecords);
+          int chunkSize = (topRecordsList.size() + numThreadsExtractFinalResult - 1) / numThreadsExtractFinalResult;
+          for (int threadId = 0; threadId < numThreadsExtractFinalResult; threadId++) {
+            int startIdx = threadId * chunkSize;
+            int endIdx = Math.min(startIdx + chunkSize, topRecordsList.size());
+            if (startIdx < endIdx) {
+              // Submit a task for processing a chunk of values
+              futures.add(_executorService.submit(new TraceCallable<Void>() {
+                @Override
+                public Void callJob() {
+                  for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
+                    Object[] values = topRecordsList.get(recordIdx).getValues();
+                    for (int i = 0; i < numAggregationFunctions; i++) {
+                      int colId = i + _numKeyColumns;
+                      values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+                    }
+                  }
+                  return null;
+                }
+              }));
+            }
+          }
+          // Wait for all tasks to complete
+          for (Future<Void> future : futures) {
+            future.get();
+          }
+        } catch (InterruptedException | ExecutionException e) {
+          // Cancel all running tasks
+          for (Future<Void> future : futures) {
+            future.cancel(true);
+          }
+          throw new RuntimeException("Error during multi-threaded final reduce", e);
+        }
+      } else {
+        for (Record record : _topRecords) {
+          Object[] values = record.getValues();
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            int colId = i + _numKeyColumns;
+            values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+          }
         }
       }
     }
+  }
+
+  private int inferNumThreadsExtractFinalResult() {
+    if (_numThreadsExtractFinalResult > 1) {
+      return _numThreadsExtractFinalResult;
+    }
+    if (containsExpensiveAggregationFunctions()) {
+      int parallelChunkSize = _chunkSizeExtractFinalResult;
+      if (_topRecords != null && _topRecords.size() > parallelChunkSize) {
+        int estimatedThreads = (int) Math.ceil((double) _topRecords.size() / parallelChunkSize);
+        if (estimatedThreads == 0) {
+          return 1;
+        }
+        return Math.min(estimatedThreads, QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
+      }
+    }
+    // Default to 1 thread
+    return 1;
+  }
+
+  private boolean containsExpensiveAggregationFunctions() {
+    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+      switch (aggregationFunction.getType()) {
+        case FUNNELCOMPLETECOUNT:
+        case FUNNELCOUNT:
+        case FUNNELMATCHSTEP:
+        case FUNNELMAXSTEP:
+          return true;
+        default:
+          break;
+      }
+    }
+    return false;
   }
 
   @Override

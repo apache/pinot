@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "OperateClusterConfig")
+@CommandLine.Command(name = "OperateClusterConfig", mixinStandardHelpOptions = true)
 public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OperateClusterConfigCommand.class.getName());
 
@@ -67,16 +67,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
       description = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

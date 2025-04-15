@@ -20,15 +20,18 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
 /**
@@ -36,18 +39,21 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
  */
 public class TransformPipeline {
-  private final RecordTransformer _recordTransformer;
+  private final List<RecordTransformer> _preComplexTypeTransformers;
   private final ComplexTypeTransformer _complexTypeTransformer;
+  private final RecordTransformer _recordTransformer;
 
   /**
    * Constructs a transform pipeline with customized RecordTransformer and customized ComplexTypeTransformer
-   * @param recordTransformer the customized record transformer
+   * @param preComplexTypeTransformers the list of customized pre-complex type transformers
    * @param complexTypeTransformer the customized complexType transformer
+   * @param recordTransformer the customized record transformer
    */
-  public TransformPipeline(RecordTransformer recordTransformer,
-      @Nullable ComplexTypeTransformer complexTypeTransformer) {
-    _recordTransformer = recordTransformer;
+  public TransformPipeline(@Nullable List<RecordTransformer> preComplexTypeTransformers,
+      @Nullable ComplexTypeTransformer complexTypeTransformer, RecordTransformer recordTransformer) {
+    _preComplexTypeTransformers = preComplexTypeTransformers;
     _complexTypeTransformer = complexTypeTransformer;
+    _recordTransformer = recordTransformer;
   }
 
   /**
@@ -56,18 +62,31 @@ public class TransformPipeline {
    * @param schema the table schema
    */
   public TransformPipeline(TableConfig tableConfig, Schema schema) {
-    // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    // Create pre complex type transformers
+    _preComplexTypeTransformers = CompositeTransformer.getPreComplexTypeTransformers(tableConfig);
 
     // Create complex type transformer
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+
+    // Create record transformer
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
   }
 
   /**
    * Returns a pass through pipeline that does not transform the record.
    */
   public static TransformPipeline getPassThroughPipeline() {
-    return new TransformPipeline(CompositeTransformer.getPassThroughTransformer(), null);
+    return new TransformPipeline(null, null, CompositeTransformer.getPassThroughTransformer());
+  }
+
+  public Collection<String> getInputColumns() {
+    if (_complexTypeTransformer == null) {
+      return _recordTransformer.getInputColumns();
+    } else {
+      Set<String> inputColumns = new HashSet<>(_recordTransformer.getInputColumns());
+      inputColumns.addAll(_complexTypeTransformer.getInputColumns());
+      return inputColumns;
+    }
   }
 
   /**
@@ -79,16 +98,26 @@ public class TransformPipeline {
   public void processRow(GenericRow decodedRow, Result reusedResult)
       throws Exception {
     reusedResult.reset();
+
+    if (_preComplexTypeTransformers != null) {
+      for (RecordTransformer preComplexTypeTransformer : _preComplexTypeTransformers) {
+        decodedRow = preComplexTypeTransformer.transform(decodedRow);
+      }
+    }
+
     if (_complexTypeTransformer != null) {
       // TODO: consolidate complex type transformer into composite type transformer
       decodedRow = _complexTypeTransformer.transform(decodedRow);
     }
+
     Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    if (rows != null) {
+
+    if (CollectionUtils.isNotEmpty(rows)) {
       for (GenericRow row : rows) {
         processPlainRow(row, reusedResult);
       }
     } else {
+      decodedRow.removeValue(GenericRow.MULTIPLE_RECORDS_KEY);
       processPlainRow(decodedRow, reusedResult);
     }
   }

@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 
@@ -71,12 +73,18 @@ public class S3Config {
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
+  public static final String DEFAULT_CROSS_REGION_ACCESS_ENABLED = "true";
   public static final String HTTP_CLIENT_CONFIG_PREFIX = "httpclient";
   public static final String HTTP_CLIENT_CONFIG_MAX_CONNECTIONS = "maxConnections";
   private static final String HTTP_CLIENT_CONFIG_SOCKET_TIMEOUT = "socketTimeout";
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIMEOUT = "connectionTimeout";
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE = "connectionTimeToLive";
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT = "connectionAcquisitionTimeout";
+  private static final String CROSS_REGION_ACCESS_ENABLED = "crossRegionAccessEnabled";
+  public static final String ANONYMOUS_CREDENTIALS_PROVIDER = "anonymousCredentialsProvider";
+  public static final String REQUEST_CHECKSUM_CALCULATION = "requestChecksumCalculation";
+  public static final String RESPONSE_CHECKSUM_VALIDATION = "responseChecksumValidation";
+
   private final String _accessKey;
   private final String _secretKey;
   private final String _region;
@@ -97,6 +105,10 @@ public class S3Config {
   private final long _minObjectSizeForMultiPartUpload;
   private final long _multiPartUploadPartSize;
   private final ApacheHttpClient.Builder _httpClientBuilder;
+  private final boolean _enableCrossRegionAccess;
+  private final boolean _anonymousCredentialsProvider;
+  private final RequestChecksumCalculation _requestChecksumCalculationWhenRequired;
+  private final ResponseChecksumValidation _responseChecksumValidationWhenRequired;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -104,6 +116,12 @@ public class S3Config {
     _secretKey = pinotConfig.getProperty(SECRET_KEY);
     _region = pinotConfig.getProperty(REGION);
     _endpoint = pinotConfig.getProperty(ENDPOINT);
+    _anonymousCredentialsProvider = Boolean.parseBoolean(
+        pinotConfig.getProperty(ANONYMOUS_CREDENTIALS_PROVIDER, "false"));
+    _requestChecksumCalculationWhenRequired = RequestChecksumCalculation.fromValue(
+        pinotConfig.getProperty(REQUEST_CHECKSUM_CALCULATION, RequestChecksumCalculation.WHEN_REQUIRED.name()));
+    _responseChecksumValidationWhenRequired = ResponseChecksumValidation.fromValue(
+        pinotConfig.getProperty(RESPONSE_CHECKSUM_VALIDATION, ResponseChecksumValidation.WHEN_REQUIRED.name()));
 
     _storageClass = pinotConfig.getProperty(STORAGE_CLASS);
     if (_storageClass != null) {
@@ -140,6 +158,8 @@ public class S3Config {
     }
     PinotConfiguration httpConfig = pinotConfig.subset(HTTP_CLIENT_CONFIG_PREFIX);
     _httpClientBuilder = httpConfig.isEmpty() ? null : createHttpClientBuilder(httpConfig);
+    _enableCrossRegionAccess =
+        Boolean.parseBoolean(pinotConfig.getProperty(CROSS_REGION_ACCESS_ENABLED, DEFAULT_CROSS_REGION_ACCESS_ENABLED));
   }
 
   private static ApacheHttpClient.Builder createHttpClientBuilder(PinotConfiguration config) {
@@ -264,5 +284,21 @@ public class S3Config {
   @Nullable
   public String getStorageClass() {
     return _storageClass;
+  }
+
+  public boolean isCrossRegionAccessEnabled() {
+    return _enableCrossRegionAccess;
+  }
+
+  public boolean isAnonymousCredentialsProvider() {
+    return _anonymousCredentialsProvider;
+  }
+
+  public RequestChecksumCalculation getRequestChecksumCalculationWhenRequired() {
+    return _requestChecksumCalculationWhenRequired;
+  }
+
+  public ResponseChecksumValidation getResponseChecksumValidationWhenRequired() {
+    return _responseChecksumValidationWhenRequired;
   }
 }

@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,6 +66,7 @@ import static org.testng.Assert.*;
 
 public class TableConfigSerDeTest {
   private static final double NO_DICTIONARY_THRESHOLD_RATIO = 0.72;
+
   @Test
   public void testSerDe()
       throws IOException {
@@ -192,8 +194,8 @@ public class TableConfigSerDeTest {
     }
     {
       // With query config
-      QueryConfig queryConfig = new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null,
-          null);
+      QueryConfig queryConfig =
+          new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null, null);
       TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
 
       checkQueryConfig(tableConfig);
@@ -270,7 +272,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config - with metadata ttl and metadata time column
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn");
+      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn", false);
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
@@ -290,8 +292,11 @@ public class TableConfigSerDeTest {
       ingestionConfig.setBatchIngestionConfig(
           new BatchIngestionConfig(Collections.singletonList(Collections.singletonMap("batchType", "s3")), "APPEND",
               "HOURLY"));
-      ingestionConfig.setStreamIngestionConfig(
-          new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka"))));
+      StreamIngestionConfig streamIngestionConfig =
+          new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka")));
+      streamIngestionConfig.setParallelSegmentConsumptionPolicy(
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+      ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
       ingestionConfig.setFilterConfig(new FilterConfig("filterFunc(foo)"));
       ingestionConfig.setTransformConfigs(
           Arrays.asList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()")));
@@ -476,7 +481,8 @@ public class TableConfigSerDeTest {
     assertNotNull(ingestionConfig.getStreamIngestionConfig());
     assertNotNull(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps());
     assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size(), 1);
-    assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().get(0).get("streamType"), "kafka");
+    assertEquals(ingestionConfig.getStreamIngestionConfig().getParallelSegmentConsumptionPolicy(),
+        ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {

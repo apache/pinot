@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.operator.query.EmptyAggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
@@ -36,6 +37,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -47,10 +49,10 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 @SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
-      EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTCOUNTHLL,
-          DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, SEGMENTPARTITIONEDDISTINCTCOUNT,
-          DISTINCTCOUNTSMARTHLL, DISTINCTSUM, DISTINCTAVG, DISTINCTSUMMV, DISTINCTAVGMV, DISTINCTCOUNTHLLPLUS,
-          DISTINCTCOUNTHLLPLUSMV, DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTRAWHLLPLUSMV);
+      EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTSUM,
+          DISTINCTSUMMV, DISTINCTAVG, DISTINCTAVGMV, DISTINCTCOUNTOFFHEAP, DISTINCTCOUNTHLL, DISTINCTCOUNTHLLMV,
+          DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTHLLPLUSMV,
+          DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTRAWHLLPLUSMV, SEGMENTPARTITIONEDDISTINCTCOUNT, DISTINCTCOUNTSMARTHLL);
 
   // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
@@ -69,6 +71,11 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator<AggregationResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null;
+
+    if (_queryContext.getLimit() == 0) {
+      return new EmptyAggregationOperator(_queryContext, _indexSegment.getSegmentMetadata().getTotalDocs());
+    }
+
     return _queryContext.hasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
   }
 
@@ -94,11 +101,17 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (!_queryContext.isNullHandlingEnabled()) {
-      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
-        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
-      }
+    // Priority 1: Check if star-tree based aggregation is feasible
+    AggregationInfo aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithStarTree(_segmentContext,
+        _queryContext, aggregationFunctions, _queryContext.getFilter(), filterOperator,
+        filterPlanNode.getPredicateEvaluators());
+    if (aggregationInfo != null) {
+      return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
+    }
 
+    boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
+    if (!hasNullValues) {
+      // Priority 2: Check if non-scan based aggregation is feasible
       if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
@@ -110,12 +123,49 @@ public class AggregationPlanNode implements PlanNode {
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
+
+      // Priority 3: Check if fast filtered count can be used
+      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
+      }
     }
 
-    AggregationInfo aggregationInfo =
-        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext, aggregationFunctions,
-            _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+    // Default:
+    aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
+        aggregationFunctions, filterOperator);
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
+  }
+
+  /**
+   * Returns {@code true} if any of the aggregation functions have null values, {@code false} otherwise.
+   *
+   * The current implementation is pessimistic and returns {@code true} if any of the arguments to the aggregation
+   * functions is of function type. This is because we do not have a way to determine if the function will return null
+   * values without actually evaluating it.
+   */
+  private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
+        switch (argument.getType()) {
+          case IDENTIFIER:
+            DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
+            NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+            if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+              return true;
+            }
+            break;
+          case LITERAL:
+            if (argument.getLiteral().isNull()) {
+              return true;
+            }
+            break;
+          case FUNCTION:
+          default:
+            return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -124,11 +174,11 @@ public class AggregationPlanNode implements PlanNode {
    */
   private static boolean isFitForNonScanBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == COUNT) {
         continue;
       }
-      ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
+      ExpressionContext argument = aggregationFunction.getInputExpressions().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }

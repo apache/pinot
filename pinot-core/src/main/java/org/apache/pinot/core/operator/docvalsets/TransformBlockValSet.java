@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -140,6 +141,39 @@ public class TransformBlockValSet implements BlockValSet {
       recordTransformValues(scope, DataType.BYTES, true);
       return _transformFunction.transformToBytesValuesSV(_valueBlock);
     }
+  }
+
+  @Override
+  public int[] get32BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    int[] hashValues = new int[length];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit32(bytes[i], 0);
+    }
+    return hashValues;
+  }
+
+  @Override
+  public long[] get64BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    long[] hashValues = new long[length];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit64(bytes[i], 0);
+    }
+    return hashValues;
+  }
+
+  @Override
+  public long[][] get128BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    long[][] hashValues = new long[length][];
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = MurmurHashFunctions.murmurHash3X64Bit128AsLongs(bytes[i], 0);
+    }
+    return hashValues;
   }
 
   @Override

@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
@@ -44,6 +44,9 @@ import { get, isEmpty } from "lodash";
 import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
+import {
+  RebalanceServerStatusOp, RebalanceTableSegmentJobs
+} from "../components/Homepage/Operations/RebalanceServerStatusOp";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -130,7 +133,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [config, setConfig] = useState('{}');
 
-  const instanceColumns = ["Instance Name", "# of segments"];
+  const instanceColumns = ["Instance Name", "# of segments", "Status"];
   const loadingInstanceData = Utils.getLoadingTableData(instanceColumns);
   const [instanceCountData, setInstanceCountData] = useState<TableData>(loadingInstanceData);
 
@@ -151,6 +154,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [tableJobsData, setTableJobsData] = useState<TableSegmentJobs | null>(null);
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
+  const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+
+  // This is quite hacky, but it's the only way to get this to work with the dialog.
+  // The useState variables are simply for the dialog box to know what to render in
+  // the checkbox fields. The actual state of the checkboxes is stored in the refs.
+  // The refs are then used to determine how we delete the table. If you try to use
+  // the state variables in this class, you will not be able to get their latest values.
+  const [dialogCheckboxes, setDialogCheckboxes] = useState({
+    deleteImmediately: false,
+    deleteSchema: false
+  });
+  const deleteImmediatelyRef = useRef(false);
+  const deleteSchemaRef = useRef(false);
 
   const fetchTableData = async () => {
     // We keep all the fetching inside this component since we need to be able
@@ -187,10 +203,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
     const data = await PinotMethodUtils.fetchServerToSegmentsCountData(tableName, tableType);
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstances();
     const {columns, records} = result;
     setInstanceCountData({
       columns: instanceColumns,
-      records: data.records
+      records: data.records.map((record) => {
+        return [...record, liveInstanceNames.data.includes(record[0]) ? 'Alive' : 'Dead'];
+      })
     });
 
     const segmentTableRows = [];
@@ -299,45 +318,66 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const handleDeleteTableAction = () => {
+    // Set checkboxes to the last state when opening dialog
+    setDialogCheckboxes({
+      deleteImmediately: deleteImmediatelyRef.current,
+      deleteSchema: deleteSchemaRef.current
+    });
+
     setDialogDetails({
       title: 'Delete Table',
-      content: 'Are you sure want to delete this table? All data and configs will be deleted.',
-      successCb: () => deleteTable()
+      content:
+        'Are you sure want to delete this table? All data and configs will be deleted.',
+      successCb: () => {
+        deleteTable();
+      },
+      renderChildren: true,
     });
     setConfirmDialog(true);
   };
 
   const deleteTable = async () => {
-    const result = await PinotMethodUtils.deleteTableOp(tableName);
-    if(result.status){
-      dispatch({type: 'success', message: result.status, show: true});
-    } else {
-      dispatch({type: 'error', message: result.error, show: true});
-    }
-    closeDialog();
-    if(result.status){
-      setTimeout(()=>{
-        if(tenantName){
-          history.push(Utils.navigateToPreviousPage(location, true));  
-        } else {
-          history.push('/tables');
+    let message = '';
+    let tableDeleted = false;
+    let schemaDeleted = false;
+
+    try {
+      const tableRes = await PinotMethodUtils.deleteTableOp(tableName, deleteImmediatelyRef.current ? '0d' : undefined);
+
+      if (tableRes.status) {
+        message = tableRes.status;
+        tableDeleted = true;
+
+        if (deleteSchemaRef.current) {
+          const schemaRes = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
+          if (schemaRes.status) {
+            message += ". " + schemaRes.status;
+            schemaDeleted = true;
+          } else {
+            message += ". " + schemaRes.error || "Unknown error deleting schema";
+          }
         }
-      }, 1000);
+      } else {
+        message = tableRes.error || "Unknown error deleting table";
+      }
+
+      const isSuccess = tableDeleted && (!deleteSchemaRef.current || schemaDeleted);
+      dispatch({ type: isSuccess ? 'success' : 'error', message, show: true });
+      closeDialog();
+
+      if (tableDeleted) {
+        setTimeout(() => {
+          if (tenantName) {
+            history.push(Utils.navigateToPreviousPage(location, true));
+          } else {
+            history.push('/tables');
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      dispatch({ type: 'error', message: error.toString(), show: true });
+      closeDialog();
     }
-  };
-
-  const handleDeleteSchemaAction = () => {
-    setDialogDetails({
-      title: 'Delete Schema',
-      content: 'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
-      successCb: () => deleteSchema()
-    });
-    setConfirmDialog(true);
-  };
-
-  const deleteSchema = async () => {
-    const result = await PinotMethodUtils.deleteSchemaOp(schemaJSON.schemaName);
-    syncResponse(result);
   };
 
   const handleReloadSegments = () => {
@@ -407,6 +447,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       dispatch({type: 'error', message: error, show: true});
       setShowReloadStatusModal(false);
     }
+  };
+
+  const handleRebalanceTableStatus = () => {
+    setShowRebalanceServerStatus(true);
   };
 
   const handleRebalanceBrokers = () => {
@@ -480,20 +524,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Edit Schema
               </CustomButton>
               <CustomButton
-                isDisabled={!schemaJSON} onClick={handleDeleteSchemaAction}
-                tooltipTitle="Delete Schema"
-                enableTooltip={true}
-              >
-                Delete Schema
-              </CustomButton>
-              <CustomButton
-                isDisabled={true} onClick={()=>{}}
-                tooltipTitle="Truncate Table"
-                enableTooltip={true}
-              >
-                Truncate Table
-              </CustomButton>
-              <CustomButton
                 onClick={handleReloadSegments}
                 tooltipTitle="Reloads all segments of the table to apply changes such as indexing, column default values, etc"
                 enableTooltip={true}
@@ -513,6 +543,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 enableTooltip={true}
               >
                 Rebalance Servers
+              </CustomButton>
+              <CustomButton
+                  onClick={handleRebalanceTableStatus}
+                  tooltipTitle="The status of table rebalance job"
+                  enableTooltip={true}
+              >
+                Rebalance Servers Status
               </CustomButton>
               <CustomButton
                 onClick={handleRebalanceBrokers}
@@ -647,35 +684,96 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         </Grid>
         <EditConfigOp
           showModal={showEditConfig}
-          hideModal={()=>{setShowEditConfig(false);}}
+          hideModal={() => {
+            setShowEditConfig(false);
+          }}
           saveConfig={saveConfigAction}
           config={config}
           handleConfigChange={handleConfigChange}
         />
-        {
-          showReloadStatusModal &&
+        {showReloadStatusModal && (
           <ReloadStatusOp
-            hideModal={()=>{setShowReloadStatusModal(false); setReloadStatusData(null)}}
+            hideModal={() => {
+              setShowReloadStatusModal(false);
+              setReloadStatusData(null);
+            }}
             reloadStatusData={reloadStatusData}
             tableJobsData={tableJobsData}
           />
-        }
-        {showRebalanceServerModal &&
+        )}
+        {showRebalanceServerStatus && (
+            <RebalanceServerStatusOp
+                hideModal={() => setShowRebalanceServerStatus(false)}
+                tableName={tableName} />
+        )}
+        {showRebalanceServerModal && (
           <RebalanceServerTableOp
-            hideModal={()=>{setShowRebalanceServerModal(false)}}
+            hideModal={() => {
+              setShowRebalanceServerModal(false);
+            }}
             tableType={tableType.toUpperCase()}
             tableName={tableName}
           />
-        }
-        {confirmDialog && dialogDetails && <Confirm
-          openDialog={confirmDialog}
-          dialogTitle={dialogDetails.title}
-          dialogContent={dialogDetails.content}
-          successCallback={dialogDetails.successCb}
-          closeDialog={closeDialog}
-          dialogYesLabel='Yes'
-          dialogNoLabel='No'
-        />}
+        )}
+        {confirmDialog && dialogDetails && (
+          <Confirm
+            openDialog={confirmDialog}
+            dialogTitle={dialogDetails.title}
+            dialogContent={dialogDetails.content}
+            successCallback={dialogDetails.successCb}
+            children={
+              dialogDetails.renderChildren && <>
+                <Tooltip
+                  title="Delete table and all segments immediately.
+                         If not checked, all segments will be copied over to a separate path
+                         and kept until the cluster default retention period is met."
+                  arrow
+                  placement="right"
+                >
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={dialogCheckboxes.deleteImmediately}
+                        onChange={(e) => {
+                          const { checked } = e.target;
+                          setDialogCheckboxes(prev => ({
+                            ...prev,
+                            deleteImmediately: checked
+                          }));
+                          deleteImmediatelyRef.current = checked
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Delete Immediately"
+                  />
+                </Tooltip>
+                <Tooltip title="If the table is successfully deleted, also delete the schema associated with this table." arrow placement="right">
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={dialogCheckboxes.deleteSchema}
+                        onChange={(e) => {
+                          const { checked } = e.target;
+                          setDialogCheckboxes(prev => ({
+                            ...prev,
+                            deleteSchema: checked
+                          }));
+                          deleteSchemaRef.current = checked;
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Delete Schema"
+                  />
+                </Tooltip>
+              </>
+            }
+            closeDialog={closeDialog}
+            dialogYesLabel="Yes"
+            dialogNoLabel="No"
+          />
+        )}
       </Grid>
     );
   }

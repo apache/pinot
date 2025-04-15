@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,6 +37,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.AssertJUnit.assertTrue;
 
 
 /**
@@ -52,6 +54,34 @@ public class DateTimeFunctionsTest {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
     assertEquals(evaluator.getArguments(), expectedArguments);
     assertEquals(evaluator.evaluate(row), expectedResult);
+  }
+
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Consumer<Object> assertResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    assertEquals(evaluator.getArguments(), expectedArguments);
+    assertResult.accept(evaluator.evaluate(row));
+  }
+
+  private void testDateFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Object expectedResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    assertEquals(evaluator.getArguments(), expectedArguments);
+    Object actual = evaluator.evaluate(row);
+    try {
+      assertEquals(actual, expectedResult);
+    } catch (AssertionError ae) {
+      String actualDate = "";
+      if (actual instanceof Long) {
+        actualDate = " (" + new DateTime(actual, DateTimeZone.UTC) + ")";
+      }
+      String expectedDate = "";
+      if (expectedResult instanceof Long) {
+        expectedDate = " (" + new DateTime(expectedResult, DateTimeZone.UTC) + ")";
+      }
+
+      throw new AssertionError("Expected: " + expectedResult + (expectedDate) + " but was " + actual + actualDate, ae);
+    }
   }
 
   @Test(dataProvider = "dateTimeFunctionsDataProvider")
@@ -489,6 +519,7 @@ public class DateTimeFunctionsTest {
     // Test conversion from millis to hours
     testDateTimeConvert(1505902560000L/* 20170920T03:16:00 */, "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS",
         418306L/* 20170920T03:00:00 */);
+
     // Test conversion from 5 minutes to hours
     testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS",
         418306L/* 20170920T03:00:00 */);
@@ -497,68 +528,130 @@ public class DateTimeFunctionsTest {
         1505901600000L/* 20170920T03:00:00 */);
 
     testDateTimeConvert(null, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", null);
+    // test custom bucketing time zone
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", "UTC",
+        1505901600000L/* 20170920T03:00:00 */);
+
+    // test with custom bucketing time zone
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "4:HOURS",
+        1505894400000L/* 20170920T03:00:00 */);
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "4:HOURS", "UTC",
+        1505894400000L/* 20170920T03:00:00 */);
+    testDateTimeConvert(5019635L/* 20170919T23:55:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "4:HOURS", "CET",
+        1505887200000L/* 20170920T03:00:00 */);
+
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "2:DAYS",
+        1505779200000L/* 20170920T03:00:00 */);
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "2:DAYS", "UTC",
+        1505779200000L/* 20170920T03:00:00 */);
+    testDateTimeConvert(5019675L/* 20170920T03:15:00 */, "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "2:DAYS", "CET",
+        1505772000000L/* 20170920T03:00:00 */);
 
     // EPOCH to SDF
     // Test conversion from millis since epoch to simple date format (UTC)
     testDateTimeConvert(1505985360000L/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "20170921");
+    testDateTimeConvert(1505985360000L/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "CET", "20170920");
+
     // Test conversion from millis since epoch to simple date format (Pacific timezone)
     testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)", "1:DAYS", "20170920");
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)", "1:DAYS", "CET", "20170920");
+
     // Test conversion from millis since epoch to simple date format (IST)
     testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", "1:DAYS", "20170921");
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", "1:DAYS", "CET", "20170921");
+
     // Test conversion from millis since epoch to simple date format (Pacific timezone)
     testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:HOURS", "2017092020");
+    testDateTimeConvert(1505962800000L/* 20170920T20:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:HOURS", "CET", "2017092020");
+
     // Test conversion from millis since epoch to simple date format (East Coast timezone)
     testDateTimeConvert(1505970000000L/* 20170920T22:00:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:HOURS", "2017092101");
+    testDateTimeConvert(1505970000000L/* 20170920T22:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:HOURS", "CET", "2017092101");
+
     // Test conversion from millis since epoch to simple date format (America/Denver timezone with 15 second
     // granularity)
     testDateTimeConvert(1523560632000L/* 20180412T19:17:12 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS",
         "2018-04-12 13:17:00.000");
+
     // Test conversion from millis since epoch to simple date format (America/Denver timezone with 3 minute granularity)
     testDateTimeConvert(1523561708000L/* 20180412T19:35:08 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "3:MINUTES",
         "2018-04-12 13:33:00.000");
+
     // Test conversion from millis since epoch to simple date format (America/Denver timezone with 12 hour granularity)
     testDateTimeConvert(1523430205000L/* 20180411T07:03:25 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS",
         "2018-04-11 00:00:00.000");
+    testDateTimeConvert(1523430205000L/* 20180411T07:03:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS", "CET",
+        "2018-04-10 16:00:00.000");
+
     // Test conversion from millis since epoch to simple date format (America/Denver timezone with 5 day granularity)
     testDateTimeConvert(1519926205000L/* 20180301T09:43:25 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
         "2018-03-01 00:00:00.000");
+    testDateTimeConvert(1519926205000L/* 20180301T09:43:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", "CET",
+        "2018-02-28 16:00:00.000");
+
     testDateTimeConvert(1522230205000L/* 20180328T09:43:25 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
         "2018-03-26 00:00:00.000");
+    testDateTimeConvert(1522230205000L/* 20180328T09:43:25 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", "CET",
+        "2018-03-25 16:00:00.000");
+
     // Test conversion from millis since epoch to simple date format (America/Los_Angeles timezone with 1 day
     // granularity)
     testDateTimeConvert(1524013200000L/* 20180418T01:00:00 */, "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS",
         "2018-04-17 00:00:00.000");
+    testDateTimeConvert(1524013200000L/* 20180418T01:00:00 */, "1:MILLISECONDS:EPOCH",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", "CET",
+        "2018-04-17 15:00:00.000");
 
     // SDF to EPOCH
     // Test conversion from simple date format to millis since epoch
     testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS",
         1505952000000L/* 20170921T00:00:00 */);
+    testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS", "CET",
+        1505944800000L/* 20170921T00:00:00 */);
+
     // Test conversion from simple date format (East Coast timezone) to millis since epoch
     testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", "1:MILLISECONDS:EPOCH",
         "1:DAYS", 1505952000000L/* 20170921T00:00:00 */);
+    testDateTimeConvert("20170921", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", "1:MILLISECONDS:EPOCH",
+        "1:DAYS", "CET", 1505944800000L/* 20170920T22:00:00 */);
+
     // Test conversion from simple date format (East Coast timezone) to millis since epoch
     testDateTimeConvert("2017092000", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)",
         "1:MILLISECONDS:EPOCH", "1:HOURS", 1505880000000L/* 20170920T00:00:00 Eastern */);
+    testDateTimeConvert("2017092000", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)",
+        "1:MILLISECONDS:EPOCH", "1:HOURS", "CET", 1505880000000L/* 20170920T00:00:00 Eastern */);
+
     // Test conversion from simple date format with special characters to millis since epoch
     testDateTimeConvert("2017092000 America/Los_Angeles", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH ZZZ",
         "1:MILLISECONDS:EPOCH", "1:HOURS", 1505890800000L/* 20170920T00:00:00 UTC */);
+
     // Test conversion from simple date format with special characters to millis since epoch
     testDateTimeConvert("8/7/2017 12 PM", "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", "1:MILLISECONDS:EPOCH", "1:HOURS",
         1502107200000L/* 20170807T12:00:00 UTC */);
+
     // Test conversion from simple date format with special characters to millis since epoch, with bucketing
     testDateTimeConvert("8/7/2017 12:00:01 PM", "1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a",
         "1:MILLISECONDS:EPOCH", "1:HOURS", 1502107200000L/* 20170807T12:00:00 UTC */);
+
     // Test conversion from simple date format with special characters to millis since epoch, without bucketing
     testDateTimeConvert("8/7/2017 12:00:01 PM", "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH",
         "1:MILLISECONDS", 1502107201000L/* 20170807T12:00:01 UTC */);
@@ -567,27 +660,42 @@ public class DateTimeFunctionsTest {
     // Test conversion from simple date format to another simple date format
     testDateTimeConvert("8/7/2017 12:45:50 AM", "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", "20170807");
+
     // Test conversion from simple date format with timezone to another simple date format
     testDateTimeConvert("20170921 Asia/Kolkata", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", "20170920");
+
     // Test conversion from simple date format with timezone to another simple date format with timezone
     testDateTimeConvert("20170921 Asia/Kolkata", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "1:MILLISECONDS", "20170920");
+
     // Test conversion from simple date format to another simple date format (America/Denver timezone with 15 second
     // granularity)
     testDateTimeConvert("20180412T19:17:12", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS",
         "2018-04-12 13:17:00.000");
+    testDateTimeConvert("20180412T19:17:12", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", "CET",
+        "2018-04-12 13:17:00.000");
+
     // Test conversion from simple date format to another simple date format (America/Denver timezone with 5 day
     // granularity)
     testDateTimeConvert("20180328T09:43:25", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
-        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss" + ".SSS tz(America/Denver)", "5:DAYS",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS",
         "2018-03-26 00:00:00.000");
+    testDateTimeConvert("20180328T09:43:25", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", "CET",
+        "2018-03-25 16:00:00.000");
+
     // Test conversion from simple date format to another simple date format (America/Los_Angeles timezone with 1 day
     // granularity)
     testDateTimeConvert("20180418T01:00:00", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS",
         "2018-04-17 00:00:00.000");
+    testDateTimeConvert("20180418T01:00:00", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
+        "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", "CET",
+        "2018-04-17 15:00:00.000");
+
     // Test time value with scientific number
     testDateTimeConvert(1.50598536E12/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "20170921");
@@ -640,8 +748,17 @@ public class DateTimeFunctionsTest {
     GenericRow row = new GenericRow();
     row.putValue("timeCol", timeValue);
     List<String> arguments = Collections.singletonList("timeCol");
-    testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
+    testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
+  }
+
+  private void testDateTimeConvert(Object timeValue, String inputFormatStr, String outputFormatStr,
+      String outputGranularityStr, String bucketingTz, Object expectedResult) {
+    GenericRow row = new GenericRow();
+    row.putValue("timeCol", timeValue);
+    List<String> arguments = Collections.singletonList("timeCol");
+    testDateFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
+        outputGranularityStr, bucketingTz), arguments, row, expectedResult == null ? null : expectedResult);
   }
 
   private void testMultipleInvocations(String functionExpression, List<GenericRow> rows, List<Object> expectedResults) {
@@ -669,5 +786,15 @@ public class DateTimeFunctionsTest {
     }
     testMultipleInvocations(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), rows, expectedResults);
+  }
+
+  @Test
+  public void testSleepFunction() {
+    long startTime = System.currentTimeMillis();
+    testFunction("sleep(50)", Collections.emptyList(), new GenericRow(), result -> {
+      assertTrue((long) result >= 50);
+    });
+    long endTime = System.currentTimeMillis();
+    assertTrue(endTime - startTime >= 50);
   }
 }

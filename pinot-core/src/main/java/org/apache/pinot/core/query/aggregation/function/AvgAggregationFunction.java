@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -133,23 +134,24 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          updateGroupByResult(groupKey, groupByResultHolder, value, 1L);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
+          }
         }
-      }
+      });
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        double sum = avgPair.getSum();
-        long count = avgPair.getCount();
-        for (int groupKey : groupKeysArray[i]) {
-          updateGroupByResult(groupKey, groupByResultHolder, sum, count);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+          }
         }
-      }
+      });
     }
   }
 
@@ -197,6 +199,17 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(AvgPair avgPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.AvgPair.getValue(),
+        ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+  }
+
+  @Override
+  public AvgPair deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

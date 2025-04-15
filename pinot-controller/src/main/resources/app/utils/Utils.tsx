@@ -24,12 +24,24 @@ import { map, isEqual, findIndex, findLast } from 'lodash';
 import app_state from '../app_state';
 import {
   DISPLAY_SEGMENT_STATUS, InstanceType,
+  MapRecord,
   PinotTableDetails,
   SEGMENT_STATUS,
   SegmentStatus,
   TableData,
 } from 'Models';
 import Loading from '../components/Loading';
+import moment from "moment";
+import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
+
+const getRebalanceConfigValue = (
+    rebalanceConfig: { [optionName: string]: string | boolean | number },
+    option: RebalanceServerOption
+) => {
+  return (
+      Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue
+  );
+}
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -64,7 +76,7 @@ const pinotTableDetailsFormat = (tableDetails: PinotTableDetails): Array<string 
   ];
 }
 
-const pinotTableDetailsFromArray = (tableDetails: Array<string | number | boolean | SegmentStatus | { customRenderer: JSX.Element }>): PinotTableDetails => {
+const pinotTableDetailsFromArray = (tableDetails: Array<string | number | boolean | MapRecord | SegmentStatus | { customRenderer: JSX.Element }>): PinotTableDetails => {
   return {
     name: tableDetails[0] as string,
     estimated_size: tableDetails[1] as string,
@@ -74,7 +86,7 @@ const pinotTableDetailsFromArray = (tableDetails: Array<string | number | boolea
   };
 }
 
-const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
+const tableFormat = (data: TableData, withColumnNameSeparator: boolean = true): Array<{ [key: string]: any }> => {
   const rows = data.records;
   const header = data.columns;
 
@@ -82,7 +94,14 @@ const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
   rows.forEach((singleRow) => {
     const obj: { [key: string]: any } = {};
     singleRow.forEach((val: any, index: number) => {
-      obj[header[index]+app_state.columnNameSeparator+index] = val;
+      // The column name separator is added to avoid conflicts where 2 columns
+      // have the same name. But for cases where we download the raw data, we
+      // do not want the separate there.
+      if (withColumnNameSeparator) {
+        obj[header[index] + app_state.columnNameSeparator + index] = val;
+      } else {
+        obj[header[index]] = val;
+      }
     });
     results.push(obj);
   });
@@ -300,6 +319,7 @@ const syncTableSchemaData = (data, showFieldType) => {
   const dimensionFields = data.dimensionFieldSpecs || [];
   const metricFields = data.metricFieldSpecs || [];
   const dateTimeField = data.dateTimeFieldSpecs || [];
+  const complexFields = data.complexFieldSpecs || [];
 
   dimensionFields.map((field) => {
     field.fieldType = 'Dimension';
@@ -312,7 +332,12 @@ const syncTableSchemaData = (data, showFieldType) => {
   dateTimeField.map((field) => {
     field.fieldType = 'Date-Time';
   });
-  const columnList = [...dimensionFields, ...metricFields, ...dateTimeField];
+
+  complexFields.map((field) => {
+    field.fieldType = 'Complex'
+  })
+
+  const columnList = [...dimensionFields, ...metricFields, ...dateTimeField, ...complexFields];
   if (showFieldType) {
     return {
       columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
@@ -449,6 +474,10 @@ const getLoadingTableData = (columns: string[]): TableData => {
   };
 }
 
+const formatTime = (time: number, format?: string): string => {
+  return moment(time).format(format ?? "MMMM Do YYYY, HH:mm:ss")
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -463,5 +492,7 @@ export default {
   splitStringByLastUnderscore,
   pinotTableDetailsFormat,
   pinotTableDetailsFromArray,
-  getLoadingTableData
+  getLoadingTableData,
+  formatTime,
+  getRebalanceConfigValue
 };

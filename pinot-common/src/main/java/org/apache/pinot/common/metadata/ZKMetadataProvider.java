@@ -44,7 +44,6 @@ import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -63,8 +62,10 @@ public class ZKMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
+  private static final String CLUSTER_APPLICATION_QUOTAS = "applicationQuotas";
   private static final String PROPERTYSTORE_CONTROLLER_JOBS_PREFIX = "/CONTROLLER_JOBS";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
+  private static final String PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX = "/PAUSELESS_DEBUG_METADATA";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
@@ -110,6 +111,15 @@ public class ZKMetadataProvider {
   @VisibleForTesting
   public static void removeDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
     propertyStore.remove(constructPropertyStorePathForDatabaseConfig(databaseName), AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Remove database config.
+   */
+  @VisibleForTesting
+  public static void removeApplicationQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    propertyStore.remove(constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS),
+        AccessOption.PERSISTENT);
   }
 
   private static ZNRecord toZNRecord(DatabaseConfig databaseConfig) {
@@ -234,6 +244,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
+  }
+
+  public static String constructPropertyStorePathForPauselessDebugMetadata(String resourceName) {
+    return StringUtil.join("/", PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX, resourceName);
   }
 
   public static String constructPropertyStorePathForSchema(String schemaName) {
@@ -362,6 +376,15 @@ public class ZKMetadataProvider {
     return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
         AccessOption.PERSISTENT);
   }
+  public static boolean removePauselessDebugMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String pauselessDebugMetadataPath = constructPropertyStorePathForPauselessDebugMetadata(tableNameWithType);
+    if (propertyStore.exists(pauselessDebugMetadataPath, AccessOption.PERSISTENT)) {
+      return propertyStore.remove(pauselessDebugMetadataPath, AccessOption.PERSISTENT);
+    }
+    return true;
+  }
+
 
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
@@ -466,6 +489,16 @@ public class ZKMetadataProvider {
       boolean replaceVariables) {
     return toTableConfig(propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
         AccessOption.PERSISTENT), replaceVariables);
+  }
+
+  @Nullable
+  public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    Stat tableConfigStat = new Stat();
+    TableConfig tableConfig = toTableConfig(
+        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
+            AccessOption.PERSISTENT));
+    return tableConfig != null ? ImmutablePair.of(tableConfig, tableConfigStat) : null;
   }
 
   /**
@@ -605,60 +638,16 @@ public class ZKMetadataProvider {
    */
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-
-    // For backward compatible where schema name is not the same as raw table name
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    // Try to fetch realtime schema first
-    if (tableType == null || tableType == TableType.REALTIME) {
-      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        String realtimeSchemaNameFromValidationConfig = realtimeTableConfig.getValidationConfig().getSchemaName();
-        if (realtimeSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, realtimeSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    // Try to fetch offline schema if realtime schema does not exist
-    if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
-      TableConfig offlineTableConfig = getOfflineTableConfig(propertyStore, tableName);
-      if (offlineTableConfig != null) {
-        String offlineSchemaNameFromValidationConfig = offlineTableConfig.getValidationConfig().getSchemaName();
-        if (offlineSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, offlineSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
-    }
-    return schema;
+    return getSchema(propertyStore, TableNameBuilder.extractRawTableName(tableName));
   }
 
   /**
    * Get the schema associated with the given table.
    */
+  @Deprecated
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-    String schemaNameFromTableConfig = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaNameFromTableConfig != null) {
-      schema = getSchema(propertyStore, schemaNameFromTableConfig);
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schemaNameFromTableConfig, rawTableName);
-    }
-    return schema;
+    return getTableSchema(propertyStore, tableConfig.getTableName());
   }
 
   /**
@@ -756,6 +745,68 @@ public class ZKMetadataProvider {
       }
     } else {
       return true;
+    }
+  }
+
+  public static boolean setApplicationQpsQuota(ZkHelixPropertyStore<ZNRecord> propertyStore, String applicationName,
+      Double value) {
+    final ZNRecord znRecord;
+    final String path = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
+
+    boolean doCreate;
+    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      znRecord = new ZNRecord(CLUSTER_APPLICATION_QUOTAS);
+      doCreate = true;
+    } else {
+      znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+      doCreate = false;
+    }
+
+    Map<String, String> quotas = znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS);
+    if (quotas == null) {
+      quotas = new HashMap<>();
+      znRecord.setMapField(CLUSTER_APPLICATION_QUOTAS, quotas);
+    }
+    quotas.put(applicationName, value != null ? value.toString() : null);
+
+    if (doCreate) {
+      return propertyStore.create(path, znRecord, AccessOption.PERSISTENT);
+    } else {
+      return propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    }
+  }
+
+  @Nullable
+  public static Map<String, Double> getApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
+    if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
+      ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
+      if (znRecord.getMapFields().containsKey(CLUSTER_APPLICATION_QUOTAS)) {
+        return toApplicationQpsQuotas(znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS));
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  private static Map<String, Double> toApplicationQpsQuotas(Map<String, String> quotas) {
+    if (quotas == null) {
+      return new HashMap<>();
+    } else {
+      HashMap<String, Double> result = new HashMap<>();
+      for (Map.Entry<String, String> entry : quotas.entrySet()) {
+        if (entry.getValue() != null) {
+          try {
+            double value = Double.parseDouble(entry.getValue());
+            result.put(entry.getKey(), value);
+          } catch (NumberFormatException nfe) {
+            continue;
+          }
+        }
+      }
+      return result;
     }
   }
 }

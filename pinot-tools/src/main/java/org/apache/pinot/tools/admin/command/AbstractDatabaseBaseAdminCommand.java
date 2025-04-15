@@ -67,10 +67,6 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
   @CommandLine.Option(names = {"-database"}, required = false, description = "Corresponding database.")
   protected String _database;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   public AbstractDatabaseBaseAdminCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
     return this;
@@ -129,11 +125,6 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
   public AbstractDatabaseBaseAdminCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

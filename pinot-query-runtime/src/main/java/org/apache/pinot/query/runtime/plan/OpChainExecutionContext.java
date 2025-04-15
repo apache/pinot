@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
+
   private final MailboxService _mailboxService;
   private final long _requestId;
   private final long _deadlineMs;
@@ -49,19 +50,24 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  @Nullable
   private final ThreadExecutionContext _parentContext;
-
+  @Nullable
   private ServerPlanRequestContext _leafStageContext;
+  private final boolean _sendStats;
+
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext) {
+      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
+      boolean sendStats) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _deadlineMs = deadlineMs;
     _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _workerMetadata = workerMetadata;
+    _sendStats = sendStats;
     _server =
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), workerMetadata.getWorkerId());
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
@@ -119,6 +125,7 @@ public class OpChainExecutionContext {
     return _traceEnabled;
   }
 
+  @Nullable
   public ServerPlanRequestContext getLeafStageContext() {
     return _leafStageContext;
   }
@@ -130,5 +137,9 @@ public class OpChainExecutionContext {
   @Nullable
   public ThreadExecutionContext getParentContext() {
     return _parentContext;
+  }
+
+  public boolean isSendStats() {
+    return _sendStats;
   }
 }

@@ -23,39 +23,56 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.operator.timeseries.TimeSeriesOperatorUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
 public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
+  private final TimeSeriesExecutionContext _context;
   private final ServerQueryRequest _request;
   private final QueryExecutor _queryExecutor;
   private final ExecutorService _executorService;
+  private final ServerQueryLogger _queryLogger;
 
-  public LeafTimeSeriesOperator(ServerQueryRequest serverQueryRequest, QueryExecutor queryExecutor,
-      ExecutorService executorService) {
+  public LeafTimeSeriesOperator(TimeSeriesExecutionContext context, ServerQueryRequest serverQueryRequest,
+      QueryExecutor queryExecutor, ExecutorService executorService) {
     super(Collections.emptyList());
+    _context = context;
     _request = serverQueryRequest;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
+    _queryLogger = ServerQueryLogger.getInstance();
   }
 
   @Override
   public TimeSeriesBlock getNextBlock() {
     Preconditions.checkNotNull(_queryExecutor, "Leaf time series operator has not been initialized");
     InstanceResponseBlock instanceResponseBlock = _queryExecutor.execute(_request, _executorService);
-    assert instanceResponseBlock.getResultsBlock() instanceof TimeSeriesResultsBlock;
+    assert instanceResponseBlock.getResultsBlock() instanceof GroupByResultsBlock;
+    _queryLogger.logQuery(_request, instanceResponseBlock, "TimeSeries");
     if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptions())) {
       // TODO: Return error in the TimeSeriesBlock instead?
-      String oneException = instanceResponseBlock.getExceptions().values().iterator().next();
-      throw new RuntimeException(oneException);
+      String message = instanceResponseBlock.getExceptions().values().iterator().next();
+      throw new RuntimeException("Error running time-series query: " + message);
     }
-    TimeSeriesResultsBlock timeSeriesResultsBlock =
-        ((TimeSeriesResultsBlock) instanceResponseBlock.getResultsBlock());
-    return timeSeriesResultsBlock.getTimeSeriesBuilderBlock().build();
+    if (instanceResponseBlock.getResultsBlock() instanceof GroupByResultsBlock) {
+      return TimeSeriesOperatorUtils.buildTimeSeriesBlock(_context.getInitialTimeBuckets(),
+          (GroupByResultsBlock) instanceResponseBlock.getResultsBlock());
+    } else if (instanceResponseBlock.getResultsBlock() instanceof AggregationResultsBlock) {
+      return TimeSeriesOperatorUtils.buildTimeSeriesBlock(_context.getInitialTimeBuckets(),
+          (AggregationResultsBlock) instanceResponseBlock.getResultsBlock());
+    } else if (instanceResponseBlock.getResultsBlock() == null) {
+      throw new IllegalStateException("Found null results block in time-series query");
+    } else {
+      throw new UnsupportedOperationException(
+          String.format("Unknown results block: %s", instanceResponseBlock.getResultsBlock().getClass().getName()));
+    }
   }
 
   @Override

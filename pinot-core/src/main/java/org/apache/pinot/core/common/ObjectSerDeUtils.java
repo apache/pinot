@@ -76,9 +76,9 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -125,7 +125,7 @@ public class ObjectSerDeUtils {
     Map(8),
     IntSet(9),
     TDigest(10),
-    DistinctTable(11),
+//    DistinctTable(11),
     DataSketch(12),
     Geometry(13),
     RoaringBitmap(14),
@@ -177,6 +177,10 @@ public class ObjectSerDeUtils {
       return _value;
     }
 
+    /**
+     * @deprecated Avoid using this method because it is very inefficient.
+     */
+    @Deprecated
     public static ObjectType getObjectType(Object value) {
       if (value instanceof String) {
         return ObjectType.String;
@@ -227,8 +231,6 @@ public class ObjectSerDeUtils {
         return ObjectType.IntSet;
       } else if (value instanceof TDigest) {
         return ObjectType.TDigest;
-      } else if (value instanceof DistinctTable) {
-        return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
       } else if (value instanceof KllDoublesSketch) {
@@ -333,6 +335,7 @@ public class ObjectSerDeUtils {
     T deserialize(ByteBuffer byteBuffer);
   }
 
+  @Deprecated
   public static final ObjectSerDe<String> STRING_SER_DE = new ObjectSerDe<String>() {
 
     @Override
@@ -353,6 +356,7 @@ public class ObjectSerDeUtils {
     }
   };
 
+  @Deprecated
   public static final ObjectSerDe<Long> LONG_SER_DE = new ObjectSerDe<Long>() {
 
     @Override
@@ -371,6 +375,7 @@ public class ObjectSerDeUtils {
     }
   };
 
+  @Deprecated
   public static final ObjectSerDe<Double> DOUBLE_SER_DE = new ObjectSerDe<Double>() {
 
     @Override
@@ -797,36 +802,6 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
-
-    @Override
-    public byte[] serialize(DistinctTable distinctTable) {
-      try {
-        return distinctTable.toBytes();
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while serializing DistinctTable", e);
-      }
-    }
-
-    @Override
-    public DistinctTable deserialize(byte[] bytes) {
-      try {
-        return DistinctTable.fromByteBuffer(ByteBuffer.wrap(bytes));
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-      }
-    }
-
-    @Override
-    public DistinctTable deserialize(ByteBuffer byteBuffer) {
-      try {
-        return DistinctTable.fromByteBuffer(byteBuffer);
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-      }
-    }
-  };
-
   public static final ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE = new ObjectSerDe<QuantileDigest>() {
 
     @Override
@@ -845,6 +820,7 @@ public class ObjectSerDeUtils {
     }
   };
 
+  @Deprecated
   public static final ObjectSerDe<Map<Object, Object>> MAP_SER_DE = new ObjectSerDe<Map<Object, Object>>() {
 
     @Override
@@ -1262,10 +1238,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public byte[] serialize(RoaringBitmap bitmap) {
-      byte[] bytes = new byte[bitmap.serializedSizeInBytes()];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      bitmap.serialize(byteBuffer);
-      return bytes;
+      return RoaringBitmapUtils.serialize(bitmap);
     }
 
     @Override
@@ -1275,13 +1248,7 @@ public class ObjectSerDeUtils {
 
     @Override
     public RoaringBitmap deserialize(ByteBuffer byteBuffer) {
-      RoaringBitmap bitmap = new RoaringBitmap();
-      try {
-        bitmap.deserialize(byteBuffer);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while deserializing RoaringBitmap", e);
-      }
-      return bitmap;
+      return RoaringBitmapUtils.deserialize(byteBuffer);
     }
   };
 
@@ -1315,10 +1282,11 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<List<Object>> LIST_SER_DE = new ObjectSerDe<List<Object>>() {
+  @Deprecated
+  public static final ObjectSerDe<List> LIST_SER_DE = new ObjectSerDe<>() {
 
     @Override
-    public byte[] serialize(List<Object> list) {
+    public byte[] serialize(List list) {
       int size = list.size();
 
       // Directly return the size (0) for empty list
@@ -1794,7 +1762,7 @@ public class ObjectSerDeUtils {
       MAP_SER_DE,
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
-      DISTINCT_TABLE_SER_DE,
+      null, // Deprecate DISTINCT_TABLE_SER_DE
       DATA_SKETCH_THETA_SER_DE,
       GEOMETRY_SER_DE,
       ROARING_BITMAP_SER_DE,
@@ -1838,6 +1806,10 @@ public class ObjectSerDeUtils {
   };
   //@formatter:on
 
+  /**
+   * @deprecated Use each individual SER_DE class instead.
+   */
+  @Deprecated
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);
   }
@@ -1848,7 +1820,7 @@ public class ObjectSerDeUtils {
 
   @VisibleForTesting
   public static byte[] serialize(Object value) {
-    return serialize(value, ObjectType.getObjectType(value)._value);
+    return SER_DES[ObjectType.getObjectType(value)._value].serialize(value);
   }
 
   @VisibleForTesting

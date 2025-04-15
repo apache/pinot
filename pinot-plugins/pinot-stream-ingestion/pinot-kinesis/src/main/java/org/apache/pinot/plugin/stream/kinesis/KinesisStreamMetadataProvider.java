@@ -43,44 +43,76 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
-
 
 /**
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
-  private static final String SHARD_ID_PREFIX = "shardId-";
+  public static final String SHARD_ID_PREFIX = "shardId-";
   private final KinesisConnectionHandler _kinesisConnectionHandler;
   private final StreamConsumerFactory _kinesisStreamConsumerFactory;
   private final String _clientId;
   private final int _fetchTimeoutMs;
+  private final String _partitionId;
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisStreamMetadataProvider.class);
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
+    this(clientId, streamConfig, String.valueOf(Integer.MIN_VALUE));
+  }
+
+  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig, String partitionId) {
     KinesisConfig kinesisConfig = new KinesisConfig(streamConfig);
     _kinesisConnectionHandler = new KinesisConnectionHandler(kinesisConfig);
     _kinesisStreamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     _clientId = clientId;
+    _partitionId = partitionId;
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
   }
 
   public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig,
       KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
+    this(clientId, streamConfig, String.valueOf(Integer.MIN_VALUE), kinesisConnectionHandler, streamConsumerFactory);
+  }
+
+  public KinesisStreamMetadataProvider(String clientId, StreamConfig streamConfig, String partitionId,
+      KinesisConnectionHandler kinesisConnectionHandler, StreamConsumerFactory streamConsumerFactory) {
     _kinesisConnectionHandler = kinesisConnectionHandler;
     _kinesisStreamConsumerFactory = streamConsumerFactory;
     _clientId = clientId;
+    _partitionId = partitionId;
     _fetchTimeoutMs = streamConfig.getFetchTimeoutMillis();
   }
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
-    throw new UnsupportedOperationException();
+    try {
+      List<Shard> shards = _kinesisConnectionHandler.getShards();
+      return shards.size();
+    } catch (Exception e) {
+      LOGGER.error("Failed to fetch partition count", e);
+      throw new RuntimeException("Failed to fetch partition count", e);
+    }
   }
 
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
-    throw new UnsupportedOperationException();
+    // fetch offset for _partitionId
+    Shard foundShard = _kinesisConnectionHandler.getShards().stream()
+        .filter(shard -> {
+          String shardId = shard.shardId();
+          int partitionGroupId = getPartitionGroupIdFromShardId(shardId);
+          return partitionGroupId == Integer.parseInt(_partitionId);
+        })
+        .findFirst().orElseThrow(() -> new RuntimeException("Failed to find shard for partitionId: " + _partitionId));
+    SequenceNumberRange sequenceNumberRange = foundShard.sequenceNumberRange();
+    if (offsetCriteria.isSmallest()) {
+      return new KinesisPartitionGroupOffset(foundShard.shardId(), sequenceNumberRange.startingSequenceNumber());
+    } else if (offsetCriteria.isLargest()) {
+      return new KinesisPartitionGroupOffset(foundShard.shardId(), sequenceNumberRange.endingSequenceNumber());
+    }
+    throw new IllegalArgumentException("Unsupported offset criteria: " + offsetCriteria);
   }
 
   /**
@@ -207,5 +239,26 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
 
   @Override
   public void close() {
+  }
+
+  @Override
+  public List<TopicMetadata> getTopics() {
+    return _kinesisConnectionHandler.getStreamNames()
+        .stream()
+        .map(streamName -> new KinesisTopicMetadata().setName(streamName))
+        .collect(Collectors.toList());
+  }
+
+  public static class KinesisTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public KinesisTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 }

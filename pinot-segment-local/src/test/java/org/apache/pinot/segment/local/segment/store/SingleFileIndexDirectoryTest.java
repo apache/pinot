@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -57,7 +58,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class SingleFileIndexDirectoryTest {
+public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), SingleFileIndexDirectoryTest.class.toString());
 
@@ -92,19 +93,22 @@ public class SingleFileIndexDirectoryTest {
       throws Exception {
     // segmentDir does not have anything to begin with
     assertEquals(TEMP_DIR.list().length, 0);
-    SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-    PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", StandardIndexes.dictionary(), 1024);
-    String data = "This is a test string";
-    final byte[] dataBytes = data.getBytes();
-    int pos = 0;
-    for (byte b : dataBytes) {
-      writtenBuffer.putByte(pos++, b);
+    final byte[] dataBytes;
+    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
+        ReadMode.mmap);
+        PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", StandardIndexes.dictionary(), 1024)) {
+      String data = "This is a test string";
+      dataBytes = data.getBytes();
+      int pos = 0;
+      for (byte b : dataBytes) {
+        writtenBuffer.putByte(pos++, b);
+      }
     }
-    writtenBuffer.close();
 
     Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Arrays.asList("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
-        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", StandardIndexes.dictionary())) {
+        ReadMode.mmap);
+        PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", StandardIndexes.dictionary())) {
       assertEquals(1024, readBuffer.size());
       int length = dataBytes.length;
       for (int i = 0; i < length; i++) {
@@ -235,7 +239,7 @@ public class SingleFileIndexDirectoryTest {
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
     TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-            null, null, false, false, 0);
+        null, null, false, false, 0, false, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -259,18 +263,20 @@ public class SingleFileIndexDirectoryTest {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(sfd.hasIndexFor("foo", StandardIndexes.text()));
       // Use TextIndex once to trigger the creation of mapping files.
-      LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>());
-      fooReader.getDocIds("clean");
-      LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>());
-      barReader.getDocIds("retain hold");
+      try (LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>())) {
+        fooReader.getDocIds("clean");
+      }
+      try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
+        barReader.getDocIds("retain hold");
+      }
 
       // Both files for TextIndex should be removed.
       sfd.removeIndex("foo", StandardIndexes.text());
-      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists());
+      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists());
       assertFalse(
           new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
     }
-    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists());
+    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists());
     assertTrue(
         new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
 
@@ -289,10 +295,11 @@ public class SingleFileIndexDirectoryTest {
       assertTrue(sfd.hasIndexFor("bar", StandardIndexes.text()));
 
       // Check if the text index still work.
-      LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>());
-      MutableRoaringBitmap ids = barReader.getDocIds("retain hold");
-      assertTrue(ids.contains(0));
-      assertTrue(ids.contains(2));
+      try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
+        MutableRoaringBitmap ids = barReader.getDocIds("retain hold");
+        assertTrue(ids.contains(0));
+        assertTrue(ids.contains(2));
+      }
     }
   }
 
@@ -325,25 +332,30 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test
-  public void testPersistIndexMaps() {
+  public void testPersistIndexMaps()
+      throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream(1024 * 1024);
     try (PrintWriter pw = new PrintWriter(output)) {
       List<IndexEntry> entries = Arrays
           .asList(new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 1024),
               new IndexEntry(new IndexKey("bar", StandardIndexes.inverted()), 1024, 100),
-              new IndexEntry(new IndexKey("baz", StandardIndexes.inverted()), 1124, 200));
+              new IndexEntry(new IndexKey("baz", StandardIndexes.inverted()), 1124, 200),
+              new IndexEntry(new IndexKey("=special", StandardIndexes.inverted()), 1324, 200),
+              new IndexEntry(new IndexKey("period.:colon", StandardIndexes.inverted()), 1524, 200));
       SingleFileIndexDirectory.persistIndexMaps(entries, pw);
     }
     assertEquals(output.toString(), "foo.inverted_index.startOffset = 0\nfoo.inverted_index.size = 1024\n"
         + "bar.inverted_index.startOffset = 1024\nbar.inverted_index.size = 100\n"
-        + "baz.inverted_index.startOffset = 1124\nbaz.inverted_index.size = 200\n");
+        + "baz.inverted_index.startOffset = 1124\nbaz.inverted_index.size = 200\n"
+        + "\\=special.inverted_index.startOffset = 1324\n\\=special.inverted_index.size = 200\n"
+        + "period.\\:colon.inverted_index.startOffset = 1524\nperiod.\\:colon.inverted_index.size = 200\n");
   }
 
   @Test
   public void testGetColumnIndices()
       throws Exception {
     TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-            null, null, false, false, 0);
+        null, null, false, false, 0, false, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -378,8 +390,7 @@ public class SingleFileIndexDirectoryTest {
           new HashSet<>(Collections.singletonList("col2")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()),
-          new HashSet<>(Collections.singletonList("col5")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.singletonList("col5")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
       sfd.removeIndex("col1", StandardIndexes.forward());

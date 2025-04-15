@@ -419,7 +419,7 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (Map) columnValue);
             break;
           case UNKNOWN:
-            dataTableBuilder.setColumn(i, (Object) null);
+            dataTableBuilder.setNull(i);
             break;
 
           // Multi-value column
@@ -440,9 +440,8 @@ public class SelectionOperatorUtils {
             break;
 
           default:
-            throw new IllegalStateException(
-                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
-                    dataSchema.getColumnName(i)));
+            throw new IllegalStateException("Unsupported data type: " + storedColumnDataTypes + " for column: "
+                + dataSchema.getColumnName(i));
         }
       }
       dataTableBuilder.finishRow();
@@ -519,9 +518,8 @@ public class SelectionOperatorUtils {
           break;
 
         default:
-          throw new IllegalStateException(
-              String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
-                  dataSchema.getColumnName(i)));
+          throw new IllegalStateException("Unsupported data type: " + storedColumnDataTypes[i] + " for column: "
+              + dataSchema.getColumnName(i));
       }
     }
 

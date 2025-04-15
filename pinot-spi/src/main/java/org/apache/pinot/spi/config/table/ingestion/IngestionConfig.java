@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -49,16 +50,25 @@ public class IngestionConfig extends BaseJsonConfig {
   private ComplexTypeConfig _complexTypeConfig;
 
   @JsonPropertyDescription("Config related to the SchemaConformingTransformer")
+  @JsonProperty("schemaConformingTransformerConfig")
   private SchemaConformingTransformerConfig _schemaConformingTransformerConfig;
 
-  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2")
-  private SchemaConformingTransformerV2Config _schemaConformingTransformerV2Config;
+  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2 (backward compatibility)")
+  @JsonProperty("schemaConformingTransformerV2Config")
+  public void setSchemaConformingTransformerV2Config(
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
+  }
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
+
+  @JsonPropertyDescription(
+      "Configs related to retry segment build on reduced size when previous build fails on Preconditions check")
+  private boolean _retryOnSegmentBuildPrecheckFailure;
 
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
   private boolean _rowTimeValueCheck;
@@ -72,7 +82,6 @@ public class IngestionConfig extends BaseJsonConfig {
       @Nullable List<EnrichmentConfig> enrichmentConfigs,
       @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
       @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
-      @Nullable SchemaConformingTransformerV2Config schemaConformingTransformerV2Config,
       @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
@@ -81,7 +90,6 @@ public class IngestionConfig extends BaseJsonConfig {
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
     _aggregationConfigs = aggregationConfigs;
   }
 
@@ -124,17 +132,16 @@ public class IngestionConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public SchemaConformingTransformerV2Config getSchemaConformingTransformerV2Config() {
-    return _schemaConformingTransformerV2Config;
-  }
-
-  @Nullable
   public List<AggregationConfig> getAggregationConfigs() {
     return _aggregationConfigs;
   }
 
   public boolean isContinueOnError() {
     return _continueOnError;
+  }
+
+  public boolean isRetryOnSegmentBuildPrecheckFailure() {
+    return _retryOnSegmentBuildPrecheckFailure;
   }
 
   public boolean isRowTimeValueCheck() {
@@ -174,17 +181,16 @@ public class IngestionConfig extends BaseJsonConfig {
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }
 
-  public void setSchemaConformingTransformerV2Config(
-      SchemaConformingTransformerV2Config schemaConformingTransformerV2Config) {
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
-  }
-
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
     _aggregationConfigs = aggregationConfigs;
   }
 
   public void setContinueOnError(boolean continueOnError) {
     _continueOnError = continueOnError;
+  }
+
+  public void setRetryOnSegmentBuildPrecheckFailure(boolean retryOnSegmentBuildPrecheckFailure) {
+    _retryOnSegmentBuildPrecheckFailure = retryOnSegmentBuildPrecheckFailure;
   }
 
   public void setRowTimeValueCheck(boolean rowTimeValueCheck) {

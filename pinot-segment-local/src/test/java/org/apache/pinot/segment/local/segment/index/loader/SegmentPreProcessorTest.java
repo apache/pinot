@@ -35,6 +35,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
@@ -42,6 +43,10 @@ import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -80,7 +85,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class SegmentPreProcessorTest {
+public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final File TEMP_DIR =
@@ -139,6 +144,10 @@ public class SegmentPreProcessorTest {
   private static final String NEW_WRONG_ARG_DATE_TRUNC_DERIVED_COLUMN_NAME = "newWrongArgDateTruncDerivedColumn";
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
+
+  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(2, 4, true),
+          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(2, 4, true));
 
   private final File _avroFile;
   private final Schema _schema;
@@ -306,7 +315,7 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, createIndexLoadingConfig(schema),
             schema)) {
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
   }
 
@@ -1262,8 +1271,8 @@ public class SegmentPreProcessorTest {
     // V1 use separate file for each column index.
     File iiFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     File rgFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    File txtFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
-    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
+    File txtFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     File bfFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     assertFalse(iiFile.exists());
@@ -1491,7 +1500,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             createIndexLoadingConfig(_newColumnsSchemaWithH3Json), _newColumnsSchemaWithH3Json)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
     verifyProcessNotNeeded();
   }
@@ -1602,7 +1611,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Update table config to convert noDict to dict for longCol
@@ -1611,7 +1620,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Update table config to convert dict to noDict for longCol and add the Startree index config
@@ -1624,7 +1633,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Remove Startree index but keep the no dictionary for longCol
@@ -1633,7 +1642,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
     // Update table config to convert noDict to dict for longCol and also add the Startree index
@@ -1643,7 +1652,7 @@ public class SegmentPreProcessorTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process();
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
   }
 

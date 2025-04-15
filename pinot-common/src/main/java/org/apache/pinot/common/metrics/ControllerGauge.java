@@ -54,8 +54,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // be queried from the table.
   SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
 
+  // Track response size of getChildren from /PROPERTYSTORE/SEGMENTS/<table>
+  PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE("propertystore", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
+  EXTERNALVIEW_ZNODE_SIZE("externalview", false),
+  EXTERNALVIEW_ZNODE_BYTE_SIZE("externalview", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
@@ -64,10 +68,15 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE("TimeMsSinceLastMinionTaskMetadataUpdate", false),
   TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION("TimeMsSinceLastSuccessfulMinionTaskGeneration", false),
   LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR("LastMinionTaskGenerationEncountersError", false),
+  // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
+  NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
+  NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
+  NUM_MINION_SUBTASKS_TIMED_OUT("NumMinionSubtasksTimedOut", true),
+  NUM_MINION_SUBTASKS_ABORTED("NumMinionSubtasksAborted", true),
   PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
   PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
   TIER_BACKEND_TABLE_COUNT("TierBackendTableCount", true),
@@ -144,20 +153,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Consumption availability lag in ms at a partition level
   MAX_RECORD_AVAILABILITY_LAG_MS("maxRecordAvailabilityLagMs", false),
 
-  // Number of table schema got misconfigured
-  MISCONFIGURED_SCHEMA_TABLE_COUNT("misconfiguredSchemaTableCount", true),
+  // Number of table without table config
+  TABLE_WITHOUT_TABLE_CONFIG_COUNT("tableWithoutTableConfigCount", true),
 
-  // Number of table without schema
+  // Number of table with table config but without schema
   TABLE_WITHOUT_SCHEMA_COUNT("tableWithoutSchemaCount", true),
-
-  // Number of table schema got fixed
-  FIXED_SCHEMA_TABLE_COUNT("fixedSchemaTableCount", true),
-
-  // Number of tables that we want to fix but failed to copy schema from old schema name to new schema name
-  FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
-
-  // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
 
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE("LLCSegmentDeepStoreUploadRetryQueueSize", false),
 
@@ -165,7 +165,47 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_DISABLED("tableDisabled", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  // A per-table metric that shows the number of rows we expect to consume for the next segment of
+  // any partition in the realtime table. This metric is emitted from the segment size based threshold
+  // computer.
+  NUM_ROWS_THRESHOLD("numRowsThreshold", false),
+  // Added to preserve backwards compatibility of the above metric
+  NUM_ROWS_THRESHOLD_WITH_TOPIC("numRowsThresholdWithTopic", false),
+
+  // The actual segment size for committing segments. These may be shorter than expected when the administrator
+  // issues a force-commit, or zero when new partitions are detected in the stream (since there is no completing
+  // segment when the partition is first detected).
+  COMMITTING_SEGMENT_SIZE("committingSegmentSize", false),
+  // Added to preserve backwards compatibility of the above metric
+  COMMITTING_SEGMENT_SIZE_WITH_TOPIC("committingSegmentSizeWithTopic", false),
+
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+
+  // Number of reingested segments getting uploaded
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
+
+  // Resource utilization is within limits or not for a table
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  // The number of segments in deepstore that do not have corresponding metadata in ZooKeeper.
+  // These segments are untracked and should be considered for deletion based on retention policies.
+  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
+
+  // Metric used to track errors during the periodic table retention management
+  RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table
+  PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
+
+  // ZK JUTE max buffer size in bytes
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
 
   private final String _gaugeName;
   private final String _unit;

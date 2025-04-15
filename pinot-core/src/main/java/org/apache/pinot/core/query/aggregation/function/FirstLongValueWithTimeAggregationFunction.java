@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -98,6 +99,17 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'LONG')";
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Long> longLongPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongLongPair.getValue(),
+        ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE.serialize((LongLongPair) longLongPair));
+  }
+
+  @Override
+  public ValueLongPair<Long> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

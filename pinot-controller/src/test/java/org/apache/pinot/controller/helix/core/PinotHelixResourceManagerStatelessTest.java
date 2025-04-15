@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,6 +50,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -58,10 +60,12 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -663,6 +667,80 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testValidateTableTaskMinionInstanceTagConfig() {
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
+
+    Map<String, String> segmentGenerationAndPushTaskConfig =
+        Map.of("invalidRecordsThresholdCount", "1", "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1",
+            "validDocIdsType", "SNAPSHOT");
+
+    Map<String, String> upsertCompactionTask =
+        Map.of("invalidRecordsThresholdCount", "1", "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1",
+            "validDocIdsType", "SNAPSHOT", "minionInstanceTag", "minionTenant");
+
+    Map<String, String> segmentGenerationAndPushTaskConfig2 =
+        Map.of("schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
+            "minionInstanceTag", "anotherMinionTenant");
+
+    // Minion instance tag set but no minion present
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
+
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertTrue(e.getMessage().contains(
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME"));
+        throw e;
+      }
+    });
+
+    // Valid minion instance tag with instances
+    addMinionInstance();
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+
+    //Untag minion instance
+    untagMinions();
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertTrue(e.getMessage().contains(
+            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME"));
+        throw e;
+      }
+    });
+
+    Map<String, String> taskWithWrongTenantButNotScheduled =
+        Map.of("tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
+            "minionInstanceTag", "anotherMinionTenant");
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+  }
+
+  private void untagMinions() {
+    for (InstanceConfig minionInstance : _helixResourceManager.getAllMinionInstanceConfigs()) {
+      _helixResourceManager.updateInstanceTags(minionInstance.getId(), Helix.UNTAGGED_MINION_INSTANCE, false);
+    }
+  }
+
+  private void addMinionInstance() {
+    untagMinions();
+    Instance minionTenant =
+        new Instance("2.3.4.5", 2345, InstanceType.MINION, Collections.singletonList("minionTenant"), null, 0, 0, 0, 0,
+            false);
+    _helixResourceManager.addInstance(minionTenant, false);
+  }
+
+  @Test
   public void testCreateColocatedTenant() {
     untagServers();
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_SERVER_INSTANCES, NUM_SERVER_INSTANCES,
@@ -708,8 +786,9 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       throws Exception {
     // Create an instance with no tags
     String serverName = "Server_localhost_" + NUM_SERVER_INSTANCES;
-    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
-        Collections.emptyList(), null, 0, 12345, 0, 0, false);
+    Instance instance =
+        new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER, Collections.emptyList(), null, 0, 12345, 0,
+            0, false);
     _helixResourceManager.addInstance(instance, false);
     addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(serverName, false);
 
@@ -724,7 +803,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Takes care of the negative case
     assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
-
 
     stopAndDropFakeInstance(serverName);
 
@@ -850,21 +928,42 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertNull(segmentZKMetadata.getTier());
 
     // Move on to new tier
-    _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
+    Map<String, Set<String>> tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
     List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
         _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j11", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
 
     // Move back to default tier
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.updateTableConfig(tableConfig);
-    _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
+    tierToSegmentsMap = _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
     retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j22", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
   }
 
   /**
@@ -892,9 +991,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
             new EndReplaceSegmentsRequest(Arrays.asList("s9", "s6"), null)));
     // Try after new segments added to the table
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s20"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s20"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s20"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s21"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s21"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s21"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId,
         new EndReplaceSegmentsRequest(Arrays.asList("s21"), null));
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
@@ -921,7 +1022,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Add 5 segments
     for (int i = 0; i < 5; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
     assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).size(), 5);
 
@@ -966,9 +1068,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Try after new segments added to the table
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s5"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s5"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s5"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s6"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s6"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s6"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId1, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds(), Collections.singleton(lineageEntryId1));
@@ -989,7 +1093,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t1_0"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t1_0"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "merged_t1_0"));
     IdealState idealState = _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME);
     assertNotNull(idealState);
     assertTrue(idealState.getPartitionSet().contains("merged_t1_0"));
@@ -1021,7 +1126,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t2_0"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t2_0"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "merged_t2_0"));
 
     // Without force cleanup, 'startReplaceSegments' again should fail because of duplicate segments on 'segmentFrom'
     List<String> segmentsFrom4 = Arrays.asList("s1", "s2");
@@ -1049,9 +1155,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload segments again
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t3_0"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t3_0"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "merged_t3_0"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t3_1"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_t3_1"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "merged_t3_1"));
 
     // Finish the replacement
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId4, null);
@@ -1090,7 +1198,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s7"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s7"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s7"));
 
     // Start another new segment replacement with empty segmentsFrom, and check that previous lineages with empty
     // segmentsFrom are not reverted
@@ -1105,9 +1214,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Finish the replacement
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s9"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s9"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s9"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s10"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s10"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s10"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId7, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 6);
@@ -1130,7 +1241,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s11"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s11"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s11"));
 
     // Start another new segment replacement with segmentsFrom overlapping with previous lineage, and check that
     // previous lineages with overlapped segmentsFrom are reverted
@@ -1145,9 +1257,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Finish the replacement
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s13"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s13"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s13"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s14"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s14"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s14"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId9, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntryIds().size(), 8);
@@ -1195,7 +1309,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Add 3 segments
     for (int i = 0; i < 3; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
     List<String> segmentsForTable = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false);
     assertEquals(segmentsForTable.size(), 3);
@@ -1215,7 +1330,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Add new segments
     for (int i = 3; i < 6; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false), "s0", "s1", "s2", "s3", "s4",
         "s5");
@@ -1251,7 +1367,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Add partial segments to indicate incomplete protocol
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s6"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s6"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s6"));
     assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).size(), 7);
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true), "s3", "s4", "s5");
 
@@ -1284,7 +1401,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Add new segments
     for (int i = 9; i < 12; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
 
     // Call end segment replacements
@@ -1305,7 +1423,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Re-upload (s9, s10, s11) to test the segment clean up from startReplaceSegments
     for (int i = 9; i < 12; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false), "s3", "s4", "s5", "s9", "s10",
         "s11");
@@ -1320,7 +1439,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Upload the new segments (s12, s13, s14)
     for (int i = 12; i < 15; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i), "downloadUrl");
+          SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
+          getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s" + i));
     }
 
     // Call endReplaceSegments to start to use (s12, s13, s14)
@@ -1342,7 +1462,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s15"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s15"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s15"));
 
     // Start another new segment replacement with empty segmentsFrom, and check that previous lineages with empty
     // segmentsFrom are not reverted
@@ -1356,9 +1477,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Finish the replacement
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s17"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s17"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s17"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s18"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s18"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s18"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId6, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getSegmentsFrom(), segmentsFrom6);
@@ -1378,7 +1501,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload partial data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s19"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s19"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s19"));
 
     // Start another new segment replacement with segmentsFrom overlapping with previous lineage, and check that
     // previous lineages with overlapped segmentsFrom are reverted
@@ -1392,9 +1516,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Finish the replacement
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s21"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s21"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s21"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s22"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s22"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s22"));
 
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId8, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
@@ -1415,9 +1541,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Upload data
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s23"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s23"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s23"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s24"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s24"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s24"));
 
     // Start another new segment replacement with segmentsTo overlapping with previous lineage, and check that previous
     // lineages with overlapped segmentsTo are reverted
@@ -1435,9 +1563,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Finish the replacement
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s24"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s24"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s24"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s25"), "downloadUrl");
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s25"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s25"));
     _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryId10, null);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getSegmentsFrom(), segmentsFrom10);
@@ -1448,6 +1578,10 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+  }
+
+  private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {
+    return URIUtils.getUri(controllerDataDir, rawTableName, URIUtils.encode(segmentId)).toString();
   }
 
   private static void assertSetEquals(Collection<String> actual, String... expected) {

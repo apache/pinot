@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -29,6 +30,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -54,14 +56,14 @@ public class TableScanVisitor {
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
           context._requestId);
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
-      Preconditions.checkState(routingTable.getServerInstanceToSegmentsMap().size() == 1,
-          "Only support routing to a single server. Computed: %s",
-          routingTable.getServerInstanceToSegmentsMap().size());
-      var entry = routingTable.getServerInstanceToSegmentsMap().entrySet().iterator().next();
-      List<String> segments = entry.getValue().getLeft();
-      context.getPlanIdToSegmentMap().put(sfpNode.getId(), segments);
+      for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+        ServerInstance serverInstance = entry.getKey();
+        List<String> segments = entry.getValue().getSegments();
+        context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
+            .put(sfpNode.getId(), segments);
+      }
     }
-    for (BaseTimeSeriesPlanNode childNode : planNode.getChildren()) {
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
     }
   }
@@ -71,15 +73,28 @@ public class TableScanVisitor {
   }
 
   public static class Context {
-    private final Map<String, List<String>> _planIdToSegmentMap = new HashMap<>();
+    private final Map<ServerInstance, Map<String, List<String>>> _leafIdToSegmentsByServer = new HashMap<>();
     private final Long _requestId;
 
     public Context(Long requestId) {
       _requestId = requestId;
     }
 
-    public Map<String, List<String>> getPlanIdToSegmentMap() {
-      return _planIdToSegmentMap;
+    public List<TimeSeriesQueryServerInstance> getQueryServers() {
+      return _leafIdToSegmentsByServer.keySet().stream().map(TimeSeriesQueryServerInstance::new).collect(
+          Collectors.toList());
+    }
+
+    public Map<String, Map<String, List<String>>> getLeafIdToSegmentsByInstanceId() {
+      Map<String, Map<String, List<String>>> result = new HashMap<>();
+      for (var entry : _leafIdToSegmentsByServer.entrySet()) {
+        result.put(entry.getKey().getInstanceId(), entry.getValue());
+      }
+      return result;
+    }
+
+    Map<ServerInstance, Map<String, List<String>>> getLeafIdToSegmentsByServer() {
+      return _leafIdToSegmentsByServer;
     }
   }
 

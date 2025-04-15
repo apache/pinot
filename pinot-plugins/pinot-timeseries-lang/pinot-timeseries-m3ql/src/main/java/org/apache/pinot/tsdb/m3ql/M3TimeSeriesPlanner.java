@@ -20,8 +20,11 @@ package org.apache.pinot.tsdb.m3ql;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,14 +80,15 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
       switch (command) {
         case "fetch":
           List<String> tokens = commands.get(commandId).subList(1, commands.get(commandId).size());
-          currentNode = handleFetchNode(planIdGenerator.generateId(), tokens, children, aggInfo, groupByColumns);
+          currentNode = handleFetchNode(planIdGenerator.generateId(), tokens, children, aggInfo, groupByColumns,
+              request);
           break;
         case "sum":
         case "min":
         case "max":
           Preconditions.checkState(commandId == 1, "Aggregation should be the second command (fetch should be first)");
           Preconditions.checkState(aggInfo == null, "Aggregation already set. Only single agg allowed.");
-          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH), null);
+          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH), false, Collections.emptyMap());
           if (commands.get(commandId).size() > 1) {
             String[] cols = commands.get(commandId).get(1).split(",");
             groupByColumns = Stream.of(cols).map(String::trim).collect(Collectors.toList());
@@ -108,7 +112,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
           rootNode = currentNode;
         }
         if (lastNode != null) {
-          lastNode.addChildNode(currentNode);
+          lastNode.addInputNode(currentNode);
         }
         lastNode = currentNode;
       }
@@ -117,7 +121,8 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   }
 
   public BaseTimeSeriesPlanNode handleFetchNode(String planId, List<String> tokens,
-      List<BaseTimeSeriesPlanNode> children, AggInfo aggInfo, List<String> groupByColumns) {
+      List<BaseTimeSeriesPlanNode> children, AggInfo aggInfo, List<String> groupByColumns,
+      RangeTimeSeriesRequest request) {
     Preconditions.checkState(tokens.size() % 2 == 0, "Mismatched args");
     String tableName = null;
     String timeColumn = null;
@@ -151,7 +156,11 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     Preconditions.checkNotNull(timeColumn, "Time column not set. Set via time_col=");
     Preconditions.checkNotNull(timeUnit, "Time unit not set. Set via time_unit=");
     Preconditions.checkNotNull(valueExpr, "Value expression not set. Set via value=");
+    Map<String, String> queryOptions = new HashMap<>();
+    if (request.getNumGroupsLimit() > 0) {
+      queryOptions.put("numGroupsLimit", Integer.toString(request.getNumGroupsLimit()));
+    }
     return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr, aggInfo,
-        groupByColumns);
+        groupByColumns, request.getLimit(), queryOptions);
   }
 }

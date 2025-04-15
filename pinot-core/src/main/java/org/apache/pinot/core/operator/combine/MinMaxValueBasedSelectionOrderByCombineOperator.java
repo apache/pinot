@@ -19,15 +19,11 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -40,6 +36,8 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,26 +203,19 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (SelectionResultsBlock) operator.nextBlock();
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      Collection<Object[]> rows = resultsBlock.getRows();
-      if (rows != null && rows.size() >= _numRowsToKeep) {
+      List<Object[]> rows = resultsBlock.getRows();
+      assert rows != null;
+      int numRows = rows.size();
+      if (numRows >= _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
-
-        Comparable segmentBoundaryValue;
-        if (rows instanceof PriorityQueue) {
-          // Results from SelectionOrderByOperator
-          assert ((PriorityQueue<Object[]>) rows).peek() != null;
-          segmentBoundaryValue = (Comparable) ((PriorityQueue<Object[]>) rows).peek()[0];
-        } else {
-          // Results from LinearSelectionOrderByOperator
-          assert rows instanceof List;
-          segmentBoundaryValue = (Comparable) ((List<Object[]>) rows).get(rows.size() - 1)[0];
-        }
-
+        Comparable segmentBoundaryValue = (Comparable) rows.get(numRows - 1)[0];
         if (boundaryValue == null) {
           boundaryValue = segmentBoundaryValue;
         } else {
@@ -268,16 +259,18 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
-        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-            _queryContext);
-        return new ExceptionResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-            new TimeoutException("Timed out while polling results block")));
+        String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "
+            + _queryContext + ")";
+        LOGGER.error(logMsg);
+        QueryErrorMessage errMsg = new QueryErrorMessage(
+            QueryErrorCode.EXECUTION_TIMEOUT, "Timed out while polling results block", logMsg);
+        return new ExceptionResultsBlock(errMsg);
       }
       if (blockToMerge == EMPTY_RESULTS_BLOCK) {
         numBlocksMerged++;
         continue;
       }
-      if (blockToMerge.getProcessingExceptions() != null) {
+      if (blockToMerge.getErrorMessages() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return
         // the exception
         return blockToMerge;
@@ -308,8 +301,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
               mergedDataSchema, dataSchemaToMerge);
       // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
       LOGGER.debug(errorMessage);
-      mergedBlock.addToProcessingExceptions(
-          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage);
+      mergedBlock.addErrorMessage(errMsg);
       return;
     }
     SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge, _numRowsToKeep);

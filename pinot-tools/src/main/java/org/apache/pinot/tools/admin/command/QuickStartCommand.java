@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "QuickStart")
+@CommandLine.Command(name = "QuickStart", mixinStandardHelpOptions = true)
 public class QuickStartCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartCommand.class.getName());
 
@@ -54,15 +54,6 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-configFile", "-configFilePath"}, required = false,
       description = "Config file path to override default pinot configs")
   private String _configFilePath;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -142,7 +133,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       }
     }
     throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". "
-        + "Valid types are: " + errroMessageFor(quickStarts));
+        + "Valid types are: " + errorMessageFor(quickStarts));
   }
 
   @Override
@@ -154,7 +145,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
 
       throw new UnsupportedOperationException("No QuickStart type provided. "
-          + "Valid types are: " + errroMessageFor(quickStarts));
+          + "Valid types are: " + errorMessageFor(quickStarts));
     }
 
     QuickStartBase quickstart = selectQuickStart(_type);
@@ -179,7 +170,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return true;
   }
 
-  private static List<String> errroMessageFor(Set<Class<? extends QuickStartBase>> quickStarts)
+  private static List<String> errorMessageFor(Set<Class<? extends QuickStartBase>> quickStarts)
       throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
     List<String> validTypes = new ArrayList<>();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {

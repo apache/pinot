@@ -23,12 +23,18 @@ import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 
 public class WriterSpec {
   private final DataGenerator _generator;
+  private final int _fileIndex;
 
-  public WriterSpec(DataGenerator generator) {
+  public WriterSpec(DataGenerator generator, int fileIndex) {
     _generator = generator;
+    _fileIndex = fileIndex;
   }
 
   public DataGenerator getGenerator() {
     return _generator;
+  }
+
+  public int getFileIndex() {
+    return _fileIndex;
   }
 }

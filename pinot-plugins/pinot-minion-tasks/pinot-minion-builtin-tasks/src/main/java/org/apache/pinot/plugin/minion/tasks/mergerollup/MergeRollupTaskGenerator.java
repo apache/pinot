@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -40,6 +42,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -50,11 +53,13 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.mergerollup.segmentgroupmananger.MergeRollupTaskSegmentGroupManagerProvider;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -157,21 +162,22 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
-      // Filter segments based on status
-      List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
-          = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);
+      List<SegmentZKMetadata> allSegments =
+              tableConfig.getTableType() == TableType.OFFLINE
+                      ? getSegmentsZKMetadataForTable(tableNameWithType)
+                      : filterSegmentsforRealtimeTable(
+                              getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType));
 
       // Select current segment snapshot based on lineage, filter out empty segments
       SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableNameWithType);
       Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
-      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
+      for (SegmentZKMetadata segment : allSegments) {
         preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
-      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
+      for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
             && MergeTaskUtils.allowMerge(segment)) {
           preSelectedSegments.add(segment);
@@ -486,45 +492,102 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
-  @VisibleForTesting
-  static List<SegmentZKMetadata> filterSegmentsBasedOnStatus(TableType tableType, List<SegmentZKMetadata> allSegments) {
-    if (tableType == TableType.REALTIME) {
-      // For realtime table, don't process
-      // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS)
-      // 2. sealed segments with start time later than the earliest start time of all in progress segments
-      // This prevents those in-progress segments from not being merged.
-      //
-      // Note that we make the following two assumptions here:
-      // 1. streaming data consumer lags are negligible
-      // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
-      //    than bufferTimeMS)
-      //
-      // We don't handle the following cases intentionally because it will be either overkill or too complex
-      // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
-      //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
-      //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
-      //    for new partitions to be picked up
-      // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
-      //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
-      //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
-      //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
-      //    records correctly.
-      long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
-      for (SegmentZKMetadata segmentZKMetadata : allSegments) {
-        if (!segmentZKMetadata.getStatus().isCompleted()
-            && segmentZKMetadata.getTotalDocs() > 0
-            && segmentZKMetadata.getStartTimeMs() < earliestStartTimeMsOfInProgressSegments) {
-          earliestStartTimeMsOfInProgressSegments = segmentZKMetadata.getStartTimeMs();
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
+    Set<String> columnNames = schema.getColumnNames();
+    // check no mis-configured columns when erasing dimensions
+    Set<String> dimensionsToErase = MergeRollupTaskUtils.getDimensionsToErase(taskConfigs);
+    for (String dimension : dimensionsToErase) {
+      Preconditions.checkState(columnNames.contains(dimension), "Column dimension to erase \"" + dimension
+          + "\" not found in schema!");
+    }
+    // check no mis-configured aggregation function parameters
+    Set<String> allowedFunctionParameterNames = ImmutableSet.of(Constants.CPCSKETCH_LGK_KEY.toLowerCase(),
+        Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY.toLowerCase(),
+        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase());
+    Map<String, Map<String, String>> aggregationFunctionParameters =
+        MergeRollupTaskUtils.getAggregationFunctionParameters(taskConfigs);
+    for (String fieldName : aggregationFunctionParameters.keySet()) {
+      // check that function parameter field name exists
+      Preconditions.checkState(columnNames.contains(fieldName), "Metric column \"" + fieldName + "\" for aggregation "
+          + "function parameter not found in schema!");
+      Map<String, String> functionParameters = aggregationFunctionParameters.get(fieldName);
+      for (String functionParameterName : functionParameters.keySet()) {
+        // check that function parameter name is valid
+        Preconditions.checkState(allowedFunctionParameterNames.contains(functionParameterName.toLowerCase()),
+            "Aggregation function parameter name must be one of [lgK, samplingProbability, nominalEntries]!");
+        // check that function parameter value is valid for nominal entries
+        if (functionParameterName.equalsIgnoreCase(Constants.CPCSKETCH_LGK_KEY)
+            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          String value = functionParameters.get(functionParameterName);
+          String err = "Aggregation function parameter \"" + functionParameterName + "\" on column \"" + fieldName
+              + "\" has invalid value: " + value;
+          try {
+            Preconditions.checkState(Integer.parseInt(value) > 0, err);
+          } catch (NumberFormatException e) {
+            throw new IllegalStateException(err);
+          }
+        }
+        // check that function parameter value is valid for sampling probability
+        if (functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY)) {
+          String value = functionParameters.get(functionParameterName);
+          String err = "Aggregation function parameter \"" + functionParameterName + "\" on column \"" + fieldName
+              + "\" has invalid value: " + value;
+          try {
+            float p = Float.parseFloat(value);
+            Preconditions.checkState(p >= 0.0f && p <= 1.0f, err);
+          } catch (NumberFormatException e) {
+            throw new IllegalStateException(err);
+          }
         }
       }
-      final long finalEarliestStartTimeMsOfInProgressSegments = earliestStartTimeMsOfInProgressSegments;
-      return allSegments.stream()
-          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
-              && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
-          .collect(Collectors.toList());
-    } else {
-      return allSegments;
     }
+  }
+
+  @VisibleForTesting
+  static List<SegmentZKMetadata> filterSegmentsforRealtimeTable(List<SegmentZKMetadata> allSegments) {
+    // For realtime table, don't process
+    // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS), this has been taken care of in
+    //    getNonConsumingSegmentsZKMetadataForRealtimeTable()
+    // 2. most recent sealed segments in each partition, this prevents those paused segments from being merged.
+    //
+    // Note that we make the following two assumptions here:
+    // 1. streaming data consumer lags are negligible
+    // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
+    //    than bufferTimeMS)
+    //
+    // We don't handle the following cases intentionally because it will be either overkill or too complex
+    // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
+    //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
+    //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
+    //    for new partitions to be picked up
+    // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
+    //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
+    //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
+    //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
+    //    records correctly.
+    Map<Integer, LLCSegmentName> partitionIdToLatestCompletedSegment = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : allSegments) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      if (LLCSegmentName.isLLCSegment(segmentName)) {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
+          if (latestSegment == null) {
+            return llcSegmentName;
+          } else {
+            return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber()
+                    ? latestSegment : llcSegmentName;
+          }
+        });
+      }
+    }
+    Set<String> filteredSegmentNames = new HashSet<>();
+    for (LLCSegmentName llcSegmentName : partitionIdToLatestCompletedSegment.values()) {
+      filteredSegmentNames.add(llcSegmentName.getSegmentName());
+    }
+    return allSegments.stream()
+            .filter(a -> !filteredSegmentNames.contains(a.getSegmentName()))
+            .collect(Collectors.toList());
   }
 
   /**

@@ -83,6 +83,7 @@ public abstract class QuickStartBase {
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
       .put("airlineStats", "examples/stream/airlineStats")
+      .put("dailySales", "examples/stream/dailySales")
       .put("githubEvents", "examples/stream/githubEvents")
       .put("meetupRsvp", "examples/stream/meetupRsvp")
       .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
@@ -162,6 +163,10 @@ public abstract class QuickStartBase {
   public abstract void execute()
       throws Exception;
 
+  protected String getValidationTypesToSkip() {
+    return null;
+  }
+
   protected List<QuickstartTableRequest> bootstrapOfflineTableDirectories(File quickstartTmpDir)
       throws IOException {
     List<QuickstartTableRequest> quickstartTableRequests = new ArrayList<>();
@@ -172,13 +177,13 @@ public abstract class QuickStartBase {
         File dataDir = new File(baseDir, "rawdata");
         Preconditions.checkState(dataDir.mkdirs());
         copyResourceTableToTmpDirectory(directory, tableName, baseDir, dataDir, false);
-        quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
+        quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
       }
     } else {
       String tableName = getTableName();
       File baseDir = new File(quickstartTmpDir, tableName);
       copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
-      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
+      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
     }
     return quickstartTableRequests;
   }
@@ -286,6 +291,10 @@ public abstract class QuickStartBase {
     }
   }
 
+  protected Map<String, String> getClusterConfigOverrides() {
+    return Map.of("pinot.broker.grpc.port", "8010");
+  }
+
   protected String[] getDefaultBatchTableDirectories() {
     return DEFAULT_OFFLINE_TABLE_DIRECTORIES;
   }
@@ -342,6 +351,9 @@ public abstract class QuickStartBase {
       case "fineFoodReviews":
         publishLineSplitFileToKafka("fineFoodReviews",
             new File(dataDir, "/rawdata/fine_food_reviews_with_embeddings_1k.json.gz"));
+        break;
+      case "dailySales":
+        publishLineSplitFileToKafka("dailySales", new File(dataDir, "/rawdata/dailySales.json"));
         break;
       default:
         break;
@@ -428,6 +440,12 @@ public abstract class QuickStartBase {
               e.printStackTrace();
             }
           }));
+          break;
+        case "dailySales":
+          kafkaStarter.createTopic("dailySales", KafkaStarterUtils.getTopicCreationProps(1));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting dailySales data stream and publishing to Kafka *****");
+          publishStreamDataToKafka("dailySales", new File(quickstartTmpDir, "dailySales"));
           break;
         case "meetupRsvp":
           kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));

@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "VerifySegmentState")
+@CommandLine.Command(name = "VerifySegmentState", mixinStandardHelpOptions = true)
 public class VerifySegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(VerifySegmentState.class);
 
@@ -46,14 +46,6 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-tablePrefix"}, required = false,
       description = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String _tablePrefix = "";
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public boolean execute()

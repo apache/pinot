@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -100,8 +99,6 @@ public class StreamConfig {
     Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
 
     _tableNameWithType = tableNameWithType;
-
-    validateConsumerType(_type, streamConfigMap);
 
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
@@ -205,25 +202,12 @@ public class StreamConfig {
     _streamConfigMap.putAll(streamConfigMap);
   }
 
-  public static void validateConsumerType(String streamType, Map<String, String> streamConfigMap) {
-    String consumerTypesKey =
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES);
-    String consumerTypes = streamConfigMap.get(consumerTypesKey);
-    if (consumerTypes == null) {
-      return;
-    }
-    for (String consumerType : StringUtils.split(consumerTypes, ',')) {
-      Preconditions.checkState(!consumerType.equalsIgnoreCase("highlevel"),
-          "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
-    }
-  }
-
   @Nullable
   public Boolean isServerUploadToDeepStore() {
     return _serverUploadToDeepStore;
   }
 
-  private double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
+  public static double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.FLUSH_THRESHOLD_VARIANCE_FRACTION;
     String flushThresholdVarianceFractionStr = streamConfigMap.get(key);
     if (flushThresholdVarianceFractionStr != null) {
@@ -245,7 +229,7 @@ public class StreamConfig {
     }
   }
 
-  private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
+  public static long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE;
     String flushThresholdSegmentSizeStr = streamConfigMap.get(key);
     if (flushThresholdSegmentSizeStr == null) {
@@ -264,7 +248,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
     String flushThresholdRowsStr = streamConfigMap.get(key);
     if (flushThresholdRowsStr == null) {
@@ -288,7 +272,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS;
     String flushThresholdSegmentRowsStr = streamConfigMap.get(key);
     if (flushThresholdSegmentRowsStr != null) {
@@ -302,7 +286,7 @@ public class StreamConfig {
     }
   }
 
-  protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
+  public static long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     String flushThresholdTimeStr = streamConfigMap.get(key);
     if (flushThresholdTimeStr == null) {
@@ -332,16 +316,6 @@ public class StreamConfig {
 
   public String getTopicName() {
     return _topicName;
-  }
-
-  @Deprecated
-  public boolean hasHighLevelConsumerType() {
-    return false;
-  }
-
-  @Deprecated
-  public boolean hasLowLevelConsumerType() {
-    return true;
   }
 
   public String getConsumerFactoryClassName() {

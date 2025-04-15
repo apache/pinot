@@ -81,7 +81,7 @@ public interface StreamMetadataProvider extends Closeable {
     // If partition group is still in progress, this value will be null
     for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
       newPartitionGroupMetadataList.add(
-          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(),
+          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getStreamPartitionGroupId(),
               currentPartitionGroupConsumptionStatus.getEndOffset()));
     }
     // Add PartitionGroupMetadata for new partitions
@@ -89,7 +89,7 @@ public interface StreamMetadataProvider extends Closeable {
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     for (int i = partitionGroupConsumptionStatuses.size(); i < partitionCount; i++) {
       try (StreamMetadataProvider partitionMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(
-          clientId, i)) {
+          StreamConsumerFactory.getUniqueClientId(clientId), i)) {
         StreamPartitionMsgOffset streamPartitionMsgOffset =
             partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(i, streamPartitionMsgOffset));
@@ -104,6 +104,22 @@ public interface StreamMetadataProvider extends Closeable {
     PartitionLagState unknownLagState = new UnknownLagState();
     currentPartitionStateMap.forEach((k, v) -> result.put(k, unknownLagState));
     return result;
+  }
+
+  /**
+   * Fetches the list of available topics/streams
+   *
+   * @return List of topics
+   */
+  default List<TopicMetadata> getTopics() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
+   */
+  interface TopicMetadata {
+    String getName();
   }
 
   class UnknownLagState extends PartitionLagState {

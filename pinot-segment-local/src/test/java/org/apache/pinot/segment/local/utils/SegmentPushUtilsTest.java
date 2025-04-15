@@ -28,13 +28,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -43,14 +56,31 @@ public class SegmentPushUtilsTest {
   private File _tempDir;
 
   @BeforeMethod
-  public void setUp() throws IOException {
+  public void setUp()
+      throws IOException {
     _tempDir = new File(FileUtils.getTempDirectory(), "test-" + UUID.randomUUID());
     FileUtils.forceMkdir(_tempDir);
   }
 
   @AfterMethod
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Test
+  public void testSegmentParallelProtectionUploadParam() {
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    NameValuePair nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
+    Assert.assertEquals(nameValuePair.getName(),
+        FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
+    Assert.assertEquals(nameValuePair.getValue(), "false");
+    pushJobSpec.setPushParallelism(2);
+    nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
+    Assert.assertEquals(nameValuePair.getName(),
+        FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
+    Assert.assertEquals(nameValuePair.getValue(), "true");
   }
 
   @Test
@@ -103,7 +133,8 @@ public class SegmentPushUtilsTest {
   }
 
   @Test
-  public void testCreateSegmentsMetadataTarFile() throws IOException {
+  public void testCreateSegmentsMetadataTarFile()
+      throws IOException {
     // setup
     List<String> segmentURIs = Arrays.asList("http://example.com/segment1", "http://example.com/segment2");
 
@@ -136,5 +167,68 @@ public class SegmentPushUtilsTest {
     // verify
     assertTrue(result.exists(), "The resulting tar.gz file should exist");
     assertTrue(result.getName().endsWith(".tar.gz"), "The resulting file should have a .tar.gz extension");
+  }
+
+  @Test
+  public void testGenerateSegmentMetadataFiles()
+      throws Exception {
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setSegmentMetadataGenerationParallelism(2);
+    jobSpec.setPushJobSpec(pushJobSpec);
+    PinotFS mockFs = Mockito.mock(PinotFS.class);
+    Map<String, String> segmentUriToTarPathMap = Map.of(
+        "segment1", "segment1.tar.gz",
+        "segment2", "segment2.tar.gz"
+    );
+    ConcurrentHashMap<String, File> segmentMetadataFileMap = new ConcurrentHashMap<>();
+    ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
+
+    when(mockFs.exists(any(URI.class))).thenReturn(true);
+    mockFs.copyToLocalFile(any(URI.class), any(File.class));
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap,
+          segmentURIs, executor);
+    } finally {
+      executor.shutdown();
+    }
+
+    assertEquals(segmentMetadataFileMap.size(), 2);
+    assertEquals(segmentURIs.size(), 4);
+  }
+
+  @Test
+  public void testGenerateSegmentMetadataFilesFailure()
+      throws Exception {
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    jobSpec.setPushJobSpec(pushJobSpec);
+    PinotFS mockFs = Mockito.mock(PinotFS.class);
+    Map<String, String> segmentUriToTarPathMap = Map.of(
+        "segment1", "segment1.tar.gz",
+        "segment2", "segment2.tar.gz"
+    );
+    ConcurrentHashMap<String, File> segmentMetadataFileMap = new ConcurrentHashMap<>();
+    ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
+
+    when(mockFs.exists(any(URI.class))).thenReturn(true);
+    doNothing().doThrow(new RuntimeException("test exception"))
+        .when(mockFs)
+        .copyToLocalFile(any(URI.class), any(File.class));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap,
+          segmentURIs, executor);
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "1 out of 2 segment metadata generation failed");
+    } finally {
+      executor.shutdown();
+    }
+
+    assertEquals(segmentMetadataFileMap.size(), 1);
+    assertEquals(segmentURIs.size(), 2);
   }
 }

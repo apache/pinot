@@ -39,8 +39,10 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.HelixPropertyFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.model.CloudConfig;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -78,6 +80,8 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +105,7 @@ public class ControllerTest {
   public static final int DEFAULT_NUM_BROKER_INSTANCES = 3;
   // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
+  public static final int DEFAULT_NUM_MINION_INSTANCES = 2;
 
   public static final long TIMEOUT_MS = 10_000L;
 
@@ -116,6 +121,7 @@ public class ControllerTest {
 
   protected int _nextControllerPort = 20000;
   protected int _nextBrokerPort = _nextControllerPort + 1000;
+  protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
@@ -180,13 +186,13 @@ public class ControllerTest {
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      _zookeeperInstance = ZkStarter.startLocalZkServer();
+      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
     }
   }
 
   public void startZk(int port) {
     if (_zookeeperInstance == null) {
-      _zookeeperInstance = ZkStarter.startLocalZkServer(port);
+      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer(port));
     }
   }
 
@@ -220,6 +226,7 @@ public class ControllerTest {
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
+    properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideControllerConf(properties);
     return properties;
@@ -243,44 +250,52 @@ public class ControllerTest {
     startController(getDefaultControllerConfiguration());
   }
 
+  public void startControllerWithSwagger()
+      throws Exception {
+    Map<String, Object> config = getDefaultControllerConfiguration();
+    config.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, true);
+    startController(config);
+  }
+
   public void startController(Map<String, Object> properties)
       throws Exception {
-    assertNull(_controllerStarter, "Controller is already started");
-    assertTrue(_controllerPort > 0, "Controller port is not assigned");
-
-    _controllerStarter = createControllerStarter();
-    _controllerStarter.init(new PinotConfiguration(properties));
-    _controllerStarter.start();
-    _controllerConfig = _controllerStarter.getConfig();
-    _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerDataDir = _controllerConfig.getDataDir();
-    _helixResourceManager = _controllerStarter.getHelixResourceManager();
-    _helixManager = _controllerStarter.getHelixControllerManager();
-    _helixDataAccessor = _helixManager.getHelixDataAccessor();
-    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
-    // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    switch (_controllerStarter.getControllerMode()) {
-      case DUAL:
-      case PINOT_ONLY:
-        _helixAdmin = _helixResourceManager.getHelixAdmin();
-        _propertyStore = _helixResourceManager.getPropertyStore();
-        // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
-        //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
-        //       Remove this after Helix fixing the issue.
-        configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
-        break;
-      case HELIX_ONLY:
-        _helixAdmin = _helixManager.getClusterManagmentTool();
-        _propertyStore = _helixManager.getHelixPropertyStore();
-        break;
-      default:
-        break;
-    }
-    assertEquals(System.getProperty("user.timezone"), "UTC");
+    runWithHelixMock(() -> {
+      assertNull(_controllerStarter, "Controller is already started");
+      assertTrue(_controllerPort > 0, "Controller port is not assigned");
+      _controllerStarter = createControllerStarter();
+      _controllerStarter.init(new PinotConfiguration(properties));
+      _controllerStarter.start();
+      _controllerConfig = _controllerStarter.getConfig();
+      _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
+      _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+      _controllerDataDir = _controllerConfig.getDataDir();
+      _helixResourceManager = _controllerStarter.getHelixResourceManager();
+      _helixManager = _controllerStarter.getHelixControllerManager();
+      _helixDataAccessor = _helixManager.getHelixDataAccessor();
+      ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
+      // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
+      HelixConfigScope scope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+              .build();
+      switch (_controllerStarter.getControllerMode()) {
+        case DUAL:
+        case PINOT_ONLY:
+          _helixAdmin = _helixResourceManager.getHelixAdmin();
+          _propertyStore = _helixResourceManager.getPropertyStore();
+          // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
+          //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
+          //       Remove this after Helix fixing the issue.
+          configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
+          break;
+        case HELIX_ONLY:
+          _helixAdmin = _helixManager.getClusterManagmentTool();
+          _propertyStore = _helixManager.getHelixPropertyStore();
+          break;
+        default:
+          break;
+      }
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+    });
   }
 
   public void stopController() {
@@ -650,6 +665,11 @@ public class ControllerTest {
     getControllerRequestClient().updateSchema(schema);
   }
 
+  public void forceUpdateSchema(Schema schema)
+      throws IOException {
+    getControllerRequestClient().forceUpdateSchema(schema);
+  }
+
   public Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);
@@ -671,6 +691,11 @@ public class ControllerTest {
     getControllerRequestClient().updateTableConfig(tableConfig);
   }
 
+  public void toggleTableState(String tableName, TableType type, boolean enable)
+      throws IOException {
+    getControllerRequestClient().toggleTableState(tableName, type, enable);
+  }
+
   public TableConfig getOfflineTableConfig(String tableName) {
     TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
     assertNotNull(offlineTableConfig);
@@ -686,6 +711,11 @@ public class ControllerTest {
   public void dropOfflineTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+  }
+
+  public void dropOfflineTable(String tableName, String retentionPeriod)
+      throws IOException {
+    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), retentionPeriod);
   }
 
   public void dropRealtimeTable(String tableName)
@@ -726,6 +756,11 @@ public class ControllerTest {
   public long getTableSize(String tableName)
       throws IOException {
     return getControllerRequestClient().getTableSize(tableName);
+  }
+
+  public Map<String, List<String>> getTableServersToSegmentsMap(String tableName, TableType tableType)
+      throws IOException {
+    return getControllerRequestClient().getServersToSegmentsMap(tableName, tableType);
   }
 
   public String reloadOfflineTable(String tableName)
@@ -995,6 +1030,7 @@ public class ControllerTest {
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_SERVER_INSTANCES, true);
+    addFakeMinionInstancesToAutoJoinHelixCluster(DEFAULT_NUM_MINION_INSTANCES);
   }
 
   /**
@@ -1081,6 +1117,31 @@ public class ControllerTest {
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(schemaName);
+      }
+    }
+  }
+
+  @FunctionalInterface
+  public interface ExceptionalRunnable {
+    void run()
+        throws Exception;
+  }
+
+  protected void runWithHelixMock(ExceptionalRunnable r) {
+    try (MockedStatic<HelixPropertyFactory> mock = Mockito.mockStatic(HelixPropertyFactory.class)) {
+
+      // mock helix method to disable slow, but useless, getCloudConfig() call
+      Mockito.when(HelixPropertyFactory.getCloudConfig(Mockito.anyString(), Mockito.anyString()))
+          .then((i) -> new CloudConfig());
+
+      mock.when(HelixPropertyFactory::getInstance).thenCallRealMethod();
+
+      r.run();
+    } catch (Exception e) {
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      } else {
+        throw new RuntimeException(e);
       }
     }
   }

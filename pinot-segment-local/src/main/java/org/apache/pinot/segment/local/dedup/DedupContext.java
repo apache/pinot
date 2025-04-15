@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.List;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -34,24 +33,24 @@ public class DedupContext {
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
   private final HashFunction _hashFunction;
+  private final boolean _enablePreload;
   private final double _metadataTTL;
   private final String _dedupTimeColumn;
   private final File _tableIndexDir;
   private final TableDataManager _tableDataManager;
-  private final ServerMetrics _serverMetrics;
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, double metadataTTL, String dedupTimeColumn, File tableIndexDir,
-      TableDataManager tableDataManager, ServerMetrics serverMetrics) {
+      HashFunction hashFunction, boolean enablePreload, double metadataTTL, String dedupTimeColumn, File tableIndexDir,
+      TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
+    _enablePreload = enablePreload;
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
     _tableIndexDir = tableIndexDir;
     _tableDataManager = tableDataManager;
-    _serverMetrics = serverMetrics;
   }
 
   public TableConfig getTableConfig() {
@@ -70,6 +69,10 @@ public class DedupContext {
     return _hashFunction;
   }
 
+  public boolean isPreloadEnabled() {
+    return _enablePreload;
+  }
+
   public double getMetadataTTL() {
     return _metadataTTL;
   }
@@ -86,20 +89,16 @@ public class DedupContext {
     return _tableDataManager;
   }
 
-  public ServerMetrics getServerMetrics() {
-    return _serverMetrics;
-  }
-
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
     private List<String> _primaryKeyColumns;
     private HashFunction _hashFunction;
+    private boolean _enablePreload;
     private double _metadataTTL;
     private String _dedupTimeColumn;
     private File _tableIndexDir;
     private TableDataManager _tableDataManager;
-    private ServerMetrics _serverMetrics;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -118,6 +117,11 @@ public class DedupContext {
 
     public Builder setHashFunction(HashFunction hashFunction) {
       _hashFunction = hashFunction;
+      return this;
+    }
+
+    public Builder setEnablePreload(boolean enablePreload) {
+      _enablePreload = enablePreload;
       return this;
     }
 
@@ -141,19 +145,14 @@ public class DedupContext {
       return this;
     }
 
-    public Builder setServerMetrics(ServerMetrics serverMetrics) {
-      _serverMetrics = serverMetrics;
-      return this;
-    }
-
     public DedupContext build() {
       Preconditions.checkState(_tableConfig != null, "Table config must be set");
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
-      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
-          _tableIndexDir, _tableDataManager, _serverMetrics);
+      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _enablePreload, _metadataTTL,
+          _dedupTimeColumn, _tableIndexDir, _tableDataManager);
     }
   }
 }

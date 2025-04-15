@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.math.BigDecimal;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
@@ -46,6 +47,8 @@ public class TypeUtils {
         return ((Number) value).floatValue();
       case DOUBLE:
         return ((Number) value).doubleValue();
+      case BIG_DECIMAL:
+        return value instanceof BigDecimal ? value : BigDecimal.valueOf(((Number) value).doubleValue());
       // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction
       case STRING:
         return value.toString();

@@ -23,7 +23,7 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(mixinStandardHelpOptions = true)
 public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Address of the Zookeeper (host:port)")
   private String _zkAddress;
@@ -65,15 +65,6 @@ public class AutoAddInvertedIndexTool extends AbstractBaseCommand implements Com
       description = "Optional max number of inverted index added, default: "
           + AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED)
   private int _maxNumInvertedIndex = AutoAddInvertedIndex.DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

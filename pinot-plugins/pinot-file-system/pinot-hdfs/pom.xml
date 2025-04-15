@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-hdfs</artifactId>
   <name>Pinot Hadoop Filesystem</name>
@@ -49,7 +49,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
   </dependencies>
 

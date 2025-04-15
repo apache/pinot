@@ -60,12 +60,12 @@ public class InstancePartitionsUtils {
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
-      InstancePartitionsType instancePartitionsType) {
+InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    // If table has pre-configured instance partitions.
-    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
+    // If table has pre-configured table-level instance partitions
+    if (shouldFetchPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return fetchInstancePartitionsWithRename(helixManager.getHelixPropertyStore(),
           tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
           instancePartitionsType.getInstancePartitionsName(rawTableName));
@@ -136,8 +136,8 @@ public class InstancePartitionsUtils {
       default:
         throw new IllegalStateException();
     }
-    return computeDefaultInstancePartitionsForTag(helixManager, tableConfig.getTableName(),
-        instancePartitionsType.toString(), serverTag);
+    return computeDefaultInstancePartitionsForTag(helixManager, tableConfig, instancePartitionsType.toString(),
+        serverTag);
   }
 
   /**
@@ -147,10 +147,15 @@ public class InstancePartitionsUtils {
    * data shuffling when instances get disabled.
    */
   public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
-      String tableNameWithType, String instancePartitionsType, String serverTag) {
+      TableConfig tableConfig, String instancePartitionsType, String serverTag) {
+    String tableNameWithType = tableConfig.getTableName();
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
-    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
+    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s for table: %s", serverTag,
+        tableNameWithType);
+    Preconditions.checkState(numInstances >= tableConfig.getReplication(),
+        "Number of instances: %s with tag: %s < table replication: %s for table: %s", numInstances, serverTag,
+        tableConfig.getReplication(), tableNameWithType);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
@@ -192,5 +197,11 @@ public class InstancePartitionsUtils {
         .forEach(instancePartition -> {
           removeInstancePartitions(propertyStore, instancePartition.getInstancePartitionsName());
         });
+  }
+
+  public static boolean shouldFetchPreConfiguredInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    return TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
+        && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
   }
 }

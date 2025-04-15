@@ -34,7 +34,7 @@ import picocli.CommandLine;
  *
  *
  */
-@CommandLine.Command(name = "StartZookeeper")
+@CommandLine.Command(name = "StartZookeeper", mixinStandardHelpOptions = true)
 public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 
@@ -43,15 +43,6 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
 
   @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Directory for zookeper data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "PinotAdmin/zkData";
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

@@ -32,6 +32,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -74,8 +75,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
-    _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
+    _servers.put(new QueryServerInstance("Server_localhost_" + port1, "localhost", port1, port1), server1);
+    _servers.put(new QueryServerInstance("Server_localhost_" + port2, "localhost", port2, port2), server2);
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
@@ -112,7 +113,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory");
+            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
@@ -134,7 +135,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory");
+            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
@@ -150,8 +151,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
   public static class InterruptingAccountant
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
 
-    public InterruptingAccountant(PinotConfiguration config, String instanceId) {
-      super(config, instanceId);
+    public InterruptingAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+      super(config, instanceId, instanceType);
     }
 
     @Override
@@ -166,7 +167,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
 
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     InterruptingAccountant accountant =
-        new InterruptingAccountant(new PinotConfiguration(configs), "testWithPerQueryAccountantFactory");
+        new InterruptingAccountant(new PinotConfiguration(configs), "testWithPerQueryAccountantFactory",
+            InstanceType.SERVER);
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);

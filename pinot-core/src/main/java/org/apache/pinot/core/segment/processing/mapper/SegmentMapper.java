@@ -21,7 +21,6 @@ package org.apache.pinot.core.segment.processing.mapper;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -31,8 +30,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
+import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
@@ -41,15 +40,15 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
-import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,22 +69,33 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
-  private final CompositeTransformer _recordTransformer;
-  private final ComplexTypeTransformer _complexTypeTransformer;
+  private final TransformPipeline _transformPipeline;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
-  private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
-  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
-  private List<RecordTransformer> _customRecordTransformers;
+  private final AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
+  private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+    this(recordReaderFileConfigs,
+        new TransformPipeline(
+            // pre-complex type transformers
+            CompositeTransformer.getPreComplexTypeTransformers(processorConfig.getTableConfig()),
+            // complex type transformer
+            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig()),
+            // plain record transformations
+            CompositeTransformer.composeAllTransformers(
+                customRecordTransformers, processorConfig.getTableConfig(), processorConfig.getSchema()
+            )),
+        processorConfig, mapperOutputDir);
+  }
+
+  public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs, TransformPipeline transformPipeline,
+      SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
-    _customRecordTransformers = customRecordTransformers;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
 
@@ -97,9 +107,7 @@ public class SegmentMapper {
     _numSortFields = pair.getRight();
     _includeNullFields =
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
-    _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
-    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
@@ -168,20 +176,34 @@ public class SegmentMapper {
 
 //   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
 //   intermediate file size during map phase.
-  private boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
-      reuse = recordReader.next(reuse);
-      _recordEnricherPipeline.run(reuse);
 
-      if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-        //noinspection unchecked
-        for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          transformAndWrite(row);
+    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
+    boolean continueOnError =
+        _processorConfig.getTableConfig().getIngestionConfig() != null && _processorConfig.getTableConfig()
+            .getIngestionConfig().isContinueOnError();
+
+    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
+      try {
+        reuse = recordReader.next(reuse);
+        _transformPipeline.processRow(reuse, reusedResult);
+        for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
+          writeRecord(transformedRow);
         }
-      } else {
-        transformAndWrite(reuse);
+      } catch (Exception e) {
+        String logMessage = "Caught exception while reading data.";
+        observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
+            .withStatus(logMessage + " Reason: " + e.getMessage())
+            .build());
+        if (!continueOnError) {
+          throw new RuntimeException(logMessage, e);
+        } else {
+          LOGGER.debug(logMessage, e);
+          continue;
+        }
       }
       reuse.clear();
     }
@@ -197,29 +219,7 @@ public class SegmentMapper {
     return true;
   }
 
-  private void transformAndWrite(GenericRow row)
-      throws IOException {
-    GenericRow decodedRow = row;
-    if (_complexTypeTransformer != null) {
-      decodedRow = _complexTypeTransformer.transform(row);
-    }
-    Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    if (rows != null) {
-      for (GenericRow unrappedRow : rows) {
-        GenericRow transformedRow = _recordTransformer.transform(unrappedRow);
-        if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-          writeRecord(transformedRow);
-        }
-      }
-    } else {
-      GenericRow transformedRow = _recordTransformer.transform(row);
-      if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-        writeRecord(transformedRow);
-      }
-    }
-  }
-
-  private void writeRecord(GenericRow row)
+  protected void writeRecord(GenericRow row)
       throws IOException {
     String timePartition = _timeHandler.handleTime(row);
     if (timePartition == null) {
@@ -245,7 +245,7 @@ public class SegmentMapper {
     }
 
     // Get the file writer.
-    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    FileWriter<GenericRow> fileWriter = fileManager.getFileWriter();
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);

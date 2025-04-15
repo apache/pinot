@@ -90,6 +90,10 @@ pinotAuth:
 # ------------------------------------------------------------------------------
 controller:
   name: controller
+  # Controls whether controller.port is included in the configuration.
+  # Set to false to exclude controller.port when using TLS-only mode or when
+  # you want to specify the port in controller.access.protocols.https.port instead.
+  configureControllerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -140,7 +144,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -179,6 +183,7 @@ controller:
       tls: { }
       path: /
       hosts: [ ]
+      # port: 9433
     v1:
       enabled: false
       ingressClassName: ""
@@ -186,6 +191,7 @@ controller:
       tls: []
       path: /
       hosts: []
+      # port: 9433
 
   resources:
     requests:
@@ -194,6 +200,8 @@ controller:
   nodeSelector: {}
 
   tolerations: []
+
+  initContainers: []
 
   affinity: {}
 
@@ -234,6 +242,10 @@ controller:
 # ------------------------------------------------------------------------------
 broker:
   name: broker
+  # Controls whether pinot.broker.client.queryPort is included in the configuration.
+  # Set to false to exclude pinot.broker.client.queryPort when using TLS-only mode or when
+  # you want to specify the port in pinot.broker.access.protocols.https.port instead.
+  configureBrokerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -241,7 +253,7 @@ broker:
   securityContext: {}
   startCommand: "StartBroker"
 
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -314,6 +326,7 @@ broker:
       tls: {}
       path: /
       hosts: []
+      # port: 8443
     v1:
       enabled: false
       ingressClassName: ""
@@ -321,6 +334,7 @@ broker:
       tls: []
       path: /
       hosts: []
+      # port: 8443
 
   resources:
     requests:
@@ -331,6 +345,8 @@ broker:
   affinity: {}
 
   tolerations: []
+
+  initContainers: []
 
   podAnnotations: {}
 
@@ -370,6 +386,10 @@ broker:
 # ------------------------------------------------------------------------------
 server:
   name: server
+  # Controls whether pinot.server.netty.port is included in the configuration.
+  # Set to false to exclude pinot.server.netty.port when using TLS-only mode or when
+  # you want to specify the port in pinot.server.nettytls.port instead.
+  configureServerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -419,7 +439,7 @@ server:
     extraVolumes: []
     extraVolumeMounts: []
 
-  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
+  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -457,6 +477,8 @@ server:
   affinity: {}
 
   tolerations: []
+
+  initContainers: []
 
   podAnnotations: {}
 
@@ -498,6 +520,10 @@ server:
 minion:
   enabled: false
   name: minion
+  # Controls whether pinot.minion.port is included in the configuration.
+  # Set to false to exclude pinot.minion.port when using TLS-only mode
+  # or when you're configuring ports through another mechanism.
+  configureMinionPort: true
   replicaCount: 0
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -532,7 +558,7 @@ minion:
       periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -573,6 +599,8 @@ minion:
 
   tolerations: []
 
+  initContainers: []
+
   podAnnotations: {}
 
   automaticReload:
@@ -610,6 +638,10 @@ minion:
 minionStateless:
   enabled: true
   name: minion-stateless
+  # Controls whether pinot.minion.port is included in the configuration.
+  # Set to false to exclude pinot.minion.port when using TLS-only mode
+  # or when you're configuring ports through another mechanism.
+  configureMinionStatelessPort: true
   replicaCount: 1
   podSecurityContext: {}
     # fsGroup: 2000
@@ -643,7 +675,7 @@ minionStateless:
       periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log -Djute.maxbuffer=4000000"
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -677,6 +709,8 @@ minionStateless:
   affinity: {}
 
   tolerations: []
+
+  initContainers: []
 
   podAnnotations: {}
 
@@ -741,6 +775,9 @@ zookeeper:
   ## Size (in MB) for the Java Heap options (Xmx and Xms)
   ## This env var is ignored if Xmx an Xms are configured via `zookeeper.jvmFlags`
   heapSize: "1024"
+
+  ## Extra JVM Flags for Zookeeper
+  jvmFlags: "-Djute.maxbuffer=4000000"
 
   persistence:
     enabled: true

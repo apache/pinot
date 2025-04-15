@@ -47,6 +47,8 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
@@ -220,8 +222,8 @@ public class ServerSegmentMetadataReader {
    * This method will return metadata of all the servers along with need reload flag.
    * In future additional details like segments list can also be added
    */
-  public List<String> getCheckReloadSegmentsFromServer(String tableNameWithType, Set<String> serverInstances,
-      BiMap<String, String> endpoints, int timeoutMs) {
+  public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
@@ -248,7 +250,7 @@ public class ServerSegmentMetadataReader {
     }
 
     LOGGER.debug("Retrieved metadata of reload check from servers.");
-    return serversNeedReloadResponses;
+    return new TableReloadResponse(serviceResponse._failedResponseCount, serversNeedReloadResponses);
   }
 
   /**
@@ -397,6 +399,34 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
+  public Map<String, TableStaleSegmentResponse> getStaleSegmentsFromServer(
+      String tableNameWithType, Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
+    LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
+    List<String> serverURLs = new ArrayList<>();
+    for (String serverInstance : serverInstances) {
+      serverURLs.add(generateStaleSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
+    }
+    BiMap<String, String> endpointsToServers = endpoints.inverse();
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, false, timeoutMs);
+    Map<String, TableStaleSegmentResponse> serverResponses = new HashMap<>();
+
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        List<StaleSegment> staleSegments = JsonUtils.stringToObject(streamResponse.getValue(),
+            new TypeReference<List<StaleSegment>>() { });
+        serverResponses.put(streamResponse.getKey(), new TableStaleSegmentResponse(staleSegments));
+      } catch (Exception e) {
+        serverResponses.put(streamResponse.getKey(), new TableStaleSegmentResponse(e.getMessage()));
+        LOGGER.error("Unable to parse server {} response for needRefresh for table {} due to an error: ",
+            streamResponse.getKey(), tableNameWithType, e);
+      }
+    }
+    return serverResponses;
+  }
+
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
@@ -469,5 +499,28 @@ public class ServerSegmentMetadataReader {
     }
     paramsStr = String.join("&", params);
     return paramsStr;
+  }
+
+  private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  public class TableReloadResponse {
+    private int _numFailedResponses;
+    private List<String> _serverReloadResponses;
+
+    TableReloadResponse(int numFailedResponses, List<String> serverReloadResponses) {
+      _numFailedResponses = numFailedResponses;
+      _serverReloadResponses = serverReloadResponses;
+    }
+
+    public int getNumFailedResponses() {
+      return _numFailedResponses;
+    }
+
+    public List<String> getServerReloadResponses() {
+      return _serverReloadResponses;
+    }
   }
 }

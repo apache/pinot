@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -99,11 +100,18 @@ public class MockInstanceDataManagerFactory {
     _serverTableDataDirMap.put(tableNameWithType, tableDataDir);
   }
 
-  public String addSegment(String tableNameWithType, List<GenericRow> rows) {
-    String segmentName = String.format("%s_%s", tableNameWithType, UUID.randomUUID());
+  public ImmutableSegment addSegment(String tableNameWithType, List<GenericRow> rows) {
     File tableDataDir = _serverTableDataDirMap.get(tableNameWithType);
-    ImmutableSegment segment = buildSegment(tableNameWithType, tableDataDir, segmentName, rows);
+    ImmutableSegment segment = buildSegment(tableNameWithType, tableDataDir, rows);
+    addSegment(tableNameWithType, segment);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    List<GenericRow> tableRows = _tableRowsMap.getOrDefault(rawTableName, new ArrayList<>());
+    tableRows.addAll(rows);
+    _tableRowsMap.put(rawTableName, tableRows);
+    return segment;
+  }
 
+  public void addSegment(String tableNameWithType, ImmutableSegment segment) {
     List<ImmutableSegment> segmentList = _tableSegmentMap.getOrDefault(tableNameWithType, new ArrayList<>());
     segmentList.add(segment);
     _tableSegmentMap.put(tableNameWithType, segmentList);
@@ -111,20 +119,13 @@ public class MockInstanceDataManagerFactory {
     List<String> segmentNameList = _tableSegmentNameMap.getOrDefault(tableNameWithType, new ArrayList<>());
     segmentNameList.add(segment.getSegmentName());
     _tableSegmentNameMap.put(tableNameWithType, segmentNameList);
-
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    List<GenericRow> tableRows = _tableRowsMap.getOrDefault(rawTableName, new ArrayList<>());
-    tableRows.addAll(rows);
-    _tableRowsMap.put(rawTableName, tableRows);
-
-    return segmentName;
   }
 
   public InstanceDataManager buildInstanceDataManager() {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     Map<String, TableDataManager> tableDataManagers = new HashMap<>();
     for (Map.Entry<String, List<ImmutableSegment>> e : _tableSegmentMap.entrySet()) {
-      TableDataManager tableDataManager = mockTableDataManager(e.getValue());
+      TableDataManager tableDataManager = mockTableDataManager(e.getKey(), e.getValue());
       tableDataManagers.put(e.getKey(), tableDataManager);
     }
     for (Map.Entry<String, TableDataManager> e : tableDataManagers.entrySet()) {
@@ -149,10 +150,16 @@ public class MockInstanceDataManagerFactory {
     return _tableSegmentNameMap;
   }
 
-  private TableDataManager mockTableDataManager(List<ImmutableSegment> segmentList) {
+  private TableDataManager mockTableDataManager(String tableNameWithType, List<ImmutableSegment> segmentList) {
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableName()).thenReturn(tableNameWithType);
+    TableConfig tableConfig = createTableConfig(tableNameWithType);
+    Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    when(tableDataManager.getIndexLoadingConfig()).thenReturn(indexLoadingConfig);
+
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
-    TableDataManager tableDataManager = mock(TableDataManager.class);
     // TODO: support optional segments for multi-stage engine, but for now, it's always null.
     when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
@@ -165,14 +172,10 @@ public class MockInstanceDataManagerFactory {
     return tableDataManager;
   }
 
-  private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, String segmentName,
-      List<GenericRow> rows) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    // TODO: plugin table config constructor
-    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
-        .setNullHandlingEnabled(true).build();
-    Schema schema = _schemaMap.get(rawTableName);
+  private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, List<GenericRow> rows) {
+    String segmentName = String.format("%s_%s", tableNameWithType, UUID.randomUUID());
+    TableConfig tableConfig = createTableConfig(tableNameWithType);
+    Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());
     config.setTableName(tableNameWithType);
@@ -186,5 +189,13 @@ public class MockInstanceDataManagerFactory {
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }
+  }
+
+  // TODO: plugin table config
+  private TableConfig createTableConfig(String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    return new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
+        .setNullHandlingEnabled(true).build();
   }
 }

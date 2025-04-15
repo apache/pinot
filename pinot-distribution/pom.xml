@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-distribution</artifactId>
   <name>Pinot Distribution</name>
@@ -96,6 +96,7 @@
                     <descriptor>${pinot.root}/pinot-distribution/pinot-source-assembly.xml</descriptor>
                   </descriptors>
                   <appendAssemblyId>false</appendAssemblyId>
+                  <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
                 </configuration>
               </execution>
             </executions>

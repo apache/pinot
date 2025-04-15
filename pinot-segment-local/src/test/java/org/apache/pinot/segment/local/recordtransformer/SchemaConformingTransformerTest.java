@@ -19,50 +19,127 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.NumericNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.AssertJUnit.fail;
 
 
 public class SchemaConformingTransformerTest {
-  static final private String INDEXABLE_EXTRAS_FIELD_NAME = "indexableExtras";
-  static final private String UNINDEXABLE_EXTRAS_FIELD_NAME = "unindexableExtras";
-  static final private String UNINDEXABLE_FIELD_SUFFIX = "_noIndex";
+  private static final String INDEXABLE_EXTRAS_FIELD_NAME = "json_data";
+  private static final String UNINDEXABLE_EXTRAS_FIELD_NAME = "json_data_no_idx";
+  private static final String UNINDEXABLE_FIELD_SUFFIX = "_noIndex";
+  private static final String MERGED_TEXT_INDEX_FIELD_NAME = "__mergedTextIndex";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final JsonNodeFactory N = OBJECT_MAPPER.getNodeFactory();
+  private static final String TEST_JSON_MESSAGE_NAME = "message";
+  private static final String TEST_JSON_MESSAGE_LOGTYPE_NAME = "message_logtype";
+  private static final String TEST_JSON_ARRAY_FIELD_NAME = "arrayField";
+  private static final String TEST_JSON_NULL_FIELD_NAME = "nullField";
+  private static final String TEST_JSON_STRING_FIELD_NAME = "stringField";
+  private static final String TEST_JSON_DOT_FIELD_NAME = "dotField.dotSuffix";
+  private static final String TEST_JSON_MAP_FIELD_NAME = "mapField";
+  private static final String TEST_JSON_MAP_EXTRA_FIELD_NAME = "mapFieldExtra";
+  private static final String TEST_JSON_MAP_NO_IDX_FIELD_NAME = "mapField_noIndex";
+  private static final String TEST_JSON_NESTED_MAP_FIELD_NAME = "nestedFields";
+  private static final String TEST_JSON_INT_NO_IDX_FIELD_NAME = "intField_noIndex";
+  private static final String TEST_JSON_STRING_NO_IDX_FIELD_NAME = "stringField_noIndex";
+  private static final ArrayNode TEST_JSON_ARRAY_NODE = N.arrayNode().add(0).add(1).add(2).add(3);
+  private static final NullNode TEST_JSON_NULL_NODE = N.nullNode();
+  private static final TextNode TEST_JSON_STRING_NODE = N.textNode("a");
+  private static final TextNode TEST_JSON_STRING_NODE_WITH_UPEERCASE = N.textNode("aA_123");
+  private static final NumericNode TEST_INT_NODE = N.numberNode(9);
+  private static final TextNode TEST_JSON_STRING_NO_IDX_NODE = N.textNode("z");
+  private static final CustomObjectNode TEST_JSON_MAP_NODE =
+      CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+          .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE).set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE);
+  private static final CustomObjectNode TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD =
+      CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+          .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE);
 
-  static final private ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final CustomObjectNode TEST_JSON_MAP_NO_IDX_NODE =
+      CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+          .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE);
+  private static final CustomObjectNode TEST_JSON_MAP_NODE_WITH_NO_IDX =
+      CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+          .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE).set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+          .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE);
+  private static final String JSON_KEY_VALUE_SEPARATOR = "\u001e";
+  private static final String MERGED_TEXT_INDEX_BOD_ANCHOR = "\u0002";
+  private static final String MERGED_TEXT_INDEX_EOD_ANCHOR = "\u0003";
 
-  private TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
-      String unindexableFieldSuffix, Set<String> fieldPathsToDrop) {
+  static {
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  private static final SchemaConformingTransformer _RECORD_TRANSFORMER =
+      new SchemaConformingTransformer(createDefaultBasicTableConfig(), createDefaultSchema());
+
+  private static TableConfig createDefaultBasicTableConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-        new SchemaConformingTransformerConfig(indexableExtrasField, unindexableExtrasField, unindexableFieldSuffix,
-            fieldPathsToDrop);
+        new SchemaConformingTransformerConfig(true, INDEXABLE_EXTRAS_FIELD_NAME, true, UNINDEXABLE_EXTRAS_FIELD_NAME,
+            UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, false, null, null, null, null, null, null,
+            null, null, null, null);
     ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
   }
 
-  private Schema.SchemaBuilder createDefaultSchemaBuilder() {
+  private static TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
+      String unindexableFieldSuffix, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve,
+      Set<String> fieldPathsToPreserveWithIndex, Map<String, String> columnNameToJsonKeyPathMap,
+      String mergedTextIndexField, boolean useAnonymousDotInFieldNames, boolean optimizeCaseInsensitiveSearch,
+      Boolean reverseTextIndexKeyValueOrder) {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+        new SchemaConformingTransformerConfig(indexableExtrasField != null, indexableExtrasField,
+            unindexableExtrasField != null, unindexableExtrasField, unindexableFieldSuffix, fieldPathsToDrop,
+            fieldPathsToPreserve, fieldPathsToPreserveWithIndex, null, columnNameToJsonKeyPathMap,
+            mergedTextIndexField, useAnonymousDotInFieldNames, optimizeCaseInsensitiveSearch,
+            reverseTextIndexKeyValueOrder, null, null, null,
+            null, null, JSON_KEY_VALUE_SEPARATOR, MERGED_TEXT_INDEX_BOD_ANCHOR, MERGED_TEXT_INDEX_EOD_ANCHOR);
+    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
+        .build();
+  }
+
+  private static Schema createDefaultSchema() {
+    return createDefaultSchemaBuilder().addSingleValueDimension("intField", DataType.INT).build();
+  }
+
+  private static Schema.SchemaBuilder createDefaultSchemaBuilder() {
     return new Schema.SchemaBuilder().addSingleValueDimension(INDEXABLE_EXTRAS_FIELD_NAME, DataType.JSON)
         .addSingleValueDimension(UNINDEXABLE_EXTRAS_FIELD_NAME, DataType.JSON);
   }
@@ -71,168 +148,602 @@ public class SchemaConformingTransformerTest {
   public void testWithNoUnindexableFields() {
     /*
     {
-      "arrayField":[0, 1, 2, 3],
-      "nullField":null,
-      "stringField":"a",
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
+      "arrayField" : [ 0, 1, 2, 3 ],
+      "stringField" : "a",
+      "dotField.dotSuffix" : "a",
+      "mapField" : {
+        "arrayField" : [ 0, 1, 2, 3 ],
+        "stringField" : "a"
       },
-      "nestedFields":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a",
-        "mapField":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "stringField":"a"
+      "nestedField" : {
+        "arrayField" : [ 0, 1, 2, 3 ],
+        "stringField" : "a",
+        "mapField" : {
+          "arrayField" : [ 0, 1, 2, 3 ],
+          "stringField" : "a"
         }
       }
     }
     */
-    final String inputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"},\"nestedFields\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\",\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,"
-            + "\"stringField\":\"a\"}}}";
-    String expectedOutputRecordJSONString;
+    final CustomObjectNode inputJsonNode =
+        CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE)
+            .set(TEST_JSON_DOT_FIELD_NAME, TEST_JSON_STRING_NODE)
+            .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE));
+
+    CustomObjectNode expectedJsonNode;
     Schema schema;
 
-    schema = createDefaultSchemaBuilder().build();
+    // No dedicated columns, everything moved under INDEXABLE_EXTRAS_FIELD_NAME
     /*
+    {
+      "json_data" : {
+        "arrayField" : [ 0, 1, 2, 3 ],
+        "stringField" : "a",
+        "dotField.dotSuffix" : "a",
+        "mapField" : {
+          "arrayField" : [ 0, 1, 2, 3 ],
+          "stringField" : "a"
+        },
+        "nestedField" : {
+          "arrayField" : [ 0, 1, 2, 3 ],
+          "stringField" : "a",
+          "mapField" : {
+            "arrayField" : [ 0, 1, 2, 3 ],
+            "stringField" : "a"
+          }
+        }
+      }
+    }
+    */
+    schema = createDefaultSchemaBuilder().build();
+    // The input json node stripped of null fields.
+    final CustomObjectNode inputJsonNodeWithoutNullFields =
+        CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+            .set(TEST_JSON_DOT_FIELD_NAME, TEST_JSON_STRING_NODE)
+            .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD).set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+            CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD));
+
+    expectedJsonNode = CustomObjectNode.create().set(INDEXABLE_EXTRAS_FIELD_NAME, inputJsonNodeWithoutNullFields);
+    transformWithIndexableFields(schema, inputJsonNode, expectedJsonNode, true);
+
+    // Four dedicated columns in schema, only two are populated, two ignored
+    /*
+    {
+      "arrayField":[0, 1, 2, 3],
+      "nestedFields.stringField":"a",
+      "<indexableExtras>":{
+        "dotField.dotSuffix" : "a", // it is not loaded to dedicated column because we do not enable anonymous dot in
+         field names
+        "mapField": {
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a"
+        },
+        "stringField":"a",
+        "nestedFields":{
+          "arrayField":[0, 1, 2, 3],
+          "mapField":{
+            "arrayField":[0, 1, 2, 3],
+            "stringField":"a"
+          }
+        }
+      }
+    }
+    */
+    schema = createDefaultSchemaBuilder().addMultiValueDimension(TEST_JSON_ARRAY_FIELD_NAME, DataType.INT)
+        .addSingleValueDimension(TEST_JSON_MAP_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_DOT_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .build();
+    expectedJsonNode = CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+        .set(INDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .setAll(TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD.deepCopy().removeAndReturn(TEST_JSON_ARRAY_FIELD_NAME))
+                .set(TEST_JSON_DOT_FIELD_NAME, TEST_JSON_STRING_NODE)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME, CustomObjectNode.create().setAll(
+                    TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD.deepCopy().removeAndReturn(TEST_JSON_STRING_FIELD_NAME))
+                    .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)));
+    transformWithIndexableFields(schema, inputJsonNode, expectedJsonNode, false);
+
+    // 8 dedicated columns, only 6 are populated
+    /*
+    {
+      "arrayField" : [ 0, 1, 2, 3 ],
+      "stringField" : "a",
+      "dotField.dotSuffix" : "a",
+      "nestedField.arrayField" : [ 0, 1, 2, 3 ],
+      "nestedField.stringField" : "a",
+      "json_data" : {
+        "mapField" : {
+          "arrayField" : [ 0, 1, 2, 3 ],
+          "stringField" : "a"
+        },
+        "nestedField" : {
+          "mapField" : {
+            "arrayField" : [ 0, 1, 2, 3 ],
+            "stringField" : "a"
+          }
+        }
+      }
+    }
+    */
+    schema = createDefaultSchemaBuilder().addMultiValueDimension(TEST_JSON_ARRAY_FIELD_NAME, DataType.INT)
+        .addSingleValueDimension(TEST_JSON_NULL_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_DOT_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_MAP_FIELD_NAME, DataType.JSON)
+        .addMultiValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, DataType.INT)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_NULL_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_MAP_FIELD_NAME, DataType.JSON)
+        .build();
+    expectedJsonNode = CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+        .set(TEST_JSON_DOT_FIELD_NAME, TEST_JSON_STRING_NODE)
+        .set(INDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)));
+    transformWithIndexableFields(schema, inputJsonNode, expectedJsonNode, true);
+  }
+
+  @Test
+  public void testWithUnindexableFieldsAndMergedTextIndex() {
+    /*
+    {
+      "arrayField":[0, 1, 2, 3],
+      "stringField":"a",
+      "intField_noIndex":9,
+      "string_noIndex":"z",
+      "message": "a",
+      "mapField":{
+        "arrayField":[0, 1, 2, 3],
+        "stringField":"a",
+        "intField_noIndex":9,
+        "string_noIndex":"z"
+      },
+      "mapField_noIndex":{
+        "arrayField":[0, 1, 2, 3],
+        "stringField":"a",
+      },
+      "nestedFields":{
+        "arrayField":[0, 1, 2, 3],
+        "stringField":"a",
+        "intField_noIndex":9,
+        "string_noIndex":"z",
+        "mapField":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a",
+          "intField_noIndex":9,
+          "string_noIndex":"z"
+        }
+      }
+    }
+    */
+    final CustomObjectNode inputJsonNode =
+        CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+            .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)
+            .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+            .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+            .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+            .set(TEST_JSON_MESSAGE_NAME, TEST_JSON_STRING_NODE)
+            .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX)
+            .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE).set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+            CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_ARRAY_FIELD_NAME,
+                TEST_JSON_ARRAY_NODE)
+                .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)
+                .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+                .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX));
+
+    CustomObjectNode expectedJsonNode;
+    CustomObjectNode expectedJsonNodeWithMergedTextIndex;
+    Schema.SchemaBuilder schemaBuilder;
+
+    // No schema
+    schemaBuilder = createDefaultSchemaBuilder();
+    /* Expected output
     {
       "indexableExtras":{
         "arrayField":[0, 1, 2, 3],
-        "nullField":null,
         "stringField":"a",
+        "stringField":"aA_123",
         "mapField":{
           "arrayField":[0, 1, 2, 3],
-          "nullField":null,
           "stringField":"a"
         },
         "nestedFields":{
           "arrayField":[0, 1, 2, 3],
-          "nullField":null,
           "stringField":"a",
           "mapField":{
             "arrayField":[0, 1, 2, 3],
-            "nullField":null,
             "stringField":"a"
           }
         }
-      }
+      },
+      "unindexableExtras":{
+        "intField_noIndex":9,
+        "string_noIndex":"z",
+        "mapField":{
+          "intField_noIndex":9,
+          "string_noIndex":"z"
+        },
+        "mapField_noIndex":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a",
+        },
+        "nestedFields":{
+          "intField_noIndex":9,
+          "string_noIndex":"z",
+          "mapField":{
+            "intField_noIndex":9,
+            "string_noIndex":"z"
+          }
+        }
+      },
+      __mergedTextIndex: [
+        see the value of expectedJsonNodeWithMergedTextIndex
+      ]
     }
     */
-    expectedOutputRecordJSONString =
-        "{\"indexableExtras\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"}}}}";
-    testTransformWithNoUnindexableFields(schema, inputRecordJSONString, expectedOutputRecordJSONString);
+    expectedJsonNode = CustomObjectNode.create().set(INDEXABLE_EXTRAS_FIELD_NAME,
+        CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+            .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+            .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD).set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+                .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)))
 
-    schema = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
-        .addSingleValueDimension("mapField", DataType.JSON)
-        .addSingleValueDimension("nestedFields.stringField", DataType.STRING).build();
+        .set(UNINDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                        .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                        .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)));
+    transformWithUnIndexableFieldsAndMergedTextIndex(schemaBuilder.build(), inputJsonNode, expectedJsonNode);
+
+    expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME, N.arrayNode()
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "arrayField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "aA_123" + JSON_KEY_VALUE_SEPARATOR + "stringField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField"
+                + ".arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "message" + MERGED_TEXT_INDEX_EOD_ANCHOR));
+    transformWithUnIndexableFieldsAndMergedTextIndex(
+        schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), inputJsonNode,
+        expectedJsonNodeWithMergedTextIndex);
+
+    // With schema, mapField is not indexed
+    schemaBuilder = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
+        .addSingleValueDimension(TEST_JSON_MAP_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME, DataType.JSON)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, DataType.STRING);
     /*
     {
       "arrayField":[0, 1, 2, 3],
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
       "nestedFields.stringField":"a",
       "indexableExtras":{
-        "nullField":null,
         "stringField":"a",
+        "mapField":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a"
+          "stringField":"aA_123"
+        },
         "nestedFields":{
           "arrayField":[0, 1, 2, 3],
-          "nullField":null,
           "mapField":{
             "arrayField":[0, 1, 2, 3],
-            "nullField":null,
             "stringField":"a"
           }
         }
-      }
+      },
+      "unindexableExtras":{
+        "intField_noIndex":9,
+        "string_noIndex":"z",
+        "mapField":{
+          "intField_noIndex":9,
+          "string_noIndex":"z"
+        },
+        "mapField_noIndex":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a",
+        },
+        "nestedFields":{
+          "intField_noIndex":9,
+          "string_noIndex":"z",
+          "mapField":{
+            "intField_noIndex":9,
+            "string_noIndex":"z"
+          }
+        }
+      },
+      __mergedTextIndex: [
+        // See the value of expectedJsonNodeWithMergedTextIndex
+      ]
     }
     */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields.stringField\":\"a\",\"indexableExtras\":{\"nullField\":null,\"stringField\":\"a\","
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"}}}}";
-    testTransformWithNoUnindexableFields(schema, inputRecordJSONString, expectedOutputRecordJSONString);
+    expectedJsonNode = CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+        .set(INDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+                        .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)))
 
-    schema = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
-        .addSingleValueDimension("nullField", DataType.STRING).addSingleValueDimension("stringField", DataType.STRING)
-        .addSingleValueDimension("mapField", DataType.JSON)
-        .addMultiValueDimension("nestedFields.arrayField", DataType.INT)
-        .addSingleValueDimension("nestedFields.nullField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.stringField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.mapField", DataType.JSON).build();
+        .set(UNINDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                        .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                        .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)));
+    transformWithUnIndexableFieldsAndMergedTextIndex(schemaBuilder.build(), inputJsonNode, expectedJsonNode);
+
+    expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME, N.arrayNode()
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "arrayField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "aA_123" + JSON_KEY_VALUE_SEPARATOR + "stringField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "message" + MERGED_TEXT_INDEX_EOD_ANCHOR));
+    transformWithUnIndexableFieldsAndMergedTextIndex(
+        schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), inputJsonNode,
+        expectedJsonNodeWithMergedTextIndex);
+
+    // With all fields in schema, but map field would not be indexed
+    schemaBuilder = createDefaultSchemaBuilder().addMultiValueDimension(TEST_JSON_ARRAY_FIELD_NAME, DataType.INT)
+        .addSingleValueDimension(TEST_JSON_NULL_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_MAP_FIELD_NAME, DataType.JSON)
+        .addMultiValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, DataType.INT)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_NULL_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_MAP_FIELD_NAME, DataType.JSON);
     /*
     {
       "arrayField":[0, 1, 2, 3],
-      "nullField":null,
       "stringField":"a",
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
+      "stringField":"aA_123",
       "nestedFields.arrayField":[0, 1, 2, 3],
-      "nestedFields.nullField":null,
       "nestedFields.stringField":"a",
-      "nestedFields.mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      }
+      "indexableExtras":{
+        "mapField":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a"
+        },
+        "nestedFields":{
+          mapField":{
+            "arrayField":[0, 1, 2, 3],
+            "stringField":"a"
+          }
+        }
+      },
+      "unindexableExtras":{
+        "intField_noIndex":9,
+        "string_noIndex":"z",
+        "mapField":{
+          "intField_noIndex":9,
+          "string_noIndex":"z"
+        },
+        "mapField_noIndex":{
+          "arrayField":[0, 1, 2, 3],
+          "stringField":"a",
+        },
+        "nestedFields":{
+          "intField_noIndex":9,
+          "string_noIndex":"z",
+          "mapField":{
+            "intField_noIndex":9,
+            "string_noIndex":"z"
+          }
+        }
+      },
+      __mergedTextIndex: [
+        // See the value of expectedJsonNodeWithMergedTextIndex
+      ]
     }
     */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"},\"nestedFields.arrayField\":[0,1,2,3],\"nestedFields"
-            + ".nullField\":null,\"nestedFields.stringField\":\"a\",\"nestedFields.mapField\":{\"arrayField\":[0,1,2,"
-            + "3],\"nullField\":null,\"stringField\":\"a\"}}";
-    testTransformWithNoUnindexableFields(schema, inputRecordJSONString, expectedOutputRecordJSONString);
-  }
+    expectedJsonNode = CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+        .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+        .set(INDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)))
 
-  private void testTransformWithNoUnindexableFields(Schema schema, String inputRecordJSONString,
-      String expectedOutputRecordJSONString) {
-    testTransform(null, null, schema, null, inputRecordJSONString, expectedOutputRecordJSONString);
-    testTransform(null, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString, expectedOutputRecordJSONString);
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString,
-        expectedOutputRecordJSONString);
+        .set(UNINDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                        .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                        .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)));
+    transformWithUnIndexableFieldsAndMergedTextIndex(schemaBuilder.build(), inputJsonNode, expectedJsonNode);
+    expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME, N.arrayNode()
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "arrayField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "arrayField" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "aA_123" + JSON_KEY_VALUE_SEPARATOR + "stringField"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "[0,1,2,3]" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "0" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "1" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "2" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "3" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.arrayField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "nestedFields.mapField.stringField"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "a" + JSON_KEY_VALUE_SEPARATOR + "message" + MERGED_TEXT_INDEX_EOD_ANCHOR));
+    transformWithUnIndexableFieldsAndMergedTextIndex(
+        schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), inputJsonNode,
+        expectedJsonNodeWithMergedTextIndex);
   }
 
   @Test
-  public void testWithUnindexableFields() {
+  public void testKeyValueTransformation() {
     /*
     {
       "arrayField":[0, 1, 2, 3],
-      "nullField":null,
+      "message_logtype": "a",
       "stringField":"a",
       "intField_noIndex":9,
       "string_noIndex":"z",
       "mapField":{
         "arrayField":[0, 1, 2, 3],
-        "nullField":null,
+        "stringField":"a",
+        "stringField":"aA_123",
+        "intField_noIndex":9,
+        "string_noIndex":"z"
+      },
+      "mapFieldExtra":{
+        "arrayField":[0, 1, 2, 3],
         "stringField":"a",
         "intField_noIndex":9,
         "string_noIndex":"z"
       },
+      "mapField_noIndex":{
+        "arrayField":[0, 1, 2, 3],
+        "stringField":"a",
+      },
       "nestedFields":{
         "arrayField":[0, 1, 2, 3],
-        "nullField":null,
         "stringField":"a",
+        "stringField":"aA_123",
         "intField_noIndex":9,
         "string_noIndex":"z",
         "mapField":{
           "arrayField":[0, 1, 2, 3],
-          "nullField":null,
           "stringField":"a",
           "intField_noIndex":9,
           "string_noIndex":"z"
@@ -240,454 +751,219 @@ public class SchemaConformingTransformerTest {
       }
     }
     */
-    final String inputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"intField_noIndex\":9,"
-            + "\"string_noIndex\":\"z\",\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,"
-            + "\"stringField\":\"a\",\"intField_noIndex\":9,\"string_noIndex\":\"z\"},"
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"intField_noIndex\":9,\"string_noIndex\":\"z\",\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\",\"intField_noIndex\":9,\"string_noIndex\":\"z\"}}}";
-    String expectedOutputRecordJSONString;
-    Schema schema;
+    final CustomObjectNode inputJsonNode =
+        CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
+            .set(TEST_JSON_MESSAGE_NAME, TEST_JSON_STRING_NODE)
+            .set(TEST_JSON_MESSAGE_LOGTYPE_NAME, TEST_JSON_STRING_NODE)
+            .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)
+            .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+            .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+            .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+            .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX)
+            .set(TEST_JSON_MAP_EXTRA_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX)
+            .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE).set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+            CustomObjectNode.create().setAll(TEST_JSON_MAP_NODE).set(TEST_JSON_ARRAY_FIELD_NAME,
+                TEST_JSON_ARRAY_NODE)
+                .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)
+                .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
+                .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX));
 
-    schema = createDefaultSchemaBuilder().build();
+    CustomObjectNode expectedJsonNode;
+    CustomObjectNode expectedJsonNodeWithMergedTextIndex;
+    Schema.SchemaBuilder schemaBuilder;
+
+    String destStrColumnName = "mystringname_all_lowercases";
+    String destMapColumnName = "myMapName";
+    // make array field as single value STRING, test the conversion function
+    // drop the column nestedFields.mapFields
+    // preserve the entire mapField value
+    // preserve the nestedFields.arrayField value and test the conversion function
+    // map the column someMeaningfulName to nestedFields.stringField
+    // abandon the json_data extra field
+    // mergedTextIndex should contain columns who are not in preserved or dropped list
+    // mergedTextIndex should contain message_logtye
+    schemaBuilder = createDefaultSchemaBuilder().addSingleValueDimension(TEST_JSON_ARRAY_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_STRING_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_MESSAGE_LOGTYPE_NAME, DataType.STRING)
+        .addSingleValueDimension(destMapColumnName, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_MAP_EXTRA_FIELD_NAME, DataType.JSON)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(destStrColumnName, DataType.STRING);
+
+    Map<String, String> keyMapping = new HashMap<>() {
+      {
+        put(destStrColumnName, TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME);
+        put(destMapColumnName, TEST_JSON_MAP_FIELD_NAME);
+      }
+    };
+    Set<String> pathToDrop = new HashSet<>() {
+      {
+        add(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_MAP_FIELD_NAME);
+      }
+    };
+    Set<String> pathToPreserve = new HashSet<>() {
+      {
+        add(TEST_JSON_MAP_FIELD_NAME);
+        add(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME);
+      }
+    };
+    Set<String> pathToPreserveWithIndex = new HashSet<>() {
+      {
+        add(TEST_JSON_MAP_EXTRA_FIELD_NAME);
+      }
+    };
+
     /*
     {
-      "indexableExtras":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
+      "arrayField":[0,1,2,3],
+      "message_logtype": "a",
+      "nestedFields.arrayField":[0,1,2,3],
+      "stringFiled":"aA_123"
+      "mystringname_all_lowercases":"a",
+      "myMapName":{
+        "arrayField":[0,1,2,3],
         "stringField":"a",
-        "mapField":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "stringField":"a"
-        },
+        "stringField":"aA_123",
+        "intField_noIndex":9,
+        "string_noIndex":"z"
+      },
+      "mapFieldExtra":{
+        "arrayField":[0,1,2,3],
+        "stringField":"a",
+        "intField_noIndex":9,
+        "string_noIndex":"z"
+      }
+      "indexableExtras":{
+        "stringField":"a",
         "nestedFields":{
           "arrayField":[0, 1, 2, 3],
-          "nullField":null,
+        }
+      },
+      "nestedField.arrayField":[0,1,2,3],
+      "unindexableExtras":{
+        "intField_noIndex":9,
+        "string_noIndex":"z",
+        "mapField_noIndex":{
+          "arrayField":[0, 1, 2, 3],
           "stringField":"a",
-          "mapField":{
-            "arrayField":[0, 1, 2, 3],
-            "nullField":null,
-            "stringField":"a"
-          }
-        }
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"indexableExtras\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"}}}}";
-    testTransform(null, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString, expectedOutputRecordJSONString);
-    /*
-    {
-      "indexableExtras":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a",
-        "mapField":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "stringField":"a"
         },
         "nestedFields":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "stringField":"a",
-          "mapField":{
-            "arrayField":[0, 1, 2, 3],
-            "nullField":null,
-            "stringField":"a"
-          }
-        }
-      },
-      "unindexableExtras":{
-        "intField_noIndex":9,
-        "string_noIndex":"z",
-        "mapField":{
           "intField_noIndex":9,
           "string_noIndex":"z"
-        },
-        "nestedFields":{
-          "intField_noIndex":9,
-          "string_noIndex":"z",
-          "mapField":{
-            "intField_noIndex":9,
-            "string_noIndex":"z"
-          }
         }
-      }
+      },
+      __mergedTextIndex: [
+        // check mergedTextIndexNode
+      ],
+      __mergedTextIndex_delimeter: [
+        // check mergedTextIndexNode
+      ]
     }
     */
-    expectedOutputRecordJSONString =
-        "{\"indexableExtras\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"}}},"
-            + "\"unindexableExtras\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\","
-            + "\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"},"
-            + "\"nestedFields\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\","
-            + "\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"}}}}";
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString,
-        expectedOutputRecordJSONString);
+    expectedJsonNode = CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, N.textNode("[0,1,2,3]"))
+        .set(TEST_JSON_MESSAGE_LOGTYPE_NAME, TEST_JSON_STRING_NODE)
+        .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE_WITH_UPEERCASE)
+        .set(destStrColumnName, TEST_JSON_STRING_NODE)
+        // For single value field, it would serialize the value whose format is slightly different
+        .set(destMapColumnName, N.textNode("{\"arrayField\":[0,1,2,3],\"stringField\":\"a\",\"intField_noIndex\":9,"
+            + "\"stringField_noIndex\":\"z\"}")).set(TEST_JSON_MAP_EXTRA_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX)
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, N.textNode("[0,1,2,3]"))
 
-    schema = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
-        .addSingleValueDimension("mapField", DataType.JSON)
-        .addSingleValueDimension("nestedFields.stringField", DataType.STRING).build();
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
-      "nestedFields.stringField":"a",
-      "indexableExtras":{
-        "nullField":null,
-        "stringField":"a",
-        "nestedFields":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "mapField":{
-            "arrayField":[0, 1, 2, 3],
-            "nullField":null,
-            "stringField":"a"
-          }
-        }
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields.stringField\":\"a\",\"indexableExtras\":{\"nullField\":null,\"stringField\":\"a\","
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"}}}}";
-    testTransform(null, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString, expectedOutputRecordJSONString);
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
-      "nestedFields.stringField":"a",
-      "indexableExtras":{
-        "nullField":null,
-        "stringField":"a",
-        "nestedFields":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-          "mapField":{
-            "arrayField":[0, 1, 2, 3],
-            "nullField":null,
-            "stringField":"a"
-          }
-        }
-      },
-      "unindexableExtras":{
-        "intField_noIndex":9,
-        "string_noIndex":"z",
-        "mapField":{
-          "intField_noIndex":9,
-          "string_noIndex":"z"
-        },
-        "nestedFields":{
-          "intField_noIndex":9,
-          "string_noIndex":"z",
-          "mapField":{
-            "intField_noIndex":9,
-            "string_noIndex":"z"
-          }
-        }
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"mapField\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\"},"
-            + "\"nestedFields.stringField\":\"a\",\"indexableExtras\":{\"nullField\":null,\"stringField\":\"a\","
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"}}},\"unindexableExtras\":{\"intField_noIndex\":9,"
-            + "\"string_noIndex\":\"z\",\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"},"
-            + "\"nestedFields\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\","
-            + "\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"}}}}";
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString,
-        expectedOutputRecordJSONString);
+        .set(UNINDEXABLE_EXTRAS_FIELD_NAME,
+            CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)
+                .set(TEST_JSON_MAP_NO_IDX_FIELD_NAME, TEST_JSON_MAP_NODE_WITHOUT_NULL_FIELD)
+                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
+                    CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
+                        .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)));
 
-    schema = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
-        .addSingleValueDimension("nullField", DataType.STRING).addSingleValueDimension("stringField", DataType.STRING)
-        .addSingleValueDimension("mapField", DataType.JSON)
-        .addMultiValueDimension("nestedFields.arrayField", DataType.INT)
-        .addSingleValueDimension("nestedFields.nullField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.stringField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.mapField", DataType.JSON).build();
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "nullField":null,
-      "stringField":"a",
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
-      "nestedFields.arrayField":[0, 1, 2, 3],
-      "nestedFields.nullField":null,
-      "nestedFields.stringField":"a",
-      "nestedFields.mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"},\"nestedFields.arrayField\":[0,1,2,3],\"nestedFields"
-            + ".nullField\":null,\"nestedFields.stringField\":\"a\",\"nestedFields.mapField\":{\"arrayField\":[0,1,2,"
-            + "3],\"nullField\":null,\"stringField\":\"a\"} }";
-    testTransform(null, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString, expectedOutputRecordJSONString);
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "nullField":null,
-      "stringField":"a",
-      "mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
-      "nestedFields.arrayField":[0, 1, 2, 3],
-      "nestedFields.nullField":null,
-      "nestedFields.stringField":"a",
-      "nestedFields.mapField":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a"
-      },
-      "unindexableExtras":{
-        "intField_noIndex":9,
-        "string_noIndex":"z",
-        "mapField":{
-          "intField_noIndex":9,
-          "string_noIndex":"z"
-        },
-        "nestedFields":{
-          "intField_noIndex":9,
-          "string_noIndex":"z",
-          "mapField":{
-            "intField_noIndex":9,
-            "string_noIndex":"z"
-          }
-        }
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"mapField\":{\"arrayField\":[0,1,2,3],"
-            + "\"nullField\":null,\"stringField\":\"a\"},\"nestedFields.arrayField\":[0,1,2,3],\"nestedFields"
-            + ".nullField\":null,\"nestedFields.stringField\":\"a\",\"nestedFields.mapField\":{\"arrayField\":[0,1,2,"
-            + "3],\"nullField\":null,\"stringField\":\"a\"},\"unindexableExtras\":{\"intField_noIndex\":9,"
-            + "\"string_noIndex\":\"z\",\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"},"
-            + "\"nestedFields\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\","
-            + "\"mapField\":{\"intField_noIndex\":9,\"string_noIndex\":\"z\"}}}}";
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, null, inputRecordJSONString,
-        expectedOutputRecordJSONString);
+    JsonNode mergedTextIndexNode = N.arrayNode().add(
+        MERGED_TEXT_INDEX_BOD_ANCHOR + "arrayField" + JSON_KEY_VALUE_SEPARATOR + "0" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "arrayField" + JSON_KEY_VALUE_SEPARATOR + "1" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "arrayField" + JSON_KEY_VALUE_SEPARATOR + "2" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "arrayField" + JSON_KEY_VALUE_SEPARATOR + "3" + MERGED_TEXT_INDEX_EOD_ANCHOR)
+        .add(MERGED_TEXT_INDEX_BOD_ANCHOR + "arrayField" + JSON_KEY_VALUE_SEPARATOR + "[0,1,2,3]"
+            + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + destStrColumnName + JSON_KEY_VALUE_SEPARATOR + "a"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + TEST_JSON_STRING_FIELD_NAME + JSON_KEY_VALUE_SEPARATOR
+                + TEST_JSON_STRING_NODE_WITH_UPEERCASE.textValue() + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + TEST_JSON_STRING_FIELD_NAME + JSON_KEY_VALUE_SEPARATOR
+                + TEST_JSON_STRING_NODE_WITH_UPEERCASE.textValue().toLowerCase(Locale.ENGLISH)
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.arrayField" + JSON_KEY_VALUE_SEPARATOR + "[0,1,2,3]"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.stringField" + JSON_KEY_VALUE_SEPARATOR + "a"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.arrayField" + JSON_KEY_VALUE_SEPARATOR + "0"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.arrayField" + JSON_KEY_VALUE_SEPARATOR + "1"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.arrayField" + JSON_KEY_VALUE_SEPARATOR + "2"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR).add(
+            MERGED_TEXT_INDEX_BOD_ANCHOR + "mapFieldExtra.arrayField" + JSON_KEY_VALUE_SEPARATOR + "3"
+                + MERGED_TEXT_INDEX_EOD_ANCHOR);
+    expectedJsonNodeWithMergedTextIndex =
+        expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME, mergedTextIndexNode);
+    transformKeyValueTransformation(null, UNINDEXABLE_EXTRAS_FIELD_NAME,
+        MERGED_TEXT_INDEX_FIELD_NAME,
+        schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), keyMapping,
+        pathToDrop, pathToPreserve, pathToPreserveWithIndex, inputJsonNode, expectedJsonNodeWithMergedTextIndex);
   }
 
-  @Test
-  public void testFieldPathsToDrop() {
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "nullField":null,
-      "stringField":"a",
-      "boolField":false,
-      "nestedFields":{
-        "arrayField":[0, 1, 2, 3],
-        "nullField":null,
-        "stringField":"a",
-        "boolField":false
-      }
-    }
-    */
-    final String inputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"boolField\":false,"
-            + "\"nestedFields\":{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\","
-            + "\"boolField\":false}}";
-    String expectedOutputRecordJSONString;
-    Schema schema;
-
-    schema = createDefaultSchemaBuilder().addMultiValueDimension("arrayField", DataType.INT)
-        .addSingleValueDimension("nullField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.stringField", DataType.STRING)
-        .addSingleValueDimension("nestedFields.boolField", DataType.BOOLEAN).build();
-    Set<String> fieldPathsToDrop = new HashSet<>(Arrays.asList("stringField", "nestedFields.arrayField"));
-    /*
-    {
-      "arrayField":[0, 1, 2, 3],
-      "nullField":null,
-      "indexableExtras": {
-        "boolField":false,
-        "nestedFields": {
-          nullField":null
-        }
-      },
-      "nestedFields":{
-        "stringField":"a",
-        "boolField":false
-      }
-    }
-    */
-    expectedOutputRecordJSONString =
-        "{\"arrayField\":[0,1,2,3],\"nullField\":null,\"nestedFields.stringField\":\"a\",\"nestedFields"
-            + ".boolField\":false,\"indexableExtras\":{\"boolField\":false,\"nestedFields\":{\"nullField\":null}}}";
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, fieldPathsToDrop,
-        inputRecordJSONString, expectedOutputRecordJSONString);
+  private void transformWithIndexableFields(Schema schema, JsonNode inputRecordJsonNode, JsonNode ouputRecordJsonNode,
+      boolean useAnonymousDotInFieldNames) {
+    testTransform(INDEXABLE_EXTRAS_FIELD_NAME, null, null, useAnonymousDotInFieldNames, false, false, schema, null,
+        null, null, null,
+        inputRecordJsonNode.toString(), ouputRecordJsonNode.toString());
   }
 
-  @Test
-  public void testIgnoringSpecialRowKeys() {
-    // Configure a FilterTransformer and a SchemaConformingTransformer such that the filter will introduce a special
-    // key $(SKIP_RECORD_KEY$) that the SchemaConformingTransformer should ignore
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setFilterConfig(new FilterConfig("intField = 1"));
-    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-        new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME,
-            UNINDEXABLE_FIELD_SUFFIX, null);
-    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
+  private void transformWithUnIndexableFieldsAndMergedTextIndex(Schema schema, JsonNode inputRecordJsonNode,
+      JsonNode ouputRecordJsonNode) {
+    testTransform(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME, null, true, false, null, schema, null,
+        null,
+        null, null, inputRecordJsonNode.toString(), ouputRecordJsonNode.toString());
+  }
+
+  private void transformKeyValueTransformation(String indexableExtraField, String unindeableExtraField,
+      String mergedTextIndexField, Schema schema, Map<String, String> keyMapping, Set<String> fieldPathsToDrop,
+      Set<String> fieldPathsToPreserve, Set<String> fieldPathsToPreserveWithIndex, JsonNode inputRecordJsonNode,
+      JsonNode ouputRecordJsonNode) {
+    testTransform(indexableExtraField, unindeableExtraField, mergedTextIndexField, true, true, false, schema,
+        keyMapping,
+        fieldPathsToDrop, fieldPathsToPreserve, fieldPathsToPreserveWithIndex, inputRecordJsonNode.toString(),
+        ouputRecordJsonNode.toString());
+  }
+
+  private void testTransform(String indexableExtrasField, String unindexableExtrasField,
+      String mergedTextIndexField, boolean useAnonymousDotInFieldNames, boolean optimizeCaseInsensitiveSearch,
+      Boolean reverseTextIndexKeyValueOrder,
+      Schema schema, Map<String, String> keyMapping, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve,
+      Set<String> fieldPathsToPreserveWithIndex, String inputRecordJSONString, String expectedOutputRecordJSONString) {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
-
-    // Create a series of transformers: FilterTransformer -> SchemaConformingTransformer
-    List<RecordTransformer> transformers = new LinkedList<>();
-    transformers.add(new FilterTransformer(tableConfig));
-    Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("intField", DataType.INT).build();
-    transformers.add(new SchemaConformingTransformer(tableConfig, schema));
-    CompositeTransformer compositeTransformer = new CompositeTransformer(transformers);
-
-    Map<String, Object> inputRecordMap = jsonStringToMap("{\"intField\":1}");
-    GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    GenericRow outputRecord = compositeTransformer.transform(inputRecord);
-    Assert.assertNotNull(outputRecord);
-    // Check that the transformed record has $SKIP_RECORD_KEY$
-    Assert.assertFalse(IngestionUtils.shouldIngestRow(outputRecord));
-  }
-
-  @Test
-  public void testOverlappingSchemaFields() {
-    Assert.assertThrows(IllegalArgumentException.class, () -> {
-      Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b", DataType.STRING)
-          .addSingleValueDimension("a.b.c", DataType.INT).build();
-      SchemaConformingTransformer.validateSchema(schema,
-          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
-    });
-
-    // This is a repeat of the previous test but with fields reversed just in case they are processed in order
-    Assert.assertThrows(IllegalArgumentException.class, () -> {
-      Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b.c", DataType.INT)
-          .addSingleValueDimension("a.b", DataType.STRING).build();
-      SchemaConformingTransformer.validateSchema(schema,
-          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
-    });
-  }
-
-  @Test
-  public void testInvalidFieldNamesInSchema() {
-    // Ensure schema fields which end with unindexableFieldSuffix are caught as invalid
-    Assert.assertThrows(() -> {
-      Schema schema =
-          createDefaultSchemaBuilder().addSingleValueDimension("a" + UNINDEXABLE_FIELD_SUFFIX, DataType.STRING)
-              .addSingleValueDimension("a.b" + UNINDEXABLE_FIELD_SUFFIX, DataType.INT).build();
-      SchemaConformingTransformer.validateSchema(schema,
-          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, UNINDEXABLE_FIELD_SUFFIX, null));
-    });
-
-    // Ensure schema fields which are in fieldPathsToDrop are caught as invalid
-    Assert.assertThrows(() -> {
-      Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a", DataType.STRING)
-          .addSingleValueDimension("b.c", DataType.INT).build();
-      Set<String> fieldPathsToDrop = new HashSet<>(Arrays.asList("a", "b.c"));
-      SchemaConformingTransformer.validateSchema(schema,
-          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, fieldPathsToDrop));
-    });
-  }
-
-  @Test
-  public void testSchemaRecordMismatch() {
-    Schema schema =
-        createDefaultSchemaBuilder().addSingleValueDimension("nestedFields.mapField", DataType.JSON).build();
-    /*
-    {
-      "indexableExtras":{
-        "nestedFields":0,
-      }
-    }
-    */
-    // Schema field "nestedFields.map" is a Map but the record field is an int, so it should be stored in
-    // indexableExtras
-    testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, null, "{\"nestedFields\":0}",
-        "{\"indexableExtras\":{\"nestedFields\":0}}");
-  }
-
-  @Test
-  public void testFieldTypesForExtras() {
-    final String inputRecordJSONString = "{\"arrayField\":[0,1,2,3]}";
-
-    TableConfig tableConfig =
-        createDefaultTableConfig(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX,
-            null);
-    Schema validSchema =
-        new Schema.SchemaBuilder().addSingleValueDimension(INDEXABLE_EXTRAS_FIELD_NAME, DataType.STRING)
-            .addSingleValueDimension(UNINDEXABLE_EXTRAS_FIELD_NAME, DataType.STRING).build();
-    GenericRow outputRecord = transformRow(tableConfig, validSchema, inputRecordJSONString);
-
-    Assert.assertNotNull(outputRecord);
-    // Validate that the indexable extras field contains the input record as a string
-    Assert.assertEquals(outputRecord.getValue(INDEXABLE_EXTRAS_FIELD_NAME), inputRecordJSONString);
-
-    // Validate that invalid field types are caught
-    Schema invalidSchema = new Schema.SchemaBuilder().addSingleValueDimension(INDEXABLE_EXTRAS_FIELD_NAME, DataType.INT)
-        .addSingleValueDimension(UNINDEXABLE_EXTRAS_FIELD_NAME, DataType.BOOLEAN).build();
-    Assert.assertThrows(() -> {
-      transformRow(tableConfig, invalidSchema, inputRecordJSONString);
-    });
-  }
-
-  @Test
-  public void testInvalidTransformerConfig() {
-    Assert.assertThrows(() -> {
-      createDefaultTableConfig(null, null, null, null);
-    });
-    Assert.assertThrows(() -> {
-      createDefaultTableConfig(null, UNINDEXABLE_EXTRAS_FIELD_NAME, null, null);
-    });
-    Assert.assertThrows(() -> {
-      createDefaultTableConfig(null, null, UNINDEXABLE_FIELD_SUFFIX, null);
-    });
-    Assert.assertThrows(() -> {
-      createDefaultTableConfig(null, UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, null);
-    });
-    Assert.assertThrows(() -> {
-      createDefaultTableConfig(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME, null, null);
-    });
-  }
-
-  /**
-   * Validates transforming the given row results in the expected row, where both rows are given as JSON strings
-   */
-  private void testTransform(String unindexableExtrasField, String unindexableFieldSuffix, Schema schema,
-      Set<String> fieldPathsToDrop, String inputRecordJSONString, String expectedOutputRecordJSONString) {
-    TableConfig tableConfig =
-        createDefaultTableConfig(INDEXABLE_EXTRAS_FIELD_NAME, unindexableExtrasField, unindexableFieldSuffix,
-            fieldPathsToDrop);
+        createDefaultTableConfig(indexableExtrasField, unindexableExtrasField, UNINDEXABLE_FIELD_SUFFIX,
+            fieldPathsToDrop, fieldPathsToPreserve, fieldPathsToPreserveWithIndex, keyMapping, mergedTextIndexField,
+            useAnonymousDotInFieldNames,
+            optimizeCaseInsensitiveSearch, reverseTextIndexKeyValueOrder);
     GenericRow outputRecord = transformRow(tableConfig, schema, inputRecordJSONString);
+    Map<String, Object> expectedOutputRecordMap = jsonStringToMap(expectedOutputRecordJSONString);
+
+    // Merged text index field does not need to have deterministic order
+    Object mergedTextIndexValue = outputRecord.getFieldToValueMap().get(MERGED_TEXT_INDEX_FIELD_NAME);
+    Object expectedMergedTextIndexValue = expectedOutputRecordMap.get(MERGED_TEXT_INDEX_FIELD_NAME);
+    if (mergedTextIndexValue != null) {
+      ((List<Object>) mergedTextIndexValue).sort(null);
+    }
+    if (expectedMergedTextIndexValue != null) {
+      ((List<Object>) expectedMergedTextIndexValue).sort(null);
+    }
 
     Assert.assertNotNull(outputRecord);
-    Map<String, Object> expectedOutputRecordMap = jsonStringToMap(expectedOutputRecordJSONString);
     Assert.assertEquals(outputRecord.getFieldToValueMap(), expectedOutputRecordMap);
   }
 
@@ -698,7 +974,8 @@ public class SchemaConformingTransformerTest {
   private GenericRow transformRow(TableConfig tableConfig, Schema schema, String inputRecordJSONString) {
     Map<String, Object> inputRecordMap = jsonStringToMap(inputRecordJSONString);
     GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    SchemaConformingTransformer schemaConformingTransformer = new SchemaConformingTransformer(tableConfig, schema);
+    SchemaConformingTransformer schemaConformingTransformer =
+        new SchemaConformingTransformer(tableConfig, schema);
     return schemaConformingTransformer.transform(inputRecord);
   }
 
@@ -727,5 +1004,111 @@ public class SchemaConformingTransformerTest {
       record.putValue(entry.getKey(), entry.getValue());
     }
     return record;
+  }
+
+  @Test
+  public void testOverlappingSchemaFields() {
+    try {
+      Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b", DataType.STRING)
+          .addSingleValueDimension("a.b.c", DataType.INT).build();
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null, null,
+              null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+    } catch (Exception ex) {
+      fail("Should not have thrown any exception when overlapping schema occurs");
+    }
+
+    try {
+      // This is a repeat of the previous test but with fields reversed just in case they are processed in order
+      Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b.c", DataType.INT)
+          .addSingleValueDimension("a.b", DataType.STRING).build();
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null, null,
+              null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+    } catch (Exception ex) {
+      fail("Should not have thrown any exception when overlapping schema occurs");
+    }
+  }
+
+  @Test
+  public void testBase64ValueFilter() {
+    String text = "Hello world";
+    String binaryData = "ABCxyz12345-_+/=";
+    String binaryDataWithTrailingPeriods = "ABCxyz12345-_+/=..";
+    String binaryDataWithRandomPeriods = "A.BCxy.z12345-_+/=..";
+    String shortBinaryData = "short";
+    String longBinaryDataWithColon = "field:1:1:v1Cgy+ypzk8yf9JzsdkBjvZ1jM8Mem/BTtNilst64Df/34xmJzeRstmihpfrWZ";
+    String jsonBinaryData = "{\"field\":\"text:1:1:v1Cgy+ypzk8yf9JzsdkBjvZ1jM8Mem/BTtNilst64Df/34xmJzeRstmihpfrWZ\"}";
+    int minLength = 10;
+
+    // A space is not expected in a based64 encoded string.
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(text.getBytes(), minLength));
+    assertTrue(SchemaConformingTransformer.base64ValueFilter(binaryData.getBytes(), minLength));
+    assertTrue(SchemaConformingTransformer.base64ValueFilter(binaryDataWithTrailingPeriods.getBytes(), minLength));
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(binaryDataWithRandomPeriods.getBytes(), minLength));
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(shortBinaryData.getBytes(), minLength));
+    // A colon : is not expected in base64 encoded string.
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(longBinaryDataWithColon.getBytes(), minLength));
+    // Json string can not be detected as base64 encoded string even one field has base64 encoded strings.
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(jsonBinaryData.getBytes(), minLength));
+  }
+
+  @Test
+  public void testCreateSchemaConformingTransformerConfig() throws Exception {
+    String ingestionConfigJson = "{"
+        + "\"schemaConformingTransformerConfig\": {"
+        + "  \"enableIndexableExtras\": false"
+        + "}"
+        + "}";
+
+    IngestionConfig ingestionConfig = JsonUtils.stringToObject(ingestionConfigJson, IngestionConfig.class);
+    SchemaConformingTransformerConfig config = ingestionConfig.getSchemaConformingTransformerConfig();
+    assertNotNull(config);
+    assertEquals(config.isEnableIndexableExtras(), false);
+
+    // Backward compatibility test, V2 config should be able to create schemaConformingTransformerConfig
+    ingestionConfigJson = "{"
+        + "\"schemaConformingTransformerV2Config\": {"
+        + "  \"enableIndexableExtras\": false"
+        + "}"
+        + "}";
+
+    ingestionConfig = JsonUtils.stringToObject(ingestionConfigJson, IngestionConfig.class);
+    config = ingestionConfig.getSchemaConformingTransformerConfig();
+    assertNotNull(config);
+    assertEquals(config.isEnableIndexableExtras(), false);
+  }
+
+  static class CustomObjectNode extends ObjectNode {
+    public CustomObjectNode() {
+      super(OBJECT_MAPPER.getNodeFactory());
+    }
+
+    public static CustomObjectNode create() {
+      return new CustomObjectNode();
+    }
+
+    public CustomObjectNode set(String fieldName, JsonNode value) {
+      super.set(fieldName, value);
+      return this;
+    }
+
+    public CustomObjectNode setAll(ObjectNode other) {
+      super.setAll(other);
+      return this;
+    }
+
+    public CustomObjectNode removeAndReturn(String fieldName) {
+      super.remove(fieldName);
+      return this;
+    }
+
+    public CustomObjectNode deepCopy() {
+      return CustomObjectNode.create().setAll(this);
+    }
+  }
+
+  static {
+    ServerMetrics.register(mock(ServerMetrics.class));
   }
 }

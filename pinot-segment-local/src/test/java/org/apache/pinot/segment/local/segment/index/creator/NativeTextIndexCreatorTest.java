@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -33,7 +34,7 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_TEXT_INDEX
 import static org.testng.AssertJUnit.assertEquals;
 
 
-public class NativeTextIndexCreatorTest {
+public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NativeTextIndexCreatorTest");
 
   @BeforeClass
@@ -68,25 +69,28 @@ public class NativeTextIndexCreatorTest {
 
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + NATIVE_TEXT_INDEX_FILE_EXTENSION);
     try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile())) {
+      try {
+        int[] matchedDocIds = reader.getDocIds("hello.*").toArray();
+        assertEquals(2, matchedDocIds.length);
+        assertEquals(0, matchedDocIds[0]);
+        assertEquals(1, matchedDocIds[1]);
 
-      int[] matchedDocIds = reader.getDocIds("hello.*").toArray();
-      assertEquals(2, matchedDocIds.length);
-      assertEquals(0, matchedDocIds[0]);
-      assertEquals(1, matchedDocIds[1]);
+        matchedDocIds = reader.getDocIds(".*llo").toArray();
+        assertEquals(2, matchedDocIds.length);
+        assertEquals(0, matchedDocIds[0]);
+        assertEquals(1, matchedDocIds[1]);
 
-      matchedDocIds = reader.getDocIds(".*llo").toArray();
-      assertEquals(2, matchedDocIds.length);
-      assertEquals(0, matchedDocIds[0]);
-      assertEquals(1, matchedDocIds[1]);
+        matchedDocIds = reader.getDocIds("wor.*").toArray();
+        assertEquals(2, matchedDocIds.length);
+        assertEquals(0, matchedDocIds[0]);
+        assertEquals(1, matchedDocIds[1]);
 
-      matchedDocIds = reader.getDocIds("wor.*").toArray();
-      assertEquals(2, matchedDocIds.length);
-      assertEquals(0, matchedDocIds[0]);
-      assertEquals(1, matchedDocIds[1]);
-
-      matchedDocIds = reader.getDocIds("zoo.*").toArray();
-      assertEquals(1, matchedDocIds.length);
-      assertEquals(3, matchedDocIds[0]);
+        matchedDocIds = reader.getDocIds("zoo.*").toArray();
+        assertEquals(1, matchedDocIds.length);
+        assertEquals(3, matchedDocIds[0]);
+      } finally {
+        reader.closeInTest();
+      }
     }
   }
 }

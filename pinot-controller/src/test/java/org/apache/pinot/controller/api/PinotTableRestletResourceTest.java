@@ -24,25 +24,34 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -64,6 +73,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
+    registerMinionTasks();
     _createTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
@@ -75,6 +85,43 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
         .setStreamConfigs(streamConfig.getStreamConfigsMap());
+  }
+
+  private void registerMinionTasks() {
+    PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.MergeRollupTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
   }
 
   @Test
@@ -706,8 +753,223 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
+  /**
+   * Validates the behavior of the system when creating or updating tables with invalid replication factors.
+   * This method tests both REALTIME and OFFLINE table configurations.
+   *
+   * The method performs the following steps:
+   * 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
+   *  available instances. The creation is expected to fail, and the test verifies that the exception message
+   *  contains the expected error.
+   * 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
+   *  fail, and the test verifies that the exception message contains the expected error.
+   * 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
+   * testing. These creations are expected to succeed.
+   * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
+   * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
+   * messages are returned.
+   *
+   * @throws Exception if any error occurs during the validation process
+   */
+  @Test
+  public void validateInvalidTableReplication()
+      throws Exception {
+    String rawTableName = "validateInvalidTableReplication";
+
+    validateTableCreationWithInvalidReplication(rawTableName, TableType.REALTIME);
+    validateTableCreationWithInvalidReplication(rawTableName, TableType.OFFLINE);
+
+    createTableWithValidReplication(rawTableName, TableType.REALTIME);
+    createTableWithValidReplication(rawTableName, TableType.OFFLINE);
+
+    validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.REALTIME);
+    validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.OFFLINE);
+  }
+
+  /**
+   * Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
+   * This method tests the REALTIME table configuration.
+   *
+   * The method performs the following steps:
+   * 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
+   * fail, and the test verifies that the exception message contains the expected error.
+   * 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
+   * testing. This creation is expected to succeed.
+   * 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
+   * value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
+   *
+   * @throws Exception if any error occurs during the validation process
+   */
+  @Test
+  public void validateInvalidReplicaGroupConfig()
+      throws Exception {
+
+    // Create a REALTIME table with an invalid replication factor. Creation should fail.
+    String tableName = "validateInvalidReplicaGroupConfig";
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 2));
+
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setServerTenant("DefaultTenant")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setNumReplicas(10)
+        .build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+    }
+
+    // Create a new valid table and update it with invalid replica group config
+    instanceAssignmentConfigMap.clear();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 1));
+
+    realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setServerTenant("DefaultTenant")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setNumReplicas(10)
+        .build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      fail("Preconditions failure: Could not create a REALTIME table with a valid replica group config as a "
+          + "precondition to testing config updates");
+    }
+
+    // Update it with an invalid RG config, the update should fail
+    instanceAssignmentConfigMap.clear();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 1, 8));
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+    }
+  }
+
+  /**
+   * Updating existing REALTIME table with invalid replication factor should throw exception.
+   */
+  private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(5)
+            .build();
+
+    try {
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+    }
+  }
+
+  private void createTableWithValidReplication(String rawTableName, TableType tableType) {
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(1)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(1)
+            .build();
+
+    try {
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+    } catch (Exception e) {
+      fail("Preconditions failure: Could not create a " + tableType.toString()
+          + " table with valid replication factor of 1 as a " + "precondition to testing config updates");
+    }
+  }
+
+  /**
+   * When table is created with invalid replication factor, it should throw exception.
+   */
+  private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
+      throws IOException {
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(5)
+            .build();
+
+    try {
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
+    }
+  }
+
+  private static InstanceAssignmentConfig getInstanceAssignmentConfig(String tag, int numReplicaGroups,
+      int numInstancesPerReplicaGroup) {
+    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig(tag, false, 0, null);
+    List<String> constraints = new ArrayList<>();
+    constraints.add("constraints1");
+    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 1, numReplicaGroups, numInstancesPerReplicaGroup, 1, 1, true,
+            null);
+    return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
+        instanceReplicaGroupPartitionConfig,
+        InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name(), false);
+  }
+
   @AfterClass
   public void tearDown() {
-    DEFAULT_INSTANCE.cleanup();
+    DEFAULT_INSTANCE.stopSharedTestSetup();
   }
 }

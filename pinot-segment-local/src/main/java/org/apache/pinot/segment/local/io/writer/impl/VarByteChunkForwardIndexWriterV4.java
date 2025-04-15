@@ -76,7 +76,9 @@ import org.slf4j.LoggerFactory;
 public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexWriterV4.class);
+  // Use the run-time concrete class to retrieve the logger
+  protected final Logger _logger = LoggerFactory.getLogger(getClass());
+
   private static final String DATA_BUFFER_SUFFIX = ".buf";
 
   private final File _dataBuffer;
@@ -105,11 +107,16 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     writeHeader(_chunkCompressor.compressionType(), chunkSize);
   }
 
+  // Child class must override this class instance method
+  protected int getVersion() {
+    return VERSION;
+  }
+
   private void writeHeader(ChunkCompressionType compressionType, int targetDecompressedChunkSize)
       throws IOException {
     // keep metadata BE for backwards compatibility
     // (e.g. the version needs to be read by a factory which assumes BE)
-    _output.writeInt(VERSION);
+    _output.writeInt(getVersion());
     _output.writeInt(targetDecompressedChunkSize);
     _output.writeInt(compressionType.getValue());
     // reserve a slot to write the data offset into
@@ -129,7 +136,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
 
   @Override
   public void putBytes(byte[] bytes) {
-    Preconditions.checkState(_chunkOffset < (1L << 32), "exceeded 4GB of compressed chunks");
+    Preconditions.checkState(_chunkOffset < (1L << 32),
+        "exceeded 4GB of compressed chunks for: " + _dataBuffer.getName());
     int sizeRequired = Integer.BYTES + bytes.length;
     if (_chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired) {
       flushChunk();
@@ -270,7 +278,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       _chunkOffset += compressedSize;
       _docIdOffset = _nextDocId;
     } catch (IOException e) {
-      LOGGER.error("Exception caught while compressing/writing data chunk", e);
+      _logger.error("Exception caught while compressing/writing data chunk", e);
       throw new RuntimeException(e);
     } finally {
       if (mapped != null) {

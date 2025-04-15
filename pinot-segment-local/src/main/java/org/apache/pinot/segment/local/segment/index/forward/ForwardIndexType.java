@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
@@ -87,7 +87,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.DEFAULT;
+    return ForwardIndexConfig.getDefault();
   }
 
   @Override
@@ -109,10 +109,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         for (FieldConfig fieldConfig : fieldConfigs) {
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.getDisabled());
           } else {
             ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
-            if (!config.equals(ForwardIndexConfig.DEFAULT)) {
+            if (!config.equals(ForwardIndexConfig.getDefault())) {
               fwdConfig.put(fieldConfig.getName(), config);
             }
             // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
@@ -251,7 +251,17 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           int initialCapacity =
               Math.min(context.getCapacity(), NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
           if (config.getCompressionCodec() == CompressionCodec.CLP) {
-            return new CLPMutableForwardIndex(column, storedType, context.getMemoryManager(), context.getCapacity());
+            CLPMutableForwardIndexV2 clpMutableForwardIndex =
+                new CLPMutableForwardIndexV2(column, context.getMemoryManager());
+            // CLP (V1) always have clp encoding enabled whereas V2 is dynamic
+            clpMutableForwardIndex.forceClpEncoding();
+            return clpMutableForwardIndex;
+          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_ZSTD
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_LZ4) {
+            CLPMutableForwardIndexV2 clpMutableForwardIndex =
+                new CLPMutableForwardIndexV2(column, context.getMemoryManager());
+            return clpMutableForwardIndex;
           }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
               initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);

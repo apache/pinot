@@ -40,7 +40,7 @@ import picocli.CommandLine;
  * Class to implement CreateResource command.
  *
  */
-@CommandLine.Command(name = "AddTable")
+@CommandLine.Command(name = "AddTable", mixinStandardHelpOptions = true)
 public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
@@ -65,6 +65,10 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   @CommandLine.Option(names = {"-update"}, required = false, description = "Update the existing table instead of "
       + "creating new one")
   private boolean _update = false;
+
+  @CommandLine.Option(names = {"-validationTypesToSkip"}, required = false, description =
+      "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+  private String _validationTypesToSkip = null;
 
   private String _controllerAddress;
 
@@ -112,13 +116,30 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     return this;
   }
 
+  public String getValidationTypesToSkip() {
+    return _validationTypesToSkip;
+  }
+
+  public AddTableCommand setValidationTypesToSkip(String validationTypesToSkip) {
+    _validationTypesToSkip = validationTypesToSkip;
+    return this;
+  }
+
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
-        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(), getHeaders(),
+        getTableCreationRequestURL(), node.toString(), getHeaders(),
         makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
+  }
+
+  private String getTableCreationRequestURL() {
+    String baseURL = ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate();
+    if (_validationTypesToSkip != null) {
+      return String.format(baseURL + "?validationTypesToSkip=%s", _validationTypesToSkip);
+    }
+    return baseURL;
   }
 
   public boolean sendTableUpdateRequest(JsonNode node, String tableName)

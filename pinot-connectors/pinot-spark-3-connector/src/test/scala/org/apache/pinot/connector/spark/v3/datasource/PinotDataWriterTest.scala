@@ -20,7 +20,7 @@ package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType, BinaryType}
 import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.scalatest.matchers.should.Matchers
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -55,6 +55,8 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = "/tmp/pinot",
       timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
       segmentNameFormat = "{table}_{partitionId:03}",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
@@ -63,14 +65,18 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     )
     val writeSchema = StructType(Seq(
       StructField("name", StringType, nullable = false),
-      StructField("age", IntegerType, nullable = false)
+      StructField("age", IntegerType, nullable = false),
+      StructField("ts", LongType, nullable = false),
+      StructField("bin", BinaryType, nullable = false),
     ))
 
-    val pinotSchema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
     val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
 
-    val record1 = new TestInternalRow(Array[Any]("Alice", 30))
-    val record2 = new TestInternalRow(Array[Any]("Bob", 25))
+    val record1 = new TestInternalRow(Array[Any]("Alice", 30, 1234567890L, "Alice".getBytes))
+    val record2 = new TestInternalRow(Array[Any]("Bob", 25, 1234567891L, "Bob".getBytes))
 
     writer.write(record1)
     writer.write(record2)
@@ -92,7 +98,9 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = tmpDir.getAbsolutePath,
       timeColumnName = "ts",
-      segmentNameFormat = "{table}_{partitionId:03}",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
+      segmentNameFormat = "{table}_{startTime}_{endTime}_{partitionId:03}",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
       bloomFilterColumns = Array("name"),
@@ -100,26 +108,32 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     )
     val writeSchema = StructType(Seq(
       StructField("name", StringType, nullable = false),
-      StructField("age", IntegerType, nullable = false)
+      StructField("age", IntegerType, nullable = false),
+      StructField("ts", LongType, nullable = false),
+      StructField("bin", BinaryType, nullable = false),
     ))
-    val pinotSchema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
     val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
-    val record1 = new TestInternalRow(Array[Any]("Alice", 30))
+    val record1 = new TestInternalRow(Array[Any]("Alice", 30, 1234567890L, "Alice".getBytes))
     writer.write(record1)
+    val record2 = new TestInternalRow(Array[Any]("Bob", 25, 1234567891L, "Bob".getBytes))
+    writer.write(record2)
 
     val commitMessage: WriterCommitMessage = writer.commit()
     commitMessage shouldBe a[SuccessWriterCommitMessage]
 
     // Verify that the segment is created and stored in the target location
     val fs = FileSystem.get(new URI(writeOptions.savePath), new org.apache.hadoop.conf.Configuration())
-    val segmentPath = new Path(writeOptions.savePath + "/testTable_000.tar.gz")
+    val segmentPath = new Path(writeOptions.savePath + "/testTable_1234567890_1234567891_000.tar.gz")
     fs.exists(segmentPath) shouldBe true
 
     // Verify the contents of the segment tar file
     TarCompressionUtils.untar(
-      new File(writeOptions.savePath + "/testTable_000.tar.gz"),
+      new File(writeOptions.savePath + "/testTable_1234567890_1234567891_000.tar.gz"),
       new File(writeOptions.savePath))
-    val untarDir = Paths.get(writeOptions.savePath + "/testTable_000/v3/")
+    val untarDir = Paths.get(writeOptions.savePath + "/testTable_1234567890_1234567891_000/v3/")
     Files.exists(untarDir) shouldBe true
 
     val segmentFiles = Files.list(untarDir).toArray.map(_.toString)
@@ -132,14 +146,19 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     val metadataSrc = Source.fromFile(untarDir + "/metadata.properties")
     val metadataContent = metadataSrc.getLines.mkString("\n")
     metadataSrc.close()
-    metadataContent should include ("segment.name = testTable_000")
+
+    metadataContent should include ("segment.name = testTable_1234567890_1234567891_000")
+    metadataContent should include ("segment.time.column.name = ts")
+    metadataContent should include ("segment.start.time = 1234567890")
+    metadataContent should include ("segment.end.time = 1234567891")
   }
 
   test("getSegmentName should format segment name correctly with custom format") {
     val testCases = Seq(
       ("{table}_{partitionId}", "airlineStats_12"),
       ("{partitionId:05}_{table}", "00012_airlineStats"),
-      ("{table}_20240805", "airlineStats_20240805")
+      ("{table}_20240805", "airlineStats_20240805"),
+      ("{table}_{startTime}_{endTime}_{partitionId:03}", "airlineStats_1234567890_1234567891_012"),
     )
 
     testCases.foreach { case (format, expected) =>
@@ -147,19 +166,26 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
         tableName = "airlineStats",
         savePath = "/tmp/pinot",
         timeColumnName = "ts",
+        timeFormat = "EPOCH|SECONDS",
+        timeGranularity = "1:SECONDS",
         segmentNameFormat = format,
         invertedIndexColumns = Array("name"),
         noDictionaryColumns = Array("age"),
         bloomFilterColumns = Array("name"),
-        rangeIndexColumns = Array()
+        rangeIndexColumns = Array(),
       )
       val writeSchema = StructType(Seq(
         StructField("name", StringType, nullable = false),
-        StructField("age", IntegerType, nullable = false)
+        StructField("age", IntegerType, nullable = false),
+        StructField("ts", LongType, nullable = false),
       ))
 
-      val pinotSchema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+      val pinotSchema = SparkToPinotTypeTranslator.translate(
+        writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+        writeOptions.timeFormat, writeOptions.timeGranularity)
       val writer = new PinotDataWriter[InternalRow](12, 0, writeOptions, writeSchema, pinotSchema)
+      writer.write(new TestInternalRow(Array[Any]("Alice", 30, 1234567890L)))
+      writer.write(new TestInternalRow(Array[Any]("Bob", 25, 1234567891L)))
 
       val segmentName = writer.getSegmentName
 

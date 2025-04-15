@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -58,6 +58,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-local</artifactId>
       <type>test-jar</type>
     </dependency>
@@ -85,6 +90,7 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -93,7 +99,7 @@
     </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-generator-annprocess</artifactId>
+      <artifactId>jmh-core</artifactId>
     </dependency>
     <dependency>
       <groupId>net.sf.jopt-simple</groupId>
@@ -103,6 +109,19 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths combine.children="append">
+            <path>
+              <groupId>org.openjdk.jmh</groupId>
+              <artifactId>jmh-generator-annprocess</artifactId>
+              <version>${jmh.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>appassembler-maven-plugin</artifactId>
         <configuration>
@@ -110,6 +129,10 @@
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkDictionary</mainClass>
               <name>pinot-BenchmarkDictionary</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkObjectOpenHashMap</mainClass>
+              <name>pinot-BenchmarkObjectOpenHashMap</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>

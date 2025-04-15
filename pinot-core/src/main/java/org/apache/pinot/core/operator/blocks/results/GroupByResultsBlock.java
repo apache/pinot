@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -41,6 +42,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -51,6 +53,7 @@ import org.roaringbitmap.RoaringBitmap;
 /**
  * Results block for group-by queries.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
   private final AggregationGroupByResult _aggregationGroupByResult;
@@ -59,6 +62,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 
   private boolean _numGroupsLimitReached;
+  private boolean _numGroupsWarningLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
 
@@ -120,12 +124,30 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return _table;
   }
 
+  public int getNumGroups() {
+    assert _aggregationGroupByResult != null || _intermediateRecords != null
+        : "Should not call getNumGroups() on instance level results";
+    if (_aggregationGroupByResult != null) {
+      return _aggregationGroupByResult.getNumGroups();
+    } else {
+      return _intermediateRecords.size();
+    }
+  }
+
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
   }
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public boolean isNumGroupsWarningLimitReached() {
+    return _numGroupsWarningLimitReached;
+  }
+
+  public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
   }
 
   public int getNumResizes() {
@@ -181,6 +203,10 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     }
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
+    assert aggregationFunctions != null && groupByExpressions != null;
+    int numKeyColumns = groupByExpressions.size();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
     if (_queryContext.isNullHandlingEnabled()) {
@@ -195,13 +221,22 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
-        for (int colId = 0; colId < numColumns; colId++) {
-          Object value = values[colId];
-          if (value == null && storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
-            value = nullPlaceholders[colId];
-            nullBitmaps[colId].add(rowId);
+        for (int i = 0; i < numColumns; i++) {
+          Object value = values[i];
+          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+            if (value == null) {
+              dataTableBuilder.setNull(i);
+            } else {
+              dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
+            }
+          } else {
+            if (value == null) {
+              value = nullPlaceholders[i];
+              nullBitmaps[i].add(rowId);
+            }
+            assert value != null;
+            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
           }
-          setDataTableColumn(storedColumnDataTypes[colId], dataTableBuilder, colId, value);
         }
         dataTableBuilder.finishRow();
         numRowsAdded++;
@@ -215,8 +250,15 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
-        for (int colId = 0; colId < numColumns; colId++) {
-          setDataTableColumn(storedColumnDataTypes[colId], dataTableBuilder, colId, values[colId]);
+        for (int i = 0; i < numColumns; i++) {
+          Object value = values[i];
+          if (value == null) {
+            dataTableBuilder.setNull(i);
+          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+            dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
+          } else {
+            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
+          }
         }
         dataTableBuilder.finishRow();
         numRowsAdded++;
@@ -286,9 +328,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
           dataTableBuilder.setColumn(columnIndex, (String[]) value);
         }
         break;
-      case OBJECT:
-        dataTableBuilder.setColumn(columnIndex, value);
-        break;
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedColumnDataType);
     }
@@ -299,6 +338,9 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     Map<String, String> metadata = super.getResultsMetadata();
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+    }
+    if (_numGroupsWarningLimitReached) {
+      metadata.put(MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
     }
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));

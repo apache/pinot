@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.net.URISyntaxException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -46,8 +47,7 @@ public class SegmentCommitterFactory {
     _logger = segmentLogger;
     _protocolHandler = protocolHandler;
     _tableConfig = tableConfig;
-    _streamConfig = new StreamConfig(_tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    _streamConfig = IngestionConfigUtils.getFirstStreamConfig(tableConfig);
     _indexLoadingConfig = indexLoadingConfig;
     _serverMetrics = serverMetrics;
   }
@@ -79,6 +79,10 @@ public class SegmentCommitterFactory {
           _protocolHandler.getAuthProvider(), _tableConfig.getTableName());
     }
 
+    if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+      return new PauselessSegmentCommitter(_logger, _protocolHandler, params, segmentUploader,
+          peerSegmentDownloadScheme);
+    }
     return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
   }
 }

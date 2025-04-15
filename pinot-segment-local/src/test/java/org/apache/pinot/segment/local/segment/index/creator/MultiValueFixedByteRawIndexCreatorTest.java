@@ -30,41 +30,44 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
-public class MultiValueFixedByteRawIndexCreatorTest {
 
-  private static final String OUTPUT_DIR =
-      System.getProperty("java.io.tmpdir") + File.separator + "mvFixedRawTest";
+public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
-  private static final Random RANDOM = new Random();
+  protected static String _outputDir;
+
+  protected static final Random RANDOM = new Random();
 
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
     return Arrays.stream(ChunkCompressionType.values())
-        .flatMap(ct -> IntStream.of(2, 4).boxed()
-            .map(writerVersion -> new Object[]{ct, writerVersion})).toArray(Object[][]::new);
+        .flatMap(ct -> IntStream.rangeClosed(2, 5).boxed().map(writerVersion -> new Object[]{ct, writerVersion}))
+        .toArray(Object[][]::new);
   }
 
   @BeforeClass
   public void setup()
       throws Exception {
-    FileUtils.forceMkdir(new File(OUTPUT_DIR));
+    _outputDir = System.getProperty("java.io.tmpdir") + File.separator + "mvFixedRawTest";
+    FileUtils.forceMkdir(new File(_outputDir));
   }
 
   /**
@@ -72,7 +75,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
    */
   @AfterClass
   public void cleanup() {
-    FileUtils.deleteQuietly(new File(OUTPUT_DIR));
+    FileUtils.deleteQuietly(new File(_outputDir));
   }
 
   @Test(dataProvider = "compressionTypes")
@@ -147,42 +150,48 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         }, compressionType, writerVersion);
   }
 
+  public MultiValueFixedByteRawIndexCreator getMultiValueFixedByteRawIndexCreator(ChunkCompressionType compressionType,
+      String column, int numDocs, DataType dataType, int maxElements, int writerVersion)
+      throws IOException {
+    return new MultiValueFixedByteRawIndexCreator(new File(_outputDir), compressionType, column, numDocs, dataType,
+        maxElements, false, writerVersion, 1024 * 1024, 1000);
+  }
+
   public <T> void testMV(DataType dataType, List<T> inputs, ToIntFunction<T> sizeof, IntFunction<T> constructor,
       Injector<T> injector, Extractor<T> extractor, ChunkCompressionType compressionType, int writerVersion)
       throws IOException {
     String column = "testCol_" + dataType;
     int numDocs = inputs.size();
     int maxElements = inputs.stream().mapToInt(sizeof).max().orElseThrow(RuntimeException::new);
-    File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    file.delete();
-    MultiValueFixedByteRawIndexCreator creator =
-        new MultiValueFixedByteRawIndexCreator(new File(OUTPUT_DIR), compressionType, column, numDocs, dataType,
-            maxElements, false, writerVersion, 1024 * 1024, 1000);
-    inputs.forEach(input -> injector.inject(creator, input));
-    creator.close();
-
-    //read
-    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    ForwardIndexReader reader =
-        writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV4(buffer,
-            dataType.getStoredType(), false) : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType());
-
-    final ForwardIndexReaderContext context = reader.createContext();
-    T valueBuffer = constructor.apply(maxElements);
-    for (int i = 0; i < numDocs; i++) {
-      Assert.assertEquals(inputs.get(i), extractor.extract(reader, context, i, valueBuffer));
+    File file = new File(_outputDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(file);
+    try (MultiValueFixedByteRawIndexCreator creator = getMultiValueFixedByteRawIndexCreator(compressionType, column,
+        numDocs, dataType, maxElements, writerVersion)) {
+      inputs.forEach(input -> injector.inject(creator, input));
     }
 
-    // Value byte range test
-    Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
-    Assert.assertFalse(reader.isFixedOffsetMappingType());
-    final ForwardIndexReaderContext valueRangeContext = reader.createContext();
-    List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
-    for (int i = 0; i < numDocs; i++) {
-      try {
-        reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
-      } catch (Exception e) {
-        Assert.fail("Failed to record byte ranges for docId: " + i, e);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, dataType, false);
+        ForwardIndexReaderContext context = reader.createContext()) {
+      T valueBuffer = constructor.apply(maxElements);
+      for (int i = 0; i < numDocs; i++) {
+        T input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), sizeof.applyAsInt(input));
+        assertEquals(extractor.extract(reader, context, i, valueBuffer), input);
+      }
+
+      // Value byte range test
+      assertTrue(reader.isBufferByteRangeInfoSupported());
+      assertFalse(reader.isFixedOffsetMappingType());
+      List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
+      try (ForwardIndexReaderContext valueRangeContext = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          try {
+            reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
+          } catch (Exception e) {
+            fail("Failed to record byte ranges for docId: " + i, e);
+          }
+        }
       }
     }
   }
@@ -196,14 +205,11 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   }
 
   private static List<int[]> ints(boolean isFixedMVRowLength) {
-    return IntStream.range(0, 1000)
-        .mapToObj(i -> new int[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)])
-        .peek(array -> {
-          for (int i = 0; i < array.length; i++) {
-            array[i] = RANDOM.nextInt();
-          }
-        })
-        .collect(Collectors.toList());
+    return IntStream.range(0, 1000).mapToObj(i -> new int[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)]).peek(array -> {
+      for (int i = 0; i < array.length; i++) {
+        array[i] = RANDOM.nextInt();
+      }
+    }).collect(Collectors.toList());
   }
 
   private static List<long[]> longs(boolean isFixedMVRowLength) {

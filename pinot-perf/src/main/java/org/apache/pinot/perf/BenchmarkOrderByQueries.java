@@ -130,7 +130,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   @Setup
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createLongSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment(FIRST_SEGMENT_NAME);

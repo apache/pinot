@@ -20,7 +20,11 @@ package org.apache.pinot.common.datablock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -29,21 +33,21 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.LongConsumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 public final class DataBlockUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
   /**
    * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
    *
@@ -75,6 +79,8 @@ public final class DataBlockUtils {
    * even for the same format.
    */
   private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
+  private static final Pattern CAUSE_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Caused by: ");
+  private static final Pattern SUPPRESSED_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Suppressed: ");
 
   static {
     SERDES = new EnumMap<>(DataBlockSerde.Version.class);
@@ -97,20 +103,60 @@ public final class DataBlockUtils {
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
-    LOGGER.info("Caught exception while processing query", e);
     if (e instanceof ProcessingException) {
-      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
+      int errorCodeId = ((ProcessingException) e).getErrorCode();
+      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
+    } else if (e instanceof QueryException) {
+      int errorCodeId = ((QueryException) e).getErrorCode().getId();
+      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
     } else {
       // TODO: Pass in meaningful error code.
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
+      return getErrorDataBlock(Map.of(QueryErrorCode.UNKNOWN.getId(), extractErrorMsg(e)));
     }
   }
 
-  private static String extractErrorMsg(Throwable t) {
+  public static String extractErrorMsg(Throwable t) {
     while (t.getCause() != null && t.getMessage() == null) {
       t = t.getCause();
     }
-    return t.getMessage() + "\n" + QueryException.getTruncatedStackTrace(t);
+    return t.getMessage() + "\n" + getTruncatedStackTrace(t);
+  }
+
+  /**
+   * Truncate the stack trace of the given {@link Throwable} to a maximum of 5 lines per frame.
+   * <p>
+   * This method is deprecated because it is not used in the codebase and it is not clear what is the purpose of
+   * truncating the stack trace.
+   * <p>
+   * The method is kept here for reference and in case it is needed in the future.
+   *
+   * @deprecated We still need to think whether and how to send stack traces downstream
+   */
+  @Deprecated
+  private static String getTruncatedStackTrace(Throwable t) {
+    StringWriter stringWriter = new StringWriter();
+    t.printStackTrace(new PrintWriter(stringWriter));
+    String fullStackTrace = stringWriter.toString();
+    String[] lines = StringUtils.split(fullStackTrace, '\n');
+    // exception should at least have one line, no need to check here.
+    StringBuilder sb = new StringBuilder(lines[0]);
+    int lineOfStackTracePerFrame = 1;
+    int maxLinesOfStackTracePerFrame = 5;
+    for (int i = 1; i < lines.length; i++) {
+      if (CAUSE_CAPTION_REGEXP.matcher(lines[i]).find() || SUPPRESSED_CAPTION_REGEXP.matcher(lines[i]).find()) {
+        // reset stack trace print counter when a new cause or suppressed Throwable were found.
+        if (lineOfStackTracePerFrame >= maxLinesOfStackTracePerFrame) {
+          sb.append('\n').append("...");
+        }
+        sb.append('\n').append(lines[i]);
+        lineOfStackTracePerFrame = 1;
+      } else if (lineOfStackTracePerFrame < maxLinesOfStackTracePerFrame) {
+        // only print numLinesOfStackTrace stack trace and ignore any additional lines.
+        sb.append('\n').append(lines[i]);
+        lineOfStackTracePerFrame++;
+      }
+    }
+    return sb.toString();
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
@@ -167,6 +213,21 @@ public final class DataBlockUtils {
     ArrayList<ByteBuffer> result = new ArrayList<>();
     dataBuffer.appendAsByteBuffers(result);
     return result;
+  }
+
+  public static ByteString toByteString(DataBlock dataBlock)
+      throws IOException {
+    List<ByteBuffer> bytes = dataBlock.serialize();
+    ByteString byteString;
+    if (bytes.isEmpty()) {
+      byteString = ByteString.EMPTY;
+    } else {
+      byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+      for (int i = 1; i < bytes.size(); i++) {
+        byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
+      }
+    }
+    return byteString;
   }
 
   /**

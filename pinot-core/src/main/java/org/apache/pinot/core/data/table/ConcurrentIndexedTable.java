@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -32,14 +33,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
 
-  public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold) {
-    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold);
-  }
-
   public ConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new ConcurrentHashMap<>());
+      int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
+        new ConcurrentHashMap<>(initialCapacity), executorService);
   }
 
   /**

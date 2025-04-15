@@ -40,7 +40,6 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -51,6 +50,7 @@ import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -117,7 +117,7 @@ public class PrioritySchedulerTest {
     for (ListenableFuture<byte[]> result : results) {
       DataTable table = DataTableFactory.getDataTable(result.get());
       hasServerShuttingDownError +=
-          table.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()) ? 1 : 0;
+          table.getExceptions().containsKey(QueryErrorCode.SERVER_SHUTTING_DOWN.getId()) ? 1 : 0;
     }
     assertTrue(hasServerShuttingDownError > 0);
   }
@@ -213,7 +213,7 @@ public class PrioritySchedulerTest {
     group.addLast(createQueryRequest("1", METRICS));
     results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
-    assertTrue(dataTable.getExceptions().containsKey(QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
+    assertTrue(dataTable.getExceptions().containsKey(QueryErrorCode.SERVER_OUT_OF_CAPACITY.getId()));
     scheduler.stop();
   }
 
@@ -224,7 +224,7 @@ public class PrioritySchedulerTest {
     ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
-    assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
+    assertTrue(response.getExceptions().containsKey(QueryErrorCode.SERVER_SHUTTING_DOWN.getId()));
     assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
     scheduler.stop();
   }
@@ -284,6 +284,11 @@ public class PrioritySchedulerTest {
 
     @Override
     public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics) {
+    }
+
+    @Override
+    public InstanceDataManager getInstanceDataManager() {
+      throw new UnsupportedOperationException();
     }
 
     @Override

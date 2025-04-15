@@ -3,6 +3,7 @@ cscope.*
 .project
 .svn
 .java-version
+.sdkmanrc
 .externalToolBuilders/
 maven-eclipse.xml
 target/
@@ -56,3 +57,4 @@ kubernetes/helm/**/Chart.lock
 
 #Develocity
 .mvn/.gradle-enterprise/
+.mvn/.develocity/

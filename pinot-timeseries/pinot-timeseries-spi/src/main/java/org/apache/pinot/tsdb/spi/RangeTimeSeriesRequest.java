@@ -48,6 +48,9 @@ import java.time.Duration;
  * </ul>
  */
 public class RangeTimeSeriesRequest {
+  // TODO: It's not ideal to have another default, that plays with numGroupsLimit, etc.
+  public static final int DEFAULT_SERIES_LIMIT = 100_000;
+  public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
   /** Engine allows a Pinot cluster to support multiple Time-Series Query Languages. */
   private final String _language;
   /** Query is the raw query sent by the caller. */
@@ -63,11 +66,15 @@ public class RangeTimeSeriesRequest {
   private final long _stepSeconds;
   /** E2E timeout for the query. */
   private final Duration _timeout;
+  /** Series limit for the query */
+  private final int _limit;
+  /** The numGroupsLimit value used in Pinot's Grouping Algorithm. */
+  private final int _numGroupsLimit;
   /** Full query string to allow language implementations to pass custom parameters. */
   private final String _fullQueryString;
 
   public RangeTimeSeriesRequest(String language, String query, long startSeconds, long endSeconds, long stepSeconds,
-      Duration timeout, String fullQueryString) {
+      Duration timeout, int limit, int numGroupsLimit, String fullQueryString) {
     Preconditions.checkState(endSeconds >= startSeconds, "Invalid range. startSeconds "
         + "should be greater than or equal to endSeconds. Found startSeconds=%s and endSeconds=%s",
         startSeconds, endSeconds);
@@ -77,6 +84,8 @@ public class RangeTimeSeriesRequest {
     _endSeconds = endSeconds;
     _stepSeconds = stepSeconds;
     _timeout = timeout;
+    _limit = limit;
+    _numGroupsLimit = numGroupsLimit;
     _fullQueryString = fullQueryString;
   }
 
@@ -102,6 +111,14 @@ public class RangeTimeSeriesRequest {
 
   public Duration getTimeout() {
     return _timeout;
+  }
+
+  public int getLimit() {
+    return _limit;
+  }
+
+  public int getNumGroupsLimit() {
+    return _numGroupsLimit;
   }
 
   public String getFullQueryString() {

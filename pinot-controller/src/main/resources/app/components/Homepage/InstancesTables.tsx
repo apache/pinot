@@ -20,15 +20,17 @@
 import React from 'react';
 import { startCase } from 'lodash';
 import { AsyncInstanceTable } from '../AsyncInstanceTable';
-import { InstanceType } from 'Models';
+import { DataTable, InstanceType } from 'Models';
 
 type Props = {
   clusterName: string;
   instanceType?: InstanceType;
+  instances: DataTable;
+  liveInstanceNames: string[] | null;
 };
 
 
-const Instances = ({ clusterName, instanceType }: Props) => {
+const Instances = ({ instanceType, instances, liveInstanceNames }: Props) => {
   const order = [
     InstanceType.CONTROLLER,
     InstanceType.BROKER,
@@ -43,9 +45,10 @@ const Instances = ({ clusterName, instanceType }: Props) => {
           return (
             <AsyncInstanceTable
               key={startCase(key)}
-              cluster={clusterName}
               instanceType={key}
               showInstanceDetails
+              instanceNames={instances?.[key] || null}
+              liveInstanceNames={liveInstanceNames || null}
             />
           );
         })}

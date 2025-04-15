@@ -22,12 +22,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
 import java.net.URL;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -37,8 +37,11 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -46,17 +49,18 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class BitmapInvertedIndexTest {
+public class BitmapInvertedIndexTest implements PinotBuffersAfterClassCheckRule {
   private static final String AVRO_FILE_PATH = "data" + File.separator + "test_sample_data.avro";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), BitmapInvertedIndexTest.class.getSimpleName());
-  private static final Set<String> INVERTED_INDEX_COLUMNS = new HashSet<String>(3) {
-    {
-      add("time_day");            // INT, cardinality 1
-      add("column10");            // STRING, cardinality 27
-      add("met_impressionCount"); // LONG, cardinality 21
-    }
-  };
+  private static final String RAW_TABLE_NAME = "testTable";
+  //@formatter:off
+  private static final List<String> INVERTED_INDEX_COLUMNS = List.of(
+      "time_day",           // INT, cardinality 1
+      "column10",           // STRING, cardinality 27
+      "met_impressionCount" // LONG, cardinality 21
+  );
+  //@formatter:on
 
   private File _avroFile;
   private File _segmentDirectory;
@@ -71,7 +75,7 @@ public class BitmapInvertedIndexTest {
     _avroFile = new File(resourceUri);
 
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "myTable");
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, RAW_TABLE_NAME);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
@@ -88,9 +92,10 @@ public class BitmapInvertedIndexTest {
 
   private void testBitmapInvertedIndex(ReadMode readMode)
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(INVERTED_INDEX_COLUMNS).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, null);
     indexLoadingConfig.setReadMode(readMode);
-    indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
 
     // Compare the loaded inverted index with the record in avro file
@@ -130,6 +135,8 @@ public class BitmapInvertedIndexTest {
         }
       }
     }
+
+    indexSegment.destroy();
   }
 
   @AfterClass

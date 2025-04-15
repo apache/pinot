@@ -69,6 +69,9 @@ public class GapfillProcessor extends BaseGapfillProcessor {
    */
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
+    replaceColumnNameWithAlias(dataSchema);
+    _timeBucketColumnIndex = getTimeBucketColumnIndexFromBrokerResponse(dataSchema);
+
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
@@ -97,8 +100,6 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
 
     List<Object[]>[] timeBucketedRawRows = putRawRowsIntoTimeBucket(brokerResponseNative.getResultTable().getRows());
-
-    replaceColumnNameWithAlias(dataSchema);
 
     if (_queryContext.getAggregationFunctions() == null) {
       Map<String, Integer> sourceColumnsIndexes = new HashMap<>();
@@ -180,7 +181,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
           resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
         }
 
-        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[0]));
+        long timeCol = _dateTimeFormatter.fromFormatToMillis(String.valueOf(resultRow[_timeBucketColumnIndex]));
         if (timeCol > bucketTime) {
           break;
         }
@@ -204,11 +205,14 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       Object[] gapfillRow = new Object[numResultColumns];
       int keyIndex = 0;
       if (resultColumnDataTypes[_timeBucketColumnIndex] == ColumnDataType.LONG) {
-        gapfillRow[0] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
+        gapfillRow[_timeBucketColumnIndex] = Long.valueOf(_dateTimeFormatter.fromMillisToFormat(bucketTime));
       } else {
-        gapfillRow[0] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
+        gapfillRow[_timeBucketColumnIndex] = _dateTimeFormatter.fromMillisToFormat(bucketTime);
       }
-      for (int i = 1; i < _isGroupBySelections.length; i++) {
+      for (int i = 0; i < _isGroupBySelections.length; i++) {
+        if (i == _timeBucketColumnIndex) {
+          continue;
+        }
         if (_isGroupBySelections[i]) {
           gapfillRow[i] = key.getValues()[keyIndex++];
         } else {
@@ -271,7 +275,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
 
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
           new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i,
               _queryContext.isNullHandlingEnabled()));

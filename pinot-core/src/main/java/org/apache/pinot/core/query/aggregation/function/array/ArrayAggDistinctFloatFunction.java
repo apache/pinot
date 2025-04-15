@@ -19,14 +19,17 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatOpenHashSet> {
+public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatSet> {
   public ArrayAggDistinctFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -36,14 +39,15 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     float[] value = blockValSet.getFloatValuesSV();
-    FloatOpenHashSet valueArray = new FloatOpenHashSet(length);
+    FloatOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+        : new FloatOpenHashSet(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
+        valueSet.add(value[i]);
       }
     });
-    aggregationResultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
@@ -54,5 +58,16 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(FloatSet floatSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatSet.getValue(),
+        ObjectSerDeUtils.FLOAT_SET_SER_DE.serialize(floatSet));
+  }
+
+  @Override
+  public FloatSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FLOAT_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

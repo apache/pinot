@@ -39,7 +39,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,6 +50,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,8 +119,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     _reusableRecord = new GenericData.Record(_avroSchema);
 
     // Create tmp dir
-    _stagingDir = new File(FileUtils.getTempDirectory(),
-        String.format("segment_writer_staging_%s_%d", _tableNameWithType, System.currentTimeMillis()));
+    _stagingDir = new File(FileUtils.getTempDirectory(), "segment_writer_staging_" + _tableNameWithType + "_"
+        + System.currentTimeMillis());
     Preconditions.checkState(_stagingDir.mkdirs(), "Failed to create staging dir: %s", _stagingDir.getAbsolutePath());
 
     // Create buffer file
@@ -141,6 +141,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   @Override
   public void collect(GenericRow row)
       throws IOException {
+    // TODO: Revisit whether we should transform the row
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _recordWriter.append(_reusableRecord);
@@ -197,14 +198,14 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
       if (segmentTarFile.exists()) {
         if (!_batchConfig.isOverwriteOutput()) {
-          throw new IllegalArgumentException(String.format("Duplicate segment name generated '%s' in '%s', please "
-              + "adjust segment name generator config to avoid duplicates, or allow batch config overwrite",
-              segmentName, _outputDirURI));
+          throw new IllegalArgumentException("Duplicate segment name generated '" + segmentName + "' in '"
+              + _outputDirURI + "', please adjust segment name generator config to avoid duplicates, or allow batch "
+              + "config overwrite");
         } else {
-          LOGGER.warn(String.format("Duplicate segment name detected '%s' in file '%s', deleting old segment",
-              segmentName, segmentDir));
+          LOGGER.warn("Duplicate segment name detected '" + segmentName + "' in file '" + segmentDir + "', deleting "
+              + "old segment");
           if (segmentTarFile.delete()) {
-            LOGGER.warn(String.format("Segment file deleted: '%s/%s'", _outputDirURI, segmentName));
+            LOGGER.warn("Segment file deleted: '" + _outputDirURI + "/" + segmentName + "'");
           }
         }
       }

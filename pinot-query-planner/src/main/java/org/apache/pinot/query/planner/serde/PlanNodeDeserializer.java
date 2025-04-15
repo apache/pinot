@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,7 +87,8 @@ public class PlanNodeDeserializer {
     return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
-        convertAggType(protoAggregateNode.getAggType()));
+        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit());
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
@@ -104,8 +106,10 @@ public class PlanNodeDeserializer {
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
+    List<PlanNode> planNodes = extractInputs(protoNode);
+    Preconditions.checkState(planNodes.isEmpty(), "MailboxReceiveNode should not have inputs but has: %s", planNodes);
     Plan.MailboxReceiveNode protoMailboxReceiveNode = protoNode.getMailboxReceiveNode();
-    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
+    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoMailboxReceiveNode.getSenderStageId(), convertExchangeType(protoMailboxReceiveNode.getExchangeType()),
         convertDistributionType(protoMailboxReceiveNode.getDistributionType()), protoMailboxReceiveNode.getKeysList(),
         convertCollations(protoMailboxReceiveNode.getCollationsList()), protoMailboxReceiveNode.getSort(),
@@ -114,8 +118,18 @@ public class PlanNodeDeserializer {
 
   private static MailboxSendNode deserializeMailboxSendNode(Plan.PlanNode protoNode) {
     Plan.MailboxSendNode protoMailboxSendNode = protoNode.getMailboxSendNode();
+
+    List<Integer> receiverIds;
+    List<Integer> protoReceiverIds = protoMailboxSendNode.getReceiverStageIdsList();
+    if (protoReceiverIds == null || protoReceiverIds.isEmpty()) {
+      // This should only happen if a not updated broker sends the request
+      receiverIds = List.of(protoMailboxSendNode.getReceiverStageId());
+    } else {
+      receiverIds = protoReceiverIds;
+    }
+
     return new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
-        protoMailboxSendNode.getReceiverStageId(), convertExchangeType(protoMailboxSendNode.getExchangeType()),
+        receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
         protoMailboxSendNode.getSort());

@@ -28,11 +28,9 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -43,7 +41,9 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,13 +115,21 @@ public abstract class QueryScheduler {
   /**
    * Create a future task for the query
    * @param queryRequest incoming query request
-   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor
+   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor.
+   *                        This is not the executor that runs the returned future task but the one that can be
+   *                        internally used to parallelize query processing.
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
-   * should be executed on a different executor service than {@code e} to avoid deadlock.
+   * should be executed on a different executor service than {@code executorService} to avoid deadlock.
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
-    return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
+    @Nullable
+    QueryThreadContext.Memento memento = QueryThreadContext.isInitialized() ? QueryThreadContext.createMemento() : null;
+    return ListenableFutureTask.create(() -> {
+      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(memento)) {
+        return processQueryAndSerialize(queryRequest, executorService);
+      }
+    });
   }
 
   /**
@@ -136,20 +144,20 @@ public abstract class QueryScheduler {
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
 
-    _latestQueryTime.accumulate(System.currentTimeMillis());
-    InstanceResponseBlock instanceResponse;
     try {
-      instanceResponse = _queryExecutor.execute(queryRequest, executorService);
-    } catch (Exception e) {
-      LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
-          queryRequest.getBrokerId(), e);
-      // For not handled exceptions
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      instanceResponse = new InstanceResponseBlock();
-      instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-    }
+      _latestQueryTime.accumulate(System.currentTimeMillis());
+      InstanceResponseBlock instanceResponse;
+      try {
+        instanceResponse = _queryExecutor.execute(queryRequest, executorService);
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
+            queryRequest.getBrokerId(), e);
+        // For not handled exceptions
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+        instanceResponse = new InstanceResponseBlock();
+        instanceResponse.addException(QueryErrorCode.INTERNAL, e.getMessage());
+      }
 
-    try {
       long requestId = queryRequest.getRequestId();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
@@ -164,15 +172,15 @@ public abstract class QueryScheduler {
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
       if (maxResponseSizeBytes != null && responseBytes != null && responseBytes.length > maxResponseSizeBytes) {
-        String errMsg =
-            String.format("Serialized query response size %d exceeds threshold %d for requestId %d from broker %s",
-                responseBytes.length, maxResponseSizeBytes, queryRequest.getRequestId(), queryRequest.getBrokerId());
+        String errMsg = "Serialized query response size " + responseBytes.length + " exceeds threshold "
+            + maxResponseSizeBytes + " for requestId " + queryRequest.getRequestId() + " from broker "
+            + queryRequest.getBrokerId();
         LOGGER.error(errMsg);
         _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
             ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
 
         instanceResponse = new InstanceResponseBlock();
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
+        instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
@@ -221,10 +229,11 @@ public abstract class QueryScheduler {
       responseByte = instanceResponse.toDataTable().toBytes();
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      String errMsg =
+      String userMsg =
           "Cancelled while building data table" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg);
-      LOGGER.error(errMsg);
-      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(errMsg, e)));
+      LOGGER.error(userMsg);
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
+      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
       instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
       return serializeResponse(queryRequest, instanceResponse);
     } catch (Exception e) {
@@ -245,10 +254,18 @@ public abstract class QueryScheduler {
    * query can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
-      ProcessingException error) {
+      QueryErrorCode errorCode) {
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-    instanceResponse.addException(error);
+    instanceResponse.addException(errorCode, errorCode.getDefaultMessage());
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
+  }
+
+  protected ListenableFuture<byte[]> shuttingDown(ServerQueryRequest queryRequest) {
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_SHUTTING_DOWN);
+  }
+
+  protected ListenableFuture<byte[]> outOfCapacity(ServerQueryRequest queryRequest) {
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_OUT_OF_CAPACITY);
   }
 }

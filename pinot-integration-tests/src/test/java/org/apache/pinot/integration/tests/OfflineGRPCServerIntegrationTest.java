@@ -35,8 +35,8 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
-import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.DataTableReducer;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.reduce.ResultReducerFactory;
@@ -60,7 +60,7 @@ import static org.testng.Assert.*;
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT =
-      new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000);
+      new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000, 128);
 
   @BeforeClass
   public void setUp()
@@ -96,19 +96,19 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     waitForAllDocsLoaded(600_000L);
   }
 
-  public GrpcQueryClient getGrpcQueryClient() {
-    return new GrpcQueryClient("localhost", getServerGrpcPort());
+  public ServerGrpcQueryClient getGrpcQueryClient() {
+    return new ServerGrpcQueryClient("localhost", getServerGrpcPort());
   }
 
   @Test
   public void testGrpcQueryServer()
       throws Exception {
-    GrpcQueryClient queryClient = getGrpcQueryClient();
+    ServerGrpcQueryClient queryClient = getGrpcQueryClient();
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000 OPTION(timeoutMs=30000)";
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
 
-    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
+    ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSegments(segments);
     testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
     testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
 
@@ -121,9 +121,9 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @Test(dataProvider = "provideSqlTestCases")
   public void testQueryingGrpcServer(String sql)
       throws Exception {
-    try (GrpcQueryClient queryClient = getGrpcQueryClient()) {
+    try (ServerGrpcQueryClient queryClient = getGrpcQueryClient()) {
       List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
-      GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSql(sql).setSegments(segments);
+      ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSql(sql).setSegments(segments);
       DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.build()));
       collectAndCompareResult(sql, queryClient.submit(requestBuilder.setEnableStreaming(true).build()), dataTable);
     }

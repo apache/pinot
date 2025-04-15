@@ -57,7 +57,7 @@ abstract class BaseGapfillProcessor {
   protected final Map<Key, Object[]> _previousByGroupKey;
   protected long _count = 0;
   protected final List<ExpressionContext> _timeSeries;
-  protected final int _timeBucketColumnIndex;
+  protected int _timeBucketColumnIndex;
   protected GapfillFilterHandler _postGapfillFilterHandler = null;
   protected GapfillFilterHandler _postAggregateHavingFilterHandler = null;
   protected final int _aggregationSize;
@@ -146,6 +146,9 @@ abstract class BaseGapfillProcessor {
    */
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
+    replaceColumnNameWithAlias(dataSchema);
+    _timeBucketColumnIndex = getTimeBucketColumnIndexFromBrokerResponse(dataSchema);
+
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
@@ -174,7 +177,6 @@ abstract class BaseGapfillProcessor {
     }
 
     List<Object[]> rows = brokerResponseNative.getResultTable().getRows();
-    replaceColumnNameWithAlias(dataSchema);
     List<Object[]> resultRows = gapFillAndAggregate(rows, dataSchema, resultTableSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
@@ -207,6 +209,27 @@ abstract class BaseGapfillProcessor {
       }
     }
     return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  /**
+   * This method returns the time bucket column for broker response since for cases where gapfill contains a subquery
+   * to be evaluated (AGGREGATE_GAP_FILL and AGGREGATE_GAP_FILL_AGGREGATE), the time column may or may not the first
+   * column in the result set, hence the index of the time column in the result set needs to be determined dynamically.
+   */
+  protected int getTimeBucketColumnIndexFromBrokerResponse(DataSchema dataSchema) {
+    if (_gapfillType != GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
+        && _gapfillType != GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      return _timeBucketColumnIndex;
+    }
+    String timeBucketColumnName = _gapFillSelection.getFunction().getArguments().get(0).getIdentifier();
+
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
+      if (dataSchema.getColumnName(i).equals(timeBucketColumnName)) {
+        return i;
+      }
+    }
+
+    throw new UnsupportedOperationException("Time column not found in the result set.");
   }
 
   protected Key constructGroupKeys(Object[] row) {

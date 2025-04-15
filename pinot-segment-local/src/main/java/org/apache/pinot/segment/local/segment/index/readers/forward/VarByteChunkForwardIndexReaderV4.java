@@ -67,8 +67,7 @@ public class VarByteChunkForwardIndexReaderV4
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
-    int version = dataBuffer.getInt(0);
-    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.VERSION, "Illegal index version: %s", version);
+    validateIndexVersion(dataBuffer);
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
@@ -79,6 +78,15 @@ public class VarByteChunkForwardIndexReaderV4
     _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
     _isSingleValue = isSingleValue;
+  }
+
+  public void validateIndexVersion(PinotDataBuffer dataBuffer) {
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkState(version == getVersion(), "Illegal index version: %s", version);
+  }
+
+  public int getVersion() {
+    return VarByteChunkForwardIndexWriterV4.VERSION;
   }
 
   @Override
@@ -189,6 +197,11 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public byte[][] getBytesMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
     return ArraySerDeUtils.deserializeBytesArray(context.getValue(docId));
+  }
+
+  @Override
+  public int getNumValuesMV(int docId, ReaderContext context) {
+    return ByteBuffer.wrap(context.getValue(docId)).getInt();
   }
 
   @Override
@@ -326,7 +339,6 @@ public class VarByteChunkForwardIndexReaderV4
   private static final class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
-    private List<ByteRange> _ranges;
 
     UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       super(chunks, metadata, chunkStartOffset);
@@ -371,6 +383,7 @@ public class VarByteChunkForwardIndexReaderV4
     private final ByteBuffer _decompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
+    private boolean _closed;
 
     CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,
         ChunkDecompressor chunkDecompressor, ChunkCompressionType chunkCompressionType, int targetChunkSize) {
@@ -436,6 +449,10 @@ public class VarByteChunkForwardIndexReaderV4
 
     @Override
     public void close() {
+      if (_closed) {
+        return;
+      }
+      _closed = true;
       CleanerUtil.cleanQuietly(_decompressedBuffer);
     }
   }
