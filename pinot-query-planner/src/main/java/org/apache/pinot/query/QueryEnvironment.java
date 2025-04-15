@@ -621,7 +621,7 @@ public class QueryEnvironment {
         // so we don't need to create a new cluster.
         RelNode unoptimizedRelNode = getUnoptimizedRelRoot().rel;
         // Important & tricky: RelOptUtil uses thread local. Therefore we need to initialize the cluster here
-        if (RelMetadataQueryBase.THREAD_PROVIDERS.get() != null) {
+        if (RelMetadataQueryBase.THREAD_PROVIDERS.get() == null) {
           RexBuilder rexBuilder = new RexBuilder(_typeFactory);
           // When the cluster is created, Calcite updates RelMetadataQueryBase.THREAD_PROVIDERS
           RelOptCluster.create(_plannerContext.getRelOptPlanner(), rexBuilder);
