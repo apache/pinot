@@ -16,10 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.dedup;
+package org.apache.pinot.spi.utils;
 
-class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
-  protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
-    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _context);
+import java.util.function.BooleanSupplier;
+
+
+/**
+ * This enum is used to represent the enablement status of a feature.
+ * It can be used to enable, disable, or use the default instance level enablement of a feature.
+ */
+public enum Enablement {
+  ENABLE,   // Enable a feature
+  DISABLE,  // Disable a feature
+  DEFAULT;  // Use the default enablement of the feature
+
+  public boolean isEnabled(boolean defaultValue) {
+    if (this == ENABLE) {
+      return true;
+    }
+    if (this == DISABLE) {
+      return false;
+    }
+    return defaultValue;
+  }
+
+  public boolean isEnabled(BooleanSupplier defaultValueSupplier) {
+    if (this == ENABLE) {
+      return true;
+    }
+    if (this == DISABLE) {
+      return false;
+    }
+    return defaultValueSupplier.getAsBoolean();
   }
 }

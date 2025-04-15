@@ -19,16 +19,15 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server.Upsert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,17 +38,16 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   protected String _tableNameWithType;
   protected UpsertContext _context;
-  protected UpsertConfig.ConsistencyMode _consistencyMode;
-  protected boolean _enablePreload;
-  protected boolean _enableDeletedKeysCompactionConsistency;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
+  public void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
+      TableDataManager tableDataManager) {
     _tableNameWithType = tableConfig.getTableName();
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    Preconditions.checkArgument(upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE,
+    Preconditions.checkArgument(tableConfig.isUpsertEnabled(),
         "Upsert must be enabled for table: %s", _tableNameWithType);
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
@@ -57,7 +55,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (comparisonColumns == null) {
-      comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
+      comparisonColumns = List.of(tableConfig.getValidationConfig().getTimeColumnName());
     }
 
     PartialUpsertHandler partialUpsertHandler = null;
@@ -65,39 +63,77 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       partialUpsertHandler = new PartialUpsertHandler(schema, comparisonColumns, upsertConfig);
     }
 
-    String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-    HashFunction hashFunction = upsertConfig.getHashFunction();
-    boolean enableSnapshot = upsertConfig.isEnableSnapshot();
-    _enablePreload =
-        enableSnapshot && upsertConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
+    boolean enableSnapshot = upsertConfig.getSnapshot()
+        .isEnabled(() -> instanceUpsertConfig.getProperty(Upsert.DEFAULT_ENABLE_SNAPSHOT, false));
+    boolean enablePreload = upsertConfig.getPreload()
+        .isEnabled(() -> instanceUpsertConfig.getProperty(Upsert.DEFAULT_ENABLE_PRELOAD, false));
+    if (enablePreload) {
+      if (!enableSnapshot) {
+        LOGGER.warn("Preload cannot be enabled without snapshot for table: {}", _tableNameWithType);
+        enablePreload = false;
+      }
+      if (tableDataManager.getSegmentPreloadExecutor() == null) {
+        LOGGER.warn("Preload cannot be enabled without segment preload executor for table: {}", _tableNameWithType);
+        enablePreload = false;
+      }
+    }
+
     double metadataTTL = upsertConfig.getMetadataTTL();
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
-    _enableDeletedKeysCompactionConsistency = upsertConfig.isEnableDeletedKeysCompactionConsistency();
-    _consistencyMode = upsertConfig.getConsistencyMode();
-    if (_consistencyMode == null) {
-      _consistencyMode = UpsertConfig.ConsistencyMode.NONE;
+    boolean enableDeletedKeysCompactionConsistency = upsertConfig.isEnableDeletedKeysCompactionConsistency();
+    if (enableDeletedKeysCompactionConsistency) {
+      if (!enableSnapshot) {
+        LOGGER.warn("Deleted keys compaction consistency cannot be enabled without snapshot for table: {}",
+            _tableNameWithType);
+        enableDeletedKeysCompactionConsistency = false;
+      }
+      if (enablePreload) {
+        LOGGER.warn("Deleted keys compaction consistency cannot be enabled with preload for table: {}",
+            _tableNameWithType);
+        enableDeletedKeysCompactionConsistency = false;
+      }
+      if (metadataTTL > 0) {
+        LOGGER.warn("Deleted keys compaction consistency cannot be enabled with metadata TTL for table: {}",
+            _tableNameWithType);
+        enableDeletedKeysCompactionConsistency = false;
+      }
+      if (deletedKeysTTL <= 0) {
+        LOGGER.warn("Deleted keys compaction consistency cannot be enabled without deleted keys TTL for table: {}",
+            _tableNameWithType);
+        enableDeletedKeysCompactionConsistency = false;
+      }
     }
-    long upsertViewRefreshIntervalMs = upsertConfig.getUpsertViewRefreshIntervalMs();
-    long newSegmentTrackingTimeMs = upsertConfig.getNewSegmentTrackingTimeMs();
-    File tableIndexDir = tableDataManager.getTableDataDir();
-    _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
-        .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
-        .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
-        .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot)
-        .setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
-        .setConsistencyMode(_consistencyMode).setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs)
-        .setNewSegmentTrackingTimeMs(newSegmentTrackingTimeMs).setTableIndexDir(tableIndexDir)
+
+    // NOTE: This field doesn't follow enablement override, and always take instance config if set to true.
+    boolean allowPartialUpsertConsumptionDuringCommit = upsertConfig.isAllowPartialUpsertConsumptionDuringCommit();
+    if (!allowPartialUpsertConsumptionDuringCommit) {
+      allowPartialUpsertConsumptionDuringCommit =
+          instanceUpsertConfig.getProperty(Upsert.DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT, false);
+    }
+
+    _context = new UpsertContext.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(upsertConfig.getHashFunction())
+        .setComparisonColumns(comparisonColumns)
+        .setPartialUpsertHandler(partialUpsertHandler)
+        .setDeleteRecordColumn(upsertConfig.getDeleteRecordColumn())
         .setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
-        .setEnableDeletedKeysCompactionConsistency(_enableDeletedKeysCompactionConsistency)
-        .setTableDataManager(tableDataManager).build();
-    LOGGER.info(
-        "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
-            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, new segment tracking"
-            + " time: {}ms, table index dir: {}", getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns,
-        comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot, _enablePreload,
-        metadataTTL, deletedKeysTTL, _consistencyMode, upsertViewRefreshIntervalMs, newSegmentTrackingTimeMs,
-        tableIndexDir);
+        .setOutOfOrderRecordColumn(upsertConfig.getOutOfOrderRecordColumn())
+        .setEnableSnapshot(enableSnapshot)
+        .setEnablePreload(enablePreload)
+        .setMetadataTTL(metadataTTL)
+        .setDeletedKeysTTL(deletedKeysTTL)
+        .setEnableDeletedKeysCompactionConsistency(enableDeletedKeysCompactionConsistency)
+        .setConsistencyMode(upsertConfig.getConsistencyMode())
+        .setUpsertViewRefreshIntervalMs(upsertConfig.getUpsertViewRefreshIntervalMs())
+        .setNewSegmentTrackingTimeMs(upsertConfig.getNewSegmentTrackingTimeMs())
+        .setMetadataManagerConfigs(upsertConfig.getMetadataManagerConfigs())
+        .setAllowPartialUpsertConsumptionDuringCommit(allowPartialUpsertConsumptionDuringCommit)
+        .build();
+    LOGGER.info("Initialized {} for table: {} with: {}", getClass().getSimpleName(), _tableNameWithType, _context);
 
     initCustomVariables();
   }
@@ -110,17 +146,25 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   }
 
   @Override
-  public UpsertConfig.Mode getUpsertMode() {
-    return _context.getPartialUpsertHandler() == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+  public UpsertContext getContext() {
+    return _context;
   }
 
+  @Deprecated
+  @Override
+  public UpsertConfig.Mode getUpsertMode() {
+    return _context.getUpsertMode();
+  }
+
+  @Deprecated
   @Override
   public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
-    return _consistencyMode;
+    return _context.getConsistencyMode();
   }
 
+  @Deprecated
   @Override
   public boolean isEnablePreload() {
-    return _enablePreload;
+    return _context.isPreloadEnabled();
   }
 }

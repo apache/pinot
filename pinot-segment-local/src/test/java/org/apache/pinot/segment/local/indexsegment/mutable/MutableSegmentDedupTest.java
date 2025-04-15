@@ -23,11 +23,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -35,8 +34,6 @@ import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -44,37 +41,46 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRule {
+
+public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR =
-      new File(FileUtils.getTempDirectory(), MutableSegmentDedupeTest.class.getSimpleName());
+      new File(FileUtils.getTempDirectory(), MutableSegmentDedupTest.class.getSimpleName());
   private static final String SCHEMA_FILE_PATH = "data/test_dedup_schema.json";
   private static final String DATA_FILE_PATH = "data/test_dedup_data.json";
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String TIME_COLUMN = "secondsSinceEpoch";
+
   private MutableSegmentImpl _mutableSegmentImpl;
 
-  private void setup(boolean dedupEnabled, double metadataTTL, String dedupTimeColumn)
+  private void setup(boolean dedupEnabled, double metadataTTL, @Nullable String dedupTimeColumn)
       throws Exception {
+    FileUtils.forceMkdir(TEMP_DIR);
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     Schema schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(metadataTTL);
+    dedupConfig.setDedupTimeColumn(dedupTimeColumn);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .build();
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, metadataTTL, dedupTimeColumn, false);
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
     try {
-      _mutableSegmentImpl =
-          MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
-              Collections.emptySet(), false, true, null, "secondsSinceEpoch", null, dedupConfig,
-              partitionDedupMetadataManager);
+      _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COLUMN, null,
+          partitionDedupMetadataManager);
       GenericRow reuse = new GenericRow();
       try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
           schema.getColumnNames(), null)) {
@@ -97,25 +103,23 @@ public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRul
   }
 
   @AfterMethod
-  public void tearDown() {
+  public void tearDown()
+      throws IOException {
     if (_mutableSegmentImpl != null) {
       _mutableSegmentImpl.destroy();
       _mutableSegmentImpl = null;
     }
+    FileUtils.forceDelete(TEMP_DIR);
   }
 
   private static TableDedupMetadataManager getTableDedupMetadataManager(Schema schema, DedupConfig dedupConfig) {
-    TableConfig tableConfig = Mockito.mock(TableConfig.class);
-    Mockito.when(tableConfig.getTableName()).thenReturn("testTable_REALTIME");
-    Mockito.when(tableConfig.getDedupConfig()).thenReturn(dedupConfig);
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
-        Mockito.mock(SegmentsValidationAndRetentionConfig.class);
-    Mockito.when(tableConfig.getValidationConfig()).thenReturn(segmentsValidationAndRetentionConfig);
-    Mockito.when(segmentsValidationAndRetentionConfig.getTimeColumnName()).thenReturn("secondsSinceEpoch");
-    TableDataManager tableDataManager = Mockito.mock(TableDataManager.class);
-    Mockito.when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
-    return TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager,
-        Mockito.mock(ServerMetrics.class), null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
+    return TableDedupMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema, tableDataManager);
   }
 
   public List<Map<String, String>> loadJsonFile(String filePath)
@@ -130,7 +134,7 @@ public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRul
   }
 
   @Test
-  public void testDedupeEnabled()
+  public void testDedupEnabled()
       throws Exception {
     setup(true, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
@@ -141,7 +145,7 @@ public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRul
   }
 
   @Test
-  public void testDedupeDisabled()
+  public void testDedupDisabled()
       throws Exception {
     setup(false, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
@@ -161,7 +165,7 @@ public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRul
   @Test
   public void testDedupWithMetadataTTLWithTableTimeColumn()
       throws Exception {
-    setup(true, 1000, "secondsSinceEpoch");
+    setup(true, 1000, TIME_COLUMN);
     checkGeneratedSegmentDataWhenTableTimeColumnIsUsedAsDedupTimeColumn();
   }
 
