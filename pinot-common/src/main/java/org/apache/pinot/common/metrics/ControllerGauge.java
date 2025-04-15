@@ -205,7 +205,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
 
   // ZK JUTE max buffer size in bytes
-  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  // The progress of a certain table rebalance job of a table
+  TABLE_REBALANCE_JOB_ADDITION_PROGRESS_PERCENT("percent", false),
+  TABLE_REBALANCE_JOB_DELETION_PROGRESS_PERCENT("percent", false);
+
 
   private final String _gaugeName;
   private final String _unit;
