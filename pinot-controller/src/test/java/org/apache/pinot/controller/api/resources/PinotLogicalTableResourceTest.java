@@ -61,7 +61,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void tearDown() {
     // cleans up the physical tables after each testcase
     cleanup();
-    System.out.println("abhishek-bafna");
   }
 
   @DataProvider
