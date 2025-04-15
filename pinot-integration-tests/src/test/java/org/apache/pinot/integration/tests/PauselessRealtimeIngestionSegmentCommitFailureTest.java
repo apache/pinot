@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.BaseControllerStarter;
@@ -45,6 +46,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -56,6 +59,9 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(PauselessRealtimeIngestionSegmentCommitFailureTest.class);
+
   private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
 
@@ -136,8 +142,9 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
     addTableConfig(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
-    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 600_000L,
-        "Segments still not in error state");
+    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 10_000L,
+        600_000L, "Segments still not in error state: expected " + MAX_NUMBER_OF_FAILURES + ", found: "
+            + getNumErrorSegmentsInEV(realtimeTableName));
   }
 
   private void setMaxSegmentCompletionTimeMillis() {
@@ -151,17 +158,43 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   private int getNumErrorSegmentsInEV(String realtimeTableName) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
     if (externalView == null) {
+      LOGGER.error("Found NULL EV for resource: {}!", realtimeTableName);
       return 0;
     }
+    if (idealState == null) {
+      LOGGER.error("Found NULL IS for resource: {}!", realtimeTableName);
+    }
     int numErrorSegments = 0;
-    for (Map<String, String> instanceStateMap : externalView.getRecord().getMapFields().values()) {
+    int numNonErrorSegments = 0;
+    for (Map.Entry<String, Map<String, String>> segmentToInstancesStateMap
+        : externalView.getRecord().getMapFields().entrySet()) {
+      String segmentName = segmentToInstancesStateMap.getKey();
+      Map<String, String> instanceStateMap = segmentToInstancesStateMap.getValue();
       for (String state : instanceStateMap.values()) {
         if (state.equals(SegmentStateModel.ERROR)) {
+          LOGGER.error("Segment {} found in ERROR state", segmentName);
           numErrorSegments++;
+        } else {
+          LOGGER.error("Segment {} found in {} state", segmentName, state);
+          numNonErrorSegments++;
         }
       }
     }
+    if (idealState != null) {
+      Map<String, Map<String, String>> evEntries = externalView.getRecord().getMapFields();
+      for (String segmentName : idealState.getRecord().getMapFields().keySet()) {
+        if (!evEntries.containsKey(segmentName)) {
+          LOGGER.error("Found segment {} in IS that is not in EV", segmentName);
+        }
+      }
+    }
+    LOGGER.error("Total EV segments: {}, total IS segments: {}, error segments found: {}, non-error segments "
+            + "found: {}, for table: {}",
+        externalView.getRecord().getMapFields().size(),
+        idealState == null ? 0 : idealState.getRecord().getMapFields().size(), numErrorSegments, numNonErrorSegments,
+        realtimeTableName);
     return numErrorSegments;
   }
 
