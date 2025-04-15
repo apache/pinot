@@ -338,7 +338,7 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
   public SchemaConformingTransformerConfig setMergedTextIndexPrefixToExclude(
       Set<String> mergedTextIndexPrefixToExclude) {
     _mergedTextIndexPrefixToExclude = mergedTextIndexPrefixToExclude == null
-        ? _mergedTextIndexPathToExclude : mergedTextIndexPrefixToExclude;
+        ? _mergedTextIndexPrefixToExclude : mergedTextIndexPrefixToExclude;
     return this;
   }
 
