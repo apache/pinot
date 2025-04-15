@@ -137,7 +137,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     addTableConfig(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
     TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 600_000L,
-        "Segments still not in error state");
+        "Segments still not in error state: expected " + MAX_NUMBER_OF_FAILURES + ", found: "
+            + getNumErrorSegmentsInEV(realtimeTableName));
   }
 
   private void setMaxSegmentCompletionTimeMillis() {
