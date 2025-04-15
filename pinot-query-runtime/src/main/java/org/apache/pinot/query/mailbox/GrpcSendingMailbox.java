@@ -102,7 +102,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    _contentObserver.onNext(toMailboxContent(block, serializedStats));
+    for (MailboxContent content: toMailboxContents(block, serializedStats)) {
+      _contentObserver.onNext(content);
+    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
@@ -131,9 +133,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-      _contentObserver.onNext(toMailboxContent(
-          ErrorMseBlock.fromException(new RuntimeException("Cancelled by sender with exception: " + msg, t)),
-          List.of()));
+      MseBlock errorBlock = ErrorMseBlock.fromException(
+          new RuntimeException("Cancelled by sender with exception: " + msg, t));
+      for (MailboxContent content: toMailboxContents(errorBlock, List.of())) {
+        _contentObserver.onNext(content);
+      }
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -157,7 +161,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
         .open(_statusObserver);
   }
 
-  private MailboxContent toMailboxContent(MseBlock block, List<DataBuffer> serializedStats)
+  private List<MailboxContent> toMailboxContents(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
@@ -169,7 +173,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-      return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
+      return List.of(MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build());
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
       throw t;
