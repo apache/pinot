@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.BaseControllerStarter;
@@ -157,13 +158,13 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   private int getNumErrorSegmentsInEV(String realtimeTableName) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
-    ExternalView newExternalView = _helixResourceManager.getTableExternalView(realtimeTableName);
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
     if (externalView == null) {
       LOGGER.error("Found NULL EV for resource: {}!", realtimeTableName);
       return 0;
     }
-    if (!externalView.equals(newExternalView)) {
-      LOGGER.error("******* EV returned from two methods differ!!! ********");
+    if (idealState == null) {
+      LOGGER.error("Found NULL IS for resource: {}!", realtimeTableName);
     }
     int numErrorSegments = 0;
     int numNonErrorSegments = 0;
@@ -181,8 +182,11 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
         }
       }
     }
-    LOGGER.error("Total EV segments: {}, error segments found: {}, non-error segments found: {}, for table: {}",
-        externalView.getRecord().getMapFields().size(), numErrorSegments, numNonErrorSegments, realtimeTableName);
+    LOGGER.error("Total EV segments: {}, total IS segments: {}, error segments found: {}, non-error segments "
+            + "found: {}, for table: {}",
+        externalView.getRecord().getMapFields().size(),
+        idealState == null ? 0 : idealState.getRecord().getMapFields().size(), numErrorSegments, numNonErrorSegments,
+        realtimeTableName);
     return numErrorSegments;
   }
 
