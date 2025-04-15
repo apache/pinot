@@ -518,8 +518,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private void doAddConsumingSegment(String segmentName)
       throws AttemptsExceededException, RetriableOperationException {
-    SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
-    if (zkMetadata == null || zkMetadata.getStatus().isCompleted()) {
+    SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+    if (zkMetadata.getStatus().isCompleted()) {
       // NOTE:
       // 1. When segment is COMMITTING (for pauseless consumption), we still create the RealtimeSegmentDataManager
       //    because there is no guarantee that the segment will be committed soon. This way the slow server can still
