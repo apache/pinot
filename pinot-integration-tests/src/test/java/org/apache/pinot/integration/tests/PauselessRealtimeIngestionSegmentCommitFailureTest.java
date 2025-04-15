@@ -157,17 +157,26 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   private int getNumErrorSegmentsInEV(String realtimeTableName) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
+    ExternalView newExternalView = _helixResourceManager.getTableExternalView(realtimeTableName);
     if (externalView == null) {
       LOGGER.error("Found NULL EV for resource: {}!", realtimeTableName);
       return 0;
     }
+    if (!externalView.equals(newExternalView)) {
+      LOGGER.error("******* EV returned from two methods differ!!! ********");
+    }
     int numErrorSegments = 0;
     int numNonErrorSegments = 0;
-    for (Map<String, String> instanceStateMap : externalView.getRecord().getMapFields().values()) {
+    for (Map.Entry<String, Map<String, String>> segmentToInstancesStateMap
+        : externalView.getRecord().getMapFields().entrySet()) {
+      String segmentName = segmentToInstancesStateMap.getKey();
+      Map<String, String> instanceStateMap = segmentToInstancesStateMap.getValue();
       for (String state : instanceStateMap.values()) {
         if (state.equals(SegmentStateModel.ERROR)) {
+          LOGGER.error("Segment {} found in ERROR state", segmentName);
           numErrorSegments++;
         } else {
+          LOGGER.error("Segment {} found in {} state", segmentName, state);
           numNonErrorSegments++;
         }
       }
