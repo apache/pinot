@@ -178,7 +178,7 @@
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.31.22</aws.sdk.version>
     <azure.sdk.version>1.2.33</azure.sdk.version>
-    <azure.msal4j.version>1.20.0</azure.msal4j.version>
+    <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
