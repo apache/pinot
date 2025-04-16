@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
@@ -53,6 +54,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
   public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
+  public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
 
   private static double _diskUtilizationThreshold;
 
@@ -98,6 +100,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
         preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment()));
+
+    preCheckResult.put(REPLICA_GROUPS_INFO, checkReplicaGroups(tableConfig, rebalanceConfig));
 
     tableRebalanceLogger.info("End pre-checks");
     return preCheckResult;
@@ -376,6 +380,42 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
         : RebalancePreCheckerResult.warn(StringUtil.join("\n", warnings.toArray(String[]::new)));
+  }
+
+  private RebalancePreCheckerResult checkReplicaGroups(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
+    String message;
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      message = getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
+    } else {
+      // for realtime table
+      message = "COMPLETED segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED) + "\n"
+          + "CONSUMING segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING);
+    }
+    if (rebalanceConfig.isReassignInstances()) {
+      return RebalancePreCheckerResult.pass(message);
+    }
+    return RebalancePreCheckerResult.warn("reassignInstances is disabled, replica groups will not update.\n" + message);
+  }
+
+  private String getReplicaGroupInfo(TableConfig tableConfig, InstancePartitionsType type) {
+    if (!InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, type)) {
+      return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
+    }
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, type)
+            .getReplicaGroupPartitionConfig();
+    if (!instanceReplicaGroupPartitionConfig.isReplicaGroupBased()) {
+      return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
+    }
+
+    int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
+    int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
+    if (numInstancePerReplicaGroup == 0) {
+      return "numReplicaGroups: " + numReplicaGroups
+          + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
+    }
+    return "numReplicaGroups: " + numReplicaGroups
+        + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
