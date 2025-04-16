@@ -48,8 +48,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class DefaultRebalancePreChecker implements RebalancePreChecker {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalancePreChecker.class);
-
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
   public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
@@ -83,11 +81,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
     // Check for reload status
-    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType,
+    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(tableNameWithType,
         preCheckContext.getCurrentAssignment(), tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig
-    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
-        tableNameWithType, tableConfig, rebalanceConfig, tableRebalanceLogger));
+    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
+        checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
@@ -114,7 +112,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
    *       and add a pre-check here to call that API.
    */
-  private RebalancePreCheckerResult checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType,
+  private RebalancePreCheckerResult checkReloadNeededOnServers(String tableNameWithType,
       Map<String, Map<String, String>> currentAssignment, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Fetching whether reload is needed");
     Boolean needsReload = null;
@@ -157,8 +155,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   /**
    * Checks if minimize data movement is set for the given table in the TableConfig
    */
-  private RebalancePreCheckerResult checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig, RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
+  private RebalancePreCheckerResult checkIsMinimizeDataMovement(TableConfig tableConfig,
+      RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Checking whether minimizeDataMovement is set");
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
