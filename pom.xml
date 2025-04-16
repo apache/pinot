@@ -286,7 +286,7 @@
     <snakeyaml.version>2.4</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.4.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
-    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <datasketches-java.version>8.0.0</datasketches-java.version>
     <t-digest.version>3.2</t-digest.version>
     <picocli.version>4.7.6</picocli.version>
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
