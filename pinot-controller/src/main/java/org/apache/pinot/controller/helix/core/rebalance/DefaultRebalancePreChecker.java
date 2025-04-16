@@ -386,17 +386,17 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   private RebalancePreCheckerResult checkReplicaGroups(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
     String message;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      message = getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
+      message = "OFFLINE segments: " +  getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
     } else {
       // for realtime table
       message = "COMPLETED segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED) + "\n"
           + "CONSUMING segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING);
     }
     String tierMessage = "";
-    if (!rebalanceConfig.isUpdateTargetTier() && tableConfig.getTierConfigsList() != null) {
+    if (rebalanceConfig.isUpdateTargetTier() && tableConfig.getTierConfigsList() != null) {
       List<String> tierMessageList = new ArrayList<>();
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
-        tierMessageList.add(getReplicaGroupInfo(tableConfig, tierConfig.getName()));
+        tierMessageList.add(tierConfig.getName() + " tier: " + getReplicaGroupInfo(tableConfig, tierConfig.getName()));
       }
       tierMessage = "\n" + StringUtil.join("\n", tierMessageList.toArray(String[]::new));
     }
