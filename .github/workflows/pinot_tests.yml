@@ -150,6 +150,15 @@ jobs:
           token: 3cb787e5-09a8-4b23-8856-06410b11455f
           fail_ci_if_error: false
           verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-unit-tests
+          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          fail_ci_if_error: false
+          verbose: true
 
   integration-test:
     if: github.repository == 'apache/pinot'
@@ -242,6 +251,15 @@ jobs:
         uses: codecov/codecov-action@v5
         continue-on-error: true
         timeout-minutes: 5
+        with:
+          flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-custom-integration-tests
+          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-custom-integration-tests
