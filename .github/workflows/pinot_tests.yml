@@ -147,7 +147,7 @@ jobs:
         with:
           flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-unit-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
       - name: Upload test results to Codecov
@@ -157,7 +157,7 @@ jobs:
         with:
           flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-unit-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
 
@@ -227,7 +227,7 @@ jobs:
         with:
           flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
       - name: Upload test results to Codecov
@@ -238,7 +238,7 @@ jobs:
         with:
           flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
       - name: Custom Integration Test
@@ -266,7 +266,7 @@ jobs:
         with:
           flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-custom-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
       - name: Upload test results to Codecov
@@ -276,7 +276,7 @@ jobs:
         with:
           flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-custom-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
 
