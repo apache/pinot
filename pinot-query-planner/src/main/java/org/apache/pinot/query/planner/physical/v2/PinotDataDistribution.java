@@ -163,10 +163,8 @@ public class PinotDataDistribution {
     }
     Set<HashDistributionDesc> newHashDesc = new HashSet<>();
     for (HashDistributionDesc desc : _hashDistributionDesc) {
-      HashDistributionDesc newDescs = desc.apply(mapping);
-      if (newDescs != null) {
-        newHashDesc.add(newDescs);
-      }
+      Set<HashDistributionDesc> newDescs = desc.apply(mapping);
+      newHashDesc.addAll(newDescs);
     }
     RelDistribution.Type newType = _type;
     if (newType == RelDistribution.Type.HASH_DISTRIBUTED && newHashDesc.isEmpty()) {

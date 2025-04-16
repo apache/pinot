@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.query.planner.physical.v2.opt;
 
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageAggregateRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageBoundaryRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule;
 
@@ -30,13 +31,19 @@ public class PhysicalOptRuleSet {
   private PhysicalOptRuleSet() {
   }
 
-  public static List<Pair<PRelOptRule, RuleExecutors.Type>> create(PhysicalPlannerContext context,
-      TableCache tableCache) {
-    return List.of(
-        Pair.of(LeafStageBoundaryRule.INSTANCE, RuleExecutors.Type.POST_ORDER),
-        Pair.of(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER));
-        // Pair.of(new WorkerExchangeAssignmentRule(context), RuleExecutors.Type.IN_ORDER),
-        // Pair.of(AggregatePushdownRule.INSTANCE, RuleExecutors.Type.POST_ORDER),
-        // Pair.of(SortPushdownRule.INSTANCE, RuleExecutors.Type.POST_ORDER));
+  public static List<PRelNodeTransformer> create(PhysicalPlannerContext context, TableCache tableCache) {
+    List<PRelNodeTransformer> transformers = new ArrayList<>();
+    transformers.add(create(LeafStageBoundaryRule.INSTANCE, RuleExecutors.Type.POST_ORDER, context));
+    transformers.add(create(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER,
+        context));
+    transformers.add(create(new LeafStageAggregateRule(context), RuleExecutors.Type.POST_ORDER, context));
+    // transformers.add(new WorkerExchangeAssignmentRule(context));
+    // transformers.add(create(new AggregatePushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
+    // transformers.add(create(new SortPushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
+    return transformers;
+  }
+
+  private static PRelNodeTransformer create(PRelOptRule rule, RuleExecutors.Type type, PhysicalPlannerContext context) {
+    return (pRelNode) -> RuleExecutors.create(type, rule, context).execute(pRelNode);
   }
 }
