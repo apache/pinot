@@ -206,7 +206,8 @@ public class QueryEnvironment {
     return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
   }
 
-  /// @deprecated Use [#optimize] and then [explain][MseQuery#explain(long) ] the returned query instead
+  /// @deprecated Use [#createQuery(String)] and then
+  /// [explain][MseQuery#explain(long, AskingServerStageExplainer.OnServerExplainer)] the returned query instead
   @VisibleForTesting
   @Deprecated
   public String explainQuery(String sqlQuery, long requestId) {
@@ -252,7 +253,8 @@ public class QueryEnvironment {
     return mseQuery;
   }
 
-  /// @deprecated Use [#optimize] and then [getTableNames][MseQuery#getTableNames()] the returned query instead
+  /// @deprecated Use [#createQuery(String) ] and then [getTableNames][MseQuery#getTableNames()] the returned query
+  /// instead
   @VisibleForTesting
   @Deprecated
   public List<String> getTableNamesForQuery(String sqlQuery) {
@@ -266,6 +268,7 @@ public class QueryEnvironment {
    */
   public boolean canCompileQuery(String query) {
     try (MseQuery unused = createQuery(query)) {
+      unused.ensureOptimization();
       return true;
     } catch (QueryException e) {
       return false;
