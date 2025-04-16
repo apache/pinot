@@ -153,6 +153,7 @@ jobs:
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
+        timeout-minutes: 5
         with:
           flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-unit-tests
@@ -260,6 +261,7 @@ jobs:
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
+        timeout-minutes: 5
         with:
           flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-custom-integration-tests
