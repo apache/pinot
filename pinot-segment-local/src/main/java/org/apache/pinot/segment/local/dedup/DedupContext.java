@@ -21,7 +21,10 @@ package org.apache.pinot.segment.local.dedup;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -33,24 +36,37 @@ public class DedupContext {
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
   private final HashFunction _hashFunction;
-  private final boolean _enablePreload;
   private final double _metadataTTL;
+  @Nullable
   private final String _dedupTimeColumn;
-  private final File _tableIndexDir;
+  private final boolean _enablePreload;
+  @Nullable
+  private final Map<String, String> _metadataManagerConfigs;
+
+  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  @Deprecated
+  private final boolean _allowDedupConsumptionDuringCommit;
+
+  /// Can be null if the context is not created from server.
+  @Nullable
   private final TableDataManager _tableDataManager;
+  private final File _tableIndexDir;
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, boolean enablePreload, double metadataTTL, String dedupTimeColumn, File tableIndexDir,
-      TableDataManager tableDataManager) {
+      HashFunction hashFunction, double metadataTTL, @Nullable String dedupTimeColumn, boolean enablePreload,
+      @Nullable Map<String, String> metadataManagerConfigs, boolean allowDedupConsumptionDuringCommit,
+      @Nullable TableDataManager tableDataManager, File tableIndexDir) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
-    _enablePreload = enablePreload;
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
-    _tableIndexDir = tableIndexDir;
+    _enablePreload = enablePreload;
+    _metadataManagerConfigs = metadataManagerConfigs;
+    _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
     _tableDataManager = tableDataManager;
+    _tableIndexDir = tableIndexDir;
   }
 
   public TableConfig getTableConfig() {
@@ -69,36 +85,65 @@ public class DedupContext {
     return _hashFunction;
   }
 
-  public boolean isPreloadEnabled() {
-    return _enablePreload;
-  }
-
   public double getMetadataTTL() {
     return _metadataTTL;
   }
 
+  @Nullable
   public String getDedupTimeColumn() {
     return _dedupTimeColumn;
+  }
+
+  public boolean isPreloadEnabled() {
+    return _enablePreload;
+  }
+
+  @Nullable
+  public Map<String, String> getMetadataManagerConfigs() {
+    return _metadataManagerConfigs;
+  }
+
+  @Deprecated
+  public boolean isAllowDedupConsumptionDuringCommit() {
+    return _allowDedupConsumptionDuringCommit;
+  }
+
+  @Nullable
+  public TableDataManager getTableDataManager() {
+    return _tableDataManager;
   }
 
   public File getTableIndexDir() {
     return _tableIndexDir;
   }
 
-  public TableDataManager getTableDataManager() {
-    return _tableDataManager;
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this)
+        .append("primaryKeyColumns", _primaryKeyColumns)
+        .append("hashFunction", _hashFunction)
+        .append("metadataTTL", _metadataTTL)
+        .append("dedupTimeColumn", _dedupTimeColumn)
+        .append("enablePreload", _enablePreload)
+        .append("metadataManagerConfigs", _metadataManagerConfigs)
+        .append("allowDedupConsumptionDuringCommit", _allowDedupConsumptionDuringCommit)
+        .append("tableIndexDir", _tableIndexDir)
+        .toString();
   }
 
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
     private List<String> _primaryKeyColumns;
-    private HashFunction _hashFunction;
-    private boolean _enablePreload;
+    private HashFunction _hashFunction = HashFunction.NONE;
     private double _metadataTTL;
     private String _dedupTimeColumn;
-    private File _tableIndexDir;
+    private boolean _enablePreload;
+    private Map<String, String> _metadataManagerConfigs;
+    @Deprecated
+    private boolean _allowDedupConsumptionDuringCommit;
     private TableDataManager _tableDataManager;
+    private File _tableIndexDir;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -120,23 +165,29 @@ public class DedupContext {
       return this;
     }
 
-    public Builder setEnablePreload(boolean enablePreload) {
-      _enablePreload = enablePreload;
-      return this;
-    }
-
     public Builder setMetadataTTL(double metadataTTL) {
       _metadataTTL = metadataTTL;
       return this;
     }
 
-    public Builder setDedupTimeColumn(String deupTimeColumn) {
-      _dedupTimeColumn = deupTimeColumn;
+    public Builder setDedupTimeColumn(String dedupTimeColumn) {
+      _dedupTimeColumn = dedupTimeColumn;
       return this;
     }
 
-    public Builder setTableIndexDir(File tableIndexDir) {
-      _tableIndexDir = tableIndexDir;
+    public Builder setEnablePreload(boolean enablePreload) {
+      _enablePreload = enablePreload;
+      return this;
+    }
+
+    public Builder setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
+      _metadataManagerConfigs = metadataManagerConfigs;
+      return this;
+    }
+
+    @Deprecated
+    public Builder setAllowDedupConsumptionDuringCommit(boolean allowDedupConsumptionDuringCommit) {
+      _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
       return this;
     }
 
@@ -145,14 +196,23 @@ public class DedupContext {
       return this;
     }
 
+    public Builder setTableIndexDir(File tableIndexDir) {
+      _tableIndexDir = tableIndexDir;
+      return this;
+    }
+
     public DedupContext build() {
       Preconditions.checkState(_tableConfig != null, "Table config must be set");
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
-      Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
-      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _enablePreload, _metadataTTL,
-          _dedupTimeColumn, _tableIndexDir, _tableDataManager);
+      if (_tableIndexDir == null) {
+        Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");
+        _tableIndexDir = _tableDataManager.getTableDataDir();
+      }
+      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
+          _enablePreload, _metadataManagerConfigs, _allowDedupConsumptionDuringCommit, _tableDataManager,
+          _tableIndexDir);
     }
   }
 }

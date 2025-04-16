@@ -55,6 +55,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 @ThreadSafe
 public interface PartitionUpsertMetadataManager extends Closeable {
 
+  UpsertContext getContext();
+
   /**
    * Returns the primary key columns.
    */
