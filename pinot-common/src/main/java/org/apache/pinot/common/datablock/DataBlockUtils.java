@@ -239,12 +239,14 @@ public final class DataBlockUtils {
 
     List<ByteString> byteStrings = new ArrayList<>();
     ByteString current = UnsafeByteOperations.unsafeWrap(bytes.get(0));
-    for (ByteBuffer bb: bytes) {
+    for (int i = 1; i < bytes.size(); i++) {
+      ByteBuffer bb = bytes.get(i);
       if (current.size() + bb.remaining() > maxBlockSize) {
         byteStrings.add(current);
-        current = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+        current = UnsafeByteOperations.unsafeWrap(bb);
+      } else {
+        current = current.concat(UnsafeByteOperations.unsafeWrap(bb));
       }
-      current = current.concat(UnsafeByteOperations.unsafeWrap(bb));
     }
     byteStrings.add(current);
     return byteStrings;
