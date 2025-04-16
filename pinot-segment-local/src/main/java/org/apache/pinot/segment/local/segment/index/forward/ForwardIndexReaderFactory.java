@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
   private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
+  private static final String FORWARD_INDEX_READER_CLASS_NAME = "forwardIndexReaderClassName";
 
   public static void setInstance(ForwardIndexReaderFactory factory) {
     _instance = factory;
@@ -68,6 +69,15 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
       ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
+    if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_READER_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(FORWARD_INDEX_READER_CLASS_NAME).toString();
+      try {
+        return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
+            .newInstance(dataBuffer, metadata);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create ForwardIndexReader", e);
+      }
+    }
     return createIndexReader(dataBuffer, metadata);
   }
 
@@ -112,9 +122,8 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION ? new FixedBytePower2ChunkSVForwardIndexReader(
+          dataBuffer, storedType) : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
     if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
