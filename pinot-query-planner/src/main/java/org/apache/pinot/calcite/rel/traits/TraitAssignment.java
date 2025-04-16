@@ -36,6 +36,7 @@ import org.apache.calcite.rel.core.Window;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
@@ -52,33 +53,35 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
 public class TraitAssignment {
   private final Supplier<Integer> _planIdGenerator;
 
-  public TraitAssignment(Supplier<Integer> planIdGenerator) {
+  private TraitAssignment(Supplier<Integer> planIdGenerator) {
     _planIdGenerator = planIdGenerator;
   }
 
-  public static RelNode assign(RelNode relNode, PhysicalPlannerContext physicalPlannerContext) {
+  public static PRelNode assign(PRelNode pRelNode, PhysicalPlannerContext physicalPlannerContext) {
     TraitAssignment traitAssignment = new TraitAssignment(physicalPlannerContext.getNodeIdGenerator());
-    return traitAssignment.assign(relNode);
+    return traitAssignment.assign(pRelNode);
   }
 
-  public RelNode assign(RelNode node) {
+  @VisibleForTesting
+  PRelNode assign(PRelNode pRelNode) {
     // Process inputs first.
+    RelNode relNode = pRelNode.unwrap();
     List<RelNode> newInputs = new ArrayList<>();
-    for (RelNode input : node.getInputs()) {
-      newInputs.add(assign(input));
+    for (RelNode input : relNode.getInputs()) {
+      newInputs.add(assign((PRelNode) input).unwrap());
     }
-    node = node.copy(node.getTraitSet(), newInputs);
-    // Process current node.
-    if (node instanceof PhysicalSort) {
-      return assignSort((PhysicalSort) node);
-    } else if (node instanceof PhysicalJoin) {
-      return assignJoin((PhysicalJoin) node);
-    } else if (node instanceof PhysicalAggregate) {
-      return assignAggregate((PhysicalAggregate) node);
-    } else if (node instanceof PhysicalWindow) {
-      return assignWindow((PhysicalWindow) node);
+    relNode = relNode.copy(relNode.getTraitSet(), newInputs);
+    // Process current relNode.
+    if (relNode instanceof PhysicalSort) {
+      return (PRelNode) assignSort((PhysicalSort) relNode);
+    } else if (relNode instanceof PhysicalJoin) {
+      return (PRelNode) assignJoin((PhysicalJoin) relNode);
+    } else if (relNode instanceof PhysicalAggregate) {
+      return (PRelNode) assignAggregate((PhysicalAggregate) relNode);
+    } else if (relNode instanceof PhysicalWindow) {
+      return (PRelNode) assignWindow((PhysicalWindow) relNode);
     }
-    return node;
+    return (PRelNode) relNode;
   }
 
   /**

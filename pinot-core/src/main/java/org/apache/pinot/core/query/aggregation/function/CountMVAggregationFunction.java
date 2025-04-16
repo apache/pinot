@@ -30,9 +30,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
 
-  public CountMVAggregationFunction(List<ExpressionContext> arguments) {
-    // TODO(nhejazi): support proper null handling for aggregation functions on MV columns.
-    super(verifySingleArgument(arguments, "COUNT_MV"), false);
+  public CountMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "COUNT_MV"), nullHandlingEnabled);
   }
 
   @Override
@@ -53,33 +52,44 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
-    long count = 0L;
-    for (int i = 0; i < length; i++) {
-      count += valueArray[i];
-    }
-    aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + count);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    int[] valueArray = blockValSet.getNumMVEntries();
+    // Hack to make count effectively final for use in the lambda (we know that there aren't concurrent access issues
+    // with forEachNotNull)
+    final long[] count = {0L};
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        count[0] += valueArray[i];
+      }
+    });
+    aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + count[0]);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    int[] valueArray = blockValSet.getNumMVEntries();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int groupKey = groupKeyArray[i];
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
-    for (int i = 0; i < length; i++) {
-      int value = valueArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    int[] valueArray = blockValSet.getNumMVEntries();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int[] groupKeys = groupKeysArray[i];
+        for (int groupKey : groupKeys) {
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+        }
       }
-    }
+    });
   }
 }

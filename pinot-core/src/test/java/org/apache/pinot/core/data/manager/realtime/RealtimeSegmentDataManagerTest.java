@@ -496,7 +496,7 @@ public class RealtimeSegmentDataManagerTest {
 
   // Tests to go online from consuming state
 
-  // If the state is is COMMITTED or RETAINED, nothing to do
+  // If the state is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
   @Test
   public void testOnlineTransitionAfterStop()
@@ -507,6 +507,7 @@ public class RealtimeSegmentDataManagerTest {
     metadata.setEndOffset(finalOffset.toString());
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -515,6 +516,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.RETAINED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -523,6 +525,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -531,6 +534,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -540,6 +544,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If holding, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -550,6 +555,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -560,6 +566,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we did not get to the final offset, then download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -570,12 +577,23 @@ public class RealtimeSegmentDataManagerTest {
 
     // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+
+    // But then if we get to the exact offset, we download the segment because consumer semaphore was never acquired.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(finalOffset);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
   }
 
@@ -767,8 +785,9 @@ public class RealtimeSegmentDataManagerTest {
       @Override
       public Long get() {
         long now = System.currentTimeMillis();
-        // now() is called once in the run() method, once before each batch reading and once for every row indexation
-        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 4) {
+        // now() is called once in the run() method, then once on setting consumeStartTime, once before each batch
+        // reading and once for every row indexation
+        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 5) {
           return now;
         }
         // Exceed segment time threshold
@@ -792,10 +811,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once more when metrics are updated after each batch is processed and then 4 more times in
-      // run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 8);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once more when metrics are updated after each batch
+      // is processed and then 4 more times in run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 9);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
@@ -827,9 +846,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once for metrics updates and then 4 more times in run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once for metrics updates and then 4 more times in
+      // run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 7);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),

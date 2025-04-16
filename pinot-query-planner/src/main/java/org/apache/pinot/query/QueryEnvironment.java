@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -182,9 +181,6 @@ public class QueryEnvironment {
     }
     switch (inferPartitionHint.toLowerCase()) {
       case "true":
-        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint. "
-            + "Please enable it using broker config"
-            + CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER + "=true");
         return workerManager;
       case "false":
         return null;

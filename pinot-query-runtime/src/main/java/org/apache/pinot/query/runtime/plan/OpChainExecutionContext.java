@@ -50,10 +50,12 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  @Nullable
   private final ThreadExecutionContext _parentContext;
+  @Nullable
+  private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
 
-  private ServerPlanRequestContext _leafStageContext;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
@@ -123,6 +125,7 @@ public class OpChainExecutionContext {
     return _traceEnabled;
   }
 
+  @Nullable
   public ServerPlanRequestContext getLeafStageContext() {
     return _leafStageContext;
   }

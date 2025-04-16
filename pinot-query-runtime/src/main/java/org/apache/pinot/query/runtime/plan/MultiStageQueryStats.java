@@ -38,10 +38,6 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
-import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -84,7 +80,6 @@ public class MultiStageQueryStats {
    *
    * @see #mergeUpstream(List)
    * @see #mergeUpstream(MultiStageQueryStats)
-   * @see #mergeInOrder(MultiStageQueryStats, MultiStageOperator.Type, StatMap)
    */
   private final ArrayList<StageStats.Closed> _closedStats;
   private static final MultiStageOperator.Type[] ALL_TYPES = MultiStageOperator.Type.values();
@@ -95,32 +90,25 @@ public class MultiStageQueryStats {
     _closedStats = new ArrayList<>();
   }
 
-  private static MultiStageQueryStats create(int stageId, MultiStageOperator.Type type, @Nullable StatMap<?> opStats) {
-    MultiStageQueryStats multiStageQueryStats = new MultiStageQueryStats(stageId);
-    multiStageQueryStats.getCurrentStats().addLastOperator(type, opStats);
-    return multiStageQueryStats;
+  private MultiStageQueryStats(MultiStageQueryStats other) {
+    _currentStageId = other._currentStageId;
+    _currentStats = StageStats.Open.copy(other._currentStats);
+    _closedStats = new ArrayList<>(other._closedStats.size());
+    for (StageStats.Closed closed : other._closedStats) {
+      if (closed == null) {
+        _closedStats.add(null);
+      } else {
+        _closedStats.add(StageStats.Closed.copy(closed));
+      }
+    }
   }
 
   public static MultiStageQueryStats emptyStats(int stageId) {
     return new MultiStageQueryStats(stageId);
   }
 
-  public static MultiStageQueryStats createLeaf(int stageId,
-      StatMap<LeafStageTransferableBlockOperator.StatKey> opStats) {
-    return create(stageId, MultiStageOperator.Type.LEAF, opStats);
-  }
-
-  public static MultiStageQueryStats createLiteral(int stageId, StatMap<LiteralValueOperator.StatKey> statMap) {
-    return create(stageId, MultiStageOperator.Type.LITERAL, statMap);
-  }
-
-  public static MultiStageQueryStats createCancelledSend(int stageId,
-      StatMap<MailboxSendOperator.StatKey> statMap) {
-    return create(stageId, MultiStageOperator.Type.MAILBOX_SEND, statMap);
-  }
-
-  public static MultiStageQueryStats createReceive(int stageId, StatMap<BaseMailboxReceiveOperator.StatKey> stats) {
-    return create(stageId, MultiStageOperator.Type.MAILBOX_RECEIVE, stats);
+  public static MultiStageQueryStats copy(MultiStageQueryStats stats) {
+    return new MultiStageQueryStats(stats);
   }
 
   public int getCurrentStageId() {
@@ -196,14 +184,18 @@ public class MultiStageQueryStats {
     return _closedStats.get(index);
   }
 
-  public void mergeInOrder(MultiStageQueryStats otherStats, MultiStageOperator.Type type,
-      StatMap<?> statMap) {
+  /**
+   * Merge stats from another MultiStageQueryStats on the same stage into the receiver object.
+   *
+   * It is important to call this method in the correct order to preserve the in-order traversal of the operator tree,
+   * which is required to be able to reconstruct the stats when the result is sent to the user.
+   */
+  public void mergeSameStage(MultiStageQueryStats otherStats) {
     Preconditions.checkArgument(_currentStageId == otherStats._currentStageId,
         "Cannot merge stats from different stages (%s and %s)", _currentStageId, otherStats._currentStageId);
     mergeUpstream(otherStats);
     StageStats.Open currentStats = getCurrentStats();
     currentStats.concat(otherStats.getCurrentStats());
-    currentStats.addLastOperator(type, statMap);
   }
 
   private void growUpToStage(int stageId) {
@@ -421,6 +413,14 @@ public class MultiStageQueryStats {
       _operatorStats = operatorStats;
     }
 
+    List<StatMap<?>> copyOperatorStats() {
+      ArrayList<StatMap<?>> copy = new ArrayList<>(_operatorStats.size());
+      for (StatMap<?> operatorStat : _operatorStats) {
+        copy.add(new StatMap<>(operatorStat));
+      }
+      return copy;
+    }
+
     /**
      * Return the stats associated with the given operator index.
      * <p>
@@ -534,6 +534,10 @@ public class MultiStageQueryStats {
         super(operatorTypes, operatorStats);
       }
 
+      public static Closed copy(Closed other) {
+        return new Closed(new ArrayList<>(other._operatorTypes), other.copyOperatorStats());
+      }
+
       /**
        * Merges the stats from another StageStats object into this one.
        * <p>
@@ -558,17 +562,19 @@ public class MultiStageQueryStats {
           throws IOException {
         int numOperators = input.readInt();
         if (numOperators != _operatorTypes.size()) {
+          Closed deserialized;
           try {
-            Closed deserialized = deserialize(input, numOperators);
-            throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
-                + _operatorTypes + " operators, got " + numOperators + ". Deserialized stats: " + deserialized);
+            deserialized = deserialize(input, numOperators);
           } catch (IOException e) {
             throw new IOException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
-          } catch (RuntimeException e) {
+          } catch (Exception e) {
             throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
           }
+          throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
+              + _operatorTypes + " operators, got " + deserialized._operatorTypes
+              + ". Deserialized stats: " + deserialized);
         }
         for (int i = 0; i < numOperators; i++) {
           byte ordinal = input.readByte();
@@ -632,6 +638,10 @@ public class MultiStageQueryStats {
         super();
       }
 
+      /// Adds the given stats as the metrics for the last operator found in the stage so far.
+      ///
+      /// @param statMap The stats for the operator to add. The ownership of this map will be transferred to this
+      ///  object, so the caller should not modify it after calling this method.
       public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
         Preconditions.checkArgument(statMap.getKeyClass().equals(type.getStatKeyClass()),
             "Expected stats of class %s for type %s but found class %s",
@@ -646,6 +656,13 @@ public class MultiStageQueryStats {
         _operatorTypes.add(type);
         _operatorStats.add(statMap);
         return this;
+      }
+
+      public static Open copy(Open other) {
+        Open copy = new Open();
+        copy._operatorTypes.addAll(other._operatorTypes);
+        copy._operatorStats.addAll(other.copyOperatorStats());
+        return copy;
       }
 
       /**

@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -253,6 +254,27 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + _storedType);
+    }
+  }
+
+  /** Only call after build(). Used by StarTree json index.  */
+  @SuppressWarnings({"unused"})
+  public Map getValueToIndexMap() {
+    switch (_storedType) {
+      case INT:
+        return _intValueToIndexMap;
+      case LONG:
+        return _longValueToIndexMap;
+      case FLOAT:
+        return _floatValueToIndexMap;
+      case DOUBLE:
+        return _doubleValueToIndexMap;
+      case STRING:
+      case BIG_DECIMAL:
+      case BYTES:
+        return _objectValueToIndexMap;
+      default:
+        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
   }
 

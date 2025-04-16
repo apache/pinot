@@ -26,7 +26,7 @@ import java.util.function.Function;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
 /**
@@ -48,7 +48,7 @@ class SingletonExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> sendingMailboxes, TransferableBlock block)
+  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block)
       throws IOException, TimeoutException {
     sendBlock(sendingMailboxes.get(0), block);
   }

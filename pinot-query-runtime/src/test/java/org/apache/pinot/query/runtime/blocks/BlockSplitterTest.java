@@ -24,8 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
-import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
@@ -37,7 +35,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-public class TransferableBlockUtilsTest {
+public class BlockSplitterTest {
   private static final int TOTAL_ROW_COUNT = 50;
   private static final int TEST_EST_BYTES_PER_COLUMN = 8;
   private static final List<ColumnDataType> EXCLUDE_DATA_TYPES =
@@ -62,21 +60,34 @@ public class TransferableBlockUtilsTest {
     return new Object[][]{new Object[]{1}, new Object[]{10}, new Object[]{42}, new Object[]{100}};
   }
 
-  // Test that we only send one block when block size is smaller than maxBlockSize.
-  @Test(dataProvider = "splitRowCountProvider")
-  public void testSplitBlockUtils(int splitRowCount)
-      throws Exception {
+  private void testSplitRows(List<Object[]> rows, MseBlock.Data rowBlock, int splitRowCount) {
     DataSchema dataSchema = getDataSchema();
     // compare serialized split
     int estRowSizeInBytes = dataSchema.size() * TEST_EST_BYTES_PER_COLUMN;
+    int maxBlockSize = estRowSizeInBytes * splitRowCount + 1;
+    Iterator<? extends MseBlock.Data> split = BlockSplitter.DEFAULT.split(rowBlock, maxBlockSize);
+    validateBlocks(split, rows, dataSchema);
+  }
+
+  // Test that we only send one block when block size is smaller than maxBlockSize.
+  @Test(dataProvider = "splitRowCountProvider")
+  public void testSplitHeapRows(int splitRowCount)
+      throws Exception {
+    DataSchema dataSchema = getDataSchema();
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
-    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    validateBlocks(
-        TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock), estRowSizeInBytes * splitRowCount + 1), rows,
-        dataSchema);
-    // compare non-serialized split
-    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW),
-        estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+    RowHeapDataBlock heapBlock = new RowHeapDataBlock(rows, dataSchema);
+    testSplitRows(rows, heapBlock, splitRowCount);
+  }
+
+  // Test that we only send one block when block size is smaller than maxBlockSize.
+  @Test(dataProvider = "splitRowCountProvider")
+  public void testSplitSerializesRows(int splitRowCount)
+      throws Exception {
+    DataSchema dataSchema = getDataSchema();
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
+    RowDataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+    SerializedDataBlock serializedBlock = new SerializedDataBlock(dataBlock);
+    testSplitRows(rows, serializedBlock, splitRowCount);
   }
 
   @Test
@@ -88,25 +99,22 @@ public class TransferableBlockUtilsTest {
         DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1));
     ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
     validateNonSplittableBlock(columnarBlock);
-
-    // METADATA
-    MetadataBlock metadataBlock = MetadataBlock.newEos();
-    validateNonSplittableBlock(metadataBlock);
   }
 
   private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock) {
-    Iterator<TransferableBlock> transferableBlocks =
-        TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), 4 * 1024 * 1024);
-    Assert.assertTrue(transferableBlocks.hasNext());
-    Assert.assertSame(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
-    Assert.assertFalse(transferableBlocks.hasNext());
+    SerializedDataBlock block = new SerializedDataBlock(nonSplittableBlock);
+    Iterator<? extends MseBlock.Data> mseBlocks = BlockSplitter.DEFAULT.split(block, 4 * 1024 * 1024);
+    Assert.assertTrue(mseBlocks.hasNext());
+    Assert.assertSame(mseBlocks.next(), block);
+    Assert.assertFalse(mseBlocks.hasNext());
   }
 
-  private void validateBlocks(Iterator<TransferableBlock> blocks, List<Object[]> rows, DataSchema dataSchema) {
+  private void validateBlocks(Iterator<? extends MseBlock> blocks, List<Object[]> rows, DataSchema dataSchema) {
     int rowId = 0;
     while (blocks.hasNext()) {
-      TransferableBlock block = blocks.next();
-      for (Object[] row : block.getContainer()) {
+      MseBlock block = blocks.next();
+      Assert.assertTrue(block.isData());
+      for (Object[] row : ((MseBlock.Data) block).asRowHeap().getRows()) {
         for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
           if (row[colId] == null && rows.get(rowId)[colId] == null) {
             continue;

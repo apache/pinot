@@ -29,16 +29,17 @@ import CustomizedTables from "../../Table";
 import Utils from "../../../utils/Utils";
 import PinotMethodUtils from "../../../utils/PinotMethodUtils";
 
+type RebalanceTableSegmentJob = {
+    jobId: string;
+    messageCount: number;
+    submissionTimeMs: number;
+    jobType: string;
+    tableName: string;
+    REBALANCE_PROGRESS_STATS: string;
+    REBALANCE_CONTEXT: string;
+}
 export type RebalanceTableSegmentJobs = {
-    [key: string]: {
-        jobId: string,
-        messageCount: number,
-        submissionTimeMs: number,
-        jobType: string,
-        tableName: string,
-        REBALANCE_PROGRESS_STATS: string,
-        REBALANCE_CONTEXT: string;
-    }
+    [key: string]: RebalanceTableSegmentJob;
 }
 
 type RebalanceServerStatusOpProps = {
@@ -49,7 +50,7 @@ type RebalanceServerStatusOpProps = {
 export const RebalanceServerStatusOp = (
     { tableName, hideModal } : RebalanceServerStatusOpProps
 ) => {
-    const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJobs>({})
+    const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJob[]>([])
     const [jobSelected, setJobSelected] = useState<string | null>(null);
     const [rebalanceContext, setRebalanceContext] = useState<{}>({});
     const [rebalanceProgressStats, setRebalanceProgressStats] = useState<{}>({});
@@ -63,7 +64,10 @@ export const RebalanceServerStatusOp = (
                 if (jobs.error) {
                     return;
                 }
-                setRebalanceServerJobs(jobs as RebalanceTableSegmentJobs)
+                const sortedJobs: RebalanceTableSegmentJob[] = Object.keys(jobs as RebalanceTableSegmentJobs)
+                    .map(jobId => jobs[jobId] as RebalanceTableSegmentJob)
+                    .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
+                setRebalanceServerJobs(sortedJobs);
             })
             .finally(() => setLoading(false));
     }, []);
@@ -137,13 +141,13 @@ export const RebalanceServerStatusOp = (
                                 setJobSelected(cell);
                             }}
                             data={{
-                                records: Object.keys(rebalanceServerJobs).map(jobId => {
-                                    const progressStats = JSON.parse(rebalanceServerJobs[jobId].REBALANCE_PROGRESS_STATS);
+                                records: rebalanceServerJobs.map(rebalanceServerJob => {
+                                    const progressStats = JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS);
                                     return [
-                                        rebalanceServerJobs[jobId].jobId,
-                                        rebalanceServerJobs[jobId].tableName,
+                                        rebalanceServerJob.jobId,
+                                        rebalanceServerJob.tableName,
                                         progressStats.status,
-                                        Utils.formatTime(+rebalanceServerJobs[jobId].submissionTimeMs)
+                                        Utils.formatTime(+rebalanceServerJob.submissionTimeMs)
                                     ];
                                 }),
                                 columns: ['Job id', 'Table name', 'Status', 'Started at']
