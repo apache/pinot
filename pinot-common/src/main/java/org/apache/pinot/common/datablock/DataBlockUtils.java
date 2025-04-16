@@ -230,6 +230,26 @@ public final class DataBlockUtils {
     return byteString;
   }
 
+  public static List<ByteString> toByteStrings(DataBlock dataBlock, int maxBlockSize)
+      throws IOException {
+    List<ByteBuffer> bytes = dataBlock.serialize();
+    if (bytes.isEmpty()) {
+      return List.of(ByteString.EMPTY);
+    }
+
+    List<ByteString> byteStrings = new ArrayList<>();
+    ByteString current = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+    for (ByteBuffer bb: bytes) {
+      if (current.size() + bb.remaining() > maxBlockSize) {
+        byteStrings.add(current);
+        current = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+      }
+      current = current.concat(UnsafeByteOperations.unsafeWrap(bb));
+    }
+    byteStrings.add(current);
+    return byteStrings;
+  }
+
   /**
    * Reads a data block from the given byte buffer.
    * @param buffer the buffer to read from. The data will be read at the buffer's current position. This position will

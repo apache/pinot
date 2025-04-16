@@ -22,10 +22,12 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
@@ -167,13 +169,22 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      ByteString byteString = DataBlockUtils.toByteString(dataBlock);
-      int sizeInBytes = byteString.size();
+      //ByteString byteString = DataBlockUtils.toByteString(dataBlock);
+      List<ByteString> byteStrings = DataBlockUtils.toByteStrings(dataBlock, Integer.MAX_VALUE);
+      int sizeInBytes = byteStrings.stream().map(ByteString::size).reduce(0, Integer::sum);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-      return List.of(MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build());
+      List<MailboxContent> contents = new ArrayList<>();
+      for (int i=0; i < byteStrings.size(); i++) {
+        contents.add(MailboxContent.newBuilder()
+            .setMailboxId(_id)
+            .setPayload(byteStrings.get(i))
+            .setWaitForMore(i < byteStrings.size()-1)
+            .build());
+      }
+      return contents;
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
       throw t;
