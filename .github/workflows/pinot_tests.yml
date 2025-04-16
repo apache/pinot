@@ -230,6 +230,17 @@ jobs:
           token: 3cb787e5-09a8-4b23-8856-06410b11455f
           fail_ci_if_error: false
           verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-integration-tests
+          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          fail_ci_if_error: false
+          verbose: true
       - name: Custom Integration Test
         if : ${{ matrix.testset == 1 }}
         env:
