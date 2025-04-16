@@ -290,7 +290,8 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
-    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+    //String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {

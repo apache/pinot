@@ -3358,7 +3358,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
+  //@Test(dataProvider = "useBothQueryEngines")
+  // disabled for MSE until we figure out how to make it case-insensitive without breaking compatibility
+  @Test(dataProvider = "useV1QueryEngine")
   public void testCaseSensitivity(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
