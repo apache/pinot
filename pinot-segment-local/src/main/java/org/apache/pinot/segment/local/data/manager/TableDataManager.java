@@ -94,10 +94,26 @@ public interface TableDataManager {
 
   /**
    * Adds a loaded immutable segment into the table.
+   * See {@link #addSegment(ImmutableSegment, SegmentZKMetadata)} for details.
+   */
+  @VisibleForTesting
+  default void addSegment(ImmutableSegment immutableSegment) {
+    addSegment(immutableSegment, null);
+  }
+
+  /**
+   * Adds a loaded immutable segment into the table.
+   * <p>If one segment already exists with the same name, replaces it with the new one.
+   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+   * segment (or the calling thread, if there are none) remove the segment.
+   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
+   * <p>Segment ZK metadata might not be available when replacing a CONSUMING segment with the locally sealed one or
+   * invoked from tests.
+   *
    * NOTE: This method is not designed to be directly used by the production code, but can be handy to set up tests.
    */
   @VisibleForTesting
-  void addSegment(ImmutableSegment immutableSegment);
+  void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata);
 
   /**
    * Adds an ONLINE segment into a table.

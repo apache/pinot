@@ -49,6 +49,9 @@ public class DedupConfig extends BaseJsonConfig {
       + "ENABLE, DISABLE and DEFAULT (use instance level default behavior).")
   private Enablement _preload = Enablement.DEFAULT;
 
+  @JsonPropertyDescription("Whether to ignore segments from non-default tiers when constructing dedup metadata.")
+  private Enablement _ignoreNonDefaultTiers = Enablement.DEFAULT;
+
   @JsonPropertyDescription("Custom class for dedup metadata manager. If not specified, the default implementation "
       + "ConcurrentMapTableDedupMetadataManager will be used.")
   @Nullable
@@ -131,6 +134,16 @@ public class DedupConfig extends BaseJsonConfig {
   public void setPreload(Enablement preload) {
     Preconditions.checkArgument(preload != null, "Preload cannot be null, must be one of ENABLE, DISABLE or DEFAULT");
     _preload = preload;
+  }
+
+  public Enablement getIgnoreNonDefaultTiers() {
+    return _ignoreNonDefaultTiers;
+  }
+
+  public void setIgnoreNonDefaultTiers(Enablement ignoreNonDefaultTiers) {
+    Preconditions.checkArgument(ignoreNonDefaultTiers != null,
+        "Ignore non-default tiers cannot be null, must be one of ENABLE, DISABLE or DEFAULT");
+    _ignoreNonDefaultTiers = ignoreNonDefaultTiers;
   }
 
   @Nullable

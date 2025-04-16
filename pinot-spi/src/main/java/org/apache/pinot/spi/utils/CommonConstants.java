@@ -1115,6 +1115,7 @@ public class CommonConstants {
       public static final String CONFIG_PREFIX = "dedup";
       public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
       public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+      public static final String DEFAULT_IGNORE_NON_DEFAULT_TIERS = "default.ignore.non.default.tiers";
 
       /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
       @Deprecated

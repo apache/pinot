@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -142,8 +143,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @Override
-  public void addSegment(ImmutableSegment immutableSegment) {
-    super.addSegment(immutableSegment);
+  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    super.addSegment(immutableSegment, zkMetadata);
     String segmentName = immutableSegment.getSegmentName();
     if (loadLookupTable()) {
       _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
