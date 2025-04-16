@@ -39,6 +39,7 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
@@ -391,31 +392,47 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       message = "COMPLETED segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED) + "\n"
           + "CONSUMING segments: " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING);
     }
-    if (rebalanceConfig.isReassignInstances()) {
-      return RebalancePreCheckerResult.pass(message);
+    String tierMessage = "";
+    if (!rebalanceConfig.isUpdateTargetTier() && tableConfig.getTierConfigsList() != null) {
+      List<String> tierMessageList = new ArrayList<>();
+      for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+        tierMessageList.add(getReplicaGroupInfo(tableConfig, tierConfig.getName()));
+      }
+      tierMessage = "\n" + StringUtil.join("\n", tierMessageList.toArray(String[]::new));
     }
-    return RebalancePreCheckerResult.warn("reassignInstances is disabled, replica groups will not update.\n" + message);
+    if (rebalanceConfig.isReassignInstances()) {
+      return RebalancePreCheckerResult.pass(message + tierMessage);
+    }
+    return RebalancePreCheckerResult.warn(
+        "reassignInstances is disabled, replica groups may not update.\n" + message + tierMessage);
   }
 
   private String getReplicaGroupInfo(TableConfig tableConfig, InstancePartitionsType type) {
     if (!InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, type)) {
       return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
     }
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, type)
-            .getReplicaGroupPartitionConfig();
-    if (!instanceReplicaGroupPartitionConfig.isReplicaGroupBased()) {
-      return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
-    }
+    return getReplicaGroupInfo(tableConfig, type.toString());
+  }
 
-    int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
-    int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
-    if (numInstancePerReplicaGroup == 0) {
+  private static String getReplicaGroupInfo(TableConfig tableConfig, String type) {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(type)) {
+      InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+          instanceAssignmentConfigMap.get(type).getReplicaGroupPartitionConfig();
+      if (!instanceReplicaGroupPartitionConfig.isReplicaGroupBased()) {
+        return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
+      }
+
+      int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
+      int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
+      if (numInstancePerReplicaGroup == 0) {
+        return "numReplicaGroups: " + numReplicaGroups
+            + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
+      }
       return "numReplicaGroups: " + numReplicaGroups
-          + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
+          + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
     }
-    return "numReplicaGroups: " + numReplicaGroups
-        + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
+    return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
