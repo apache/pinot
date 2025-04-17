@@ -28,19 +28,7 @@ import {RebalanceServerResponseCard} from "./RebalanceServer/RebalanceServerResp
 import CustomizedTables from "../../Table";
 import Utils from "../../../utils/Utils";
 import PinotMethodUtils from "../../../utils/PinotMethodUtils";
-
-type RebalanceTableSegmentJob = {
-    jobId: string;
-    messageCount: number;
-    submissionTimeMs: number;
-    jobType: string;
-    tableName: string;
-    REBALANCE_PROGRESS_STATS: string;
-    REBALANCE_CONTEXT: string;
-}
-export type RebalanceTableSegmentJobs = {
-    [key: string]: RebalanceTableSegmentJob;
-}
+import {RebalanceTableSegmentJob} from "Models";
 
 type RebalanceServerStatusOpProps = {
     tableName: string;
@@ -59,15 +47,9 @@ export const RebalanceServerStatusOp = (
     useEffect(() => {
         setLoading(true);
         PinotMethodUtils
-            .fetchTableJobs(tableName, "TABLE_REBALANCE")
+            .fetchRebalanceTableJobs(tableName)
             .then(jobs => {
-                if (jobs.error) {
-                    return;
-                }
-                const sortedJobs: RebalanceTableSegmentJob[] = Object.keys(jobs as RebalanceTableSegmentJobs)
-                    .map(jobId => jobs[jobId] as RebalanceTableSegmentJob)
-                    .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
-                setRebalanceServerJobs(sortedJobs);
+                setRebalanceServerJobs(jobs)
             })
             .finally(() => setLoading(false));
     }, []);
