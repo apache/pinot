@@ -19,15 +19,6 @@
 package org.apache.pinot.controller.api.upload;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -36,6 +27,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.controller.ControllerConf;
@@ -46,6 +38,17 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import java.io.File;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -771,16 +774,26 @@ public class ZKOperator {
     } else {
       // In push types other than METADATA, local segmentFile contains the complete segment.
       // Move local segment to final location
-      copyFromSegmentFileToDeepStore(segmentFile, finalSegmentLocationURI);
+      copyFromSegmentFileToDeepStore(segmentFile, finalSegmentLocationURI, tableNameWithType);
       LOGGER.info("Copied segment: {} of table: {} to final location: {}", segmentName, tableNameWithType,
           finalSegmentLocationURI);
     }
   }
 
-  private void copyFromSegmentFileToDeepStore(File segmentFile, URI finalSegmentLocationURI)
+  private void copyFromSegmentFileToDeepStore(File segmentFile, URI finalSegmentLocationURI, String tableNameWithType)
       throws Exception {
     LOGGER.info("Copying segment from: {} to: {}", segmentFile.getAbsolutePath(), finalSegmentLocationURI);
+    long startTimeMs = System.currentTimeMillis();
     PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copyFromLocalFile(segmentFile, finalSegmentLocationURI);
+    long durationMs = System.currentTimeMillis() - startTimeMs;
+    _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SEGMENT_REMOTE_UPLOAD_TIME_MS, durationMs,
+        TimeUnit.MILLISECONDS);
+    _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_REMOTE_UPLOAD_TIME_MS, durationMs, TimeUnit.MILLISECONDS);
+    long segmentSizeInBytes = segmentFile.length();
+    _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.SEGMENT_UPLOAD_SIZE_BYTES,
+        segmentSizeInBytes);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSizeInBytes);
+
   }
 
   private void copyFromSegmentURIToDeepStore(URI sourceDownloadURI, URI finalSegmentLocationURI)

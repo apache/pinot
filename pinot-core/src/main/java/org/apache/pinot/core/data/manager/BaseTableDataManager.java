@@ -57,6 +57,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -434,9 +435,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    long downloadStartTimeMs = System.currentTimeMillis();
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
+    // Download the segment
     File indexDir = downloadSegment(zkMetadata);
+    long totalDownloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+    _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS,
+            totalDownloadDurationMs, TimeUnit.MILLISECONDS);
+    // Load the segment
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
@@ -915,14 +922,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(downloadUrl != null,
         "Failed to find download URL in ZK metadata for segment: %s of table: %s", segmentName, _tableNameWithType);
     try {
+      File segment;
       if (!CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(downloadUrl)) {
         try {
-          return downloadSegmentFromDeepStore(zkMetadata);
+          segment = downloadSegmentFromDeepStore(zkMetadata);
         } catch (Exception e) {
           if (_peerDownloadScheme != null) {
             _logger.warn("Caught exception while downloading segment: {} from: {}, trying to download from peers",
                 segmentName, downloadUrl, e);
-            return downloadSegmentFromPeers(zkMetadata);
+            segment = downloadSegmentFromPeers(zkMetadata);
           } else {
             throw e;
           }
@@ -930,6 +938,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       } else {
         return downloadSegmentFromPeers(zkMetadata);
       }
+      long segmentSize = segment.length();
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
+      return segment;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1);
       throw e;
@@ -970,8 +982,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
               segmentName, _streamSegmentDownloadUntarRateLimitBytesPerSec);
           AtomicInteger failedAttempts = new AtomicInteger(0);
           try {
+            long downloadStartTimeMs = System.currentTimeMillis();
             untarredSegmentDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(downloadUrl, tempRootDir,
                 _streamSegmentDownloadUntarRateLimitBytesPerSec, failedAttempts);
+            long downloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+            _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_STREAMED_DOWNLOAD_TIME_MS,
+                downloadDurationMs, TimeUnit.MILLISECONDS);
+            _serverMetrics.addTimedValue(ServerTimer.SEGMENT_STREAMED_DOWNLOAD_TIME_MS,
+                downloadDurationMs, TimeUnit.MILLISECONDS);
             _logger.info("Downloaded and untarred segment: {} from: {}, failed attempts: {}", segmentName, downloadUrl,
                 failedAttempts.get());
           } finally {
@@ -980,7 +998,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
           }
         } else {
           File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+          long downloadStartTimeMs = System.currentTimeMillis();
           SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
+          long downloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+          _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_DECRYPT_DOWNLOAD_TIME_MS,
+                  downloadDurationMs, TimeUnit.MILLISECONDS);
+          _serverMetrics.addTimedValue(ServerTimer.SEGMENT_DECRYPT_DOWNLOAD_TIME_MS, downloadDurationMs,
+                TimeUnit.MILLISECONDS);
           _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
               segmentTarFile, segmentTarFile.length());
           untarredSegmentDir = untarSegment(segmentName, segmentTarFile, tempRootDir);
@@ -1025,13 +1049,20 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentDownloadThrottler.getQueueLength());
     }
     try {
+      long downloadStartTimeMs = System.currentTimeMillis();
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
             PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
                 _peerDownloadScheme);
+
         Collections.shuffle(peerServerURIs);
         return peerServerURIs;
       }, segmentTarFile, zkMetadata.getCrypterName());
+      long downloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+      _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_PEER_DOWNLOAD_TIME_MS, downloadDurationMs,
+            TimeUnit.MILLISECONDS);
+        _serverMetrics.addTimedValue(ServerTimer.SEGMENT_PEER_DOWNLOAD_TIME_MS, downloadDurationMs,
+            TimeUnit.MILLISECONDS);
       _logger.info("Downloaded tarred segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       File indexDir = untarAndMoveSegment(segmentName, segmentTarFile, tempRootDir);

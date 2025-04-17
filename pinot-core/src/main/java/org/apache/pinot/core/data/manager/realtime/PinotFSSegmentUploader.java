@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.net.URI;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -36,6 +28,10 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.net.URI;
+import java.util.concurrent.*;
 
 
 /**
@@ -89,6 +85,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         long duration = System.currentTimeMillis() - startTime;
         _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
             TimeUnit.MILLISECONDS);
+        _serverMetrics.addTimedValue(ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration, TimeUnit.MILLISECONDS);
+        long segmentSize = segmentFile.length();
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
       }
       return null;
     };

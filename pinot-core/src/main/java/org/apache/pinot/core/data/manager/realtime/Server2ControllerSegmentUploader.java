@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -34,6 +30,11 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
+
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.concurrent.TimeUnit;
 
 
 // A segment uploader which uploads segments to the controller via the controller's segmentCommitUpload end point.
@@ -111,6 +112,9 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
+      long segmentSize = segmentFile.length();
+      _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
     }
     SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;

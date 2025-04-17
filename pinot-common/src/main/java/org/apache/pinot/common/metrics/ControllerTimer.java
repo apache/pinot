@@ -30,7 +30,16 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
   // How long it took the server to start.
-  STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true);
+  STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
+  // TotalTime = segmentRemoteDownloadTimeMs + segmentProcessingTime (controller local processing)
+  SEGMENT_TOTAL_DOWNLOAD_TIME_MS("segmentDownloadTotalTimeMs", false),
+  // Time taken to download the segment from remote store
+  SEGMENT_REMOTE_DOWNLOAD_TIME_MS("segmentRemoteDownloadTimeMs", false),
+  // TotalTime = segmentUploadTimeMs + segmentProcessingTime (controller local processing)
+  SEGMENT_TOTAL_UPLOAD_TIME_MS("segmentUploadTotalTimeMs", false),
+  // Time taken to upload the segment to remote store
+  SEGMENT_REMOTE_UPLOAD_TIME_MS("segmentRemoteUploadTimeMs", false);
+
 
   private final String _timerName;
   private final boolean _global;
