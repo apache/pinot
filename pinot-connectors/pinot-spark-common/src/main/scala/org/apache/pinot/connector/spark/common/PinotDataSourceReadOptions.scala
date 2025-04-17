@@ -38,6 +38,7 @@ object PinotDataSourceReadOptions {
   var CONFIG_USE_GRPC_SERVER = "useGrpcServer"
   val CONFIG_QUERY_OPTIONS = "queryOptions"
   val CONFIG_FAIL_ON_INVALID_SEGMENTS = "failOnInvalidSegments"
+  val CONFIG_API_TOKEN = "authorization"
   val QUERY_OPTIONS_DELIMITER = ","
   private[pinot] val DEFAULT_CONTROLLER: String = "localhost:9000"
   private[pinot] val DEFAULT_USE_PUSH_DOWN_FILTERS: Boolean = true
@@ -74,9 +75,10 @@ object PinotDataSourceReadOptions {
 
     // pinot cluster options
     val controller = options.getOrDefault(CONFIG_CONTROLLER, DEFAULT_CONTROLLER)
+    val authorization = options.getOrDefault(CONFIG_API_TOKEN, "")
     val broker = options.get(PinotDataSourceReadOptions.CONFIG_BROKER) match {
       case s if s == null || s.isEmpty =>
-        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName)
+        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName, authorization)
         Random.shuffle(brokerInstances).head
       case s => s
     }
@@ -103,6 +105,7 @@ object PinotDataSourceReadOptions {
       useGrpcServer,
       queryOptions,
       failOnInvalidSegments,
+      authorization,
     )
   }
 }
@@ -118,4 +121,5 @@ private[pinot] case class PinotDataSourceReadOptions(
     pinotServerTimeoutMs: Long,
     useGrpcServer: Boolean,
     queryOptions: Set[String],
-    failOnInvalidSegments: Boolean)
+    failOnInvalidSegments: Boolean,
+    authorization: String)

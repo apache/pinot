@@ -54,7 +54,11 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
     if (currentSchema == null) {
       currentSchema = userSchema.getOrElse {
         val pinotTableSchema =
-          PinotClusterClient.getTableSchema(readParameters.controller, readParameters.tableName)
+          PinotClusterClient.getTableSchema(
+            readParameters.controller,
+            readParameters.tableName,
+            readParameters.authorization
+          )
         DataExtractor.pinotSchemaToSparkSchema(pinotTableSchema)
       }
     }
@@ -69,7 +73,7 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
       if (readParameters.tableType.isDefined) {
         None
       } else {
-        PinotClusterClient.getTimeBoundaryInfo(readParameters.broker, readParameters.tableName)
+        PinotClusterClient.getTimeBoundaryInfo(readParameters.broker, readParameters.tableName, readParameters.authorization)
       }
 
     val whereCondition = FilterPushDown.compileFiltersToSqlWhereClause(this.acceptedFilters)
@@ -82,13 +86,13 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
       readParameters.queryOptions
     )
 
-    val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, scanQuery)
+    val routingTable = PinotClusterClient.getRoutingTable(readParameters.broker, readParameters.authorization, scanQuery)
 
     val instanceInfo : Map[String, InstanceInfo] = Map()
     val instanceInfoReader = (instance:String) => { // cached reader to reduce network round trips
       instanceInfo.getOrElseUpdate(
         instance,
-        PinotClusterClient.getInstanceInfo(readParameters.controller, instance)
+        PinotClusterClient.getInstanceInfo(readParameters.controller, readParameters.authorization, instance)
       )
     }
 
