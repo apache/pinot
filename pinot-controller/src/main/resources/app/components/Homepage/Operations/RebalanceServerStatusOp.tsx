@@ -86,21 +86,36 @@ export const RebalanceServerStatusOp = (
 
     useEffect(() => {
         try {
-            if (jobSelected !== null) {
-                setRebalanceContext(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_CONTEXT))
-                setRebalanceProgressStats(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_PROGRESS_STATS))
+            if (jobSelected !== null && rebalanceServerJobs.length > 0) {
+                const rebalanceServerJob = rebalanceServerJobs
+                    .find(job => job.jobId === jobSelected);
+
+                if (rebalanceServerJob) {
+                    setRebalanceContext(JSON.parse(rebalanceServerJob.REBALANCE_CONTEXT));
+                    setRebalanceProgressStats(JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS));
+                } else {
+                    setRebalanceContext(
+                        {
+                            message: 'Failed to load rebalance context'
+                        });
+                    setRebalanceProgressStats(
+                        {
+                            message: 'Failed to load rebalance progress stats'
+                        });
+                }
+
             }
         } catch (e) {
             setRebalanceContext(
                 {
-                    message: 'Failed to load rebalance context'
+                    message: 'Failed to load rebalance context' + e.toString()
                 });
             setRebalanceProgressStats(
                 {
-                    message: 'Failed to load rebalance progress stats'
+                    message: 'Failed to load rebalance progress stats' + e.toString()
                 });
         }
-    }, [jobSelected]);
+    }, [jobSelected, rebalanceServerJobs]);
 
     if (loading) {
         return (
