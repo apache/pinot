@@ -35,8 +35,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 public class LogicalTableUtils {
 
-  private static final String DEFAULT_BROKER_TENANT = "DefaultTenant";
-
   private LogicalTableUtils() {
     // Utility class
   }
@@ -109,9 +107,6 @@ public class LogicalTableUtils {
     }
 
     // validate broker tenant
-    if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
-      logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
-    }
     String brokerTenant = logicalTable.getBrokerTenant();
     if (!allBrokerTenantNames.contains(brokerTenant)) {
       throw new IllegalArgumentException(

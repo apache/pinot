@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.arrow.util.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -81,6 +82,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotLogicalTableResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLogicalTableResource.class);
+  private static final String DEFAULT_BROKER_TENANT = "DefaultTenant";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -211,6 +213,10 @@ public class PinotLogicalTableResource {
   private SuccessResponse addLogicalTable(LogicalTable logicalTable) {
     String tableName = logicalTable.getTableName();
     try {
+      if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
+        logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
+      }
+
       LogicalTableUtils.validateLogicalTableName(
           logicalTable,
           _pinotHelixResourceManager.getAllTables(),
@@ -231,6 +237,10 @@ public class PinotLogicalTableResource {
 
   private SuccessResponse updateLogicalTable(String tableName, LogicalTable logicalTable) {
     try {
+      if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
+        logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
+      }
+
       LogicalTableUtils.validateLogicalTableName(
           logicalTable,
           _pinotHelixResourceManager.getAllTables(),

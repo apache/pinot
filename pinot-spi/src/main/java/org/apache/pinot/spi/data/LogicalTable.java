@@ -33,8 +33,8 @@ public class LogicalTable {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
 
-  public static final String LOGICAL_TABLE_NAME_KEY = "logicalTableName";
-  public static final String PHYSICAL_TABLE_CONFIG_KEY = "physicalTableConfig";
+  public static final String LOGICAL_TABLE_NAME_KEY = "tableName";
+  public static final String PHYSICAL_TABLE_CONFIG_KEY = "physicalTableConfigMap";
   public static final String BROKER_TENANT_KEY = "brokerTenant";
 
   private String _tableName;
