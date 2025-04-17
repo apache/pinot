@@ -847,8 +847,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS,
         "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0 ?
-            "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Override minimizeDataMovement
@@ -861,8 +861,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS,
         "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0 ?
-            "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Use default minimizeDataMovement and disable it in table config
@@ -878,8 +878,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS,
         "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0 ?
-            "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
@@ -955,8 +955,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS,
         "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0 ?
-            "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
@@ -971,8 +971,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS,
         "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0 ?
-            "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
