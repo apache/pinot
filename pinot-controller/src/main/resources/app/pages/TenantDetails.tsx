@@ -466,6 +466,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
   };
+  
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'Are you sure want to repair the table?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+    syncResponse(result);
+  };
 
   const closeDialog = () => {
     setConfirmDialog(false);
@@ -557,6 +571,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 enableTooltip={true}
               >
                 Rebalance Brokers
+              </CustomButton>
+              <CustomButton
+                onClick={handleRepairTable}
+                tooltipTitle="Repair table"
+                enableTooltip={true}
+              >
+                Repair Table
               </CustomButton>
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel

@@ -39,6 +39,7 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -1029,6 +1030,12 @@ const rebalanceBrokersForTableOp = (tableName) => {
     return response.data;
   });
 };
+// Runs the RealtimeSegmentValidationManager periodic task for a given table
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask('RealtimeSegmentValidationManager', tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
@@ -1360,6 +1367,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,
