@@ -1462,7 +1462,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     // Create a map from partition id to the smallest stream offset
     Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
-    if (offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
+    if (offsetCriteria != null && offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
       partitionIdToSmallestOffset = partitionIdToStartOffset;
     }
 
