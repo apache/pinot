@@ -386,7 +386,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   private RebalancePreCheckerResult checkReplicaGroups(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
     String message;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      message = "OFFLINE segments - " +  getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
+      message = "OFFLINE segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
     } else {
       // for realtime table
       message = "COMPLETED segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED) + "\n"

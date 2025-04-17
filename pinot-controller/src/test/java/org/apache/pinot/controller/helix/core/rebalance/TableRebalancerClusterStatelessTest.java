@@ -1335,7 +1335,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
         "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS + "\n" + TIER_A_NAME
-            + " tier - numReplicaGroups: " + NUM_REPLICAS + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)");
+            + " tier - numReplicaGroups: " + NUM_REPLICAS
+            + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)");
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
