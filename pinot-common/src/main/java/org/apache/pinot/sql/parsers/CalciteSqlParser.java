@@ -100,7 +100,7 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     long parseStartTimeNs = System.nanoTime();
 
-    sql = ParserUtils.sanitizeSqlForParsing(sql);
+    sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
     List<String> options = extractOptionsFromSql(sql);

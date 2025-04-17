@@ -40,46 +40,24 @@ public class ParserUtils {
   }
 
   /**
-   * Sanitize the sql string for parsing by normalizing whitespace which can
-   * cause performance issues with regex based parsing.
-   * This method replaces multiple consecutive whitespace characters with a single space.
-   *
-   * @param sql The raw SQL string to sanitize. May be null.
-   * @return A sanitized SQL string with normalized whitespace and no trailing spaces,
-   *         or {@code null} if the input was {@code null}.
+   * Sanitize the sql string for parsing by normalizing whitespace
+   * which is likely to cause performance issues with regex parsing.
+   * @param sql string to sanitize
+   * @return sanitized sql string
    */
-  public static String sanitizeSqlForParsing(String sql) {
+  public static String sanitizeSql(String sql) {
 
-    // 1. Remove excessive whitespace
+    // 1. Remove trailing whitespaces
 
-    int length = sql.length();
-    StringBuilder builder = new StringBuilder(length);
-    boolean inWhitespaceBlock = false;
-
-    for (int charIndex = 0; charIndex < length; charIndex++) {
-      char currentChar = sql.charAt(charIndex);
-
-      if (Character.isWhitespace(currentChar)) {
-        if (currentChar == '\n' || currentChar == '\r') {
-          builder.append(currentChar); // preserve line breaks
-          inWhitespaceBlock = false; // reset space block
-        } else if (!inWhitespaceBlock) {
-          builder.append(' ');
-          inWhitespaceBlock = true;
-        }
-      } else {
-        builder.append(currentChar);
-        inWhitespaceBlock = false; // reset space block
-      }
+    int endIndex = sql.length() - 1;
+    while (endIndex >= 0 && Character.isWhitespace(sql.charAt(endIndex))) {
+      endIndex--;
     }
-
-    if (sql.length() == builder.length()) {
-      return sql; // No excessive whitespace found
-    }
+    sql = sql.substring(0, endIndex + 1);
 
     // Likewise extend for other improvements
 
-    return builder.toString();
+    return sql;
   }
 
   private static void validateJsonExtractScalarFunction(List<Expression> operands) {
