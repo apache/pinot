@@ -557,7 +557,8 @@ public class TableRebalancer {
               "No state change found for segments to be moved, re-calculating the target assignment based on the "
                   + "previous target assignment");
           Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
-          targetAssignment = new HashMap<>(currentAssignment);
+          // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
+          targetAssignment = new TreeMap<>(currentAssignment);
           for (String segment : segmentsToMove) {
             targetAssignment.put(segment, oldTargetAssignment.get(segment));
           }
@@ -583,8 +584,6 @@ public class TableRebalancer {
           allSegmentsFromIdealState, null);
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
           targetAssignment, rebalanceContext);
-      // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
-      allSegmentsFromIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
@@ -618,9 +617,16 @@ public class TableRebalancer {
             "Failed to update IdealState");
         currentAssignment = nextAssignment;
         expectedVersion++;
+        // IdealState update is successful. Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should have
+        // captured the newly added / deleted segments
+        allSegmentsFromIdealState = currentAssignment.keySet();
         tableRebalanceLogger.info("Successfully updated the IdealState");
       } catch (ZkBadVersionException e) {
         tableRebalanceLogger.info("Version changed while updating IdealState");
+        // Since IdealState wasn't updated, rollback the stats changes made and continue. There is no need to update
+        // segmentsToMonitor either since that hasn't changed without the IdealState update
+        _tableRebalanceObserver.onRollback();
+        continue;
       } catch (Exception e) {
         onReturnFailure("Caught exception while updating IdealState, aborting the rebalance", e, tableRebalanceLogger);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
