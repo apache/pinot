@@ -39,7 +39,7 @@ public class LogicalTableBuilder {
   }
 
   public LogicalTableBuilder setBrokerTenant(String brokerTenant) {
-    this._brokerTenant = brokerTenant;
+    _brokerTenant = brokerTenant;
     return this;
   }
 

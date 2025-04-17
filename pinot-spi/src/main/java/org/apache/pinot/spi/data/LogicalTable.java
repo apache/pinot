@@ -38,7 +38,7 @@ public class LogicalTable {
   public static final String BROKER_TENANT_KEY = "brokerTenant";
 
   private String _tableName;
-  private String brokerTenant;
+  private String _brokerTenant;
   private Map<String, PhysicalTableConfig> _physicalTableConfigMap;
 
   public static LogicalTable fromString(String logicalTableString)
@@ -64,11 +64,11 @@ public class LogicalTable {
   }
 
   public String getBrokerTenant() {
-    return brokerTenant;
+    return _brokerTenant;
   }
 
   public void setBrokerTenant(String brokerTenant) {
-    this.brokerTenant = brokerTenant;
+    _brokerTenant = brokerTenant;
   }
 
   private JsonNode toJsonObject() {
