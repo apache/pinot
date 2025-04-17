@@ -62,11 +62,15 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
   public void setUpContextBuilder()
       throws IOException {
     FileUtils.forceMkdir(TEMP_DIR);
-    _dedupContextBuilder = new DedupContext.Builder();
-    _dedupContextBuilder.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
-        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setMetadataTTL(METADATA_TTL)
-        .setDedupTimeColumn(DEDUP_TIME_COLUMN_NAME).setTableIndexDir(mock(File.class))
-        .setTableDataManager(mock(TableDataManager.class)).setTableIndexDir(TEMP_DIR);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
+    _dedupContextBuilder = new DedupContext.Builder()
+        .setTableConfig(mock(TableConfig.class))
+        .setSchema(mock(Schema.class))
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn"))
+        .setMetadataTTL(METADATA_TTL)
+        .setDedupTimeColumn(DEDUP_TIME_COLUMN_NAME);
   }
 
   @AfterMethod
@@ -76,11 +80,17 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
 
   @Test
   public void creatingMetadataManagerThrowsExceptions() {
-    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
-    dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
-        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE).setMetadataTTL(1)
-        .setDedupTimeColumn(null).setTableIndexDir(mock(File.class)).setTableDataManager(mock(TableDataManager.class));
-    DedupContext dedupContext = dedupContextBuider.build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
+    DedupContext dedupContext = new DedupContext.Builder()
+        .setTableConfig(mock(TableConfig.class))
+        .setSchema(mock(Schema.class))
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn"))
+        .setHashFunction(HashFunction.NONE)
+        .setMetadataTTL(1)
+        .setDedupTimeColumn(null)
+        .build();
     assertThrows(IllegalArgumentException.class,
         () -> new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0, dedupContext));
   }

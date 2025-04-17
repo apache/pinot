@@ -54,6 +54,7 @@ import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.dedup.DedupContext;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
@@ -63,6 +64,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -74,7 +76,6 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
-import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -761,7 +762,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   persisted.
         // Take upsert snapshot before starting consuming events
         if (_partitionUpsertMetadataManager != null) {
-          if (_tableConfig.getUpsertMetadataTTL() > 0) {
+          if (_partitionUpsertMetadataManager.getContext().getMetadataTTL() > 0) {
             // If upsertMetadataTTL is enabled, we will remove expired primary keys from upsertMetadata
             // AFTER taking a snapshot. Taking the snapshot first is crucial to capture the final
             // state of each key before it exits the TTL window. Out-of-TTL segments are skipped in
@@ -779,7 +780,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
-        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+        if (_partitionDedupMetadataManager != null
+            && _partitionDedupMetadataManager.getContext().getMetadataTTL() > 0) {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
@@ -1662,27 +1664,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
-            .setSegmentName(_segmentNameStr)
-            .setStreamName(streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
-            .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-            .setSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
-            .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setAggregateMetrics(indexingConfig.isAggregateMetrics())
-            .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
-            .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
-            .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
-            .setUpsertConsistencyMode(tableConfig.getUpsertConsistencyMode())
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
-            .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
-            .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
-            .setUpsertOutOfOrderRecordColumn(tableConfig.getOutOfOrderRecordColumn())
-            .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
-            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-            .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList());
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+        .setTableNameWithType(_tableNameWithType)
+        .setSegmentName(_segmentNameStr)
+        .setStreamName(streamTopic)
+        .setSchema(_schema)
+        .setTimeColumnName(timeColumnName)
+        .setCapacity(_segmentMaxRowCount)
+        .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+        .setSegmentZKMetadata(segmentZKMetadata)
+        .setOffHeap(_isOffHeap)
+        .setMemoryManager(_memoryManager)
+        .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+        .setAggregateMetrics(indexingConfig.isAggregateMetrics())
+        .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
+        .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
+        .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+        .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
+        .setConsumerDir(consumerDir);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
@@ -1761,8 +1760,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  @VisibleForTesting
-  ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
+  private ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
     IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
     ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy = null;
     boolean pauseless = false;
@@ -1782,19 +1780,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //   - For pauseless tables, allow consumption during build, but disallow consumption during download
     //   - For non-pauseless tables, disallow consumption during build and download
     //     TODO: Revisit the non-pauseless handling
-    if (_realtimeTableDataManager.isDedupEnabled()) {
-      DedupConfig dedupConfig = _tableConfig.getDedupConfig();
-      assert dedupConfig != null;
-      if (dedupConfig.isAllowDedupConsumptionDuringCommit()) {
+    if (_partitionUpsertMetadataManager != null) {
+      UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
+      if (upsertContext.isAllowPartialUpsertConsumptionDuringCommit()
+          || upsertContext.getUpsertMode() != UpsertConfig.Mode.PARTIAL) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
           : ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
     }
-    if (_realtimeTableDataManager.isPartialUpsertEnabled()) {
-      UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
-      assert upsertConfig != null;
-      if (upsertConfig.isAllowPartialUpsertConsumptionDuringCommit()) {
+    if (_partitionDedupMetadataManager != null) {
+      DedupContext dedupContext = _partitionDedupMetadataManager.getContext();
+      if (dedupContext.isAllowDedupConsumptionDuringCommit()) {
         return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
       }
       return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY

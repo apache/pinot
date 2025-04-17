@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -37,14 +38,23 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
 
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager);
+  void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
+      TableDataManager tableDataManager);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
+  UpsertContext getContext();
+
+  /// @deprecated Use {@link #getContext()} instead.
+  @Deprecated
   UpsertConfig.Mode getUpsertMode();
 
+  /// @deprecated Use {@link #getContext()} instead.
+  @Deprecated
   UpsertConfig.ConsistencyMode getUpsertConsistencyMode();
 
+  /// @deprecated Use {@link #getContext()} instead.
+  @Deprecated
   boolean isEnablePreload();
 
   /**

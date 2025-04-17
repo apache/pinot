@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
@@ -34,7 +33,6 @@ import static org.testng.Assert.assertTrue;
 /**
  * Queries test for FUNNEL_COUNT queries.
  */
-@SuppressWarnings("rawtypes")
 public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTest {
 
   @Override
@@ -55,9 +53,7 @@ public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTes
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false);
+    MutableSegment mutableSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }

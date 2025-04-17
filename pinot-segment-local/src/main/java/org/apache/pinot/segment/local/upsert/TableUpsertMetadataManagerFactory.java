@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server.Upsert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,50 +35,26 @@ public class TableUpsertMetadataManagerFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
-  public static final String UPSERT_DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
-  public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
-  public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
-  public static final String UPSERT_DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
-      "default.allow.partial.upsert.consumption.during.commit";
-
-  public static TableUpsertMetadataManager create(TableConfig tableConfig,
-      @Nullable PinotConfiguration instanceUpsertConfig) {
+  public static TableUpsertMetadataManager create(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig,
+      Schema schema, TableDataManager tableDataManager) {
     String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkArgument(tableConfig.isUpsertEnabled(), "Upsert must be enabled for table: %s",
+        tableNameWithType);
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
+    assert upsertConfig != null;
 
     TableUpsertMetadataManager metadataManager;
     String metadataManagerClass = upsertConfig.getMetadataManagerClass();
-
-    if (instanceUpsertConfig != null) {
-      if (metadataManagerClass == null) {
-        metadataManagerClass = instanceUpsertConfig.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS);
-      }
-      // Server level config honoured only when table level config is not set to true
-      if (!upsertConfig.isEnableSnapshot()) {
-        upsertConfig.setEnableSnapshot(
-            Boolean.parseBoolean(instanceUpsertConfig.getProperty(UPSERT_DEFAULT_ENABLE_SNAPSHOT, "false")));
-      }
-
-      // Server level config honoured only when table level config is not set to true
-      if (!upsertConfig.isEnablePreload()) {
-        upsertConfig.setEnablePreload(
-            Boolean.parseBoolean(instanceUpsertConfig.getProperty(UPSERT_DEFAULT_ENABLE_PRELOAD, "false")));
-      }
-
-      // server level config honoured only when table level config is not set to true
-      if (!upsertConfig.isAllowPartialUpsertConsumptionDuringCommit()) {
-        upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(Boolean.parseBoolean(
-            instanceUpsertConfig.getProperty(UPSERT_DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT, "false")));
-      }
+    if (metadataManagerClass == null) {
+      metadataManagerClass = instanceUpsertConfig.getProperty(Upsert.DEFAULT_METADATA_MANAGER_CLASS);
     }
-
-    if (StringUtils.isNotEmpty(metadataManagerClass)) {
+    if (StringUtils.isNotBlank(metadataManagerClass)) {
       LOGGER.info("Creating TableUpsertMetadataManager with class: {} for table: {}", metadataManagerClass,
           tableNameWithType);
       try {
-        metadataManager = (TableUpsertMetadataManager) Class.forName(metadataManagerClass).newInstance();
+        metadataManager =
+            (TableUpsertMetadataManager) Class.forName(metadataManagerClass).getConstructor().newInstance();
       } catch (Exception e) {
         throw new RuntimeException(
             String.format("Caught exception while constructing TableUpsertMetadataManager with class: %s for table: %s",
@@ -86,7 +64,7 @@ public class TableUpsertMetadataManagerFactory {
       LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);
       metadataManager = new ConcurrentMapTableUpsertMetadataManager();
     }
-
+    metadataManager.init(instanceUpsertConfig, tableConfig, schema, tableDataManager);
     return metadataManager;
   }
 }
