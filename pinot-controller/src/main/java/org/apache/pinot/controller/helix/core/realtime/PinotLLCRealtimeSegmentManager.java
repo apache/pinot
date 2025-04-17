@@ -994,15 +994,17 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
     Set<Integer> partitionIds = new HashSet<>();
-    boolean allPartitionIdsFetched = true;
+    boolean allPartitionIdsFetched = false;
     for (int i = 0; i < streamConfigs.size(); i++) {
       final int index = i;
       try {
         partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream()
             .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
             .collect(Collectors.toSet()));
+        allPartitionIdsFetched = true;
+      } catch (UnsupportedOperationException ignored) {
+        // Stream does not support fetching partition ids. There is a log in the fallback code which is sufficient
       } catch (Exception e) {
-        allPartitionIdsFetched = false;
         LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfigs.get(i).getTopicName(), e);
       }
     }
@@ -1460,7 +1462,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     // Create a map from partition id to the smallest stream offset
     Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
-    if (offsetCriteria == OffsetCriteria.SMALLEST_OFFSET_CRITERIA) {
+    if (offsetCriteria != null && offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
       partitionIdToSmallestOffset = partitionIdToStartOffset;
     }
 
@@ -1553,11 +1555,13 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
           if (partitionIdToSmallestOffset == null) {
-            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs);
+            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState);
           }
 
           // Do not create new CONSUMING segment when the stream partition has reached end of life.
           if (!partitionIdToSmallestOffset.containsKey(partitionId)) {
+            LOGGER.info("PartitionGroup: {} has reached end of life. Skipping creation of new segment {}",
+                partitionId, latestSegmentName);
             continue;
           }
 
@@ -1651,13 +1655,17 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private Map<Integer, StreamPartitionMsgOffset> fetchPartitionGroupIdToSmallestOffset(
-      List<StreamConfig> streamConfigs) {
+      List<StreamConfig> streamConfigs, IdealState idealState) {
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestOffset = new HashMap<>();
     for (StreamConfig streamConfig : streamConfigs) {
+
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+          getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+
       OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
       List<PartitionGroupMetadata> partitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList());
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
       for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
         partitionGroupIdToSmallestOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());

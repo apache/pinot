@@ -475,7 +475,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
               messageBatch.isEndOfPartitionGroup());
         }
-        _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
+        // We need to check for both endOfPartitionGroup and messageCount == 0, because
+        // endOfPartitionGroup can be true even if this is the last batch of messages (has been observed for kinesis)
+        // To process the last batch of messages, we need to set _endOfPartitionGroup to true in such a case
+        _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
