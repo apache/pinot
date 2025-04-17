@@ -21,7 +21,6 @@ package org.apache.pinot.broker.routing.adaptiveserverselector;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 import org.testng.annotations.BeforeMethod;
@@ -30,9 +29,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 public class PriorityGroupInstanceSelectorTest {
 
@@ -49,14 +46,14 @@ public class PriorityGroupInstanceSelectorTest {
 
   @Test
   public void testSelectWithEmptyCandidates() {
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, Collections.emptyList());
-    assertFalse(result.isPresent());
+    SegmentInstanceCandidate result = _selector.select(_context, Collections.emptyList());
+    assertNull(result);
   }
 
   @Test
   public void testSelectWithNullCandidates() {
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, null);
-    assertFalse(result.isPresent());
+    SegmentInstanceCandidate result = _selector.select(_context, null);
+    assertNull(result);
   }
 
   @Test
@@ -71,11 +68,11 @@ public class PriorityGroupInstanceSelectorTest {
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, candidates);
+    SegmentInstanceCandidate result = _selector.select(_context, candidates);
 
     // Verify
-    assertTrue(result.isPresent());
-    assertEquals(result.get().getInstance(), "server2");
+    assertNotNull(result);
+    assertEquals(result.getInstance(), "server2");
   }
 
   @Test
@@ -90,12 +87,12 @@ public class PriorityGroupInstanceSelectorTest {
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, candidates);
+    SegmentInstanceCandidate result = _selector.select(_context, candidates);
 
     // Verify
-    assertTrue(result.isPresent());
-    assertEquals(result.get().getInstance(), "server2");
-    assertEquals(result.get().getReplicaGroup(), 2);
+    assertNotNull(result);
+    assertEquals(result.getInstance(), "server2");
+    assertEquals(result.getReplicaGroup(), 2);
   }
 
   @Test
@@ -110,12 +107,12 @@ public class PriorityGroupInstanceSelectorTest {
     when(_adaptiveServerSelector.select(any())).thenReturn("server1");
 
     // Execute
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, candidates);
+    SegmentInstanceCandidate result = _selector.select(_context, candidates);
 
     // Verify
-    assertTrue(result.isPresent());
-    assertEquals(result.get().getInstance(), "server1");
-    assertEquals(result.get().getReplicaGroup(), 1);
+    assertNotNull(result);
+    assertEquals(result.getInstance(), "server1");
+    assertEquals(result.getReplicaGroup(), 1);
   }
 
   @Test
@@ -129,12 +126,12 @@ public class PriorityGroupInstanceSelectorTest {
     when(_adaptiveServerSelector.select(any())).thenReturn("server4");
 
     // Execute
-    Optional<SegmentInstanceCandidate> result = _selector.select(_context, candidates);
+    SegmentInstanceCandidate result = _selector.select(_context, candidates);
 
     // Verify
-    assertTrue(result.isPresent());
-    assertEquals(result.get().getInstance(), "server4");
-    assertEquals(result.get().getReplicaGroup(), -1);
+    assertNotNull(result);
+    assertEquals(result.getInstance(), "server4");
+    assertEquals(result.getReplicaGroup(), -1);
   }
 
   @Test

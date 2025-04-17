@@ -24,10 +24,21 @@ import java.util.Map;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
+/**
+ * This class encapsulates query options and ordered preferred replica groups that influence how
+ * servers are selected for query execution.
+ */
 public class ServerSelectionContext {
   private final Map<String, String> _queryOptions;
   private final List<Integer> _orderedPreferredGroups;
 
+  /**
+   * Creates a new server selection context with the given query options.
+   * The ordered preferred groups are extracted from the query options using
+   * {@link QueryOptionsUtils#getOrderedPreferredReplicas(Map)}.
+   *
+   * @param queryOptions map of query options that may contain server selection preferences
+   */
   public ServerSelectionContext(Map<String, String> queryOptions) {
     _queryOptions = queryOptions == null ? Collections.emptyMap() : queryOptions;
     _orderedPreferredGroups = QueryOptionsUtils.getOrderedPreferredReplicas(_queryOptions);

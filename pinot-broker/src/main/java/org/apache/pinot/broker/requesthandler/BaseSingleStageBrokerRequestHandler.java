@@ -787,7 +787,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setReplicaGroups(Stream.concat(
             offlineRoutingTable != null ? offlineRoutingTable.keySet().stream() : Stream.empty(),
             realtimeRoutingTable != null ? realtimeRoutingTable.keySet().stream() : Stream.empty())
-        .map(ServerInstance::getGroup)
+        .map(ServerInstance::getPool)
         .collect(Collectors.toSet()));
 
     for (QueryProcessingException errorMsg : errorMsgs) {

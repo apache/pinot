@@ -117,7 +117,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
-    _priorityGroupInstanceSelector = new PriorityGroupInstanceSelector(_adaptiveServerSelector);
     _clock = clock;
     _useFixedReplica = useFixedReplica;
     _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
@@ -127,6 +126,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _tableNameHashForFixedReplicaRouting =
         TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
 
+    _priorityGroupInstanceSelector = _adaptiveServerSelector == null ? null : new PriorityGroupInstanceSelector(
+            _adaptiveServerSelector);
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
@@ -478,7 +479,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
               instanceID, _tableNameWithType);
     } else {
-      group = server.getGroup();
+      group = server.getPool();
     }
     return group;
   }

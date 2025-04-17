@@ -55,7 +55,7 @@ public final class ServerInstance {
   private final int _queryServicePort;
   private final int _queryMailboxPort;
   private final String _adminEndpoint;
-  private final int _group;
+  private final int _pool;
 
   /**
    * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
@@ -89,7 +89,7 @@ public final class ServerInstance {
     _queryMailboxPort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
-    _group = extractGroup(instanceConfig);
+    _pool = extractPool(instanceConfig);
   }
 
   @VisibleForTesting
@@ -102,7 +102,7 @@ public final class ServerInstance {
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
     _adminEndpoint = null;
-    _group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+    _pool = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
   }
 
   public String getInstanceId() {
@@ -136,8 +136,8 @@ public final class ServerInstance {
     return _nettyTlsPort;
   }
 
-  public int getGroup() {
-    return _group;
+  public int getPool() {
+    return _pool;
   }
 
   // Does not require TLS until all servers guaranteed to be on TLS
@@ -191,7 +191,7 @@ public final class ServerInstance {
   }
 
   @VisibleForTesting
-  int extractGroup(InstanceConfig instanceConfig) {
+  int extractPool(InstanceConfig instanceConfig) {
     Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
     if (pools == null || pools.isEmpty()) {
       return DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;

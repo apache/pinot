@@ -22,7 +22,6 @@ import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -73,11 +72,10 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         if (candidates == null) {
           continue;
         }
-        Optional<SegmentInstanceCandidate> candidateOpt = _priorityGroupInstanceSelector.select(ctx, candidates);
+        SegmentInstanceCandidate candidate = _priorityGroupInstanceSelector.select(ctx, candidates);
         // If candidates is not null, candidates is always non-empty because segments with no enabled online servers
         // are placed in segmentStates.getUnavailableSegments()
-        assert candidateOpt.isPresent();
-        SegmentInstanceCandidate candidate = candidateOpt.get();
+        assert candidate != null;
         _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, 1,
             BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(candidate.getReplicaGroup()));
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
