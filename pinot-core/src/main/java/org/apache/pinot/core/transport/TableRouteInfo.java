@@ -155,9 +155,9 @@ public interface TableRouteInfo {
    */
   boolean isRouteExists();
 
-  boolean isOfflineTableDisabled();
+  boolean isOfflineRouteExists();
 
-  boolean isRealtimeTableDisabled();
+  boolean isRealtimeRouteExists();
 
   /**
    * Checks if all the physical tables are disabled.
@@ -165,6 +165,10 @@ public interface TableRouteInfo {
    * @return true if the table is disabled, false otherwise
    */
   boolean isDisabled();
+
+  boolean isOfflineTableDisabled();
+
+  boolean isRealtimeTableDisabled();
 
   @Nullable
   List<String> getDisabledTableNames();
