@@ -20,16 +20,22 @@ package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class LogicalTableUtils {
 
-  private static final String LOGICAL_TABLE_RECORD_KEY = "logicalTableJson";
+  private static final String DEFAULT_BROKER_TENANT = "DefaultTenant";
 
   private LogicalTableUtils() {
     // Utility class
@@ -37,18 +43,39 @@ public class LogicalTableUtils {
 
   public static LogicalTable fromZNRecord(ZNRecord record)
       throws IOException {
-    String logicalTableJson = record.getSimpleField(LOGICAL_TABLE_RECORD_KEY);
-    return LogicalTable.fromString(logicalTableJson);
+    LogicalTableBuilder builder = new LogicalTableBuilder()
+        .setTableName(record.getSimpleField(LogicalTable.LOGICAL_TABLE_NAME_KEY))
+        .setBrokerTenant(record.getSimpleField(LogicalTable.BROKER_TENANT_KEY));
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : record.getMapField(LogicalTable.PHYSICAL_TABLE_CONFIG_KEY).entrySet()) {
+      String physicalTableName = entry.getKey();
+      String physicalTableConfigJson = entry.getValue();
+      physicalTableConfigMap.put(physicalTableName,
+          JsonUtils.stringToObject(physicalTableConfigJson, PhysicalTableConfig.class));
+    }
+    builder.setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
   }
 
   public static ZNRecord toZNRecord(LogicalTable logicalTable)
       throws JsonProcessingException {
+    Map<String, String> physicalTableConfigMap = new HashMap<>();
+    for (Map.Entry<String, PhysicalTableConfig> entry : logicalTable.getPhysicalTableConfigMap().entrySet()) {
+      String physicalTableName = entry.getKey();
+      PhysicalTableConfig physicalTableConfig = entry.getValue();
+      physicalTableConfigMap.put(physicalTableName, physicalTableConfig.toJsonString());
+    }
+
     ZNRecord record = new ZNRecord(logicalTable.getTableName());
-    record.setSimpleField(LOGICAL_TABLE_RECORD_KEY, logicalTable.toSingleLineJsonString());
+    record.setSimpleField(LogicalTable.LOGICAL_TABLE_NAME_KEY, logicalTable.getTableName());
+    record.setSimpleField(LogicalTable.BROKER_TENANT_KEY, logicalTable.getBrokerTenant());
+    record.setMapField(LogicalTable.PHYSICAL_TABLE_CONFIG_KEY, physicalTableConfigMap);
     return record;
   }
 
-  public static void validateLogicalTableName(LogicalTable logicalTable, List<String> allPhysicalTables) {
+  public static void validateLogicalTableName(LogicalTable logicalTable, List<String> allPhysicalTables,
+      Set<String> allBrokerTenantNames) {
     String tableName = logicalTable.getTableName();
     if (StringUtils.isEmpty(tableName)) {
       throw new IllegalArgumentException("Invalid logical table name. Reason: 'tableName' should not be null or empty");
@@ -59,16 +86,36 @@ public class LogicalTableUtils {
           "Invalid logical table name. Reason: 'tableName' should not end with _OFFLINE or _REALTIME");
     }
 
-    if (logicalTable.getPhysicalTableNames() == null || logicalTable.getPhysicalTableNames().isEmpty()) {
+    if (logicalTable.getPhysicalTableConfigMap() == null || logicalTable.getPhysicalTableConfigMap().isEmpty()) {
       throw new IllegalArgumentException(
-          "Invalid logical table. Reason: 'physicalTableNames' should not be null or empty");
+          "Invalid logical table. Reason: 'physicalTableConfigMap' should not be null or empty");
     }
 
-    for (String physicalTableName : logicalTable.getPhysicalTableNames()) {
+    for (Map.Entry<String, PhysicalTableConfig> entry : logicalTable.getPhysicalTableConfigMap().entrySet()) {
+      String physicalTableName = entry.getKey();
+      PhysicalTableConfig physicalTableConfig = entry.getValue();
+
+      // validate physical table exists
       if (!allPhysicalTables.contains(physicalTableName)) {
         throw new IllegalArgumentException(
             "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
       }
+      // validate physical table config is not null
+      if (physicalTableConfig == null) {
+        throw new IllegalArgumentException(
+            "Invalid logical table. Reason: 'physicalTableConfig' should not be null for physical table: "
+                + physicalTableName);
+      }
+    }
+
+    // validate broker tenant
+    if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
+      logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
+    }
+    String brokerTenant = logicalTable.getBrokerTenant();
+    if (!allBrokerTenantNames.contains(brokerTenant)) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: '" + brokerTenant + "' should be one of the existing broker tenants");
     }
   }
 }

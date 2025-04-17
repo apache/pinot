@@ -211,7 +211,11 @@ public class PinotLogicalTableResource {
   private SuccessResponse addLogicalTable(LogicalTable logicalTable) {
     String tableName = logicalTable.getTableName();
     try {
-      LogicalTableUtils.validateLogicalTableName(logicalTable, _pinotHelixResourceManager.getAllTables());
+      LogicalTableUtils.validateLogicalTableName(
+          logicalTable,
+          _pinotHelixResourceManager.getAllTables(),
+          _pinotHelixResourceManager.getAllBrokerTenantNames()
+      );
       _pinotHelixResourceManager.addLogicalTable(logicalTable);
       return new SuccessResponse(tableName + " logical table successfully added.");
     } catch (TableAlreadyExistsException e) {
@@ -227,7 +231,11 @@ public class PinotLogicalTableResource {
 
   private SuccessResponse updateLogicalTable(String tableName, LogicalTable logicalTable) {
     try {
-      LogicalTableUtils.validateLogicalTableName(logicalTable, _pinotHelixResourceManager.getAllTables());
+      LogicalTableUtils.validateLogicalTableName(
+          logicalTable,
+          _pinotHelixResourceManager.getAllTables(),
+          _pinotHelixResourceManager.getAllBrokerTenantNames()
+      );
       _pinotHelixResourceManager.updateLogicalTable(logicalTable);
       return new SuccessResponse(logicalTable.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -479,7 +480,8 @@ public class TableCache implements PinotConfigProvider {
     if (logicalTable == null) {
       return null;
     }
-    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(logicalTable.getPhysicalTableNames().get(0)));
+    Optional<String> physicalTableName = logicalTable.getPhysicalTableConfigMap().keySet().stream().findFirst();
+    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(physicalTableName.orElse(null)));
   }
 
   @Override

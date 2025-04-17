@@ -30,8 +30,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -121,6 +123,7 @@ public class TableCacheTest {
         "Failed to add the logical table to the cache");
     // Logical table can be accessed by the logical table name
     assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTable);
+    assertEquals(tableCache.getLogicalTableSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Register the change listeners
     TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
@@ -213,6 +216,8 @@ public class TableCacheTest {
     // update the logical table
     logicalTable = getLogicalTable(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTable(logicalTable);
+    assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTable);
+    assertEquals(tableCache.getLogicalTableSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
@@ -263,11 +268,16 @@ public class TableCacheTest {
     TEST_INSTANCE.waitForEVToDisappear(ANOTHER_TABLE_OFFLINE);
   }
 
-  private static LogicalTable getLogicalTable(String logicalTableName, List<String> physicalTableNames) {
-    LogicalTable logicalTable = new LogicalTable();
-    logicalTable.setTableName(logicalTableName);
-    logicalTable.setPhysicalTableNames(physicalTableNames);
-    return logicalTable;
+  private static LogicalTable getLogicalTable(String tableName, List<String> physicalTableNames) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : physicalTableNames) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    LogicalTableBuilder builder = new LogicalTableBuilder()
+        .setTableName(tableName)
+        .setBrokerTenant("DefaultTenant")
+        .setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

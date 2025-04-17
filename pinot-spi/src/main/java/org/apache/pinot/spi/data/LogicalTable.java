@@ -20,11 +20,10 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.File;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -32,13 +31,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LogicalTable {
 
-  private String _tableName;
-  private List<String> _physicalTableNames;
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
 
-  public static LogicalTable fromFile(File logicalTableFile)
-      throws IOException {
-    return JsonUtils.fileToObject(logicalTableFile, LogicalTable.class);
-  }
+  public static final String LOGICAL_TABLE_NAME_KEY = "logicalTableName";
+  public static final String PHYSICAL_TABLE_CONFIG_KEY = "physicalTableConfig";
+  public static final String BROKER_TENANT_KEY = "brokerTenant";
+
+  private String _tableName;
+  private String brokerTenant;
+  private Map<String, PhysicalTableConfig> _physicalTableConfigMap;
 
   public static LogicalTable fromString(String logicalTableString)
       throws IOException {
@@ -53,22 +54,25 @@ public class LogicalTable {
     _tableName = tableName;
   }
 
-  public List<String> getPhysicalTableNames() {
-    return _physicalTableNames;
+  public Map<String, PhysicalTableConfig> getPhysicalTableConfigMap() {
+    return _physicalTableConfigMap;
   }
 
-  public void setPhysicalTableNames(List<String> physicalTableNames) {
-    _physicalTableNames = physicalTableNames;
+  public void setPhysicalTableConfigMap(
+      Map<String, PhysicalTableConfig> physicalTableConfigMap) {
+    _physicalTableConfigMap = physicalTableConfigMap;
   }
 
-  private ObjectNode toJsonObject() {
-    ObjectNode node = JsonUtils.newObjectNode().put("tableName", _tableName);
-    ArrayNode arrayNode = JsonUtils.newArrayNode();
-    for (String physicalTableName : _physicalTableNames) {
-      arrayNode.add(physicalTableName);
-    }
-    node.set("physicalTableNames", arrayNode);
-    return node;
+  public String getBrokerTenant() {
+    return brokerTenant;
+  }
+
+  public void setBrokerTenant(String brokerTenant) {
+    this.brokerTenant = brokerTenant;
+  }
+
+  private JsonNode toJsonObject() {
+    return DEFAULT_MAPPER.valueToTree(this);
   }
 
   /**
@@ -108,6 +112,6 @@ public class LogicalTable {
 
   @Override
   public String toString() {
-    return "LogicalTable{" + "_tableName='" + _tableName + '\'' + ", _physicalTableNames=" + _physicalTableNames + '}';
+    return toSingleLineJsonString();
   }
 }

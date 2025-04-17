@@ -72,13 +72,16 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -154,19 +157,19 @@ public class ControllerTest {
     return DEFAULT_INSTANCE;
   }
 
-  public List<String> createPhysicalTables(List<String> physicalTableNames)
+  public List<String> createHybridTables(List<String> tableNames)
       throws IOException {
-    List<String> physicalTableNamesWithType = new ArrayList<>();
-    for (String physicalTable : physicalTableNames) {
-      addDummySchema(physicalTable);
-      TableConfig offlineTable = createDummyTableConfig(physicalTable, TableType.OFFLINE);
-      TableConfig realtimeTable = createDummyTableConfig(physicalTable, TableType.REALTIME);
+    List<String> tableNamesWithType = new ArrayList<>();
+    for (String tableName : tableNames) {
+      addDummySchema(tableName);
+      TableConfig offlineTable = createDummyTableConfig(tableName, TableType.OFFLINE);
+      TableConfig realtimeTable = createDummyTableConfig(tableName, TableType.REALTIME);
       addTableConfig(offlineTable);
       addTableConfig(realtimeTable);
-      physicalTableNamesWithType.add(offlineTable.getTableName());
-      physicalTableNamesWithType.add(realtimeTable.getTableName());
+      tableNamesWithType.add(offlineTable.getTableName());
+      tableNamesWithType.add(realtimeTable.getTableName());
     }
-    return physicalTableNamesWithType;
+    return tableNamesWithType;
   }
 
   public String getHelixClusterName() {
@@ -376,6 +379,19 @@ public class ControllerTest {
         addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
       }
     }
+  }
+
+  public static LogicalTable getDummyLogicalTable(String tableName, List<String> physicalTableNames,
+      String brokerTenant) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : physicalTableNames) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    LogicalTableBuilder builder = new LogicalTableBuilder()
+        .setTableName(tableName)
+        .setBrokerTenant(brokerTenant)
+        .setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
   }
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {

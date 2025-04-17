@@ -112,12 +112,12 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(LOGICAL_TABLE_NAME);
 
     List<String> physicalTableNames = List.of("test_table_1");
-    List<String> physicalTablesWithType = createPhysicalTables(physicalTableNames);
+    List<String> physicalTablesWithType = createHybridTables(physicalTableNames);
     LogicalTable logicalTable;
 
     // create logical table
     try {
-      logicalTable = getLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType);
+      logicalTable = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
       String resp =
           ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
       if (permissions.contains("create")) {
@@ -134,8 +134,8 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
 
     // update logical table
     try {
-      physicalTablesWithType.addAll(createPhysicalTables(List.of("test_table_2")));
-      logicalTable = getLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType);
+      physicalTablesWithType.addAll(createHybridTables(List.of("test_table_2")));
+      logicalTable = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
       String respUpdate = ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTable.toSingleLineJsonString(),
           getHeaders());
       if (permissions.contains("update")) {
@@ -168,12 +168,5 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     String respGet = ControllerTest.sendGetRequest(logicalTableNamesGet, getHeaders());
     LogicalTable remoteTable = LogicalTable.fromString(respGet);
     assertEquals(remoteTable, logicalTable);
-  }
-
-  private LogicalTable getLogicalTable(String logicalTableName, List<String> physicalTableNames) {
-    LogicalTable logicalTable = new LogicalTable();
-    logicalTable.setTableName(logicalTableName);
-    logicalTable.setPhysicalTableNames(physicalTableNames);
-    return logicalTable;
   }
 }
