@@ -33,6 +33,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,11 +83,26 @@ public class PinotZKChanger {
       Map<String, String> mapIS = mapFieldsIS.get(segment);
       Map<String, String> mapEV = mapFieldsEV.get(segment);
 
+      if (mapEV == null) {
+        // Handle the scenario where IS is OFFLINE for all servers but EV is null
+        for (Map.Entry<String, String> entry : mapIS.entrySet()) {
+          String server = entry.getKey();
+          String isState = entry.getValue();
+          if (!CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE.equals(isState)) {
+            LOGGER.info("Mismatch: segment {} server:{} expected state:{} actual state:null", segment, server, isState);
+            numDiff = numDiff + 1;
+          }
+        }
+        continue;
+      }
+
       for (String server : mapIS.keySet()) {
         String state = mapIS.get(server);
-        if (mapEV == null || mapEV.get(server) == null || !mapEV.get(server).equals(state)) {
+        // Handle the scenario where IS is OFFLINE but EV is missing for the given server
+        if ((mapEV.get(server) == null && !CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE.equals(state))
+            || (mapEV.get(server) != null && !mapEV.get(server).equals(state))) {
           LOGGER.info("Mismatch: segment {} server:{} expected state:{} actual state:{}", segment, server, state,
-              (mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server));
+              (mapEV.get(server) == null) ? "null" : mapEV.get(server));
           numDiff = numDiff + 1;
         }
       }

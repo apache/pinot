@@ -322,6 +322,9 @@ public class HelixHelper {
    */
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
+    // TODO: Checking EV alone is no longer enough to find the OFFLINE instances, need to compare with the
+    //       IdealState as that could be OFFLINE and the instance missing from EV. Perhaps delete this code since it
+    //       doesn't seem to be used
     for (String partition : resourceExternalView.getPartitionSet()) {
       Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
       for (String instance : stateMap.keySet()) {
