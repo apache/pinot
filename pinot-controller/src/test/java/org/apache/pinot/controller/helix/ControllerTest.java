@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -65,6 +66,8 @@ import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -76,6 +79,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -821,6 +825,64 @@ public class ControllerTest {
       resourceConfig.putSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.toString(enable));
       configAccessor.setResourceConfig(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
     }
+  }
+
+  public void pauseTable(String tableName)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        return pauseStatusDetails.getConsumingSegments().isEmpty();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to pause table: " + tableName);
+  }
+
+  public void resumeTable(String tableName)
+      throws IOException {
+    resumeTable(tableName, "lastConsumed");
+  }
+
+  public void resumeTable(String tableName, String offsetCriteria) throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName) +
+        "?consumeFrom=" + offsetCriteria);
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        return !pauseStatusDetails.getConsumingSegments().isEmpty();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to resume table: " + tableName);
+  }
+
+  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState, int desiredNumConsumingSegments) {
+    TestUtils.waitForCondition((aVoid) -> {
+          try {
+            AtomicInteger numConsumingSegments = new AtomicInteger(0);
+            TableViews.TableView tableView = getExternalView(tableName);
+            tableView._realtime.values().forEach((v) -> {
+              numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals(desiredState)).count());
+            });
+            return numConsumingSegments.get() == desiredNumConsumingSegments;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 5000, 60_000L,
+        "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName
+    );
+  }
+
+  public TableViews.TableView getExternalView(String tableName)
+      throws IOException {
+    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName));
+    return JsonUtils.stringToObject(state, TableViews.TableView.class);
   }
 
   public static String sendGetRequest(String urlString)

@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.realtime.ingestion;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
-import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.integration.tests.BaseRealtimeClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -38,41 +36,6 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
   private static final String KAFKA_TOPIC = "meetup";
   private static final int NUM_PARTITIONS = 1;
 
-  String getExternalView(String tableName)
-      throws IOException {
-    return sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName));
-  }
-
-  void pauseTable(String tableName)
-      throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
-        return pauseStatusDetails.getConsumingSegments().isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to pause table: " + tableName);
-  }
-
-  void resumeTable(String tableName)
-      throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName));
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
-        return !pauseStatusDetails.getConsumingSegments().isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to resume table: " + tableName);
-  }
-
   String createTable()
       throws IOException {
     Schema schema = createSchema("simpleMeetup_schema.json");
@@ -83,24 +46,6 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
     return tableConfig.getTableName();
   }
 
-  void waitForNumConsumingSegmentsInEV(String tableName, int desiredNumConsumingSegments) {
-    TestUtils.waitForCondition((aVoid) -> {
-          try {
-            AtomicInteger numConsumingSegments = new AtomicInteger(0);
-            String state = getExternalView(tableName);
-            TableViews.TableView tableView = JsonUtils.stringToObject(state, TableViews.TableView.class);
-            tableView._realtime.values().forEach((v) -> {
-              numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals("CONSUMING")).count());
-            });
-            return numConsumingSegments.get() == desiredNumConsumingSegments;
-          } catch (IOException e) {
-            LOGGER.error("Exception in waitForNumConsumingSegments: {}", e.getMessage());
-            return false;
-          }
-        }, 5000, 300_000L,
-        "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName);
-  }
-
   @Test
   public void testDecreasePartitions()
       throws Exception {
@@ -108,7 +53,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
     LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS + 2);
     _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS + 2));
     String tableName = createTable();
-    waitForNumConsumingSegmentsInEV(tableName, NUM_PARTITIONS + 2);
+    waitForNumSegmentsInDesiredStateInEV(tableName, "CONSUMING", NUM_PARTITIONS + 2);
 
     pauseTable(tableName);
 
@@ -118,7 +63,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
     _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS));
 
     resumeTable(tableName);
-    waitForNumConsumingSegmentsInEV(tableName, NUM_PARTITIONS);
+    waitForNumSegmentsInDesiredStateInEV(tableName, "CONSUMING", NUM_PARTITIONS);
   }
 
   @Test(enabled = false)
