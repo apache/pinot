@@ -75,6 +75,9 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
       }
     }
 
+    boolean ignoreNonDefaultTiers = dedupConfig.getIgnoreNonDefaultTiers()
+        .isEnabled(() -> instanceDedupConfig.getProperty(Dedup.DEFAULT_IGNORE_NON_DEFAULT_TIERS, false));
+
     // NOTE: This field doesn't follow enablement override, and always enabled if enabled at instance level.
     boolean allowDedupConsumptionDuringCommit = dedupConfig.isAllowDedupConsumptionDuringCommit();
     if (!allowDedupConsumptionDuringCommit) {
@@ -91,6 +94,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
         .setMetadataTTL(metadataTTL)
         .setDedupTimeColumn(dedupTimeColumn)
         .setEnablePreload(enablePreload)
+        .setIgnoreNonDefaultTiers(ignoreNonDefaultTiers)
         .setMetadataManagerConfigs(dedupConfig.getMetadataManagerConfigs())
         .setAllowDedupConsumptionDuringCommit(allowDedupConsumptionDuringCommit)
         .build();

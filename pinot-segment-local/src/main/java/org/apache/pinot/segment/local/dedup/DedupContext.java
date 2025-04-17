@@ -40,6 +40,7 @@ public class DedupContext {
   @Nullable
   private final String _dedupTimeColumn;
   private final boolean _enablePreload;
+  private final boolean _ignoreNonDefaultTiers;
   @Nullable
   private final Map<String, String> _metadataManagerConfigs;
 
@@ -54,8 +55,8 @@ public class DedupContext {
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       HashFunction hashFunction, double metadataTTL, @Nullable String dedupTimeColumn, boolean enablePreload,
-      @Nullable Map<String, String> metadataManagerConfigs, boolean allowDedupConsumptionDuringCommit,
-      @Nullable TableDataManager tableDataManager, File tableIndexDir) {
+      boolean ignoreNonDefaultTiers, @Nullable Map<String, String> metadataManagerConfigs,
+      boolean allowDedupConsumptionDuringCommit, @Nullable TableDataManager tableDataManager, File tableIndexDir) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -63,6 +64,7 @@ public class DedupContext {
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
     _enablePreload = enablePreload;
+    _ignoreNonDefaultTiers = ignoreNonDefaultTiers;
     _metadataManagerConfigs = metadataManagerConfigs;
     _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
     _tableDataManager = tableDataManager;
@@ -98,6 +100,10 @@ public class DedupContext {
     return _enablePreload;
   }
 
+  public boolean isIgnoreNonDefaultTiers() {
+    return _ignoreNonDefaultTiers;
+  }
+
   @Nullable
   public Map<String, String> getMetadataManagerConfigs() {
     return _metadataManagerConfigs;
@@ -125,6 +131,7 @@ public class DedupContext {
         .append("metadataTTL", _metadataTTL)
         .append("dedupTimeColumn", _dedupTimeColumn)
         .append("enablePreload", _enablePreload)
+        .append("ignoreNonDefaultTiers", _ignoreNonDefaultTiers)
         .append("metadataManagerConfigs", _metadataManagerConfigs)
         .append("allowDedupConsumptionDuringCommit", _allowDedupConsumptionDuringCommit)
         .append("tableIndexDir", _tableIndexDir)
@@ -139,6 +146,7 @@ public class DedupContext {
     private double _metadataTTL;
     private String _dedupTimeColumn;
     private boolean _enablePreload;
+    private boolean _ignoreNonDefaultTiers;
     private Map<String, String> _metadataManagerConfigs;
     @Deprecated
     private boolean _allowDedupConsumptionDuringCommit;
@@ -180,6 +188,11 @@ public class DedupContext {
       return this;
     }
 
+    public Builder setIgnoreNonDefaultTiers(boolean ignoreNonDefaultTiers) {
+      _ignoreNonDefaultTiers = ignoreNonDefaultTiers;
+      return this;
+    }
+
     public Builder setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
       _metadataManagerConfigs = metadataManagerConfigs;
       return this;
@@ -211,8 +224,8 @@ public class DedupContext {
         _tableIndexDir = _tableDataManager.getTableDataDir();
       }
       return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
-          _enablePreload, _metadataManagerConfigs, _allowDedupConsumptionDuringCommit, _tableDataManager,
-          _tableIndexDir);
+          _enablePreload, _ignoreNonDefaultTiers, _metadataManagerConfigs, _allowDedupConsumptionDuringCommit,
+          _tableDataManager, _tableIndexDir);
     }
   }
 }
