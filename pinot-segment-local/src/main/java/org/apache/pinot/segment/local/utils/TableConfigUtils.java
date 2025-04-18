@@ -364,6 +364,13 @@ public final class TableConfigUtils {
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
         Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
         // TODO: for multiple stream configs, validate them
+
+        boolean isPauselessEnabled = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
+        if (isPauselessEnabled) {
+          String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+          Preconditions.checkState(StringUtils.isNotEmpty(peerSegmentDownloadScheme),
+              "Must have peerSegmentDownloadScheme set in validation config for pauseless consumption");
+        }
       }
 
       // Filter config
