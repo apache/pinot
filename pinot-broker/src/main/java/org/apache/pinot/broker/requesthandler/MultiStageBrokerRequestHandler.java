@@ -440,11 +440,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Tracing.ThreadAccountantOps.clear();
         onQueryFinish(requestId);
       }
-      long executionEndTimeNs = System.nanoTime();
-      updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
-          executionEndTimeNs - executionStartTimeNs);
 
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+
+      QueryProcessingException processingException = queryResults.getProcessingException();
+      if (processingException != null) {
+        brokerResponse.addException(processingException);
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
+        if (errorCode == QueryErrorCode.EXECUTION_TIMEOUT) {
+          for (String table : tableNames) {
+            _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+          }
+          LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+        }
+        requestContext.setErrorCode(errorCode);
+      } else {
+        brokerResponse.setResultTable(queryResults.getResultTable());
+        long executionEndTimeNs = System.nanoTime();
+        updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
+            executionEndTimeNs - executionStartTimeNs);
+      }
+
       brokerResponse.setClientRequestId(clientRequestId);
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setTablesQueried(tableNames);

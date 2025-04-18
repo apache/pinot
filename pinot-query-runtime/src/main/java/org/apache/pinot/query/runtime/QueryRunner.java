@@ -65,6 +65,7 @@ import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperato
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -443,8 +444,8 @@ public class QueryRunner {
     return opChainMetadata;
   }
 
-  public void cancel(long requestId) {
-    _opChainScheduler.cancel(requestId);
+  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
+    return _opChainScheduler.cancel(requestId);
   }
 
   public StagePlan explainQuery(

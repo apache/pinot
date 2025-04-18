@@ -70,7 +70,8 @@ class DispatchClient {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
   }
 
-  public void cancel(long requestId) {
+  public void cancel(long requestId, QueryServerInstance virtualServer, Deadline deadline,
+      Consumer<AsyncResponse<Worker.CancelResponse>> callback) {
     String cid = QueryThreadContext.isInitialized() && QueryThreadContext.getCid() != null
         ? QueryThreadContext.getCid()
         : Long.toString(requestId);
@@ -78,7 +79,8 @@ class DispatchClient {
         .setRequestId(requestId)
         .setCid(cid)
         .build();
-    _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
+    StreamObserver<Worker.CancelResponse> observer = new LastValueDispatchObserver<>(virtualServer, callback);
+    _dispatchStub.withDeadline(deadline).cancel(cancelRequest, observer);
   }
 
   public void explain(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,

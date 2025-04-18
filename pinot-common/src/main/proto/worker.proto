@@ -39,6 +39,7 @@ message CancelRequest {
 
 message CancelResponse {
   // intentionally left empty
+  map<int32, bytes> statsByStage = 1; // stageId -> serialized MultiStageQueryStats.StageStats.Closed
 }
 
 // QueryRequest is the dispatched content for all query stages to a physical worker.

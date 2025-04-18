@@ -18,14 +18,20 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -40,6 +46,12 @@ public class OpChainSchedulerService {
 
   private final ExecutorService _executorService;
   private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap;
+  private final Cache<OpChainId, MultiStageOperator> _opChainCache = CacheBuilder.newBuilder()
+      .weigher((OpChainId key, MultiStageOperator value) -> countOperators(value))
+      .maximumWeight(1_000) // TODO: Make this configurable
+      .expireAfterWrite(1, TimeUnit.MINUTES) // TODO: Make this configurable
+      .build();
+
 
   public OpChainSchedulerService(ExecutorService executorService) {
     _executorService = executorService;
@@ -47,6 +59,8 @@ public class OpChainSchedulerService {
   }
 
   public void register(OpChain operatorChain) {
+    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
+
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -68,6 +82,7 @@ public class OpChainSchedulerService {
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, stats);
+            _opChainCache.invalidate(operatorChain.getId());
           }
         } catch (Exception e) {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
@@ -87,7 +102,7 @@ public class OpChainSchedulerService {
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 
-  public void cancel(long requestId) {
+  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
     Iterator<Map.Entry<OpChainId, Future<?>>> iterator = _submittedOpChainMap.entrySet().iterator();
@@ -98,5 +113,42 @@ public class OpChainSchedulerService {
         iterator.remove();
       }
     }
+    Map<OpChainId, MultiStageOperator> cancelledByOpChainId = _opChainCache.asMap()
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getKey().getRequestId() == requestId)
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1));
+    _opChainCache.invalidateAll(cancelledByOpChainId.keySet());
+
+    return cancelledByOpChainId.entrySet()
+        .stream()
+        .collect(Collectors.toMap(
+            e -> e.getKey().getStageId(),
+            e -> e.getValue().calculateStats().getCurrentStats().close(),
+            (e1, e2) -> {
+              e1.merge(e2);
+              return e1;
+            }
+        ));
+  }
+
+  /**
+   * Counts the number of operators in the tree rooted at the given operator.
+   */
+  private int countOperators(MultiStageOperator root) {
+    // This stack will have at most 2 elements on most stages given that there is only 1 join in a stage
+    // and joins only have 2 children.
+    // Some operators (like SetOperator) can have more than 2 children, but they are not common.
+    ArrayList<MultiStageOperator> stack = new ArrayList<>(8);
+    stack.add(root);
+    int result = 0;
+    while (!stack.isEmpty()) {
+      result++;
+      MultiStageOperator operator = stack.remove(stack.size() - 1);
+      if (operator.getChildOperators() != null) {
+        stack.addAll(operator.getChildOperators());
+      }
+    }
+    return result;
   }
 }
