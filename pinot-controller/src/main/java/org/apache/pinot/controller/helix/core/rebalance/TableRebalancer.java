@@ -35,6 +35,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -140,6 +142,7 @@ public class TableRebalancer {
   // TODO: Consider making the timeoutMs below table rebalancer configurable
   private static final int TABLE_SIZE_READER_TIMEOUT_MS = 30_000;
   private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 10_000;
+  private static final AtomicInteger REBALANCE_JOB_COUNTER = new AtomicInteger(0);
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
@@ -181,11 +184,17 @@ public class TableRebalancer {
     String tableNameWithType = tableConfig.getTableName();
     RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
     try {
+      int jobCount = REBALANCE_JOB_COUNTER.incrementAndGet();
+      if (_controllerMetrics != null) {
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, jobCount);
+      }
       RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId, providedTierToSegmentsMap);
       status = result.getStatus();
       return result;
     } finally {
+      int jobCount = REBALANCE_JOB_COUNTER.decrementAndGet();
       if (_controllerMetrics != null) {
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, jobCount);
         _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status.toString()),
             ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, System.currentTimeMillis() - startTime,
             TimeUnit.MILLISECONDS);
