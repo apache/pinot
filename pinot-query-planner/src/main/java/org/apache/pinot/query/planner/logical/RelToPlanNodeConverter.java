@@ -19,13 +19,10 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
@@ -466,15 +463,6 @@ public final class RelToPlanNodeConverter {
 
   public static String getTableNameFromTableScan(TableScan tableScan) {
     return getTableNameFromRelTable(tableScan.getTable());
-  }
-
-  public static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    List<RelOptTable> tables = RelOptUtil.findAllTables(relRoot);
-    Set<String> tableNames = Sets.newHashSetWithExpectedSize(tables.size());
-    for (RelOptTable table : tables) {
-      tableNames.add(getTableNameFromRelTable(table));
-    }
-    return tableNames;
   }
 
   public static String getTableNameFromRelTable(RelOptTable table) {

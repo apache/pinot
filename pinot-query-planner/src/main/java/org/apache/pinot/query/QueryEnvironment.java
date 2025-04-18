@@ -19,7 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +34,7 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
@@ -41,6 +42,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.metadata.RelMetadataQueryBase;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
@@ -93,13 +95,11 @@ import org.slf4j.LoggerFactory;
 /**
  * The {@code QueryEnvironment} contains the main entrypoint for query planning.
  *
- * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
+ * <p>It provides the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  * It is also used to execute some static analysis on the query like to determine if it can be compiled or get the
  * tables involved in the query.
  *
- * Queries are first compiled with Calcite into {@link CompiledQuery} objects, which can then be used to plan, explain
- * or get the tables involved in the query. These later processes are Pinot specific. They include for example how to
- * distribute the query to the workers, which is not a Calcite native concept.
+ * Text queries can be compiled into a {@link MseQuery} object that can be used to analyze and plan it.
  *
  * To learn more about Calcite compilation process, read
  * <a href="https://www.querifylabs.com/blog/relational-operators-in-apache-calcite">this Querify Labs post</a>.
@@ -161,11 +161,12 @@ public class QueryEnvironment {
         sqlNodeAndOptions.getOptions(), _envConfig, format);
   }
 
-  /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
+  /// @deprecated Use [optimize][#optimize(RelRoot, PlannerContext)] and then [plan][MseQuery#planQuery(long)]
+  /// the returned query instead
   @VisibleForTesting
   @Deprecated
   public DispatchableSubPlan planQuery(String sqlQuery) {
-    try (CompiledQuery compiledQuery = compile(sqlQuery)) {
+    try (MseQuery compiledQuery = createQuery(sqlQuery)) {
       return compiledQuery.planQuery(0).getQueryPlan();
     }
   }
@@ -201,43 +202,31 @@ public class QueryEnvironment {
     return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
   }
 
-  /// @deprecated Use [#compile] and then [explain][CompiledQuery#explain(long) ] the returned query instead
+  /// @deprecated Use [#createQuery(String)] and then
+  /// [explain][MseQuery#explain(long, AskingServerStageExplainer.OnServerExplainer)] the returned query instead
   @VisibleForTesting
   @Deprecated
   public String explainQuery(String sqlQuery, long requestId) {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
-      QueryPlannerResult queryPlannerResult = compiledQuery.explain(requestId, null);
+    try (MseQuery mseQuery = createQuery(sqlQuery, sqlNodeAndOptions)) {
+      QueryPlannerResult queryPlannerResult = mseQuery.explain(requestId, null);
       return queryPlannerResult.getExplainPlan();
     }
   }
 
-  public CompiledQuery compile(String sqlQuery) {
-    return compile(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+  public MseQuery createQuery(String sqlQuery) {
+    return createQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
   }
 
-  /// Given a query, parses, validates and optimizes the query into a [CompiledQuery].
-  ///
-  /// The returned query can then be planned, explained or used to get the tables involved in the query.
-  ///
-  /// @throws QueryException if the query cannot be compiled. Usual error types are QueryErrorCode.SQL_PARSING and
-  /// QueryErrorCode.QUERY_VALIDATION. QueryErrorCode.QUERY_EXECUTION is also possible if there is an error when
-  /// a function call is reduced into a constant.
-  public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+  public MseQuery createQuery(String sqlTextQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = null;
     try {
       plannerContext = getPlannerContext(sqlNodeAndOptions);
-
-      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
-      SqlNode queryNode;
-      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
-        queryNode = ((SqlExplain) sqlNode).getExplicandum();
-      } else {
-        queryNode = sqlNode;
-      }
-      RelRoot relRoot = compileQuery(queryNode, plannerContext);
-      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
+      return new MseQuery(sqlTextQuery, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
+      if (plannerContext != null) {
+        plannerContext.close();
+      }
       throw e;
     } catch (Throwable t) {
       if (plannerContext != null) {
@@ -247,12 +236,26 @@ public class QueryEnvironment {
     }
   }
 
-  /// @deprecated Use [#compile] and then [getTableNames][CompiledQuery#getTableNames()] the returned query instead
+  /// Given a query, parses, validates and optimizes the query into a [MseQuery].
+  ///
+  /// The returned query can then be planned, explained or used to get the tables involved in the query.
+  ///
+  /// @throws QueryException if the query cannot be compiled. Usual error types are QueryErrorCode.SQL_PARSING and
+  /// QueryErrorCode.QUERY_VALIDATION. QueryErrorCode.QUERY_EXECUTION is also possible if there is an error when
+  /// a function call is reduced into a constant.
+  public MseQuery optimize(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+    MseQuery mseQuery = createQuery(sqlQuery, sqlNodeAndOptions);
+    mseQuery.ensureOptimization();
+    return mseQuery;
+  }
+
+  /// @deprecated Use [#createQuery(String) ] and then [getTableNames][MseQuery#getTableNames()] the returned query
+  /// instead
   @VisibleForTesting
   @Deprecated
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    try (CompiledQuery compiledQuery = compile(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery))) {
-      return new ArrayList<>(compiledQuery.getTableNames());
+    try (MseQuery query = createQuery(sqlQuery)) {
+      return new ArrayList<>(query.getTableNames());
     }
   }
 
@@ -260,7 +263,8 @@ public class QueryEnvironment {
    * Returns whether the query can be successfully compiled in this query environment
    */
   public boolean canCompileQuery(String query) {
-    try (CompiledQuery compiledQuery = compile(query)) {
+    try (MseQuery unused = createQuery(query)) {
+      unused.ensureOptimization();
       return true;
     } catch (QueryException e) {
       return false;
@@ -299,17 +303,6 @@ public class QueryEnvironment {
     public Map<String, String> getExtraFields() {
       return _extraFields;
     }
-  }
-
-  // --------------------------------------------------------------------------
-  // steps
-  // --------------------------------------------------------------------------
-
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
-    SqlNode validated = validate(sqlNode, plannerContext);
-    RelRoot relation = toRelation(validated, plannerContext);
-    RelNode optimized = optimize(relation, plannerContext);
-    return relation.withRel(optimized);
   }
 
   /// Query validation is a transformation from SqlNode to SqlNode where each node is validated.
@@ -415,14 +408,10 @@ public class QueryEnvironment {
     }
   }
 
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    return toDispatchableSubPlan(relRoot, plannerContext, requestId, null);
-  }
-
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, Set<String> tableNames) {
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
-        _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
+        _envConfig.getTableCache(), useSpools(plannerContext.getOptions()), tableNames);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
@@ -560,42 +549,110 @@ public class QueryEnvironment {
     WorkerManager getWorkerManager();
   }
 
-  /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
+  /// The object that represents a query in the multi-stage engine.
   ///
-  /// This represents the last point where Calcite is being used. This object can then be:
-  /// - Used to get the tables involved in the query (see [#getTableNames])
-  /// - Used to explain the query plan (see [#explain])
-  /// - Used to plan how to evaluate the query using Pinot Engine (see [#planQuery])
-  ///
-  /// Compiled queries are created by calling [QueryEnvironment#compile] and should be closed to release resources,
-  /// including the [PlannerContext].
-  /// They are also not static classes. Instead they are bound to the [QueryEnvironment] that created them.
-  public class CompiledQuery implements Closeable {
-    private final String _database;
+  /// It contains the original SQL text, the parsed format and the internal state required to validate the SQL
+  /// expression, convert it to a relational expression and optimize it.
+  /// These steps are lazily executed and the dependency between each step is managed by the object itself, so callers
+  /// can just call the methods they need, when they need them.
+  public class MseQuery implements AutoCloseable {
     private final String _textQuery;
-    private final RelRoot _relRoot;
     private final PlannerContext _plannerContext;
     private final SqlNodeAndOptions _sqlNodeAndOptions;
-    private final Set<String> _tableNames;
+    @Nullable
+    private SqlNode _validatedSqlNode;
+    @Nullable
+    private RelRoot _unoptimizedRelRoot;
+    @Nullable
+    private RelRoot _optimizedRelRoot;
+    @Nullable
+    private Set<String> _tableNames;
 
-    private CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
-        SqlNodeAndOptions sqlNodeAndOptions) {
-      _database = database;
+    public MseQuery(String textQuery, PlannerContext plannerContext, SqlNodeAndOptions sqlNodeAndOptions) {
       _textQuery = textQuery;
-      _relRoot = relRoot;
       _plannerContext = plannerContext;
       _sqlNodeAndOptions = sqlNodeAndOptions;
-      // Important & tricky: RelToPlanNodeConverter uses thread local. Therefore we need to get the table names here
-      // instead of lazily in getTableNames() method.
-      _tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
+    }
+
+    public String getDatabase() {
+      return _envConfig.getDatabase();
+    }
+
+    public String getTextQuery() {
+      return _textQuery;
+    }
+
+    public SqlNodeAndOptions getSqlNodeAndOptions() {
+      return _sqlNodeAndOptions;
+    }
+
+    public Map<String, String> getOptions() {
+      return _sqlNodeAndOptions.getOptions();
+    }
+
+    public SqlNode getValidatedSqlNode() {
+      if (_validatedSqlNode == null) {
+        SqlNode sqlNode = _sqlNodeAndOptions.getSqlNode();
+        SqlNode queryNode;
+        if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
+          queryNode = ((SqlExplain) sqlNode).getExplicandum();
+        } else {
+          queryNode = sqlNode;
+        }
+        _validatedSqlNode = validate(queryNode, _plannerContext);
+      }
+      return _validatedSqlNode;
+    }
+
+    public RelRoot getUnoptimizedRelRoot() {
+      if (_unoptimizedRelRoot == null) {
+        _unoptimizedRelRoot = toRelation(getValidatedSqlNode(), _plannerContext);
+      }
+      return _unoptimizedRelRoot;
     }
 
     public Set<String> getTableNames() {
+      // In theory, we should be able to get table names from _validatedSqlNode, but historically we have always done it
+      // from the RelNode. So we keep it like this for now.
+      if (_tableNames == null) {
+        // We call getUnoptimizedRelRoot() before checking thread local to optimize the initialization
+        // in case unoptimizedRelRoot is already initialized, that call will initialize Calcite thread locals,
+        // so we don't need to create a new cluster.
+        RelNode unoptimizedRelNode = getUnoptimizedRelRoot().rel;
+        // Important & tricky: RelOptUtil uses thread local. Therefore we need to initialize the cluster here
+        if (RelMetadataQueryBase.THREAD_PROVIDERS.get() == null) {
+          RexBuilder rexBuilder = new RexBuilder(_typeFactory);
+          // When the cluster is created, Calcite updates RelMetadataQueryBase.THREAD_PROVIDERS
+          RelOptCluster.create(_plannerContext.getRelOptPlanner(), rexBuilder);
+        }
+        List<RelOptTable> tables = RelOptUtil.findAllTables(unoptimizedRelNode);
+        _tableNames = Sets.newHashSetWithExpectedSize(tables.size());
+        for (RelOptTable table : tables) {
+          _tableNames.add(RelToPlanNodeConverter.getTableNameFromRelTable(table));
+        }
+      }
       return _tableNames;
     }
 
-    public boolean isExplain() {
-      return _sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN);
+    public RelRoot getOptimizedRelRoot() {
+      if (_optimizedRelRoot == null) {
+        ensureOptimization();
+      }
+      return _optimizedRelRoot;
+    }
+
+    /// Optimizes the query if it hasn't been optimized yet, ensuring that subsequent calls to [#getOptimizedRelRoot()]
+    /// are going to be fast.
+    ///
+    /// This is similar to [#getOptimizedRelRoot] but it doesn't return the optimized query.
+    /// The main reason to have this method is to not call getOptimizedRelRoot() without using the returned value,
+    /// which is a bit misleading.
+    public void ensureOptimization() {
+      if (_optimizedRelRoot == null) {
+        RelRoot unoptimizedRelRoot = getUnoptimizedRelRoot();
+        RelNode optimized = QueryEnvironment.this.optimize(unoptimizedRelRoot, _plannerContext);
+        _optimizedRelRoot = unoptimizedRelRoot.withRel(optimized);
+      }
     }
 
     /// Explain the query plan.
@@ -607,18 +664,20 @@ public class QueryEnvironment {
         SqlExplain explain = (SqlExplain) _sqlNodeAndOptions.getSqlNode();
 
         SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
+        RelRoot relRoot = getOptimizedRelRoot();
+        Set<String> tableNames = getTableNames();
         if (explain instanceof SqlPhysicalExplain) {
           // get the physical plan for query.
-          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, _plannerContext, requestId, null,
+              tableNames);
           return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
               PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
         } else {
           // get the logical plan for query.
           SqlExplainLevel level =
               explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-          Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
           if (!explain.withImplementation() || onServerExplainer == null) {
-            return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
+            return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(relRoot.rel, format, level),
                 tableNames);
           } else {
             Map<String, String> options = _sqlNodeAndOptions.getOptions();
@@ -629,12 +688,12 @@ public class QueryEnvironment {
                 new TransformationTracker.ByIdentity.Builder<>();
             // Transform RelNodes into DispatchableSubPlan
             DispatchableSubPlan dispatchableSubPlan =
-                toDispatchableSubPlan(_relRoot, _plannerContext, requestId, nodeTracker);
+                toDispatchableSubPlan(relRoot, _plannerContext, requestId, nodeTracker, tableNames);
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
-            RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(_relRoot.rel,
+            RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
                 dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
 
             return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
@@ -652,8 +711,11 @@ public class QueryEnvironment {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
-        return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
+        RelRoot relRoot = getOptimizedRelRoot();
+        Set<String> tableNames = getTableNames();
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, _plannerContext, requestId, null,
+            tableNames);
+        return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, tableNames);
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -664,30 +726,6 @@ public class QueryEnvironment {
     @Override
     public void close() {
       _plannerContext.close();
-    }
-
-    public String getTextQuery() {
-      return _textQuery;
-    }
-
-    public SqlNodeAndOptions getSqlNodeAndOptions() {
-      return _sqlNodeAndOptions;
-    }
-
-    public String getDatabase() {
-      return _database;
-    }
-
-    public Map<String, String> getOptions() {
-      return _sqlNodeAndOptions.getOptions();
-    }
-
-    public RelRoot getRelRoot() {
-      return _relRoot;
-    }
-
-    public RelNode getRelNode() {
-      return _relRoot.rel;
     }
   }
 }
