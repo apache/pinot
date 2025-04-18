@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -200,7 +199,7 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN))
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN))
         .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
@@ -409,8 +408,9 @@ public class BaseTableDataManagerNeedRefreshTest {
   public void addStartreeIndex() {
     // Test 1 : Adding a StarTree index should trigger segment refresh.
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(tableConfig, SCHEMA),
         IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
@@ -423,15 +423,17 @@ public class BaseTableDataManagerNeedRefreshTest {
     // trigger segment refresh.
 
     // Create a segment with StarTree index on Carrier.
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index on Distance.
-    StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig newStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Distance"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -446,14 +448,15 @@ public class BaseTableDataManagerNeedRefreshTest {
     // refresh.
 
     // Create a segment with StarTree index on Carrier.
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -469,14 +472,14 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     // Create a segment with StarTree index on Carrier, Distance.
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Distance", "Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -491,7 +494,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     // Create a segment with StarTree index on Carrier, Distance.
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
@@ -499,7 +502,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -515,14 +518,14 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Distance", "Carrier"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertFalse(
@@ -537,13 +540,13 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -557,13 +560,13 @@ public class BaseTableDataManagerNeedRefreshTest {
     // Test 8: Adding a new StarTree index with an added metrics aggregation function should trigger segment refresh.
 
     StarTreeIndexConfig starTreeIndex = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndex)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), "MAX__Distance"), null, 100);
+        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR_NAME, "MAX__Distance"), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -578,13 +581,13 @@ public class BaseTableDataManagerNeedRefreshTest {
     // trigger segment refresh.
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), "MAX__Distance"), null, 100);
+        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR_NAME, "MAX__Distance"), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Arrays.asList("MAX__Distance", AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        Arrays.asList("MAX__Distance", AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertFalse(
@@ -598,7 +601,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     // Test 10: removing an aggregation function through aggregation config should trigger segment refresh.
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Arrays.asList("MAX__Distance", AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        Arrays.asList("MAX__Distance", AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
@@ -628,8 +631,7 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()),
-        Collections.singletonList(aggregationConfig), 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), List.of(aggregationConfig), 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -645,8 +647,7 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("Distance", "MAX");
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()),
-        Collections.singletonList(aggregationConfig), 100);
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), List.of(aggregationConfig), 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
@@ -665,14 +666,16 @@ public class BaseTableDataManagerNeedRefreshTest {
   @Test
   void testStarTreeIndexMaxLeafNode()
       throws Exception {
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
-    StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 10);
+    StarTreeIndexConfig newStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            10);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
     assertTrue(
@@ -683,8 +686,9 @@ public class BaseTableDataManagerNeedRefreshTest {
   @Test
   void testStarTreeIndexRemove()
       throws Exception {
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
@@ -696,14 +700,16 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     // Test 15: Add multiple StarTree Indexes should trigger segment refresh.
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
-    StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig newStarTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Distance"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig, newStarTreeIndexConfig)).build();
     assertTrue(
@@ -716,8 +722,9 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     // Test 16: Enabling default StarTree index should trigger a segment refresh.
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
@@ -734,8 +741,9 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     // Test 17: Attempting to trigger segment refresh again should not be successful.
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     ImmutableSegmentDataManager segmentDataManager =
@@ -748,8 +756,9 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     // Test 18: Disabling default StarTree index should trigger a segment refresh.
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("Carrier"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
+            100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     tableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
     ImmutableSegmentDataManager segmentDataManager =
