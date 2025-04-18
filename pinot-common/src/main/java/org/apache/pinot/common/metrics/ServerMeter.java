@@ -135,6 +135,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
 
+  SEGMENT_DOWNLOAD_SIZE_BYTES("bytes", true),
+  SEGMENT_UPLOAD_SIZE_BYTES("bytes", true),
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.

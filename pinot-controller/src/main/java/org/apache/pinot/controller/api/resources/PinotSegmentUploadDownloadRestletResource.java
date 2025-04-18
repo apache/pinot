@@ -46,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -74,6 +75,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -168,6 +170,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
+    long segmentDownloadStartTimeMs = System.currentTimeMillis();
     tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
     // Validate data access
     boolean hasDataAccess;
@@ -214,8 +217,19 @@ public class PinotSegmentUploadDownloadRestletResource {
       segmentFile =
           org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
               "Invalid segment name: %s", segmentName);
-
+      long deepStoreDownloadStartTimeMs = System.currentTimeMillis();
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
+      long deepStoreDownloadDurationMs = System.currentTimeMillis() - deepStoreDownloadStartTimeMs;
+      _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
+              deepStoreDownloadDurationMs, TimeUnit.MILLISECONDS);
+      _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
+              deepStoreDownloadDurationMs, TimeUnit.MILLISECONDS);
+      if (segmentFile.exists() && segmentFile.isFile()) {
+        long segmentSizeInBytes = segmentFile.length();
+        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES,
+                segmentSizeInBytes);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSizeInBytes);
+      }
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
         try {
@@ -227,12 +241,18 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
     builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentFile.getName());
     builder.header(HttpHeaders.CONTENT_LENGTH, segmentFile.length());
+    long segmentDownloadDurationMs = System.currentTimeMillis() - segmentDownloadStartTimeMs;
+    _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS,
+            segmentDownloadDurationMs, TimeUnit.MILLISECONDS);
+    _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS,
+            segmentDownloadDurationMs, TimeUnit.MILLISECONDS);
     return builder.build();
   }
 
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
+    long segmentUploadStartTimeMs = System.currentTimeMillis();
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -412,7 +432,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
           segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
           enableParallelPushProtection, allowRefresh, headers);
-
+      long segmentUploadDurationMs = System.currentTimeMillis() - segmentUploadStartTimeMs;
+      _controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.SEGMENT_TOTAL_UPLOAD_TIME_MS,
+              segmentUploadDurationMs, TimeUnit.MILLISECONDS);
+      _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_TOTAL_UPLOAD_TIME_MS, segmentUploadDurationMs,
+              TimeUnit.MILLISECONDS);
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
       throw e;
@@ -1086,7 +1110,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private static void createSegmentFileFromMultipart(FormDataMultiPart multiPart, File destFile)
+  private void createSegmentFileFromMultipart(FormDataMultiPart multiPart, File destFile)
       throws IOException {
     // Read segment file or segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();

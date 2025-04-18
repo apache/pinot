@@ -21,11 +21,10 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -47,6 +46,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final ServerMetrics _serverMetrics;
   private final AuthProvider _authProvider;
   private final String _rawTableName;
+  private final AtomicInteger _segmentActiveCount;
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
@@ -60,6 +60,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     _serverMetrics = serverMetrics;
     _authProvider = authProvider;
     _rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    _segmentActiveCount = new AtomicInteger(0);
   }
 
   @Override
@@ -91,6 +92,8 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     SegmentCompletionProtocol.Response response;
     long startTime = System.currentTimeMillis();
     try {
+      SegmentCompletionUtils.updateActiveUploadSegmentCount(_serverMetrics, _rawTableName,
+              _segmentActiveCount.incrementAndGet());
       String responseStr = _fileUploadDownloadClient
           .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
               AuthProviderUtils.toRequestHeaders(_authProvider), null, timeoutInMillis).getResponse();
@@ -109,8 +112,10 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     } finally {
       long duration = System.currentTimeMillis() - startTime;
-      _serverMetrics.addTimedTableValue(_rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
-          TimeUnit.MILLISECONDS);
+      long segmentSize = segmentFile.length();
+      SegmentCompletionUtils.raiseSegmentUploadMetrics(_serverMetrics, _rawTableName, duration, segmentSize);
+      SegmentCompletionUtils.updateActiveUploadSegmentCount(_serverMetrics, _rawTableName,
+              _segmentActiveCount.decrementAndGet());
     }
     SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;

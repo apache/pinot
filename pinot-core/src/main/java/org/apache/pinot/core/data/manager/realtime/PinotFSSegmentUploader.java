@@ -26,9 +26,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -51,11 +51,13 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private final int _timeoutInMs;
   private final ServerMetrics _serverMetrics;
+  private final AtomicInteger _segmentActiveCount;
 
   public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
     _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
     _serverMetrics = serverMetrics;
+    _segmentActiveCount = new AtomicInteger(0);
   }
 
   @Override
@@ -76,6 +78,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
           SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
       long startTime = System.currentTimeMillis();
       try {
+        SegmentCompletionUtils.updateActiveUploadSegmentCount(_serverMetrics, rawTableName,
+            _segmentActiveCount.incrementAndGet());
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
         // Check and delete any existing segment file.
         if (pinotFS.exists(destUri)) {
@@ -87,8 +91,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
       } finally {
         long duration = System.currentTimeMillis() - startTime;
-        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
-            TimeUnit.MILLISECONDS);
+        long segmentSize = segmentFile.length();
+        SegmentCompletionUtils.raiseSegmentUploadMetrics(_serverMetrics, rawTableName, duration, segmentSize);
+        SegmentCompletionUtils.updateActiveUploadSegmentCount(_serverMetrics, rawTableName,
+            _segmentActiveCount.decrementAndGet());
       }
       return null;
     };
