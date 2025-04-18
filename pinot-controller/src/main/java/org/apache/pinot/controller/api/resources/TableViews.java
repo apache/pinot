@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -45,6 +46,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -158,15 +160,26 @@ public class TableViews {
     Map<String, Map<String, String>> externalViewMap = getStateMap(externalView);
     List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
 
-    for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segment = entry.getKey();
-      Map<String, String> externalViewEntryValue = entry.getValue();
-      Map<String, String> idealViewEntryValue = idealStateMap.get(segment);
-      if (isErrorSegment(externalViewEntryValue)) {
+      Map<String, String> idealViewEntryValue = entry.getValue();
+      Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
+      if (MapUtils.isEmpty(externalViewEntryValue)) {
+        if (idealViewEntryValue.values().stream()
+            .allMatch(state -> state.equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE))) {
+          // EV may not show segments if they are OFFLINE in IS, in which case we should show status GOOD since
+          // segments in OFFLINE state are not queryable anyways
+          segmentStatusInfoList.add(
+              new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+        } else {
+          segmentStatusInfoList.add(
+              new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+        }
+      } else if (isErrorSegment(externalViewEntryValue)) {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
       } else {
-        boolean isViewsEqual = externalViewEntryValue.equals(idealViewEntryValue);
+        boolean isViewsEqual = idealViewEntryValue.equals(externalViewEntryValue);
         if (isViewsEqual) {
           if (isOnlineOrConsumingSegment(externalViewEntryValue)) {
             segmentStatusInfoList.add(
@@ -179,8 +192,27 @@ public class TableViews {
                 new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
           }
         } else {
-          segmentStatusInfoList.add(
-              new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+          if (idealViewEntryValue.values().stream()
+              .anyMatch(state -> state.equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE))) {
+            Map<String, String> idealStateWithoutOffline = idealViewEntryValue.entrySet().stream()
+                .filter(e -> !Objects.equals(e.getValue(), CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            Map<String, String> externalViewWithoutOffline = externalViewEntryValue.entrySet().stream()
+                .filter(e -> !Objects.equals(e.getValue(), CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            boolean isEqual = idealStateWithoutOffline.equals(externalViewEntryValue)
+                || idealStateWithoutOffline.equals(externalViewWithoutOffline);
+            if (isEqual) {
+              segmentStatusInfoList.add(
+                  new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+            } else {
+              segmentStatusInfoList.add(
+                  new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+            }
+          } else {
+            segmentStatusInfoList.add(
+                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+          }
         }
       }
     }

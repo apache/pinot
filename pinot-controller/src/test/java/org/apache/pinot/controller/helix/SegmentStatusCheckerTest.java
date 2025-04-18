@@ -529,6 +529,89 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
+  public void missingEVForOfflineISPartitionTest() {
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setPartitionState("myTable_0", "pinot1", "OFFLINE");
+    idealState.setPartitionState("myTable_0", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_0", "pinot3", "OFFLINE");
+    idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_1", "pinot3", "OFFLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    // Remove some segments from EV that are OFFLINE in IS to verify that it works as expected
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    externalView.setState("myTable_0", "pinot1", "OFFLINE");
+    externalView.setState("myTable_1", "pinot1", "ONLINE");
+    externalView.setState("myTable_1", "pinot3", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata segmentZKMetadata = mockPushedSegmentZKMetadata(1234, 11111L);
+    when(resourceManager.getSegmentZKMetadata(eq(OFFLINE_TABLE_NAME), anyString())).thenReturn(segmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 2, 2, 1, 33, 0, 100, 0, 1234);
+
+    // Include all the segments in the EV to match the IS, ensure that the same verifyControllerMetrics parameters
+    // work for the validation
+    ExternalView externalViewWithAllSegments = new ExternalView(OFFLINE_TABLE_NAME);
+    externalViewWithAllSegments.setState("myTable_0", "pinot1", "OFFLINE");
+    externalViewWithAllSegments.setState("myTable_0", "pinot2", "OFFLINE");
+    externalViewWithAllSegments.setState("myTable_0", "pinot3", "OFFLINE");
+    externalViewWithAllSegments.setState("myTable_1", "pinot1", "ONLINE");
+    externalViewWithAllSegments.setState("myTable_1", "pinot2", "OFFLINE");
+    externalViewWithAllSegments.setState("myTable_1", "pinot3", "OFFLINE");
+
+    when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalViewWithAllSegments);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 2, 2, 1, 33, 0, 100, 0, 1234);
+  }
+
+  @Test
+  public void missingEVForOfflineOnlineISPartitionTest() {
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot3", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_1", "pinot3", "OFFLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    // Create one EV entry with a missing segment that should be ONLINE based on IS, and another one with missing
+    // EV entry for an OFFLINE segment in IS
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    externalView.setState("myTable_0", "pinot1", "ONLINE");
+    externalView.setState("myTable_0", "pinot2", "ONLINE");
+    externalView.setState("myTable_1", "pinot1", "ONLINE");
+    externalView.setState("myTable_1", "pinot3", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata segmentZKMetadata = mockPushedSegmentZKMetadata(1234, 11111L);
+    when(resourceManager.getSegmentZKMetadata(eq(OFFLINE_TABLE_NAME), anyString())).thenReturn(segmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    verifyControllerMetrics(OFFLINE_TABLE_NAME, 0, 2, 2, 1, 33, 0, 100, 1, 2468);
+  }
+
+  @Test
   public void missingEVTest() {
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
     idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
@@ -847,6 +930,59 @@ public class SegmentStatusCheckerTest {
     tableViewExternalOffline.put("TestSegment2", testSegment1MapExternal);
     Map<String, String> testSegment1MapIdeal = new LinkedHashMap<>();
     testSegment1MapIdeal.put("Server1", "ONLINE");
+    tableViewIdealOffline.put("TestSegment1", testSegment1MapIdeal);
+    tableViewIdealOffline.put("TestSegment2", testSegment1MapIdeal);
+    tableViewExternal._offline = tableViewExternalOffline;
+    tableViewIdeal._offline = tableViewIdealOffline;
+    TableViews tableviews = new TableViews();
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
+        CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+    assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
+        CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+  }
+
+  @Test
+  public void testAllSegmentsOfflineInISMissingInEVTable() {
+    TableViews.TableView tableViewExternal = new TableViews.TableView();
+    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
+    Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
+    Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
+    testSegment1MapExternal.put("Server1", "OFFLINE");
+    testSegment1MapExternal.put("Server2", "OFFLINE");
+    // Set empty EV for one of the segments, this should still show up as GOOD since IS is OFFLINE
+    tableViewExternalOffline.put("TestSegment1", new LinkedHashMap<>());
+    tableViewExternalOffline.put("TestSegment2", testSegment1MapExternal);
+    Map<String, String> testSegment1MapIdeal = new LinkedHashMap<>();
+    testSegment1MapIdeal.put("Server1", "OFFLINE");
+    testSegment1MapIdeal.put("Server2", "OFFLINE");
+    tableViewIdealOffline.put("TestSegment1", testSegment1MapIdeal);
+    tableViewIdealOffline.put("TestSegment2", testSegment1MapIdeal);
+    tableViewExternal._offline = tableViewExternalOffline;
+    tableViewIdeal._offline = tableViewIdealOffline;
+    TableViews tableviews = new TableViews();
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
+        CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+    assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
+        CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+  }
+
+  @Test
+  public void testAllSegmentsOfflineInISMissingInEVMultipleInstancesTable() {
+    TableViews.TableView tableViewExternal = new TableViews.TableView();
+    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
+    Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
+    Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
+    testSegment1MapExternal.put("Server1", "OFFLINE");
+    testSegment1MapExternal.put("Server2", "OFFLINE");
+    tableViewExternalOffline.put("TestSegment1", new LinkedHashMap<>());
+    tableViewExternalOffline.put("TestSegment2", testSegment1MapExternal);
+    Map<String, String> testSegment1MapIdeal = new LinkedHashMap<>();
+    testSegment1MapIdeal.put("Server1", "OFFLINE");
+    testSegment1MapIdeal.put("Server2", "ONLINE");
     tableViewIdealOffline.put("TestSegment1", testSegment1MapIdeal);
     tableViewIdealOffline.put("TestSegment2", testSegment1MapIdeal);
     tableViewExternal._offline = tableViewExternalOffline;
