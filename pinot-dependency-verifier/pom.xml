@@ -49,7 +49,7 @@
                 <initialMemorySize>2G</initialMemorySize>
                 <maxMemorySize>2G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=pinot-dependency-verifier-log4j2.xml</extraArgument> <!-- Modify if needed -->
+                  <extraArgument>-Dlog4j2.configurationFile=pinot-dependency-verifier-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -61,5 +61,4 @@
     </plugins>
   </build>
 
-  <!-- No dependencies needed because this module uses Java’s built-in XML parsing libraries -->
 </project>
