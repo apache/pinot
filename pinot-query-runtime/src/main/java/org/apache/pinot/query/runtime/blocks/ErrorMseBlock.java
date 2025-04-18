@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -42,7 +43,6 @@ public class ErrorMseBlock implements MseBlock.Eos {
   }
 
   public static ErrorMseBlock fromException(Exception e) {
-    String errorMessage = DataBlockUtils.extractErrorMsg(e);
     QueryErrorCode errorCode;
     if (e instanceof QueryException) {
       errorCode = ((QueryException) e).getErrorCode();
@@ -51,7 +51,16 @@ public class ErrorMseBlock implements MseBlock.Eos {
     } else {
       errorCode = QueryErrorCode.UNKNOWN;
     }
+    String errorMessage = shouldIncludeStackTrace(errorCode) ? DataBlockUtils.extractErrorMsg(e) : e.getMessage();
     return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
+  }
+
+  public static ErrorMseBlock fromError(QueryErrorCode errorCode, String errorMessage) {
+    return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
+  }
+
+  private static boolean shouldIncludeStackTrace(@NotNull QueryErrorCode errorCode) {
+    return QueryErrorCode.UNKNOWN.equals(errorCode);
   }
 
   @Override

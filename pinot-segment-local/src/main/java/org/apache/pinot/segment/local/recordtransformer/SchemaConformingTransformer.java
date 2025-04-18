@@ -597,11 +597,14 @@ public class SchemaConformingTransformer implements RecordTransformer {
     final Integer mergedTextIndexDocumentMaxLength = _transformerConfig.getMergedTextIndexDocumentMaxLength();
     final @Nullable
     List<String> luceneDocuments = new ArrayList<>();
-    mergedTextIndexMap.entrySet().stream().filter(kv -> null != kv.getKey() && null != kv.getValue())
-        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
-        kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
-            _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength())).filter(
-        kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
+    mergedTextIndexMap.entrySet().stream()
+        .filter(kv -> null != kv.getKey() && null != kv.getValue())
+        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey()))
+        .filter(kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
+            _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength()))
+        .filter(kv -> _transformerConfig.getMergedTextIndexPrefixToExclude().stream()
+            .noneMatch(prefix -> kv.getKey().startsWith(prefix)))
+        .filter(kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
             .anyMatch(suffix -> kv.getKey().endsWith(suffix))).forEach(kv -> {
       generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
     });

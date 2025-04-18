@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
@@ -60,9 +59,7 @@ public class FunnelCountQueriesSetTest extends BaseFunnelCountQueriesTest {
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false);
+    MutableSegment mutableSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }

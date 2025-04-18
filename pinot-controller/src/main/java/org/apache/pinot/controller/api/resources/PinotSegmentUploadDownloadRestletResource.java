@@ -20,7 +20,52 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.swagger.annotations.*;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -34,8 +79,12 @@ import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
-import org.apache.pinot.common.utils.*;
+import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
+import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -73,21 +122,6 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.ws.rs.*;
-import javax.ws.rs.container.AsyncResponse;
-import javax.ws.rs.container.Suspended;
-import javax.ws.rs.core.*;
-import java.io.*;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -183,16 +217,17 @@ public class PinotSegmentUploadDownloadRestletResource {
       segmentFile =
           org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
               "Invalid segment name: %s", segmentName);
-      long downloadStartTimeMs = System.currentTimeMillis();
+      long deepStoreDownloadStartTimeMs = System.currentTimeMillis();
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
-      long remoteDownloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+      long deepStoreDownloadDurationMs = System.currentTimeMillis() - deepStoreDownloadStartTimeMs;
       _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
-              remoteDownloadDurationMs, TimeUnit.MILLISECONDS);
+              deepStoreDownloadDurationMs, TimeUnit.MILLISECONDS);
       _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
-              remoteDownloadDurationMs, TimeUnit.MILLISECONDS);
+              deepStoreDownloadDurationMs, TimeUnit.MILLISECONDS);
       if (segmentFile.exists() && segmentFile.isFile()) {
         long segmentSizeInBytes = segmentFile.length();
-        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSizeInBytes);
+        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES,
+                segmentSizeInBytes);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSizeInBytes);
       }
       // Streaming in the tmp file and delete it afterward.
@@ -398,7 +433,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
           enableParallelPushProtection, allowRefresh, headers);
       long segmentUploadDurationMs = System.currentTimeMillis() - segmentUploadStartTimeMs;
-      _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SEGMENT_TOTAL_UPLOAD_TIME_MS,
+      _controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.SEGMENT_TOTAL_UPLOAD_TIME_MS,
               segmentUploadDurationMs, TimeUnit.MILLISECONDS);
       _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_TOTAL_UPLOAD_TIME_MS, segmentUploadDurationMs,
               TimeUnit.MILLISECONDS);

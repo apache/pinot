@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import java.io.File;
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -26,12 +31,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.net.URI;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 
 /**

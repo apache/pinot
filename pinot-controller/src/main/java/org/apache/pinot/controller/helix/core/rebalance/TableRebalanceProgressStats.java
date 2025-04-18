@@ -339,6 +339,24 @@ public class TableRebalanceProgressStats {
       _startTimeMs = 0;
     }
 
+    RebalanceProgressStats(RebalanceProgressStats other) {
+      _totalSegmentsToBeAdded = other._totalSegmentsToBeAdded;
+      _totalSegmentsToBeDeleted = other._totalSegmentsToBeDeleted;
+      _totalRemainingSegmentsToBeAdded = other._totalRemainingSegmentsToBeAdded;
+      _totalRemainingSegmentsToBeDeleted = other._totalRemainingSegmentsToBeDeleted;
+      _totalRemainingSegmentsToConverge = other._totalRemainingSegmentsToConverge;
+      _totalCarryOverSegmentsToBeAdded = other._totalCarryOverSegmentsToBeAdded;
+      _totalCarryOverSegmentsToBeDeleted = other._totalCarryOverSegmentsToBeDeleted;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = other._totalUniqueNewUntrackedSegmentsDuringRebalance;
+      _percentageRemainingSegmentsToBeAdded = other._percentageRemainingSegmentsToBeAdded;
+      _percentageRemainingSegmentsToBeDeleted = other._percentageRemainingSegmentsToBeDeleted;
+      _estimatedTimeToCompleteAddsInSeconds = other._estimatedTimeToCompleteAddsInSeconds;
+      _estimatedTimeToCompleteDeletesInSeconds = other._estimatedTimeToCompleteDeletesInSeconds;
+      _averageSegmentSizeInBytes = other._averageSegmentSizeInBytes;
+      _totalEstimatedDataToBeMovedInBytes = other._totalEstimatedDataToBeMovedInBytes;
+      _startTimeMs = other._startTimeMs;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof RebalanceProgressStats)) {

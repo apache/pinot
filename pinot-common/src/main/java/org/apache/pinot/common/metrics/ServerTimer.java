@@ -47,8 +47,7 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   SEGMENT_UPLOAD_TIME_MS("milliseconds", true),
   // Measures the total time taken to upload the segment to the deep store, including server processing time
   SEGMENT_TOTAL_DOWNLOAD_TIME_MS("milliseconds", true),
-  SEGMENT_STREAMED_DOWNLOAD_TIME_MS("milliseconds", true),
-  SEGMENT_DECRYPT_DOWNLOAD_TIME_MS("milliseconds", true),
+  SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS("milliseconds", true),
   SEGMENT_PEER_DOWNLOAD_TIME_MS("milliseconds", true),
   SEGMENT_LOAD_TIME_MS("milliseconds", true),
 

@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
-
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 
 public class SegmentCompletionUtils {
@@ -62,7 +61,8 @@ public class SegmentCompletionUtils {
     }
   }
 
-  public static void updateActiveUploadSegmentCount(ServerMetrics serverMetrics, String rawTableName, long activeUploadCount) {
+  public static void updateActiveUploadSegmentCount(ServerMetrics serverMetrics, String rawTableName,
+                                                    long activeUploadCount) {
     serverMetrics.setOrUpdateTableGauge(rawTableName, ServerGauge.SEGMENT_UPLOAD_COUNT, activeUploadCount);
     serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_UPLOAD_COUNT, activeUploadCount);
   }
