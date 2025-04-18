@@ -39,6 +39,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
@@ -243,5 +245,21 @@ public class ColumnMetadataTest {
         false, -1);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration("intMap", config);
     Assert.assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+  }
+
+  @Test
+  public void testSetAndCheckIndexSizes() {
+    ColumnMetadataImpl meta = new ColumnMetadataImpl.Builder().build();
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.json()), 12345L);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.h3()), 0xffffffffffffL);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.vector()), 0);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.fst()), -1);
+
+    Assert.assertEquals(meta.getIndexTypeSizesCount(), 4);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.json()), 12345L);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.h3()), 0xffffffffffffL);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.vector()), 0);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.inverted()), ColumnMetadata.INDEX_NOT_FOUND);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.fst()), 0);
   }
 }

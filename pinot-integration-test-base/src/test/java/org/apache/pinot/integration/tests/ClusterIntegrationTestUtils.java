@@ -295,7 +295,7 @@ public class ClusterIntegrationTestUtils {
     if (numAvroFiles == 1) {
       buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
     } else {
-      ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
+      ExecutorService executorService = Executors.newFixedThreadPool(Math.min(numAvroFiles, 20));
       List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
       for (int i = 0; i < numAvroFiles; i++) {
         File avroFile = avroFiles.get(i);

@@ -132,8 +132,8 @@ public class MapIndexReaderWrapper implements org.apache.pinot.segment.spi.index
       }
 
       @Override
-      public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
-        return Map.of();
+      public long getIndexSizeFor(IndexType type) {
+        return ColumnMetadata.INDEX_NOT_FOUND;
       }
 
       @Override
