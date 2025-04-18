@@ -105,7 +105,7 @@ public interface PRelNode {
   }
 
   default PRelNode with(List<PRelNode> newInputs) {
-    return with(getNodeId(), newInputs, getPinotDataDistributionOrThrow());
+    return with(getNodeId(), newInputs, getPinotDataDistribution());
   }
 
   default PRelNode asLeafStage() {
