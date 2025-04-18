@@ -546,11 +546,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Check if response can be sent without server query evaluation.
-    if (offlineBrokerRequest != null && isFilterAlwaysFalse(offlineBrokerRequest.getPinotQuery())) {
+    if (offlineBrokerRequest != null && isFilterAlwaysFalse(offlineBrokerRequest.getPinotQuery())
+        && !hasFunctionsQuery(offlineBrokerRequest.getPinotQuery())) {
       // We don't need to evaluate offline request
       offlineBrokerRequest = null;
     }
-    if (realtimeBrokerRequest != null && isFilterAlwaysFalse(realtimeBrokerRequest.getPinotQuery())) {
+    if (realtimeBrokerRequest != null && isFilterAlwaysFalse(realtimeBrokerRequest.getPinotQuery())
+        && !hasFunctionsQuery(realtimeBrokerRequest.getPinotQuery())) {
       // We don't need to evaluate realtime request
       realtimeBrokerRequest = null;
     }
@@ -1036,6 +1038,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
         pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
     ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+    // at least return an empty result table
+    if (brokerResponse.getResultTable() == null) {
+      brokerResponse.setResultTable(new ResultTable(null, List.of()));
+    }
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
@@ -1657,6 +1663,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
     return true;
+  }
+
+  static boolean hasFunctionsQuery(PinotQuery pinotQuery) {
+    for (Expression expression : pinotQuery.getSelectList()) {
+      if (CalciteSqlParser.isFunction(expression)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
