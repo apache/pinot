@@ -385,54 +385,57 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   private RebalancePreCheckerResult checkReplicaGroups(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
     String message;
+    boolean hasAnyReplicaGroup;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      message = "OFFLINE segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE);
+      message = "OFFLINE segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE.toString());
+      hasAnyReplicaGroup = isReplicaGroupEnabled(tableConfig, InstancePartitionsType.OFFLINE.toString());
     } else {
       // for realtime table
-      message = "COMPLETED segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED) + "\n"
-          + "CONSUMING segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING);
+      message =
+          "COMPLETED segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED.toString()) + "\n"
+              + "CONSUMING segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING.toString());
+      hasAnyReplicaGroup =
+          isReplicaGroupEnabled(tableConfig, InstancePartitionsType.COMPLETED.toString()) || isReplicaGroupEnabled(
+              tableConfig, InstancePartitionsType.CONSUMING.toString());
     }
     String tierMessage = "";
     if (tableConfig.getTierConfigsList() != null) {
       List<String> tierMessageList = new ArrayList<>();
       for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
         tierMessageList.add(tierConfig.getName() + " tier - " + getReplicaGroupInfo(tableConfig, tierConfig.getName()));
+        hasAnyReplicaGroup |= isReplicaGroupEnabled(tableConfig, tierConfig.getName());
       }
       tierMessage = "\n" + StringUtil.join("\n", tierMessageList.toArray(String[]::new));
     }
-    if (rebalanceConfig.isReassignInstances()) {
-      return RebalancePreCheckerResult.pass(message + tierMessage);
+    if (hasAnyReplicaGroup && !rebalanceConfig.isReassignInstances()) {
+      return RebalancePreCheckerResult.warn(
+          "reassignInstances is disabled, replica groups may not be updated.\n" + message + tierMessage);
     }
-    return RebalancePreCheckerResult.warn(
-        "reassignInstances is disabled, replica groups may not update.\n" + message + tierMessage);
+    return RebalancePreCheckerResult.pass(message + tierMessage);
   }
 
-  private String getReplicaGroupInfo(TableConfig tableConfig, InstancePartitionsType type) {
-    if (!InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, type)) {
+  private static boolean isReplicaGroupEnabled(TableConfig tableConfig, String tier) {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    return instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(tier)
+        && instanceAssignmentConfigMap.get(tier).getReplicaGroupPartitionConfig().isReplicaGroupBased();
+  }
+
+  private static String getReplicaGroupInfo(TableConfig tableConfig, String typeOrTier) {
+    if (!isReplicaGroupEnabled(tableConfig, typeOrTier)) {
       return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
     }
-    return getReplicaGroupInfo(tableConfig, type.toString());
-  }
-
-  private static String getReplicaGroupInfo(TableConfig tableConfig, String type) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-    if (instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(type)) {
-      InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-          instanceAssignmentConfigMap.get(type).getReplicaGroupPartitionConfig();
-      if (!instanceReplicaGroupPartitionConfig.isReplicaGroupBased()) {
-        return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
-      }
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        instanceAssignmentConfigMap.get(typeOrTier).getReplicaGroupPartitionConfig();
 
-      int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
-      int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
-      if (numInstancePerReplicaGroup == 0) {
-        return "numReplicaGroups: " + numReplicaGroups
-            + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
-      }
+    int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
+    int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
+    if (numInstancePerReplicaGroup == 0) {
       return "numReplicaGroups: " + numReplicaGroups
-          + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
+          + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
     }
-    return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
+    return "numReplicaGroups: " + numReplicaGroups
+        + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {

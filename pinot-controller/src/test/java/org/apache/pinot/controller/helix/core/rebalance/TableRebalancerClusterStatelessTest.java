@@ -404,7 +404,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + NUM_REPLICAS + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)");
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
@@ -498,10 +498,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertEquals(
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - Replica Groups are not "
-            + "enabled, replication: " + NUM_REPLICAS);
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());

@@ -831,8 +831,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - Replica Groups are not "
-            + "enabled, replication: " + tableConfig.getReplication(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Enable minimizeDataMovement
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
@@ -845,7 +845,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
             + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
             ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
@@ -859,7 +859,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
             + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
             ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
@@ -876,7 +876,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
             + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
             ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
@@ -893,8 +893,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - Replica Groups are not "
-            + "enabled, replication: " + tableConfig.getReplication(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
@@ -905,8 +905,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - Replica Groups are not "
-            + "enabled, replication: " + tableConfig.getReplication(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     // Validate that the status for reload is still PASS (i.e. even though an extra server is tagged which has no
@@ -940,8 +940,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - Replica Groups are not "
-            + "enabled, replication: " + tableConfig.getReplication(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add minimizeDataMovement
     instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
@@ -953,7 +953,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN,
         "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
             + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
             ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
@@ -969,7 +969,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
         RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not update.\nOFFLINE segments - numReplicaGroups: "
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
             + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
             + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
             ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
