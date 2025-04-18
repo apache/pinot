@@ -72,6 +72,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
+  //boolean Check if dataDir is avaiable on boot?
+  public static final String CONTINUE_WITHOUT_DEEP_STORE = "controller.startup.continueWithoutDeepStore";
+
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
   public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
@@ -536,6 +539,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isUpdateSegmentStateModel() {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
+  }
+
+  public boolean isContinueWithoutDeepStore() {
+    return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false);
   }
 
   public String generateVipUrl() {
