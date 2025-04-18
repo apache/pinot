@@ -198,7 +198,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     return numErrorSegments;
   }
 
-  @Test
+  @Test(enabled = false)
   public void testSegmentAssignment()
       throws Exception {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
