@@ -264,17 +264,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setReassignInstances(true);
 
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertEquals(preCheckResult.size(), 5);
+    assertEquals(preCheckResult.size(), 6);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
@@ -301,6 +303,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
         "All rebalance parameters look good");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -389,8 +395,16 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // No need to reassign instances because instances should be automatically assigned when updating the table config
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    // Though instance partition map is set in ZK, the pre-checker is unaware of that, a warning will be thrown
+    assertEquals(
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + NUM_REPLICAS + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)");
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -478,8 +492,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // no movement should occur
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    assertEquals(
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -511,9 +531,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode with reassignment
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -1145,7 +1171,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Map<String, Map<String, String>> oldSegmentAssignment =
         _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    preChecker.init(_helixResourceManager, executorService, 1);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
 
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
@@ -1224,8 +1254,16 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setReassignInstances(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS + "\n" + TIER_A_NAME
+            + " tier - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -1286,8 +1324,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setReassignInstances(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS + "\n" + TIER_A_NAME
+            + " tier - numReplicaGroups: " + NUM_REPLICAS
+            + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)");
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -1417,6 +1464,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         6);
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
+    executorService.shutdown();
   }
 
   @Test
