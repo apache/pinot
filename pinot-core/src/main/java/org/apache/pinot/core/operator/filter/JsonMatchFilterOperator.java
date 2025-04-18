@@ -51,7 +51,8 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    ImmutableRoaringBitmap bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue());
+    ImmutableRoaringBitmap bitmap =
+        _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
     record(bitmap);
     return new BitmapDocIdSet(bitmap, _numDocs);
   }
@@ -63,7 +64,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    return _jsonIndex.getMatchingDocIds(_predicate.getValue()).getCardinality();
+    return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate()).getCardinality();
   }
 
   @Override
@@ -73,7 +74,8 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    return new BitmapCollection(_numDocs, false, _jsonIndex.getMatchingDocIds(_predicate.getValue()));
+    return new BitmapCollection(_numDocs, false,
+        _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate()));
   }
 
   @Override

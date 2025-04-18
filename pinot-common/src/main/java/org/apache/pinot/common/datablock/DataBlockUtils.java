@@ -115,7 +115,7 @@ public final class DataBlockUtils {
     }
   }
 
-  private static String extractErrorMsg(Throwable t) {
+  public static String extractErrorMsg(Throwable t) {
     while (t.getCause() != null && t.getMessage() == null) {
       t = t.getCause();
     }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -43,12 +43,8 @@ import org.testng.annotations.Test;
 
 
 public class UpsertCompactMergeTaskGeneratorTest {
-
   private static final String RAW_TABLE_NAME = "testTable";
-  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
-  private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private UpsertCompactMergeTaskGenerator _taskGenerator;
-  private TableConfig _tableConfig;
   private SegmentZKMetadata _completedSegment;
   private SegmentZKMetadata _completedSegment2;
   private Map<String, SegmentZKMetadata> _completedSegmentsMap;
@@ -56,15 +52,6 @@ public class UpsertCompactMergeTaskGeneratorTest {
   @BeforeClass
   public void setUp() {
     _taskGenerator = new UpsertCompactMergeTaskGenerator();
-    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
-    Map<String, String> compactionConfigs = new HashMap<>();
-    tableTaskConfigs.put(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, compactionConfigs);
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableSnapshot(true);
-    _tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setUpsertConfig(upsertConfig)
-            .setTaskConfig(new TableTaskConfig(tableTaskConfigs)).build();
 
     _completedSegment = new SegmentZKMetadata("testTable__0");
     _completedSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
@@ -91,22 +78,19 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
   @Test
   public void testUpsertCompactMergeTaskConfig() {
-
     // check with OFFLINE table
-    Map<String, String> upsertCompactMergeTaskConfig =
-        ImmutableMap.of("bufferTimePeriod", "5d");
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
-                new TableTaskConfig(ImmutableMap.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE,
-                    upsertCompactMergeTaskConfig)))
-            .build();
+    Map<String, String> upsertCompactMergeTaskConfig = Map.of("bufferTimePeriod", "5d");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
+        .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(offlineTableConfig, new Schema(), upsertCompactMergeTaskConfig));
 
     // check with non-upsert REALTIME table
     TableConfig nonUpsertRealtimetableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE,
-            upsertCompactMergeTaskConfig)))
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
         .build();
 
     Assert.assertThrows(IllegalStateException.class,
@@ -114,28 +98,28 @@ public class UpsertCompactMergeTaskGeneratorTest {
             upsertCompactMergeTaskConfig));
 
     // check with snapshot disabled
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.DISABLE);
     TableConfig disabledSnapshotTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE,
-            upsertCompactMergeTaskConfig)))
+        .setUpsertConfig(upsertConfig)
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(disabledSnapshotTableConfig, new Schema(),
             upsertCompactMergeTaskConfig));
 
     // valid table configs
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     TableConfig validTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE,
-            upsertCompactMergeTaskConfig)))
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
         .build();
     _taskGenerator.validateTaskConfigs(validTableConfig, new Schema(), upsertCompactMergeTaskConfig);
 
     // invalid buffer time period
-    Map<String, String> upsertCompactMergeTaskConfig1 =
-        ImmutableMap.of("bufferTimePeriod", "5hd");
+    Map<String, String> upsertCompactMergeTaskConfig1 = Map.of("bufferTimePeriod", "5hd");
     Assert.assertThrows(IllegalArgumentException.class,
         () -> _taskGenerator.validateTaskConfigs(validTableConfig, new Schema(), upsertCompactMergeTaskConfig1));
   }

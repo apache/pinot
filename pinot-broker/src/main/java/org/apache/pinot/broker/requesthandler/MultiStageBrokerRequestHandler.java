@@ -228,6 +228,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///     - A table not authorized to read is used
   ///     - An exception during function execution due to errors in the data
   ///       (ie a division by zero or casting an illegal string as int)
+  ///     - Query is too heavy and reaches the allowed timeout.
   ///   - The error message will be sent to the user and the error messages will be logged without stack trace.
   /// 3. With yellow error: The request failed in a way that is controlled but probably internal.
   ///   - The error message will be sent to the user and the error message will be logged with stack trace.
@@ -692,7 +693,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public static boolean isYellowError(QueryException e) {
     switch (e.getErrorCode()) {
       case QUERY_SCHEDULING_TIMEOUT:
-      case EXECUTION_TIMEOUT:
       case INTERNAL:
       case UNKNOWN:
       case MERGE_RESPONSE:
