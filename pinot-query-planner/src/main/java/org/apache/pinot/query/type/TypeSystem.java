@@ -32,7 +32,7 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   public static final TypeSystem INSTANCE = new TypeSystem();
 
   private static final int MAX_DECIMAL_SCALE = 1000;
-  private static final int MAX_DECIMAL_PRECISION = 1000;
+  private static final int MAX_DECIMAL_PRECISION = 2000;
 
   /**
    * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
@@ -63,13 +63,33 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
+  public int getMaxScale(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getMaxScale(typeName);
+  }
+
+  @Override
   public int getMaxNumericScale() {
     return MAX_DECIMAL_SCALE;
   }
 
   @Override
+  public int getDefaultScale(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getDefaultScale(typeName);
+  }
+
+  @Override
+  public int getMaxPrecision(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getMaxPrecision(typeName);
+  }
+
+  @Override
   public int getMaxNumericPrecision() {
     return MAX_DECIMAL_PRECISION;
+  }
+
+  @Override
+  public int getDefaultPrecision(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
   }
 
   @Override
