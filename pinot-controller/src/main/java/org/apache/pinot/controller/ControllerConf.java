@@ -75,7 +75,6 @@ public class ControllerConf extends PinotConfiguration {
   //boolean Check if dataDir is avaiable on boot?
   public static final String CONTINUE_WITHOUT_DEEP_STORE = "controller.startup.continueWithoutDeepStore";
 
-
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
   public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
