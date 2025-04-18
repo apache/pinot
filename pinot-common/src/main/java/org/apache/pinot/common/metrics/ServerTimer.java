@@ -43,12 +43,14 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   RESPONSE_SER_CPU_TIME_NS("nanoseconds", false, "Query cost (response serialization cpu time) "
       + "for query processing on server. Computed as the time spent in serializing query response on servers"),
-  // Measures only the time taken to upload the segment to the remote store, doesn't include server processing time
-  SEGMENT_UPLOAD_TIME_MS("milliseconds", false),
-  SEGMENT_TOTAL_DOWNLOAD_TIME_MS("milliseconds", false),
+  // Measures only the time taken to upload the segment to the deep store, doesn't include server processing time
+  SEGMENT_UPLOAD_TIME_MS("milliseconds", true),
+  // Measures the total time taken to upload the segment to the deep store, including server processing time
+  SEGMENT_TOTAL_DOWNLOAD_TIME_MS("milliseconds", true),
   SEGMENT_STREAMED_DOWNLOAD_TIME_MS("milliseconds", true),
   SEGMENT_DECRYPT_DOWNLOAD_TIME_MS("milliseconds", true),
   SEGMENT_PEER_DOWNLOAD_TIME_MS("milliseconds", true),
+  SEGMENT_LOAD_TIME_MS("milliseconds", true),
 
   TOTAL_CPU_TIME_NS("nanoseconds", false, "Total query cost (thread cpu time + system "
       + "activities cpu time + response serialization cpu time) for query processing on server."),
@@ -72,8 +74,6 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   PREV_SEGMENT_WAIT_TIME_MS("milliseconds", false,
       "Time spent while waiting on previous segment to be registered."),
-  SEGMENT_FETCH_TIME_MS("milliseconds", false,
-      "Time spent while fetching segment to local disk."),
 
   // Multi-stage
   /**

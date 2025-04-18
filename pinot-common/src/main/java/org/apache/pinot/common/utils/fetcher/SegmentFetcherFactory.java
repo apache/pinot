@@ -20,8 +20,6 @@ package org.apache.pinot.common.utils.fetcher;
 
 import org.apache.pinot.common.auth.AuthConfig;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -52,8 +50,6 @@ public class SegmentFetcherFactory {
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
   private static final SegmentFetcher HTTP_SEGMENT_FETCHER = new HttpSegmentFetcher();
   private static final SegmentFetcher PINOT_FS_SEGMENT_FETCHER = new PinotFSSegmentFetcher();
-  private static final ServerMetrics _serverMetrics = ServerMetrics.get();
-  private static final ControllerMetrics _controllerMetrics = ControllerMetrics.get();
 
   /**
    * Initializes the segment fetcher factory. This method should only be called once.

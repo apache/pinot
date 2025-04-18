@@ -26,6 +26,7 @@ import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.core5.http.Header;
 import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -404,7 +405,7 @@ public class HttpClient implements AutoCloseable {
 
       HttpEntity entity = response.getEntity();
       try (InputStream inputStream = response.getEntity().getContent();
-          OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dest))) {
+           OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(dest))) {
         IOUtils.copyLarge(inputStream, outputStream);
       }
 
@@ -465,14 +466,11 @@ public class HttpClient implements AutoCloseable {
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
 
-    long downloadStartTime = System.currentTimeMillis();
     try (CloseableHttpResponse response = _httpClient.execute(request, clientContext)) {
       int statusCode = response.getCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
       }
-      long downloadDurationMs = System.currentTimeMillis() - downloadStartTime;
-
       try (InputStream inputStream = response.getEntity().getContent()) {
         ret = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
       }

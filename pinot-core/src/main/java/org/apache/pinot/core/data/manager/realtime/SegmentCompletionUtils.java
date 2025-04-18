@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
+
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 
 public class SegmentCompletionUtils {
@@ -54,5 +60,20 @@ public class SegmentCompletionUtils {
     } catch (IllegalArgumentException e) {
       return false;
     }
+  }
+
+  public static void updateActiveUploadSegmentCount(ServerMetrics serverMetrics, String rawTableName, long activeUploadCount) {
+    serverMetrics.setOrUpdateTableGauge(rawTableName, ServerGauge.SEGMENT_UPLOAD_COUNT, activeUploadCount);
+    serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_UPLOAD_COUNT, activeUploadCount);
+  }
+
+  public static void raiseSegmentUploadMetrics(ServerMetrics serverMetrics, String rawTableName, long duration,
+                                               long segmentSize) {
+    // Upload duration
+    serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration, TimeUnit.MILLISECONDS);
+    serverMetrics.addTimedValue(ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration, TimeUnit.MILLISECONDS);
+    // Upload size
+    serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
+    serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_UPLOAD_SIZE_BYTES, segmentSize);
   }
 }

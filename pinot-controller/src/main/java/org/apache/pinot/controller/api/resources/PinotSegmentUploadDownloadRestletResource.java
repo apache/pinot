@@ -183,12 +183,12 @@ public class PinotSegmentUploadDownloadRestletResource {
       segmentFile =
           org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
               "Invalid segment name: %s", segmentName);
-      long remoteDownloadStartTimeMs = System.currentTimeMillis();
+      long downloadStartTimeMs = System.currentTimeMillis();
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
-      long remoteDownloadDurationMs = System.currentTimeMillis() - remoteDownloadStartTimeMs;
-      _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_REMOTE_DOWNLOAD_TIME_MS,
+      long remoteDownloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
+      _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
               remoteDownloadDurationMs, TimeUnit.MILLISECONDS);
-      _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_REMOTE_DOWNLOAD_TIME_MS,
+      _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
               remoteDownloadDurationMs, TimeUnit.MILLISECONDS);
       if (segmentFile.exists() && segmentFile.isFile()) {
         long segmentSizeInBytes = segmentFile.length();
@@ -265,7 +265,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                     + "the deep store",
                 Response.Status.BAD_REQUEST);
           }
-          createSegmentFileFromMultipart(multiPart, destFile, tableName);
+          createSegmentFileFromMultipart(multiPart, destFile);
           segmentSizeInBytes = destFile.length();
           break;
         case URI:
@@ -293,7 +293,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           String copySegmentToDeepStore =
               extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
           copySegmentToFinalLocation = Boolean.parseBoolean(copySegmentToDeepStore);
-          createSegmentFileFromMultipart(multiPart, destFile, tableName);
+          createSegmentFileFromMultipart(multiPart, destFile);
           PinotFS pinotFS = null;
           try {
             URI segmentURI = new URI(sourceDownloadURIStr);
@@ -452,7 +452,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
       long segmentSizeInBytes;
-      createSegmentFileFromMultipart(multiPart, tempTarFile, tableName);
+      createSegmentFileFromMultipart(multiPart, tempTarFile);
       PinotFS pinotFS = null;
       try {
         URI segmentURI = new URI(sourceDownloadURIStr);
@@ -1075,7 +1075,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private void createSegmentFileFromMultipart(FormDataMultiPart multiPart, File destFile, String tableName)
+  private void createSegmentFileFromMultipart(FormDataMultiPart multiPart, File destFile)
       throws IOException {
     // Read segment file or segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
@@ -1083,14 +1083,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata",
           Response.Status.BAD_REQUEST);
     }
-    long startTimeMs = System.currentTimeMillis();
     FormDataBodyPart segmentMetadataBodyPart = segmentMetadataMap.values().iterator().next().get(0);
     try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
         OutputStream outputStream = new FileOutputStream(destFile)) {
       IOUtils.copyLarge(inputStream, outputStream);
     } finally {
-      _controllerMetrics.addTimedTableValue(tableName, ControllerTimer.SEGMENT_REMOTE_DOWNLOAD_TIME_MS,
-          System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
       multiPart.cleanup();
     }
   }

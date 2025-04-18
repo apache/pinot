@@ -70,8 +70,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false),
   IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false),
   SEGMENT_SIZE_AUTO_REDUCTION("SegmentSizeAutoReduction", false),
-  SEGMENT_UPLOAD_SIZE_BYTES("SegmentUploadSizeBytes", false),
-  SEGMENT_DOWNLOAD_SIZE_BYTES("SegmentDownloadSizeBytes", false);
+  SEGMENT_UPLOAD_SIZE_BYTES("SegmentUploadSizeBytes", true),
+  SEGMENT_DOWNLOAD_SIZE_BYTES("SegmentDownloadSizeBytes", true);
 
   private final String _brokerMeterName;
   private final String _unit;

@@ -31,14 +31,14 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
-  // TotalTime = segmentRemoteDownloadTimeMs + segmentProcessingTime (controller local processing)
-  SEGMENT_TOTAL_DOWNLOAD_TIME_MS("segmentDownloadTotalTimeMs", false),
-  // Time taken to download the segment from remote store
-  SEGMENT_REMOTE_DOWNLOAD_TIME_MS("segmentRemoteDownloadTimeMs", false),
+  // TotalTime = segmentDeepStoreDownloadTimeMs + segmentProcessingTime (controller local processing)
+  SEGMENT_TOTAL_DOWNLOAD_TIME_MS("segmentDownloadTotalTimeMs", true),
+  // Time taken to download the segment from deep store
+  SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS("segmentDeepStoreDownloadTimeMs", true),
   // TotalTime = segmentUploadTimeMs + segmentProcessingTime (controller local processing)
-  SEGMENT_TOTAL_UPLOAD_TIME_MS("segmentUploadTotalTimeMs", false),
+  SEGMENT_TOTAL_UPLOAD_TIME_MS("segmentUploadTotalTimeMs", true),
   // Time taken to upload the segment to remote store
-  SEGMENT_REMOTE_UPLOAD_TIME_MS("segmentRemoteUploadTimeMs", false);
+  SEGMENT_DEEP_STORE_UPLOAD_TIME_MS("segmentDeepStoreUploadTimeMs", true);
 
 
   private final String _timerName;

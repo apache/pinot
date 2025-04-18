@@ -443,8 +443,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     long totalDownloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
     _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS,
             totalDownloadDurationMs, TimeUnit.MILLISECONDS);
+    _serverMetrics.addTimedValue(ServerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS, totalDownloadDurationMs,
+            TimeUnit.MILLISECONDS);
     // Load the segment
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
+    long loadDurationMs = System.currentTimeMillis() - downloadStartTimeMs - totalDownloadDurationMs;
+    _serverMetrics.addTimedValue(_tableNameWithType, ServerTimer.SEGMENT_LOAD_TIME_MS, loadDurationMs,
+        TimeUnit.MILLISECONDS);
+    _serverMetrics.addTimedValue(ServerTimer.SEGMENT_LOAD_TIME_MS, loadDurationMs, TimeUnit.MILLISECONDS);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -936,11 +942,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
           }
         }
       } else {
-        return downloadSegmentFromPeers(zkMetadata);
+        segment = downloadSegmentFromPeers(zkMetadata);
       }
-      long segmentSize = segment.length();
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
+      if (segment != null) {
+        long segmentSize = segment.length();
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSize);
+      }
       return segment;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1);

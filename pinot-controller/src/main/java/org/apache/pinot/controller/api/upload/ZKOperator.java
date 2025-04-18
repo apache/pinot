@@ -786,9 +786,9 @@ public class ZKOperator {
     long startTimeMs = System.currentTimeMillis();
     PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copyFromLocalFile(segmentFile, finalSegmentLocationURI);
     long durationMs = System.currentTimeMillis() - startTimeMs;
-    _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SEGMENT_REMOTE_UPLOAD_TIME_MS, durationMs,
+    _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SEGMENT_DEEP_STORE_UPLOAD_TIME_MS, durationMs,
         TimeUnit.MILLISECONDS);
-    _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_REMOTE_UPLOAD_TIME_MS, durationMs, TimeUnit.MILLISECONDS);
+    _controllerMetrics.addTimedValue(ControllerTimer.SEGMENT_DEEP_STORE_UPLOAD_TIME_MS, durationMs, TimeUnit.MILLISECONDS);
     long segmentSizeInBytes = segmentFile.length();
     _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.SEGMENT_UPLOAD_SIZE_BYTES,
         segmentSizeInBytes);

@@ -65,6 +65,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   // Incremented when the semaphore is acquired and decremented when the semaphore is released
   SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),
   SEGMENT_DOWNLOAD_COUNT("segmentDownloadCount", true),
+  SEGMENT_UPLOAD_COUNT("segmentUploadCount", true),
   SEGMENT_ALL_PREPROCESS_COUNT("segmentAllPreprocessCount", true),
   SEGMENT_STARTREE_PREPROCESS_COUNT("segmentStartreePreprocessCount", true),
 
