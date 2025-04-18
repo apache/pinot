@@ -82,19 +82,20 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
-import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
+import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -391,56 +392,26 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Get the tables hit by the request
-    String offlineTableName = null;
-    String realtimeTableName = null;
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == TableType.OFFLINE) {
-      // Offline table
-      if (_routingManager.routingExists(tableName)) {
-        offlineTableName = tableName;
-      }
-    } else if (tableType == TableType.REALTIME) {
-      // Realtime table
-      if (_routingManager.routingExists(tableName)) {
-        realtimeTableName = tableName;
-      }
-    } else {
-      // Hybrid table (check both OFFLINE and REALTIME)
-      String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      if (_routingManager.routingExists(offlineTableNameToCheck)) {
-        offlineTableName = offlineTableNameToCheck;
-      }
-      String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      if (_routingManager.routingExists(realtimeTableNameToCheck)) {
-        realtimeTableName = realtimeTableNameToCheck;
-      }
+    TableRouteProvider routeProvider = ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
+
+    if (!routeProvider.isExists()) {
+      LOGGER.info("Table not found for request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
+      return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
 
-    TableConfig offlineTableConfig =
-        _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-    TableConfig realtimeTableConfig =
-        _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-
-    if (offlineTableName == null && realtimeTableName == null) {
-      // No table matches the request
-      if (realtimeTableConfig == null && offlineTableConfig == null) {
-        LOGGER.info("Table not found for request {}: {}", requestId, query);
-        requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
-        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
-      }
+    if (!routeProvider.isRouteExists()) {
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
 
-    // Handle query rewrite that can be overridden by the table configs
-    if (offlineTableName == null) {
-      offlineTableConfig = null;
-    }
-    if (realtimeTableName == null) {
-      realtimeTableConfig = null;
-    }
+    String offlineTableName = routeProvider.getOfflineTableName();
+    String realtimeTableName = routeProvider.getRealtimeTableName();
+    TableConfig offlineTableConfig = routeProvider.getOfflineTableConfig();
+    TableConfig realtimeTableConfig = routeProvider.getRealtimeTableConfig();
+    TimeBoundaryInfo timeBoundaryInfo = routeProvider.getTimeBoundaryInfo();
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
@@ -493,19 +464,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    TimeBoundaryInfo timeBoundaryInfo = null;
-    if (offlineTableName != null && realtimeTableName != null) {
-      // Time boundary info might be null when there is no segment in the offline table, query real-time side only
-      timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
-      if (timeBoundaryInfo == null) {
-        LOGGER.debug("No time boundary info found for hybrid table: {}", rawTableName);
-        offlineTableName = null;
-      }
-    }
-    if (offlineTableName != null && realtimeTableName != null) {
+
+    if (routeProvider.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
+      assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
@@ -523,7 +487,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (offlineTableName != null) {
+    } else if (routeProvider.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
@@ -572,69 +536,38 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
-    List<String> unavailableSegments = new ArrayList<>();
-    int numPrunedSegmentsTotal = 0;
-    boolean offlineTableDisabled = false;
-    boolean realtimeTableDisabled = false;
+    TableRouteInfo
+        tableRouteInfo = routeProvider.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+        requestId);
+
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRouteInfo.getOfflineRoutingTable();
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRouteInfo.getRealtimeRoutingTable();
+    List<String> unavailableSegments = routeProvider.getUnavailableSegments();
+    int numPrunedSegmentsTotal = routeProvider.getNumPrunedSegmentsTotal();
+
+    // Rewrite the broker requests as the rest of the code expects them to be null or not based on whether the routing
+    // calculation was successful or not.
+    offlineBrokerRequest = tableRouteInfo.getOfflineBrokerRequest();
+    realtimeBrokerRequest = tableRouteInfo.getRealtimeBrokerRequest();
+
     List<QueryProcessingException> errorMsgs = new ArrayList<>();
-    if (offlineBrokerRequest != null) {
-      offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
-      // NOTE: Routing table might be null if table is just removed
-      RoutingTable routingTable = null;
-      if (!offlineTableDisabled) {
-        routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
-      }
-      if (routingTable != null) {
-        unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
-            routingTable.getServerInstanceToSegmentsMap();
-        if (!serverInstanceToSegmentsMap.isEmpty()) {
-          offlineRoutingTable = serverInstanceToSegmentsMap;
-        } else {
-          offlineBrokerRequest = null;
-        }
-        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
-      } else {
-        offlineBrokerRequest = null;
-      }
-    }
-    if (realtimeBrokerRequest != null) {
-      realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
-      // NOTE: Routing table might be null if table is just removed
-      RoutingTable routingTable = null;
-      if (!realtimeTableDisabled) {
-        routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
-      }
-      if (routingTable != null) {
-        unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
-            routingTable.getServerInstanceToSegmentsMap();
-        if (!serverInstanceToSegmentsMap.isEmpty()) {
-          realtimeRoutingTable = serverInstanceToSegmentsMap;
-        } else {
-          realtimeBrokerRequest = null;
-        }
-        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
-      } else {
-        realtimeBrokerRequest = null;
-      }
+
+    // If all tables in a hybrid are disabled then return an error.
+    // Note that if a query is for one of OFFLINE or REALTIME table and the other physical table is disabled,
+    // we still want to run the query. So this condition is false.
+    // Tested by the tables "hybrid_o_disabled_REALTIME" and "hybrid_r_disabled_OFFLINE" in ImplicitTableRouteTest
+    if (routeProvider.isDisabled()) {
+      requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
+      return BrokerResponseNative.TABLE_IS_DISABLED;
     }
 
-    if (offlineTableDisabled || realtimeTableDisabled) {
-      String errorMessage = null;
-      if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
-          && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
-          realtimeTableConfig == null && offlineTableDisabled)) {
-        requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
-        return BrokerResponseNative.TABLE_IS_DISABLED;
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
-        errorMessage = "Realtime table is disabled in hybrid table";
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
-        errorMessage = "Offline table is disabled in hybrid table";
+    List<String> disabledTableNames = routeProvider.getDisabledTableNames();
+    if (disabledTableNames != null) {
+      for (String name : disabledTableNames) {
+        String errorMessage = String.format("%s Table is disabled", name);
+        LOGGER.info("{}: {}", errorMessage, query);
+        errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
       }
-      errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
     }
 
     int numUnavailableSegments = unavailableSegments.size();
@@ -665,7 +598,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
         return BrokerResponseNative.fromBrokerErrors(errorMsgs);
       } else {
-        // When all segments have been pruned, we can just return an empty response.
+        // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity, schema, query,
             database);
       }
@@ -767,18 +700,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       onQueryStart(
           requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
       try {
-        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-            requestContext);
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRouteInfo,
+            remainingTimeMs, serverStats, requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
         onQueryFinish(requestId);
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-          requestContext);
+      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRouteInfo,
+          remainingTimeMs, serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -2016,10 +1947,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
