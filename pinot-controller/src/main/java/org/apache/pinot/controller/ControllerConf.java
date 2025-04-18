@@ -542,7 +542,7 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
   }
 
-  public boolean continueWithoutDeepStore() {
+  public boolean isContinueWithoutDeepStore() {
     return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false);
   }
 
