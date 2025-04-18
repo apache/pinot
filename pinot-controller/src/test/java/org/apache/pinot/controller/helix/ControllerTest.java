@@ -66,18 +66,23 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedStatic;
@@ -150,6 +155,21 @@ public class ControllerTest {
    */
   public static ControllerTest getInstance() {
     return DEFAULT_INSTANCE;
+  }
+
+  public List<String> createHybridTables(List<String> tableNames)
+      throws IOException {
+    List<String> tableNamesWithType = new ArrayList<>();
+    for (String tableName : tableNames) {
+      addDummySchema(tableName);
+      TableConfig offlineTable = createDummyTableConfig(tableName, TableType.OFFLINE);
+      TableConfig realtimeTable = createDummyTableConfig(tableName, TableType.REALTIME);
+      addTableConfig(offlineTable);
+      addTableConfig(realtimeTable);
+      tableNamesWithType.add(offlineTable.getTableName());
+      tableNamesWithType.add(realtimeTable.getTableName());
+    }
+    return tableNamesWithType;
   }
 
   public String getHelixClusterName() {
@@ -359,6 +379,19 @@ public class ControllerTest {
         addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
       }
     }
+  }
+
+  public static LogicalTable getDummyLogicalTable(String tableName, List<String> physicalTableNames,
+      String brokerTenant) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : physicalTableNames) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    LogicalTableBuilder builder = new LogicalTableBuilder()
+        .setTableName(tableName)
+        .setBrokerTenant(brokerTenant)
+        .setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
   }
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -639,6 +672,19 @@ public class ControllerTest {
     schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
     schema.addField(new DateTimeFieldSpec("timeColumn", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
     return schema;
+  }
+
+  public static TableConfig createDummyTableConfig(String tableName, TableType tableType) {
+    TableConfigBuilder builder = new TableConfigBuilder(tableType);
+    if (tableType == TableType.REALTIME) {
+      builder.setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+    }
+    return builder.setTableName(tableName)
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .build();
   }
 
   public static Schema createDummySchemaWithPrimaryKey(String tableName) {

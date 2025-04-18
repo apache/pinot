@@ -176,6 +176,7 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -2203,6 +2204,64 @@ public class PinotHelixResourceManager {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  public void addLogicalTable(LogicalTable logicalTable)
+      throws TableAlreadyExistsException {
+    String tableName = logicalTable.getTableName();
+    LOGGER.info("Adding logical table: {}", tableName);
+
+    // Check if the logical table name is already used
+    LogicalTable existingLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (existingLogicalTable != null) {
+      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
+    }
+
+    // Check if the table name is already used by a physical table
+    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
+        .findFirst().ifPresent(tableNameWithType -> {
+          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+        });
+
+    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
+    LOGGER.info("Added logical table: {}", tableName);
+  }
+
+  public void updateLogicalTable(LogicalTable logicalTable)
+      throws TableNotFoundException {
+    String tableName = logicalTable.getTableName();
+    LOGGER.info("Updating logical table: {}", tableName);
+
+    LogicalTable oldLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (oldLogicalTable == null) {
+      throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
+    }
+
+    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
+    LOGGER.info("Updated logical table: {}", tableName);
+  }
+
+  public boolean deleteLogicalTable(String tableName) {
+    LOGGER.info("Deleting logical table: {}", tableName);
+    boolean result = false;
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
+    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
+    }
+    LOGGER.info("Deleted logical table: {}", tableName);
+    return result;
+  }
+
+  public LogicalTable getLogicalTable(String tableName) {
+    return ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+  }
+
+  public List<String> getAllLogicalTableNames() {
+    return ZKMetadataProvider.getAllLogicalTables(_propertyStore).stream().map(LogicalTable::getTableName)
+        .collect(Collectors.toList());
   }
 
   /**
