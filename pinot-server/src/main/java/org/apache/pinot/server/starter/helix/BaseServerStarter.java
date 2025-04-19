@@ -171,10 +171,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
+    applyCustomConfigs(_serverConf);
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
-        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     String tarCompressionCodecName =
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
@@ -259,6 +259,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     ContinuousJfrStarter.init(_serverConf);
+  }
+
+  /// Can be overridden to apply custom configs to the server conf.
+  protected void applyCustomConfigs(PinotConfiguration serverConf) {
   }
 
   /**
