@@ -129,7 +129,7 @@ public final class FilterContext {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_type, _children, _predicate, _isTrue);
+    return Objects.hash(_type == null ? null : _type.toString(), _children, _predicate, _isTrue);
   }
 
   @Override
