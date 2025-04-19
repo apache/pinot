@@ -30,7 +30,7 @@ public class RebalanceConfig {
   public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
-  public static final int DEFAULT_BATCH_SIZE = Integer.MAX_VALUE; // unlimited batch size
+  public static final int DEFAULT_BATCH_SIZE_PER_SERVER = Integer.MAX_VALUE; // unlimited batch size
 
   // Whether to rebalance table in dry-run mode
   @JsonProperty("dryRun")
@@ -93,16 +93,14 @@ public class RebalanceConfig {
   @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
   private Enablement _minimizeDataMovement = Enablement.ENABLE;
 
-  // How many segment add updates to make to the IdealState as part of each rebalance step. This is used as closest
-  // estimated upper-bound, and it is still possible to select a few segments above this threshold if more than
-  // one replica of the same segment is added such that before changing the assignment we are below the threshold and
-  // after adding we are just above the threshold. For strict replica group based assignment, there is the additional
-  // constraint to move each partitionId replica as a whole rather than splitting it up. In this case also the total
-  // segment adds may be above the threshold to accomodate a full partition. The minReplicasAvailable invariant is also
-  // maintained, so fewer segments than the batchSize may be selected.
-  @JsonProperty("batchSize")
+  // How many segment add updates to make per server to the IdealState as part of each rebalance step. This is used
+  // as closest estimated upper-bound. For strict replica group based assignment, there is the additional constraint
+  // to move each partitionId replica as a whole rather than splitting it up. In this case the total segment adds per
+  // server may be above the threshold to accommodate a full partition. The minReplicasAvailable invariant is also
+  // maintained, so fewer segments than the batchSizePerServer may also be selected. Batching is disabled by default.
+  @JsonProperty("batchSizePerServer")
   @ApiModelProperty(example = "100")
-  private int _batchSize = DEFAULT_BATCH_SIZE;
+  private int _batchSizePerServer = DEFAULT_BATCH_SIZE_PER_SERVER;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -209,12 +207,12 @@ public class RebalanceConfig {
     _bestEfforts = bestEfforts;
   }
 
-  public int getBatchSize() {
-    return _batchSize;
+  public int getBatchSizePerServer() {
+    return _batchSizePerServer;
   }
 
-  public void setBatchSize(int batchSize) {
-    _batchSize = batchSize;
+  public void setBatchSizePerServer(int batchSizePerServer) {
+    _batchSizePerServer = batchSizePerServer;
   }
 
   public long getExternalViewCheckIntervalInMs() {
@@ -288,7 +286,7 @@ public class RebalanceConfig {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
         + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
         + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
-        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSize=" + _batchSize
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSizePerServer=" + _batchSizePerServer
         + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
@@ -307,7 +305,7 @@ public class RebalanceConfig {
     rc._minAvailableReplicas = cfg._minAvailableReplicas;
     rc._bestEfforts = cfg._bestEfforts;
     rc._minimizeDataMovement = cfg._minimizeDataMovement;
-    rc._batchSize = cfg._batchSize;
+    rc._batchSizePerServer = cfg._batchSizePerServer;
     rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;
