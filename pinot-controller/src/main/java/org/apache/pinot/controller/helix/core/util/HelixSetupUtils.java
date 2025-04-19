@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ConfigAccessor;
@@ -29,7 +31,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.controller.HelixControllerMain;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
-import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -60,37 +61,54 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
-    setupHelixClusterIfNeeded(helixClusterName, zkPath);
-    return HelixControllerMain
-        .startHelixController(zkPath, helixClusterName, instanceId, HelixControllerMain.STANDALONE);
-  }
-
-  private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
-    HelixAdmin admin = null;
+  public static void setupHelixClusterWithDefaultConfigs(String zkAddress, String clusterName,
+      Map<String, String> defaultConfigs) {
+    HelixAdmin admin = new ZKHelixAdmin.Builder().setZkAddress(zkAddress).build();
     try {
-      admin = new ZKHelixAdmin.Builder().setZkAddress(zkPath).build();
-      if (admin.getClusters().contains(helixClusterName)) {
-        LOGGER.info("Helix cluster: {} already exists", helixClusterName);
-      } else {
-        LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
-        admin.addCluster(helixClusterName, false);
-        // Enable Auto-Join for the cluster
+      if (admin.getClusters().contains(clusterName)) {
+        LOGGER.info("Helix cluster: {} already exists, updating default configs: {}", clusterName, defaultConfigs);
         HelixConfigScope configScope =
-            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
-        Map<String, String> configMap = new HashMap<>();
-        configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
-        configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(DEFAULT_ENABLE_CASE_INSENSITIVE));
-        configMap.put(DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(DEFAULT_HYPERLOGLOG_LOG2M));
-        configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
-        admin.setConfig(configScope, configMap);
-        LOGGER.info("New Helix cluster: {} created", helixClusterName);
+            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+        List<String> keys = new ArrayList<>(defaultConfigs.keySet());
+        Map<String, String> existingConfigs = admin.getConfig(configScope, keys);
+        Map<String, String> newConfigs = new HashMap<>();
+        Map<String, String> nonDefaultConfigs = new HashMap<>();
+        for (Map.Entry<String, String> entry : defaultConfigs.entrySet()) {
+          String key = entry.getKey();
+          String value = entry.getValue();
+          String existingValue = existingConfigs.get(key);
+          if (existingValue == null) {
+            newConfigs.put(key, value);
+          } else if (!existingValue.equals(value)) {
+            nonDefaultConfigs.put(key, existingValue);
+          }
+        }
+        if (!newConfigs.isEmpty()) {
+          admin.setConfig(configScope, newConfigs);
+          LOGGER.info("Updated helix cluster: {} with new configs: {}, non-default configs: {}", clusterName,
+              newConfigs, nonDefaultConfigs);
+        } else if (!nonDefaultConfigs.isEmpty()) {
+          LOGGER.info("No config change needed for Helix cluster: {} with non-default configs: {}", clusterName,
+              nonDefaultConfigs);
+        } else {
+          LOGGER.info("No config change needed for Helix cluster: {} with only default configs", clusterName);
+        }
+      } else {
+        LOGGER.info("Creating a new Helix cluster: {} with default configs: {}", clusterName, defaultConfigs);
+        admin.addCluster(clusterName, false);
+        HelixConfigScope configScope =
+            new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+        admin.setConfig(configScope, defaultConfigs);
+        LOGGER.info("New Helix cluster: {} created with default configs: {}", clusterName, defaultConfigs);
       }
     } finally {
-      if (admin != null) {
-        admin.close();
-      }
+      admin.close();
     }
+  }
+
+  public static HelixManager setupHelixController(String helixClusterName, String zkPath, String instanceId) {
+    return HelixControllerMain.startHelixController(zkPath, helixClusterName, instanceId,
+        HelixControllerMain.STANDALONE);
   }
 
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,

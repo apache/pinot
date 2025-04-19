@@ -48,6 +48,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.InstanceConfig;
@@ -137,6 +138,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -213,16 +215,19 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _config = new ControllerConf(pinotConfiguration.toMap());
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
+    _controllerMode = _config.getControllerMode();
+    if (_controllerMode == ControllerConf.ControllerMode.DUAL
+        || _controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
+      HelixSetupUtils.setupHelixClusterWithDefaultConfigs(_helixZkURL, _helixClusterName, getDefaultClusterConfigs());
+    }
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+    applyCustomConfigs(_config);
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.valueOf(
-        _config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     setupHelixSystemProperties();
     IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
-    _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
@@ -236,7 +241,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (_helixParticipantInstanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
       Preconditions.checkState(InstanceTypeUtils.isController(_helixParticipantInstanceId),
-          "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE,
+          "Instance id must have prefix '%s', got '%s'", Helix.PREFIX_OF_CONTROLLER_INSTANCE,
           _helixParticipantInstanceId);
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
@@ -273,6 +278,22 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ContinuousJfrStarter.init(_config);
   }
 
+  /// Returns the default cluster configs to be stored in ZK as Helix cluster config. These configs will then be
+  /// propagated to all the instance configs to control the default behavior for each component.
+  /// Can be overridden to add more configs.
+  protected Map<String, String> getDefaultClusterConfigs() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true");
+    configs.put(Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
+    configs.put(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(Helix.DEFAULT_HYPERLOGLOG_LOG2M));
+    configs.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, "true");
+    return configs;
+  }
+
+  /// Can be overridden to apply custom configs to the controller conf.
+  protected void applyCustomConfigs(ControllerConf controllerConf) {
+  }
+
   // If thread pool size is not configured executor will use cached thread pool
   private ExecutorService createExecutorService(int numThreadPool, String threadNameFormat) {
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build();
@@ -282,7 +303,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+      if (config.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
         final String inferredHostname = NetUtils.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);
@@ -299,14 +320,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
-        _config.getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
-            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+        _config.getProperty(Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   private void setupHelixClusterConstraints() {
-    String maxStateTransitions =
-        _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
-            CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
+    String maxStateTransitions = _config.getProperty(Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+        Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
@@ -430,7 +449,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _helixControllerInstanceId);
 
     // Emit helix controller metrics
-    _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+    _controllerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _helixControllerManager.isConnected() ? 1L : 0L);
     // Deprecated, since getting the leadership of Helix does not mean Helix has been ready for pinot.
     _controllerMetrics.addCallbackGauge("helix.leader", () -> _helixControllerManager.isLeader() ? 1L : 0L);
@@ -780,7 +799,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
           (resourceConfigList, changeContext) -> _leadControllerManager.onResourceConfigChange());
     } catch (Exception e) {
       throw new RuntimeException(
-          "Error registering resource config listener for " + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+          "Error registering resource config listener for " + Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
     }
   }
 
@@ -791,8 +810,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> Collections.singletonList(Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
 
