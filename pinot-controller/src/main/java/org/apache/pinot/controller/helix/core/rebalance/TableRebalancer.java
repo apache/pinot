@@ -225,8 +225,8 @@ public class TableRebalancer {
     int minReplicasToKeepUpForNoDowntime = rebalanceConfig.getMinAvailableReplicas();
     boolean lowDiskMode = rebalanceConfig.isLowDiskMode();
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
-    int batchSize = rebalanceConfig.getBatchSize();
-    Preconditions.checkState(batchSize > 0, "TableRebalance batchSize must be > 0");
+    int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
+    Preconditions.checkState(batchSizePerServer > 0, "TableRebalance batchSizePerServer must be > 0");
     long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
     long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
     Enablement minimizeDataMovement = rebalanceConfig.getMinimizeDataMovement();
@@ -236,10 +236,10 @@ public class TableRebalancer {
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
-            + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSize: {}, "
+            + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
             + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}",
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
-        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSize,
+        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement);
 
     // Dry-run must be enabled to run pre-checks
@@ -602,7 +602,7 @@ public class TableRebalancer {
       String partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-              lowDiskMode, batchSize, tableNameWithType, partitionColumn, _helixManager,
+              lowDiskMode, batchSizePerServer, tableNameWithType, partitionColumn, _helixManager,
               (segmentAssignment instanceof StrictRealtimeSegmentAssignment), segmentPartitionIdMap,
               tableRebalanceLogger);
       tableRebalanceLogger.info(
@@ -1545,12 +1545,12 @@ public class TableRebalancer {
   @VisibleForTesting
   static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
-      boolean lowDiskMode, int batchSize, String tableNameWithType, @Nullable String partitionColumn,
+      boolean lowDiskMode, int batchSizePerServer, String tableNameWithType, @Nullable String partitionColumn,
       HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment,
       Object2IntOpenHashMap<String> segmentPartitionIdMap) {
     return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-        lowDiskMode, batchSize, tableNameWithType, partitionColumn, helixManager, isStrictRealtimeSegmentAssignment,
-        segmentPartitionIdMap, LOGGER);
+        lowDiskMode, batchSizePerServer, tableNameWithType, partitionColumn, helixManager,
+        isStrictRealtimeSegmentAssignment, segmentPartitionIdMap, LOGGER);
   }
 
   /**
@@ -1561,25 +1561,25 @@ public class TableRebalancer {
    */
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
-      boolean lowDiskMode, int batchSize, String tableNameWithType, String partitionColumn, HelixManager helixManager,
-      boolean isStrictRealtimeSegmentAssignment, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      Logger tableRebalanceLogger) {
+      boolean lowDiskMode, int batchSizePerServer, String tableNameWithType, String partitionColumn,
+      HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment,
+      Object2IntOpenHashMap<String> segmentPartitionIdMap, Logger tableRebalanceLogger) {
     return enableStrictReplicaGroup ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment,
-        minAvailableReplicas, lowDiskMode, batchSize, tableNameWithType, partitionColumn, helixManager,
+        minAvailableReplicas, lowDiskMode, batchSizePerServer, tableNameWithType, partitionColumn, helixManager,
         isStrictRealtimeSegmentAssignment, segmentPartitionIdMap, tableRebalanceLogger)
         : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
-            lowDiskMode, batchSize, tableRebalanceLogger);
+            lowDiskMode, batchSizePerServer);
   }
 
   private static Map<String, Map<String, String>> getNextStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minAvailableReplicas, boolean lowDiskMode, int batchSize, String tableNameWithType, String partitionColumn,
-      HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment,
+      int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer, String tableNameWithType,
+      String partitionColumn, HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment,
       Object2IntOpenHashMap<String> segmentPartitionIdMap, Logger tableRebalanceLogger) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Integer, Map<String, Map<String, String>>> partitionIdToCurrentAssignmentMap;
-    if (batchSize == Integer.MAX_VALUE) {
+    if (batchSizePerServer == Integer.MAX_VALUE) {
       // Don't calculate the partition id to current assignment mapping if batching is disabled since
       // we want to update the next assignment based on all partitions in this case
       partitionIdToCurrentAssignmentMap = new TreeMap<>();
@@ -1592,10 +1592,33 @@ public class TableRebalancer {
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     Map<Set<String>, Set<String>> availableInstancesMap = new HashMap<>();
 
-    int segmentsAddedSoFar = 0;
+    Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
     for (Map<String, Map<String, String>> curAssignment : partitionIdToCurrentAssignmentMap.values()) {
-      if (segmentsAddedSoFar < batchSize) {
-        // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSize
+      Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
+      // All partitions should be assigned to the same set of servers so it is enough to check for whether any server
+      // for one segment is above the limit or not
+      Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
+      SingleSegmentAssignment firstAssignment =
+          getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
+              minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+      Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
+          firstAssignment._instanceStateMap);
+      boolean anyServerExhaustedBatchSize = false;
+      for (String server : serversAdded) {
+        if (serverToNumSegmentsAddedSoFar.getOrDefault(server, 0) >= batchSizePerServer) {
+          anyServerExhaustedBatchSize = true;
+          break;
+        }
+      }
+      if (anyServerExhaustedBatchSize) {
+        // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
+        for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
+          String segmentName = entry.getKey();
+          Map<String, String> currentInstanceStateMap = entry.getValue();
+          nextAssignment.put(segmentName, currentInstanceStateMap);
+        }
+      } else {
+        // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSizePerServer
         // Can only do bestEfforts w.r.t. StrictReplicaGroup since a whole partition must be moved together for
         // maintaining consistency
         for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
@@ -1631,22 +1654,22 @@ public class TableRebalancer {
           });
 
           if (!nextAssignment.get(segmentName).equals(currentInstanceStateMap)) {
-            segmentsAddedSoFar +=
-                getNumSegmentsAddedInSingleSegmentAssignment(currentInstanceStateMap, nextAssignment.get(segmentName));
+            Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
+                nextAssignment.get(segmentName));
+            for (String server : serversAddedForSegment) {
+              int numSegmentsAdded = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
+              serverToNumSegmentsAddedSoFar.put(server, numSegmentsAdded + 1);
+            }
           }
-        }
-      } else {
-        // Exhausted the batch size, just copy over the remaining segments as is
-        for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
-          String segmentName = entry.getKey();
-          Map<String, String> currentInstanceStateMap = entry.getValue();
-          nextAssignment.put(segmentName, currentInstanceStateMap);
         }
       }
     }
-    if (segmentsAddedSoFar > batchSize) {
-      tableRebalanceLogger.warn("Adding larger number of segments: {} than batchSize: {}", segmentsAddedSoFar,
-          batchSize);
+
+    int maxSegmentsAddedToAnyServer = serverToNumSegmentsAddedSoFar.isEmpty() ? 0
+        : Collections.max(serverToNumSegmentsAddedSoFar.values());
+    if (maxSegmentsAddedToAnyServer > batchSizePerServer) {
+      tableRebalanceLogger.warn("Found at least one server with {} segments added which is larger than "
+              + "batchSizePerServer: {}", maxSegmentsAddedToAnyServer, batchSizePerServer);
     }
     return nextAssignment;
   }
@@ -1701,42 +1724,49 @@ public class TableRebalancer {
 
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minAvailableReplicas, boolean lowDiskMode, int batchSize, Logger tableRebalanceLogger) {
-    int segmentsAddedSoFar = 0;
+      int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer) {
+    Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> currentInstanceStateMap = entry.getValue();
-      if (segmentsAddedSoFar < batchSize) {
-        // Only bother to calculate the next assignment for the segment if we are within the batchSize
-        Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
-        Map<String, String> nextInstanceStateMap =
-            getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-                lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
-        segmentsAddedSoFar += getNumSegmentsAddedInSingleSegmentAssignment(currentInstanceStateMap,
-            nextInstanceStateMap);
+      Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
+      Map<String, String> nextInstanceStateMap =
+          getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+      Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
+          nextInstanceStateMap);
+      boolean anyServerExhaustedBatchSize = false;
+      for (String server : serversAddedForSegment) {
+        if (serverToNumSegmentsAddedSoFar.getOrDefault(server, 0) >= batchSizePerServer) {
+          anyServerExhaustedBatchSize = true;
+          break;
+        }
+      }
+      if (anyServerExhaustedBatchSize) {
+        // Exhausted the batch size for at least 1 server, set to existing assignment
+        nextAssignment.put(segmentName, currentInstanceStateMap);
+      } else {
+        // Add the next assignment and update the segments added so far counts
+        for (String server : serversAddedForSegment) {
+          int numSegmentsAdded = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
+          serverToNumSegmentsAddedSoFar.put(server, numSegmentsAdded + 1);
+        }
         nextAssignment.put(segmentName, nextInstanceStateMap);
         updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(),
             nextInstanceStateMap.keySet());
-      } else {
-        // Exhausted the batch size and have added at least one segment, set to existing assignment
-        nextAssignment.put(segmentName, currentInstanceStateMap);
       }
-    }
-    if (segmentsAddedSoFar > batchSize) {
-      tableRebalanceLogger.warn("Adding larger number of segments: {} than batchSize: {}", segmentsAddedSoFar,
-          batchSize);
     }
     return nextAssignment;
   }
 
-  private static int getNumSegmentsAddedInSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
+  private static Set<String> getServersAddedInSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
       Map<String, String> nextInstanceStateMap) {
     Set<String> serversWithSegmentsAdded = new HashSet<>(nextInstanceStateMap.keySet());
     serversWithSegmentsAdded.removeAll(currentInstanceStateMap.keySet());
-    return serversWithSegmentsAdded.size();
+    return serversWithSegmentsAdded;
   }
 
   /**
