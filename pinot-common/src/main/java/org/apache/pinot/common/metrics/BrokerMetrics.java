@@ -20,9 +20,11 @@ package org.apache.pinot.common.metrics;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
@@ -35,6 +37,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
   private static final BrokerMetrics NOOP = new BrokerMetrics(new NoopPinotMetricsRegistry());
   private static final AtomicReference<BrokerMetrics> BROKER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
+  private static final String PREFERRED_GROUP_SET_TAG = "preferredGroupOptSet";
+  private static final String PREFERRED_GROUP_UNSET_TAG = "preferredGroupOptUnset";
 
   /**
    * register the brokerMetrics onto this class, so that we don't need to pass it down as a parameter
@@ -82,5 +86,13 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
   @Override
   protected BrokerGauge[] getGauges() {
     return BrokerGauge.values();
+  }
+
+  public static String getTagForPreferredGroup(Map<String, String> queryOption) {
+    if (queryOption == null) {
+      return PREFERRED_GROUP_UNSET_TAG;
+    }
+    return queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_REPLICAS)
+        ? PREFERRED_GROUP_SET_TAG : PREFERRED_GROUP_UNSET_TAG;
   }
 }
