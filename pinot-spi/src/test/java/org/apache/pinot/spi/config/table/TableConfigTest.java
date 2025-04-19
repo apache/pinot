@@ -95,7 +95,7 @@ public class TableConfigTest {
         .setNumReplicas(2)
         .setIngestionConfig(ingestionConfig)
         .setDedupConfig(dedupConfig)
-        .setQueryConfig(new QueryConfig(2000L, true, false, Map.of(), 100_000L, 100_000L))
+        .setQueryConfig(new QueryConfig(2000L, true, false, Map.of(), 100_000L, 100_000L, null))
         .setTierConfigList(List.of(new TierConfig("name", "type", null, null, "storageType", null, null, null)))
         .build();
 

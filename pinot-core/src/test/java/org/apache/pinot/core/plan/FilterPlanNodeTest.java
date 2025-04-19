@@ -52,6 +52,7 @@ public class FilterPlanNodeTest {
     when(meta.getTotalDocs()).then((Answer<Integer>) invocationOnMock -> numDocs.get());
     QueryContext queryContext = mock(QueryContext.class);
     when(queryContext.getFilter()).thenReturn(null);
+    when(queryContext.getTableName()).thenReturn("testTable");
 
     numDocs.set(3);
     bitmap.add(0);

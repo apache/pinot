@@ -1976,6 +1976,15 @@ public class CommonConstants {
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
   }
 
+  public static class QueryCacheConfigs {
+    public static final String QUERY_CACHE_ENABLED = "pinot.query.cache.enabled";
+    public static final boolean DEFAULT_QUERY_CACHE_ENABLED = false;
+    public static final String QUERY_CACHE_MAX_SIZE = "pinot.query.cache.max.size";
+    public static final int DEFAULT_QUERY_CACHE_MAX_SIZE = 1000;
+    public static final String QUERY_CACHE_MAX_SIZE_IN_BYTES = "pinot.query.cache.max.size.in.bytes";
+    public static final long DEFAULT_QUERY_CACHE_MAX_SIZE_IN_BYTES = 100 * 1024 * 1024; // 100MB
+  }
+
   /**
    * ZK paths used by Pinot.
    */
