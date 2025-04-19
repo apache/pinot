@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.ImmutableMap;
+import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -58,6 +59,7 @@ public class IndexService {
 
   private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
+  private final Object2ShortOpenHashMap _allIndexPosById;
 
   private IndexService(Set<IndexPlugin<?>> allPlugins) {
     ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
@@ -72,6 +74,12 @@ public class IndexService {
     Collections.sort(allIndexIds);
     _allIndexes = new ArrayList<>();
     allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
+
+    _allIndexPosById = new Object2ShortOpenHashMap(allIndexIds.size());
+    _allIndexPosById.defaultReturnValue((short) -1);
+    for (short i = 0; i < _allIndexes.size(); i++) {
+      _allIndexPosById.put(_allIndexes.get(i).getId(), i);
+    }
   }
 
   /**
@@ -150,5 +158,33 @@ public class IndexService {
       throw new IllegalArgumentException("Unknown index id: " + indexId);
     }
     return indexType;
+  }
+
+  public short getNumericId(String indexId) {
+    short id = _allIndexPosById.getShort(indexId.toLowerCase(Locale.US));
+    if (id == -1) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+    return id;
+  }
+
+  public short getNumericId(IndexType indexType) {
+    short id = _allIndexPosById.getShort(indexType.getId());
+    if (id == -1) {
+      throw new IllegalArgumentException("Unknown index type: " + indexType);
+    }
+    return id;
+  }
+
+  public IndexType<?, ?, ?> get(long indexId) {
+    return get((int) indexId);
+  }
+
+  public IndexType<?, ?, ?> get(int indexId) {
+    if (indexId < 0 || indexId >= _allIndexes.size()) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+
+    return _allIndexes.get(indexId);
   }
 }
