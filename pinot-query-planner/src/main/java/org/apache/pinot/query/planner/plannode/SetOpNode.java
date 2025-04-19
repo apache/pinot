@@ -20,10 +20,10 @@ package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.calcite.rel.core.Intersect;
+import org.apache.calcite.rel.core.Minus;
 import org.apache.calcite.rel.core.SetOp;
-import org.apache.calcite.rel.logical.LogicalIntersect;
-import org.apache.calcite.rel.logical.LogicalMinus;
-import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.core.Union;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -88,13 +88,13 @@ public class SetOpNode extends BasePlanNode {
     UNION, INTERSECT, MINUS;
 
     public static SetOpType fromObject(SetOp setOp) {
-      if (setOp instanceof LogicalUnion) {
+      if (setOp instanceof Union) {
         return UNION;
       }
-      if (setOp instanceof LogicalIntersect) {
+      if (setOp instanceof Intersect) {
         return INTERSECT;
       }
-      if (setOp instanceof LogicalMinus) {
+      if (setOp instanceof Minus) {
         return MINUS;
       }
       throw new IllegalArgumentException("Unsupported set operation: " + setOp.getClass());
