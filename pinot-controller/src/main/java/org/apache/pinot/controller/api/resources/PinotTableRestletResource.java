@@ -625,6 +625,13 @@ public class PinotTableRestletResource {
           + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "How many maximum segment adds to update in the IdealState in each step. For non-strict "
+          + "replica group based assignment, this number will be the closest possible without splitting up a single "
+          + "segment's step's replicas across steps. For strict replica group based assignment, this is treated as "
+          + "a best effort value since each partition of a replica group must be moved as a whole and at least one "
+          + "partition in a replica group should be moved. A value of Integer.MAX_VALUE is used to indicate an "
+          + "unlimited batch size, which is the non-batching behavior.")
+      @DefaultValue("2147483647") @QueryParam("batchSize") int batchSize,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
@@ -656,6 +663,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
+    rebalanceConfig.setBatchSize(batchSize);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);
