@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +27,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -39,7 +43,23 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-public class TableRebalancerTest {
+public class TableRebalancerTest extends ControllerTest {
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    startZk();
+    Map<String, Object> config = getDefaultControllerConfiguration();
+    startController(config);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+    stopZk();
+  }
 
   @Test
   public void testDowntimeMode() {
@@ -652,7 +672,9 @@ public class TableRebalancerTest {
     // assignment
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
-          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false);
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -738,14 +760,18 @@ public class TableRebalancerTest {
     // The second assignment should reach the target assignment
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
-          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false);
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
 
       nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false);
+          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -798,7 +824,8 @@ public class TableRebalancerTest {
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target assignment
     Map<String, Map<String, String>> nextAssignment =
-        TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, false);
+        TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, false,
+            Integer.MAX_VALUE, "dummyTable", null, _helixManager, false, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment, targetAssignment);
 
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 2 steps:
@@ -830,12 +857,14 @@ public class TableRebalancerTest {
     // }
     //
     // The second assignment should reach the target assignment
-    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, false);
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, false,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, false, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
-    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, false);
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, false,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, false, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment, targetAssignment);
   }
 
@@ -952,14 +981,18 @@ public class TableRebalancerTest {
     // The second assignment should reach the target assignment
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
-          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
       assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
 
       nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1086,28 +1119,36 @@ public class TableRebalancerTest {
     // The fourth assignment should reach the target assignment
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
-          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2")));
       assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
 
       nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
 
       nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host4", "host5")));
 
       nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true);
+          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
+              Integer.MAX_VALUE, "dummyTable", null, _helixManager, enableStrictReplicaGroup,
+              new Object2IntOpenHashMap<>());
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1183,13 +1224,15 @@ public class TableRebalancerTest {
     //
     // The second assignment should reach the target assignment
     Map<String, Map<String, String>> nextAssignment =
-        TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, true);
+        TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, true,
+            Integer.MAX_VALUE, "dummyTable", null, _helixManager, false, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
-    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, false, true);
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, false, true,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, false, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment, targetAssignment);
 
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 3 steps:
@@ -1240,19 +1283,22 @@ public class TableRebalancerTest {
     // }
     //
     // The third assignment should reach the target assignment
-    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, true);
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, true,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, true, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
-    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true);
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, true, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
-    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true);
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true,
+        Integer.MAX_VALUE, "dummyTable", null, _helixManager, true, new Object2IntOpenHashMap<>());
     assertEquals(nextAssignment, targetAssignment);
   }
 

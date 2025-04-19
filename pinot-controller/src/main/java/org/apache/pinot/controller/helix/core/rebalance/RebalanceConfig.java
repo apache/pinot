@@ -30,6 +30,7 @@ public class RebalanceConfig {
   public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
+  public static final int DEFAULT_BATCH_SIZE = Integer.MAX_VALUE; // unlimited batch size
 
   // Whether to rebalance table in dry-run mode
   @JsonProperty("dryRun")
@@ -91,6 +92,17 @@ public class RebalanceConfig {
   @JsonProperty("minimizeDataMovement")
   @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
   private Enablement _minimizeDataMovement = Enablement.ENABLE;
+
+  // How many segment add updates to make to the IdealState as part of each rebalance step. This is used as closest
+  // estimated upper-bound, and it is still possible to select a few segments above this threshold if more than
+  // one replica of the same segment is added such that before changing the assignment we are below the threshold and
+  // after adding we are just above the threshold. For strict replica group based assignment, there is the additional
+  // constraint to move each partitionId replica as a whole rather than splitting it up. In this case also the total
+  // segment adds may be above the threshold to accomodate a full partition. The minReplicasAvailable invariant is also
+  // maintained, so fewer segments than the batchSize may be selected.
+  @JsonProperty("batchSize")
+  @ApiModelProperty(example = "100")
+  private int _batchSize = DEFAULT_BATCH_SIZE;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -197,6 +209,14 @@ public class RebalanceConfig {
     _bestEfforts = bestEfforts;
   }
 
+  public int getBatchSize() {
+    return _batchSize;
+  }
+
+  public void setBatchSize(int batchSize) {
+    _batchSize = batchSize;
+  }
+
   public long getExternalViewCheckIntervalInMs() {
     return _externalViewCheckIntervalInMs;
   }
@@ -268,11 +288,12 @@ public class RebalanceConfig {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
         + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
         + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
-        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs="
-        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
-        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
-        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
-        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSize=" + _batchSize
+        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
+        + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
+        + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -285,6 +306,8 @@ public class RebalanceConfig {
     rc._downtime = cfg._downtime;
     rc._minAvailableReplicas = cfg._minAvailableReplicas;
     rc._bestEfforts = cfg._bestEfforts;
+    rc._minimizeDataMovement = cfg._minimizeDataMovement;
+    rc._batchSize = cfg._batchSize;
     rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;
