@@ -19,10 +19,17 @@
 package org.apache.pinot.core.plan;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.common.cache.QueryCache;
+import org.apache.pinot.common.cache.QueryCacheFactory;
+import org.apache.pinot.core.operator.CachedBitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.QueryCacheUtils;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class DocIdSetPlanNode implements PlanNode {
@@ -44,8 +51,24 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public DocIdSetOperator run() {
+    QueryCache queryCache = QueryCacheFactory.get(_queryContext.getTableName());
+    MutableRoaringBitmap bitmap = null;
+    QueryCache.QueryCacheUpdater queryCacheUpdater = null;
+    if (queryCache != null && _queryContext.getFilter() != null
+        && !(_segmentContext.getIndexSegment() instanceof MutableSegment)) {
+      if (QueryCacheUtils.isExpensiveFilter(_queryContext.getFilter())) {
+        String cacheKey = QueryCache.getCacheKey(_segmentContext.getIndexSegment().getSegmentName(),
+            _queryContext.getFilter());
+        Object cachedValue = queryCache.get(cacheKey);
+        if (cachedValue != null) {
+          return new CachedBitmapDocIdSetOperator((ImmutableRoaringBitmap) cachedValue, _maxDocPerCall);
+        }
+        bitmap = new MutableRoaringBitmap();
+        queryCacheUpdater = new QueryCache.QueryCacheUpdater(queryCache, cacheKey);
+      }
+    }
     return new DocIdSetOperator(
         _filterOperator != null ? _filterOperator : new FilterPlanNode(_segmentContext, _queryContext).run(),
-        _maxDocPerCall);
+        _maxDocPerCall, bitmap, queryCacheUpdater);
   }
 }
