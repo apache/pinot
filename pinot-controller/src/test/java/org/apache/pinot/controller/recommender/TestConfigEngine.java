@@ -327,6 +327,23 @@ public class TestConfigEngine {
     assertEquals(output.getPartitionConfig().getNumPartitionsOffline(), 4);
   }
 
+  /**
+   * tests PinotTablePartitionRule when multiple metrics and dimensions are available, making sure that weights for
+   * dimension fields get set correctly
+   */
+  @Test
+  void testPinotTablePartitionRule2()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/PinotTablePartitionRuleInput2.json");
+    AbstractRule abstractRule = RulesToExecute.RuleFactory
+        .getRule(RulesToExecute.Rule.PinotTablePartitionRule, _input, _input._overWrittenConfigs);
+    abstractRule.run();
+    ConfigManager output = _input._overWrittenConfigs;
+    LOGGER.debug("{} {} {}", output.getPartitionConfig().getPartitionDimension(),
+        output.getPartitionConfig().getNumPartitionsRealtime(), output.getPartitionConfig().getNumPartitionsOffline());
+    assertEquals(output.getPartitionConfig().getPartitionDimension().toString(), "colA");
+  }
+
   @Test
   void testKafkaPartitionRule()
       throws InvalidInputException, IOException {
