@@ -247,7 +247,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
-    return new QueryConfig(null, false, null, null, null, null);
+    return new QueryConfig(null, false, null, null, null, null, null);
   }
 
   protected boolean getNullHandlingEnabled() {
@@ -622,7 +622,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
-      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs)
+      throws Exception {
     URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
     assert dataPathUrl != null;
     File file = new File(dataPathUrl.getFile());

@@ -195,7 +195,7 @@ public class TableConfigSerDeTest {
     {
       // With query config
       QueryConfig queryConfig =
-          new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null, null);
+          new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null, null, null);
       TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
 
       checkQueryConfig(tableConfig);
