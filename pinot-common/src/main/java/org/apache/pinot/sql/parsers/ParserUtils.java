@@ -39,6 +39,27 @@ public class ParserUtils {
     }
   }
 
+  /**
+   * Sanitize the sql string for parsing by normalizing whitespace
+   * which is likely to cause performance issues with regex parsing.
+   * @param sql string to sanitize
+   * @return sanitized sql string
+   */
+  public static String sanitizeSql(String sql) {
+
+    // 1. Remove trailing whitespaces
+
+    int endIndex = sql.length() - 1;
+    while (endIndex >= 0 && Character.isWhitespace(sql.charAt(endIndex))) {
+      endIndex--;
+    }
+    sql = sql.substring(0, endIndex + 1);
+
+    // Likewise extend for other improvements
+
+    return sql;
+  }
+
   private static void validateJsonExtractScalarFunction(List<Expression> operands) {
     // Check that there are 3 or 4 arguments
     int numOperands = operands.size();
