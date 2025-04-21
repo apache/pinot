@@ -48,7 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
+public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private List<File> _avroFiles;
   private static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas_REALTIME";
@@ -94,6 +94,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
+    assert ingestionConfig.getStreamIngestionConfig() != null;
     ingestionConfig.getStreamIngestionConfig()
         .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
     ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);

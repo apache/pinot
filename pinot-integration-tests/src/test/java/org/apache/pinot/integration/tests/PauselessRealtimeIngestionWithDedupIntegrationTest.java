@@ -18,67 +18,16 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
-import org.testng.annotations.Test;
 
 
-public class PauselessRealtimeIngestionWithDedupIntegrationTest extends BasePauselessRealtimeIngestionTest {
-
+public class PauselessRealtimeIngestionWithDedupIntegrationTest extends BaseDedupIntegrationTest {
   @Override
-  protected String getFailurePoint() {
-    return null;  // No failure point for basic test
-  }
-
-  @Override
-  protected int getExpectedSegmentsWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full segments
-  }
-
-  @Override
-  protected int getExpectedZKMetadataWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full metadata
-  }
-
-  @Override
-  protected long getCountStarResultWithFailure() {
-    return DEFAULT_COUNT_STAR_RESULT;  // Always expect full count
-  }
-
-  @Override
-  protected void injectFailure() {
-    // Do nothing - no failure to inject
-  }
-
-  @Override
-  protected void disableFailure() {
-    // Do nothing - no failure to disable
-  }
-
-  @Override
-  protected int getNumKafkaPartitions() {
-    return 1;
-  }
-
-  @Override
-  protected TableConfig getPauselessTableConfig() {
-    TableConfig tableConfig = super.getPauselessTableConfig();
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE);
-    tableConfig.setDedupConfig(dedupConfig);
-
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
-    ingestionConfig.getStreamIngestionConfig()
-        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
-    return tableConfig;
-  }
-
-  @Test(description = "Ensure that all the segments are ingested, built and uploaded when pauseless consumption is "
-      + "enabled")
-  public void testSegmentAssignment() {
-    testBasicSegmentAssignment();
+  protected IngestionConfig getIngestionConfig() {
+    IngestionConfig ingestionConfig = super.getIngestionConfig();
+    assert ingestionConfig != null;
+    assert ingestionConfig.getStreamIngestionConfig() != null;
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    return ingestionConfig;
   }
 }
