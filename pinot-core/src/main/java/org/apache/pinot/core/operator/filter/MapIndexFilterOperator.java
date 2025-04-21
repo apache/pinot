@@ -121,7 +121,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
 
     // Create identifier expression for the JSON column
     ExpressionContext jsonLhs = ExpressionContext.forIdentifier("json");
-    return new JsonMatchPredicate(jsonLhs, jsonValue);
+    return new JsonMatchPredicate(jsonLhs, jsonValue, null);
   }
 
   @Override
