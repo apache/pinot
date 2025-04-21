@@ -833,10 +833,10 @@ public class ControllerTest {
 
   public void runRealtimeSegmentValidationTask(String tableName)
       throws IOException {
-    runPeriodicTask("RealtimeSegmentValidationManager", tableName, "REALTIME");
+    runPeriodicTask("RealtimeSegmentValidationManager", tableName, TableType.REALTIME);
   }
 
-  public void runPeriodicTask(String taskName, String tableName, String tableType)
+  public void runPeriodicTask(String taskName, String tableName, TableType tableType)
       throws IOException {
     sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
   }
@@ -874,6 +874,7 @@ public class ControllerTest {
         PauseStatusDetails pauseStatusDetails =
             JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
                 PauseStatusDetails.class);
+        // Its possible no segment is in consuming state, so check pause flag
         if (!pauseStatusDetails.getPauseFlag()) {
           return true;
         }

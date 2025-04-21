@@ -117,7 +117,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
     _kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(numShards).build());
 
     TestUtils.waitForCondition(aVoid ->
-            KinesisUtils.isKinesisStreamActive(_kinesisClient, STREAM_NAME), 1000L, 30000,
+            KinesisUtils.isKinesisStreamActive(_kinesisClient, STREAM_NAME), 2000L, 60000,
         "Kinesis stream " + STREAM_NAME + " is not created or is not in active state", true);
   }
 
@@ -134,7 +134,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
             return true;
           }
           return false;
-        }, 1000L, 30000,
+        }, 2000L, 60000,
         "Kinesis stream " + STREAM_NAME + " is not deleted", true);
 
     LOGGER.warn("Stream " + STREAM_NAME + " deleted");

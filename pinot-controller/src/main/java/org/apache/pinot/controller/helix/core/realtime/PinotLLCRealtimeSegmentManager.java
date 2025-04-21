@@ -1686,11 +1686,13 @@ public class PinotLLCRealtimeSegmentManager {
       StreamPartitionMsgOffset startOffsetInSegmentZkMetadata = offsetFactory.create(startOffsetInSegmentZkMetadataStr);
       StreamPartitionMsgOffset streamSmallestOffset = partitionGroupIdToSmallestStreamOffset.get(partitionGroupId);
       // Start offset in ZK must be higher than the start offset of the stream
-      if (streamSmallestOffset.compareTo(startOffsetInSegmentZkMetadata) > 0) {
-        LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffsetInSegmentZkMetadata,
-            streamSmallestOffset, partitionGroupId, tableName);
-        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-        return streamSmallestOffset;
+      if (streamSmallestOffset != null) {
+        if (streamSmallestOffset.compareTo(startOffsetInSegmentZkMetadata) > 0) {
+          LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}",
+              startOffsetInSegmentZkMetadata,
+              streamSmallestOffset, partitionGroupId, tableName);
+          _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+        }
       }
       return startOffsetInSegmentZkMetadata;
     }

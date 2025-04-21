@@ -28,6 +28,7 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.*;
 
 
 public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtimeClusterIntegrationTest {
@@ -53,7 +54,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
     LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS + 2);
     _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS + 2));
     String tableName = createTable();
-    waitForNumSegmentsInDesiredStateInEV(tableName, "CONSUMING", NUM_PARTITIONS + 2, TableType.REALTIME);
+    waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS + 2, TableType.REALTIME);
 
     pauseTable(tableName);
 
@@ -63,7 +64,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
     _kafkaStarters.get(0).createTopic(KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(NUM_PARTITIONS));
 
     resumeTable(tableName);
-    waitForNumSegmentsInDesiredStateInEV(tableName, "CONSUMING", NUM_PARTITIONS, TableType.REALTIME);
+    waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS, TableType.REALTIME);
   }
 
   @Test(enabled = false)

@@ -46,19 +46,22 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
+
 
 public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisShardChangeTest.class);
 
-  // TODO - Check with full airlineStats data with new local stack version
   private static final String SCHEMA_FILE_PATH = "kinesis/airlineStats_data_reduced.schema";
   private static final String DATA_FILE_PATH = "kinesis/airlineStats_data_reduced.json";
+  private static final Integer NUM_SHARDS = 2;
 
   @BeforeMethod
   public void beforeTest()
       throws IOException {
-    createStream(2);
+    createStream(NUM_SHARDS);
     addSchema(createSchema(SCHEMA_FILE_PATH));
     TableConfig tableConfig = createRealtimeTableConfig(null);
     addTableConfig(tableConfig);
@@ -74,11 +77,13 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   /**
    * Data provider for shard split and merge tests with different offset combinations.
+   * Documentation is in the test method.
    */
   @DataProvider(name = "shardOffsetCombinations")
   public Object[][] shardOffsetCombinations() {
     return new Object[][]{
         {"split", "smallest", "lastConsumed", 100, 250, 4, 4},
+        {"split", "smallest", "largest", 100, 100, 4, 0},
         {"split", "smallest", null, 100, 250, 4, 4},
         {"split", "largest", "lastConsumed", 50, 200, 2, 4},
         {"split", "largest", null, 50, 200, 2, 4},
@@ -87,6 +92,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
         {"split", "lastConsumed", null, 200, 200, 2, 4},
         {"split", null, null, 200, 200, 2, 4},
         {"merge", "smallest", "lastConsumed", 100, 250, 4, 1},
+        {"merge", "smallest", "largest", 100, 100, 4, 0},
         {"merge", "smallest", null, 100, 250, 4, 1},
         {"merge", "largest", "lastConsumed", 50, 200, 2, 1},
         {"merge", "largest", null, 50, 200, 2, 1},
@@ -101,19 +107,21 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    * Test case to validate shard split/merge behavior with different offset combinations.
    * The expectation is that
    * 1. when "smallest" offset is used, the old parent shards would be consumed first.
-   *    New shards will not be consumed until RVM is run or resume() is called with lastConsumed / the largest offset
+   *    New shards will not be consumed until RVM is run or resume() is called with lastConsumed / largest offset
    * 2. when "largest" offset is used, only new records would be consumed and all prior records pushed to kinesis
    *    would be skipped.
    * 3. when "lastConsumed" offset is used, data would be consumed based on the last consumed offset.
+   * 4. when RealtimeSegmentValidationManager is triggered, the behaviour should be same as calling resume() with
+   *    "lastConsumed" offset.
    * @param operation - "split" or "merge"
-   * @param firstOffsetCriteria - Offset criteria for the first resume call. If its null, we will trigger Realtime
-   *                              Segment Validation Manager
-   * @param secondOffsetCriteria - Offset criteria for the second resume call. If its null, we will trigger Realtime
-   *                               Segment Validation Manager
-   * @param firstExpectedRecords - Expected records after the first resume
-   * @param secondExpectedRecords - Expected records after the second resume
-   * @param expectedOnlineSegments - Expected number of online segments after the second resume
-   * @param expectedConsumingSegments - Expected Number of consuming segments after the second resume
+   * @param firstOffsetCriteria - Offset criteria for the first resume call.
+   *                            If it's null, RealtimeSegmentValidationManager is triggered
+   * @param secondOffsetCriteria - Offset criteria for the second resume call.
+   *                             If it's null, RealtimeSegmentValidationManager is triggered
+   * @param firstExpectedRecords - Expected records after the first resume call
+   * @param secondExpectedRecords - Expected records after the second resume call
+   * @param expectedOnlineSegments - Expected number of online segments in the end
+   * @param expectedConsumingSegments - Expected Number of consuming segments in the end
    */
   @Test(dataProvider = "shardOffsetCombinations")
   public void testShardOperationsWithOffsets(String operation, String firstOffsetCriteria, String secondOffsetCriteria,
@@ -122,7 +130,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
       throws Exception {
 
     // Publish initial records and wait for them to be consumed
-    publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
+    publishRecordsToKinesis(0, 50);
     waitForRecordsToBeConsumed(getTableName(), 50); // pinot has created 2 segments
 
     // Perform shard operation (split or merge)
@@ -134,7 +142,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     }
 
     // Publish more records after shard operation. These will go to the new shards
-    publishRecordsToKinesis(DATA_FILE_PATH, 50, 200);
+    publishRecordsToKinesis(50, 200);
 
     if (firstOffsetCriteria != null) {
       // Pause and resume with the first offset criteria
@@ -143,7 +151,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     } else {
       runRealtimeSegmentValidationTask(getTableName());
     }
-    waitForRecordsToBeConsumed(getTableName(), firstExpectedRecords); // Pinot has created Y new segments
+
+    waitForRecordsToBeConsumed(getTableName(), firstExpectedRecords); // Pinot will create new segments
 
     if (secondOffsetCriteria != null) {
       // Pause and resume with the second offset criteria
@@ -152,15 +161,16 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     } else {
       runRealtimeSegmentValidationTask(getTableName());
     }
-    // Pinot will now consume X records
-    waitForRecordsToBeConsumed(getTableName(), secondExpectedRecords); // Pinot has created Y new segments
+
+    waitForRecordsToBeConsumed(getTableName(), secondExpectedRecords); // Pinot will create new segments
 
     // Validate the final state of segments
     validateSegmentStates(getTableName(), expectedOnlineSegments, expectedConsumingSegments);
   }
 
   /**
-   * Data provider for table recreation tests with different offset combinations.
+   * Data provider for new table tests with different offset combinations.
+   * Documentation is in the test method.
    */
   @DataProvider(name = "initialOffsetCombinations")
   public Object[][] initialOffsetCombinations() {
@@ -171,11 +181,16 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     };
   }
 
+  /**
+   * Test case to split shards, then create new table and check consumption
+   * For the sake of brevity, we will only test shard split and calling Realtime Validation Manager
+   * Individually, pause and resume have been verified for shard split / merge operations
+   */
   @Test(dataProvider = "initialOffsetCombinations")
-  public void testNewTable(String offsetCriteria, int firstExpectedRecords, int secondExpectedRecords)
+  public void testNewTableAfterShardSplit(String offsetCriteria, int firstExpectedRecords, int secondExpectedRecords)
       throws Exception {
     // Publish initial records
-    publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
+    publishRecordsToKinesis(0, 50);
 
     // Split the shards
     KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 0); // splits shard 0 into shard 2 & 3
@@ -188,8 +203,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     waitForRecordsToBeConsumed(name, firstExpectedRecords);
 
     // publish more records. These will go to the new shards
-    publishRecordsToKinesis(DATA_FILE_PATH, 50, 200);
-    waitForRecordsToBeConsumed(name, firstExpectedRecords); // pinot doesn't listen to new shards yet. 1357
+    publishRecordsToKinesis(50, 200);
+    waitForRecordsToBeConsumed(name, firstExpectedRecords); // pinot doesn't listen to new shards yet.
 
     // Trigger RVM. This will commit the current segments and start consuming from the new shards
     runRealtimeSegmentValidationTask(name);
@@ -198,7 +213,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     // Validate the final state of segments
     validateSegmentStates(name, 2, 4);
 
-    dropNewSchemaAndTable(name, offsetCriteria);
+    dropNewSchemaAndTable(name);
   }
 
   /**
@@ -210,7 +225,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   public void testSplitAndMergeShards()
       throws Exception {
     // Publish initial records
-    publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
+    publishRecordsToKinesis(0, 50);
     waitForRecordsToBeConsumed(getTableName(), 50); // pinot has created 2 segments
 
     // Split the shards
@@ -218,14 +233,14 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     KinesisUtils.splitNthShard(_kinesisClient, STREAM_NAME, 1); // splits shard 1 into shard 4 & 5
 
     // Publish more records after shard operation. These will go to the new shards
-    publishRecordsToKinesis(DATA_FILE_PATH, 50, 175);
+    publishRecordsToKinesis(50, 175);
 
     // Merge some shards
     KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 2, 3); // merges shard 2 & 3 into shard 6
     KinesisUtils.mergeShards(_kinesisClient, STREAM_NAME, 4, 5); // merges shard 4 & 5 into shard 7
 
     // Publish more records after shard operation. These will go to the new shards
-    publishRecordsToKinesis(DATA_FILE_PATH, 175, 200);
+    publishRecordsToKinesis(175, 200);
 
     // Trigger RVM. This will commit segments 0 and 1 and start consuming from shards 2-5
     runRealtimeSegmentValidationTask(getTableName());
@@ -245,13 +260,13 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     Assert.assertEquals(tableView._realtime.size(), expectedOnlineSegments + expectedConsumingSegments);
 
     List<String> onlineSegments = tableView._realtime.entrySet().stream()
-        .filter(x -> x.getValue().containsValue("ONLINE"))
+        .filter(x -> x.getValue().containsValue(ONLINE))
         .map(Map.Entry::getKey)
         .collect(Collectors.toList());
     Assert.assertEquals(onlineSegments.size(), expectedOnlineSegments);
 
     List<String> consumingSegments = tableView._realtime.entrySet().stream()
-        .filter(x -> x.getValue().containsValue("CONSUMING"))
+        .filter(x -> x.getValue().containsValue(CONSUMING))
         .map(Map.Entry::getKey)
         .collect(Collectors.toList());
     Assert.assertEquals(consumingSegments.size(), expectedConsumingSegments);
@@ -259,15 +274,15 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   /**
    * start and end offsets are essentially the start row index and end row index of the file
+   *
    * @param startOffset - inclusive
-   * @param endOffset - exclusive
-   * @return the number of records published to Kinesis
+   * @param endOffset   - exclusive
    */
-  private int publishRecordsToKinesis(String dataFilePath, int startOffset, int endOffset)
+  private void publishRecordsToKinesis(int startOffset, int endOffset)
       throws Exception {
-    InputStream inputStream =
-        RealtimeKinesisIntegrationTest.class.getClassLoader().getResourceAsStream(dataFilePath);
-    int numRecordsPushed = 0;
+    InputStream inputStream = RealtimeKinesisIntegrationTest.class.getClassLoader()
+        .getResourceAsStream(KinesisShardChangeTest.DATA_FILE_PATH);
+    assert inputStream != null;
     try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
       String line;
       int count = 0;
@@ -282,15 +297,12 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
         }
         JsonNode data = JsonUtils.stringToJsonNode(line);
         PutRecordResponse putRecordResponse = putRecord(line, data.get("Origin").textValue());
-        if (putRecordResponse.sdkHttpResponse().statusCode() == 200) {
-          numRecordsPushed++;
-        } else {
+        if (putRecordResponse.sdkHttpResponse().statusCode() != 200) {
           throw new RuntimeException("Failed to put record " + line + " to Kinesis stream with status code: "
               + putRecordResponse.sdkHttpResponse().statusCode());
         }
       }
     }
-    return numRecordsPushed;
   }
 
   private void waitForRecordsToBeConsumed(String tableName, int expectedNumRecords)
@@ -305,7 +317,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
       } catch (Exception e) {
         return false;
       }
-    }, 1000, 60_000L, "Wait for all records to be ingested");
+    }, 2000, 60_000L, "Wait for all records to be ingested");
     // Sleep for few secs and validate the count again (to ensure no more records are ingested)
     Thread.sleep(2000);
     long count = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
@@ -328,7 +340,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     addTableConfig(tableConfig);
   }
 
-  private void dropNewSchemaAndTable(String name, String offsetCriteria)
+  private void dropNewSchemaAndTable(String name)
       throws IOException {
     dropRealtimeTable(name);
     deleteSchema(name);

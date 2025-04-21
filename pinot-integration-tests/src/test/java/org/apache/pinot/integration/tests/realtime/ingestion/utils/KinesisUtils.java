@@ -51,7 +51,7 @@ public class KinesisUtils {
 
     TestUtils.waitForCondition((avoid) -> isKinesisStreamActive(kinesisClient, stream)
             && getShards(kinesisClient, stream).size() == initialSize + 2,
-        Duration.ofMinutes(1).toMillis(), "Waiting for Kinesis stream to be active and shards to be split");
+        2000, Duration.ofMinutes(1).toMillis(), "Waiting for Kinesis stream to be active and shards to be split");
   }
 
   public static void mergeShards(KinesisClient kinesisClient, String stream, int index1, int index2) {

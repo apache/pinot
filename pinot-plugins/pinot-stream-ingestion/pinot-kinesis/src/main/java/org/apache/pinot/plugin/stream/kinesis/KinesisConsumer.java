@@ -94,7 +94,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
 
     // Read records from kinesis.
-    // Based on getRecords documentation, we might get a response with empty records but a valid nextShardIterator.
+    // Based on getRecords documentation, we might get a response with empty records but a non-null nextShardIterator.
     // This method is also used to accurately determine if we reached end of shard. So, we need to use nextShardIterator
     // and call getRecords again until we get non-empty records or null nextShardIterator.
     // To prevent an infinite loop due to some bug, we will limit the number of attempts
