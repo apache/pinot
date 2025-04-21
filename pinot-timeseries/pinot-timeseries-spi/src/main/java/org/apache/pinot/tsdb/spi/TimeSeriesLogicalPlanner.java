@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tsdb.spi;
 
+import java.util.List;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
@@ -35,5 +37,5 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 public interface TimeSeriesLogicalPlanner {
   void init(PinotConfiguration pinotConfiguration);
 
-  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request);
+  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, List<TableConfig> tableConfigs);
 }

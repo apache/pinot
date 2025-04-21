@@ -80,7 +80,7 @@ public class TimeSeriesQueryEnvironment {
     Preconditions.checkState(_plannerMap.containsKey(request.getLanguage()),
         "No logical planner found for engine: %s. Available: %s", request.getLanguage(),
         _plannerMap.keySet());
-    return _plannerMap.get(request.getLanguage()).plan(request);
+    return _plannerMap.get(request.getLanguage()).plan(request, _tableCache.getTableConfigs());
   }
 
   public TimeSeriesDispatchablePlan buildPhysicalPlan(RangeTimeSeriesRequest timeSeriesRequest,

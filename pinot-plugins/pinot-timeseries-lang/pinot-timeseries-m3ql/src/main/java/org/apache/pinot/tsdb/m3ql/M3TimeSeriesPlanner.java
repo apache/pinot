@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.m3ql.parser.Tokenizer;
 import org.apache.pinot.tsdb.m3ql.plan.KeepLastValuePlanNode;
@@ -48,7 +49,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   }
 
   @Override
-  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request) {
+  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, List<TableConfig> tableConfigs) {
     if (!request.getLanguage().equals(Constants.LANGUAGE)) {
       throw new IllegalArgumentException(
           String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(), Constants.LANGUAGE));
