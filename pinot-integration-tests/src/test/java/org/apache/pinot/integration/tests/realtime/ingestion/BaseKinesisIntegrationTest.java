@@ -24,6 +24,7 @@ import cloud.localstack.docker.annotation.LocalstackDockerAnnotationProcessor;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
 import cloud.localstack.docker.annotation.LocalstackDockerProperties;
 import cloud.localstack.docker.command.Command;
+import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.realtime.ingestion.utils.KinesisUtils;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -54,6 +56,7 @@ import software.amazon.awssdk.services.kinesis.model.CreateStreamRequest;
 import software.amazon.awssdk.services.kinesis.model.DeleteStreamRequest;
 import software.amazon.awssdk.services.kinesis.model.PutRecordRequest;
 import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
+import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
@@ -72,10 +75,8 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final String REGION = "us-east-1";
   private static final String LOCALSTACK_KINESIS_ENDPOINT = "http://localhost:4566";
-  private static final String STREAM_TYPE = "kinesis";
+  protected static final String STREAM_TYPE = "kinesis";
   protected static final String STREAM_NAME = "kinesis-test";
-
-//  private boolean _skipTestNoDockerInstalled = false;
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -83,7 +84,6 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
       DockerInfoCommand dockerInfoCommand = new DockerInfoCommand();
       dockerInfoCommand.execute();
     } catch (IllegalStateException e) {
-//      _skipTestNoDockerInstalled = true;
       LOGGER.warn("Skipping kinesis tests! Docker is not found running", e);
       throw new SkipException(e.getMessage());
     }
@@ -102,10 +102,6 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-//    if (_skipTestNoDockerInstalled) {
-//      return;
-//    }
-
     stopServer();
     stopBroker();
     stopController();
@@ -115,6 +111,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void createStream(int numShards) {
+    LOGGER.warn("Stream " + STREAM_NAME + " being created");
     _kinesisClient.createStream(CreateStreamRequest.builder().streamName(STREAM_NAME).shardCount(numShards).build());
 
     TestUtils.waitForCondition(aVoid ->
@@ -123,7 +120,22 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void deleteStream() {
-    _kinesisClient.deleteStream(DeleteStreamRequest.builder().streamName(STREAM_NAME).build());
+    try {
+      _kinesisClient.deleteStream(DeleteStreamRequest.builder().streamName(STREAM_NAME).build());
+    } catch (ResourceNotFoundException ignored) {
+      return;
+    }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        KinesisUtils.getKinesisStreamStatus(_kinesisClient, STREAM_NAME);
+      } catch (ResourceNotFoundException e) {
+        return true;
+      }
+      return false;
+    }, 1000L, 30000,
+    "Kinesis stream " + STREAM_NAME + " is not deleted", true);
+
+    LOGGER.warn("Stream " + STREAM_NAME + " deleted");
   }
 
   protected PutRecordResponse putRecord(String data, String partitionKey) {
@@ -136,7 +148,7 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   public Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigMap = new HashMap<>();
-    String streamType = "kinesis";
+    String streamType = STREAM_TYPE;
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
 
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
@@ -153,10 +165,17 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
     streamConfigMap.put(KinesisConfig.ENDPOINT, LOCALSTACK_KINESIS_ENDPOINT);
     streamConfigMap.put(KinesisConfig.ACCESS_KEY, getLocalAWSCredentials().resolveCredentials().accessKeyId());
     streamConfigMap.put(KinesisConfig.SECRET_KEY, getLocalAWSCredentials().resolveCredentials().secretAccessKey());
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(200));
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(2000));
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "lastConsumed");
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
     return streamConfigMap;
+  }
+
+  @Override
+  public TableConfig createRealtimeTableConfig(File sampleAvroFile) {
+    // Calls the super class to create the table config.
+    // Properties like stream configs are overriden in the getStreamConfigs() method.
+    return super.createRealtimeTableConfig(sampleAvroFile);
   }
 
   private void stopKinesis() {

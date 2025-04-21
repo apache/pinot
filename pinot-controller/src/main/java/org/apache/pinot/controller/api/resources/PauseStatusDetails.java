@@ -65,4 +65,10 @@ public class PauseStatusDetails {
   public String getTimestamp() {
     return _timestamp;
   }
+
+  @Override
+  public String toString() {
+    return "PauseStatusDetails{" + "_pauseFlag=" + _pauseFlag + ", _consumingSegments=" + _consumingSegments
+        + ", _reasonCode=" + _reasonCode + ", _comment='" + _comment + '\'' + ", _timestamp='" + _timestamp + '\'' + '}';
+  }
 }

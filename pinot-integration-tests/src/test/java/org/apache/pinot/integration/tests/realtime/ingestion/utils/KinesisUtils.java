@@ -28,8 +28,13 @@ import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.DescribeStreamRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
+import software.amazon.awssdk.services.kinesis.model.MergeShardsRequest;
+import software.amazon.awssdk.services.kinesis.model.MergeShardsResponse;
+import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 import software.amazon.awssdk.services.kinesis.model.SplitShardRequest;
+import software.amazon.awssdk.services.kinesis.model.SplitShardResponse;
+
 
 public class KinesisUtils {
 
@@ -42,20 +47,37 @@ public class KinesisUtils {
     LOGGER.info("Splitted shard with ID: " + shards.get(index).shardId());
 
     TestUtils.waitForCondition((avoid) -> isKinesisStreamActive(kinesisClient, stream) && getShards(kinesisClient, stream).size() == initialSize + 2,
-        Duration.ofMinutes(2).toMillis(), "Waiting for Kinesis stream to be active and shards to be split");
+        Duration.ofMinutes(1).toMillis(), "Waiting for Kinesis stream to be active and shards to be split");
+  }
+
+  public static void mergeShards(KinesisClient kinesisClient, String stream, int index1, int index2) {
+    List<Shard> shards = getShards(kinesisClient, stream);
+    int initialSize = shards.size();
+    mergeShard(kinesisClient, stream, shards.get(index1), shards.get(index2));
+    LOGGER.info("Merged shard with ID: " + shards.get(index1).shardId() + " and " + shards.get(index2).shardId());
+
+    TestUtils.waitForCondition((avoid) -> isKinesisStreamActive(kinesisClient, stream)
+            && getShards(kinesisClient, stream).size() == initialSize + 1,
+        2000, Duration.ofMinutes(1).toMillis(), "Waiting for Kinesis stream to be active and shards to be merged");
   }
 
   public static boolean isKinesisStreamActive(KinesisClient kinesisClient, String streamName) {
     try {
-      String kinesisStreamStatus =
-          kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(streamName).build())
-              .streamDescription().streamStatusAsString();
-
-      return kinesisStreamStatus.contentEquals("ACTIVE");
-    } catch (Exception e) {
-      LOGGER.warn("Could not fetch kinesis stream status", e);
+      String kinesisStreamStatus = getKinesisStreamStatus(kinesisClient, streamName);
+      boolean isActive = kinesisStreamStatus.contentEquals("ACTIVE");
+      if (!isActive) {
+        LOGGER.warn("Kinesis stream " + streamName + " in state" + kinesisStreamStatus);
+      }
+      return isActive;
+    } catch (ResourceNotFoundException e) {
+      LOGGER.warn("Kinesis stream " + streamName + " not found");
       return false;
     }
+  }
+
+  public static String getKinesisStreamStatus(KinesisClient kinesisClient, String streamName) {
+    return kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(streamName).build())
+        .streamDescription().streamStatusAsString();
   }
 
   private static List<Shard> getShards(KinesisClient kinesisClient, String stream) {
@@ -63,14 +85,22 @@ public class KinesisUtils {
     return listShardsResponse.shards();
   }
 
-  private static void splitShard(KinesisClient kinesisClient, String stream, Shard shard) {
+  private static SplitShardResponse splitShard(KinesisClient kinesisClient, String stream, Shard shard) {
     BigInteger startHash = new BigInteger(shard.hashKeyRange().startingHashKey());
     BigInteger endHash = new BigInteger(shard.hashKeyRange().endingHashKey());
     BigInteger newStartingHashKey = startHash.add(endHash).divide(new BigInteger("2"));
-    kinesisClient.splitShard(SplitShardRequest.builder()
+    return kinesisClient.splitShard(SplitShardRequest.builder()
         .shardToSplit(shard.shardId())
         .streamName(stream)
         .newStartingHashKey(newStartingHashKey.toString())
+        .build());
+  }
+
+  private static MergeShardsResponse mergeShard(KinesisClient kinesisClient, String stream, Shard shard1, Shard shard2) {
+    return kinesisClient.mergeShards(MergeShardsRequest.builder()
+        .shardToMerge(shard1.shardId())
+        .adjacentShardToMerge(shard2.shardId())
+        .streamName(stream)
         .build());
   }
 }

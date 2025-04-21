@@ -95,6 +95,9 @@ import static org.testng.Assert.*;
 
 
 public class ControllerTest {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
+
   public static final String LOCAL_HOST = "localhost";
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
@@ -828,6 +831,15 @@ public class ControllerTest {
     }
   }
 
+  public void runRealtimeSegmentValidationTask(String tableName)
+      throws IOException {
+    runPeriodicTask("RealtimeSegmentValidationManager", tableName, "REALTIME");
+  }
+
+  public void runPeriodicTask(String taskName, String tableName, String tableType) throws IOException {
+    sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+  }
+
   public void pauseTable(String tableName)
       throws IOException {
     sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
@@ -836,11 +848,15 @@ public class ControllerTest {
         PauseStatusDetails pauseStatusDetails =
             JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
                 PauseStatusDetails.class);
-        return pauseStatusDetails.getConsumingSegments().isEmpty();
+        if (pauseStatusDetails.getConsumingSegments().isEmpty()) {
+          return true;
+        }
+        LOGGER.warn("Table not yet paused. Response " + pauseStatusDetails);
+        return false;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 60_000L, "Failed to pause table: " + tableName);
+    }, 2000, 60_000L, "Failed to pause table: " + tableName);
   }
 
   public void resumeTable(String tableName)
@@ -856,19 +872,24 @@ public class ControllerTest {
         PauseStatusDetails pauseStatusDetails =
             JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
                 PauseStatusDetails.class);
-        return !pauseStatusDetails.getConsumingSegments().isEmpty();
+        if (!pauseStatusDetails.getPauseFlag()) {
+          return true;
+        }
+        LOGGER.warn("Pause flag is not yet set to false. Response " + pauseStatusDetails);
+        return false;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 60_000L, "Failed to resume table: " + tableName);
+    }, 2000, 60_000L, "Failed to resume table: " + tableName);
   }
 
-  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState, int desiredNumConsumingSegments) {
+  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState, int desiredNumConsumingSegments, TableType type) {
     TestUtils.waitForCondition((aVoid) -> {
           try {
             AtomicInteger numConsumingSegments = new AtomicInteger(0);
-            TableViews.TableView tableView = getExternalView(tableName);
-            tableView._realtime.values().forEach((v) -> {
+            TableViews.TableView tableView = getExternalView(tableName, type);
+            Map<String, Map<String, String>> viewForType = type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
+            viewForType.values().forEach((v) -> {
               numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals(desiredState)).count());
             });
             return numConsumingSegments.get() == desiredNumConsumingSegments;
@@ -880,9 +901,9 @@ public class ControllerTest {
     );
   }
 
-  public TableViews.TableView getExternalView(String tableName)
+  public TableViews.TableView getExternalView(String tableName, TableType type)
       throws IOException {
-    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName));
+    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
     return JsonUtils.stringToObject(state, TableViews.TableView.class);
   }
 
