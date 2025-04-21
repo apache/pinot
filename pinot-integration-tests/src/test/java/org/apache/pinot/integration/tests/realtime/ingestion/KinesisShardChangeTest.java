@@ -46,6 +46,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
 
+
 public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisShardChangeTest.class);
@@ -76,7 +77,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    */
   @DataProvider(name = "shardOffsetCombinations")
   public Object[][] shardOffsetCombinations() {
-    return new Object[][] {
+    return new Object[][]{
         {"split", "smallest", "lastConsumed", 100, 250, 4, 4},
         {"split", "smallest", null, 100, 250, 4, 4},
         {"split", "largest", "lastConsumed", 50, 200, 2, 4},
@@ -101,11 +102,14 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    * The expectation is that
    * 1. when "smallest" offset is used, the old parent shards would be consumed first.
    *    New shards will not be consumed until RVM is run or resume() is called with lastConsumed / the largest offset
-   * 2. when "largest" offset is used, only new records would be consumed and all prior records pushed to kinesis would be skipped.
+   * 2. when "largest" offset is used, only new records would be consumed and all prior records pushed to kinesis
+   *    would be skipped.
    * 3. when "lastConsumed" offset is used, data would be consumed based on the last consumed offset.
    * @param operation - "split" or "merge"
-   * @param firstOffsetCriteria - Offset criteria for the first resume call. If its null, we will trigger Realtime Segment Validation Manager
-   * @param secondOffsetCriteria - Offset criteria for the second resume call. If its null, we will trigger Realtime Segment Validation Manager
+   * @param firstOffsetCriteria - Offset criteria for the first resume call. If its null, we will trigger Realtime
+   *                              Segment Validation Manager
+   * @param secondOffsetCriteria - Offset criteria for the second resume call. If its null, we will trigger Realtime
+   *                               Segment Validation Manager
    * @param firstExpectedRecords - Expected records after the first resume
    * @param secondExpectedRecords - Expected records after the second resume
    * @param expectedOnlineSegments - Expected number of online segments after the second resume
@@ -114,7 +118,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   @Test(dataProvider = "shardOffsetCombinations")
   public void testShardOperationsWithOffsets(String operation, String firstOffsetCriteria, String secondOffsetCriteria,
       int firstExpectedRecords, int secondExpectedRecords, int expectedOnlineSegments,
-      int expectedConsumingSegments) throws Exception {
+      int expectedConsumingSegments)
+      throws Exception {
 
     // Publish initial records and wait for them to be consumed
     publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
@@ -159,15 +164,16 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    */
   @DataProvider(name = "initialOffsetCombinations")
   public Object[][] initialOffsetCombinations() {
-    return new Object[][] {
+    return new Object[][]{
         {"smallest", 50, 200},
-        {"largest", 50, 200}, // TODO - This seems like a bug. A table created with largest offset should not consume any old records
+        {"largest", 50, 200}, // TODO - Fix. Table created with largest offset should not consume old records
         {"lastConsumed", 50, 200}
     };
   }
 
   @Test(dataProvider = "initialOffsetCombinations")
-  public void testNewTable(String offsetCriteria, int firstExpectedRecords, int secondExpectedRecords) throws Exception {
+  public void testNewTable(String offsetCriteria, int firstExpectedRecords, int secondExpectedRecords)
+      throws Exception {
     // Publish initial records
     publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
 
@@ -201,7 +207,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    * Individually, pause and resume have been verified for shard split / merge operations
    */
   @Test
-  public void testSplitAndMergeShards() throws Exception {
+  public void testSplitAndMergeShards()
+      throws Exception {
     // Publish initial records
     publishRecordsToKinesis(DATA_FILE_PATH, 0, 50);
     waitForRecordsToBeConsumed(getTableName(), 50); // pinot has created 2 segments
@@ -256,7 +263,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
    * @param endOffset - exclusive
    * @return the number of records published to Kinesis
    */
-  private int publishRecordsToKinesis(String dataFilePath, int startOffset, int endOffset) throws Exception {
+  private int publishRecordsToKinesis(String dataFilePath, int startOffset, int endOffset)
+      throws Exception {
     InputStream inputStream =
         RealtimeKinesisIntegrationTest.class.getClassLoader().getResourceAsStream(dataFilePath);
     int numRecordsPushed = 0;
@@ -285,7 +293,8 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
     return numRecordsPushed;
   }
 
-  private void waitForRecordsToBeConsumed(String tableName, int expectedNumRecords) throws InterruptedException {
+  private void waitForRecordsToBeConsumed(String tableName, int expectedNumRecords)
+      throws InterruptedException {
     TestUtils.waitForCondition(aVoid -> {
       try {
         long count = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
@@ -334,5 +343,4 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   public String getSortedColumn() {
     return null;
   }
-
 }

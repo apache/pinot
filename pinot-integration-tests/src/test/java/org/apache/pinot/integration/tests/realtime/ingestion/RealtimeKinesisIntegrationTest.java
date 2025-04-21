@@ -49,6 +49,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.services.kinesis.model.PutRecordResponse;
 
+
 public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeKinesisIntegrationTest.class);
 
@@ -298,5 +299,4 @@ public class RealtimeKinesisIntegrationTest extends BaseKinesisIntegrationTest {
     dropRealtimeTable(getTableName());
     super.tearDown();
   }
-
 }

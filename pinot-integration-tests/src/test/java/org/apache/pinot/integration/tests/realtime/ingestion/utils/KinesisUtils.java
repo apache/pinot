@@ -38,6 +38,9 @@ import software.amazon.awssdk.services.kinesis.model.SplitShardResponse;
 
 public class KinesisUtils {
 
+  private KinesisUtils() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisUtils.class);
 
   public static void splitNthShard(KinesisClient kinesisClient, String stream, int index) {
@@ -46,7 +49,8 @@ public class KinesisUtils {
     splitShard(kinesisClient, stream, shards.get(index));
     LOGGER.info("Splitted shard with ID: " + shards.get(index).shardId());
 
-    TestUtils.waitForCondition((avoid) -> isKinesisStreamActive(kinesisClient, stream) && getShards(kinesisClient, stream).size() == initialSize + 2,
+    TestUtils.waitForCondition((avoid) -> isKinesisStreamActive(kinesisClient, stream)
+            && getShards(kinesisClient, stream).size() == initialSize + 2,
         Duration.ofMinutes(1).toMillis(), "Waiting for Kinesis stream to be active and shards to be split");
   }
 
@@ -81,7 +85,8 @@ public class KinesisUtils {
   }
 
   private static List<Shard> getShards(KinesisClient kinesisClient, String stream) {
-    ListShardsResponse listShardsResponse = kinesisClient.listShards(ListShardsRequest.builder().streamName(stream).build());
+    ListShardsResponse listShardsResponse =
+        kinesisClient.listShards(ListShardsRequest.builder().streamName(stream).build());
     return listShardsResponse.shards();
   }
 
@@ -96,7 +101,8 @@ public class KinesisUtils {
         .build());
   }
 
-  private static MergeShardsResponse mergeShard(KinesisClient kinesisClient, String stream, Shard shard1, Shard shard2) {
+  private static MergeShardsResponse mergeShard(KinesisClient kinesisClient, String stream, Shard shard1,
+      Shard shard2) {
     return kinesisClient.mergeShards(MergeShardsRequest.builder()
         .shardToMerge(shard1.shardId())
         .adjacentShardToMerge(shard2.shardId())

@@ -836,7 +836,8 @@ public class ControllerTest {
     runPeriodicTask("RealtimeSegmentValidationManager", tableName, "REALTIME");
   }
 
-  public void runPeriodicTask(String taskName, String tableName, String tableType) throws IOException {
+  public void runPeriodicTask(String taskName, String tableName, String tableType)
+      throws IOException {
     sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
   }
 
@@ -864,9 +865,10 @@ public class ControllerTest {
     resumeTable(tableName, "lastConsumed");
   }
 
-  public void resumeTable(String tableName, String offsetCriteria) throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName) +
-        "?consumeFrom=" + offsetCriteria);
+  public void resumeTable(String tableName, String offsetCriteria)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName)
+        + "?consumeFrom=" + offsetCriteria);
     TestUtils.waitForCondition((aVoid) -> {
       try {
         PauseStatusDetails pauseStatusDetails =
@@ -883,12 +885,14 @@ public class ControllerTest {
     }, 2000, 60_000L, "Failed to resume table: " + tableName);
   }
 
-  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState, int desiredNumConsumingSegments, TableType type) {
+  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState,
+      int desiredNumConsumingSegments, TableType type) {
     TestUtils.waitForCondition((aVoid) -> {
           try {
             AtomicInteger numConsumingSegments = new AtomicInteger(0);
             TableViews.TableView tableView = getExternalView(tableName, type);
-            Map<String, Map<String, String>> viewForType = type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
+            Map<String, Map<String, String>> viewForType =
+                type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
             viewForType.values().forEach((v) -> {
               numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals(desiredState)).count());
             });

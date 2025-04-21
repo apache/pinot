@@ -60,15 +60,16 @@ import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.utils.AttributeMap;
 
+
 /**
- * Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis integration.
+ * Creates all dependencies (docker image, kinesis server, kinesis client, configs) for all tests requiring kinesis
  */
-@LocalstackDockerProperties(services = {ServiceName.KINESIS}, imageTag = BaseKinesisIntegrationTest.LOCALSTACK_IMAGE_TAG)
+@LocalstackDockerProperties(services = {ServiceName.KINESIS}, imageTag = BaseKinesisIntegrationTest.LOCALSTACK_IMAGE)
 abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseKinesisIntegrationTest.class);
 
-  static final String LOCALSTACK_IMAGE_TAG = "2.3.2";
+  static final String LOCALSTACK_IMAGE = "2.3.2";
   private static final LocalstackDockerAnnotationProcessor PROCESSOR = new LocalstackDockerAnnotationProcessor();
   private final Localstack _localstackDocker = Localstack.INSTANCE;
   protected KinesisClient _kinesisClient;
@@ -79,7 +80,8 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   protected static final String STREAM_NAME = "kinesis-test";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     try {
       DockerInfoCommand dockerInfoCommand = new DockerInfoCommand();
       dockerInfoCommand.execute();
@@ -126,14 +128,14 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
       return;
     }
     TestUtils.waitForCondition(aVoid -> {
-      try {
-        KinesisUtils.getKinesisStreamStatus(_kinesisClient, STREAM_NAME);
-      } catch (ResourceNotFoundException e) {
-        return true;
-      }
-      return false;
-    }, 1000L, 30000,
-    "Kinesis stream " + STREAM_NAME + " is not deleted", true);
+          try {
+            KinesisUtils.getKinesisStreamStatus(_kinesisClient, STREAM_NAME);
+          } catch (ResourceNotFoundException e) {
+            return true;
+          }
+          return false;
+        }, 1000L, 30000,
+        "Kinesis stream " + STREAM_NAME + " is not deleted", true);
 
     LOGGER.warn("Stream " + STREAM_NAME + " deleted");
   }
@@ -187,7 +189,8 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  private void startKinesis() throws Exception {
+  private void startKinesis()
+      throws Exception {
     LocalstackDockerConfiguration dockerConfig = PROCESSOR.process(this.getClass());
     StopAllLocalstackDockerCommand stopAllLocalstackDockerCommand = new StopAllLocalstackDockerCommand();
     stopAllLocalstackDockerCommand.execute();
@@ -204,7 +207,8 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
 
     public void execute() {
       String runningDockerContainers =
-          dockerExe.execute(Arrays.asList("ps", "-a", "-q", "-f", "ancestor=localstack/localstack:" + LOCALSTACK_IMAGE_TAG));
+          dockerExe.execute(
+              Arrays.asList("ps", "-a", "-q", "-f", "ancestor=localstack/localstack:" + LOCALSTACK_IMAGE));
       if (StringUtils.isNotBlank(runningDockerContainers) && !runningDockerContainers.toLowerCase().contains("error")) {
         String[] containerList = runningDockerContainers.split("\n");
 
@@ -229,5 +233,4 @@ abstract class BaseKinesisIntegrationTest extends BaseClusterIntegrationTest {
   private static AwsCredentialsProvider getLocalAWSCredentials() {
     return StaticCredentialsProvider.create(AwsBasicCredentials.create("access", "secret"));
   }
-
 }

@@ -42,7 +42,8 @@ public class PauseStatusDetails {
     _pauseFlag = pauseFlag;
     _consumingSegments = consumingSegments;
     _reasonCode = reasonCode;
-    _comment = comment != null ? comment : pauseFlag ? "Table is paused." : "Table is unpaused.";
+    _comment = comment != null ? comment : pauseFlag ? "Table is paused."
+        : "Table is unpaused.";
     _timestamp = timestamp;
   }
 
@@ -68,7 +69,8 @@ public class PauseStatusDetails {
 
   @Override
   public String toString() {
-    return "PauseStatusDetails{" + "_pauseFlag=" + _pauseFlag + ", _consumingSegments=" + _consumingSegments
-        + ", _reasonCode=" + _reasonCode + ", _comment='" + _comment + '\'' + ", _timestamp='" + _timestamp + '\'' + '}';
+    return "PauseStatusDetails{" + "_pauseFlag=" + _pauseFlag + ", _consumingSegments="
+        + _consumingSegments + ", _reasonCode=" + _reasonCode + ", _comment='" + _comment
+        + '\'' + ", _timestamp='" + _timestamp + '\'' + '}';
   }
 }
