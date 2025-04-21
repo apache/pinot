@@ -116,19 +116,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected TableConfig getPauselessTableConfig() {
-    TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
-    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
-    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
-    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
-    tableConfig.getIndexingConfig().setStreamConfigs(null);
-    tableConfig.setIngestionConfig(ingestionConfig);
-    return tableConfig;
-  }
-
   private void setupNonPauselessTable()
       throws Exception {
     _avroFiles = unpackAvroData(_tempDir);
@@ -159,7 +146,16 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     schema.setSchemaName(DEFAULT_TABLE_NAME);
     addSchema(schema);
 
-    TableConfig tableConfig = getPauselessTableConfig();
+    TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
+    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    tableConfig.setIngestionConfig(ingestionConfig);
     addTableConfig(tableConfig);
   }
 
