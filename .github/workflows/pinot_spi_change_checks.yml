@@ -65,15 +65,15 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_spi_difference.sh
-      - name: Archive artifacts into zip
-        if: always()
-        run: |
-          zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
-      - uses: actions/upload-artifact@v4
-        name: Store SPI file diff work directory
-        if: always()
-        with:
-          name: SPI_file_diff_work_dir
-          retention-days: 3
-          path: artifacts.zip
+        run: .github/workflows/scripts/.pinot_spi_change_checker.sh
+#      - name: Archive artifacts into zip
+#        if: always()
+#        run: |
+#          zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
+#      - uses: actions/upload-artifact@v4
+#        name: Store SPI file diff work directory
+#        if: always()
+#        with:
+#          name: SPI_file_diff_work_dir
+#          retention-days: 3
+#          path: artifacts.zip
