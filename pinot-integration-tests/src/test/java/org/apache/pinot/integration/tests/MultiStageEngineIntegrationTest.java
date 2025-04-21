@@ -66,7 +66,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.assertj.core.api.Assertions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -971,7 +970,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     inputs.add(new Object[]{"INT", "1", "0", "1"});
     inputs.add(new Object[]{"LONG", "12345678999", "12345678998", "12345678999"});
     inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
-    inputs.add(new Object[]{"DOUBLE", "CAST(1.234 AS DOUBLE)", "CAST(1.23 AS DOUBLE)", "1.234"});
+    inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
     inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
     inputs.add(new Object[]{
         "TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
