@@ -64,25 +64,21 @@ public class ControllerFilePathProvider {
       throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
     _dataDirURI = URIUtils.getUri(dataDir);
-    LOGGER.info("Data directory: {}", _dataDirURI);
+    LOGGER.info("Initializing data directory: {}", _dataDirURI);
     try {
-      PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
-      if (pinotFS.exists(_dataDirURI)) {
-        try {
-          Preconditions
-              .checkState(pinotFS.isDirectory(_dataDirURI),
-                  "Data directory: %s must be a directory", _dataDirURI);
-        } catch (Exception e) {
-          if (controllerConf.isContinueWithoutDeepStore()) {
-            LOGGER.error("Failed to access data directory: {}. Controller will continue without deep store {}",
-                dataDir, e.getMessage());
-          } else {
-            throw e;
-          }
+      try (PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme())) {
+        if (pinotFS.exists(_dataDirURI)) {
+          Preconditions.checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory",
+              _dataDirURI);
+        } else {
+          Preconditions.checkState(pinotFS.mkdir(_dataDirURI), "Failed to create data directory: %s", _dataDirURI);
         }
-      } else {
-        Preconditions.checkState(pinotFS.mkdir(_dataDirURI),
-            "Failed to create data directory: %s", _dataDirURI);
+      } catch (Exception e) {
+        if (controllerConf.isContinueWithoutDeepStore()) {
+          LOGGER.error("Failed to access data directory: {}. Controller will continue without deep store.", dataDir, e);
+        } else {
+          throw e;
+        }
       }
 
       String localTempDirPath = controllerConf.getLocalTempDir();
