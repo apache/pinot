@@ -61,6 +61,19 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
+  /**
+   * Set up Helix cluster with the given default configs as the Helix cluster config.
+   *
+   * <ul>
+   *   <li>
+   *     If the cluster doesn't exist, a new cluster will be created with the default configs.
+   *   </li>
+   *   <li>
+   *     If the cluster already exists, it will be updated with the default configs. Default config will be set only if
+   *     the config doesn't already exist.
+   *   </li>
+   * </ul>
+   */
   public static void setupHelixClusterWithDefaultConfigs(String zkAddress, String clusterName,
       Map<String, String> defaultConfigs) {
     HelixAdmin admin = new ZKHelixAdmin.Builder().setZkAddress(zkAddress).build();
@@ -72,7 +85,7 @@ public class HelixSetupUtils {
         List<String> keys = new ArrayList<>(defaultConfigs.keySet());
         Map<String, String> existingConfigs = admin.getConfig(configScope, keys);
         Map<String, String> newConfigs = new HashMap<>();
-        Map<String, String> nonDefaultConfigs = new HashMap<>();
+        Map<String, String> ignoredConfigs = new HashMap<>();
         for (Map.Entry<String, String> entry : defaultConfigs.entrySet()) {
           String key = entry.getKey();
           String value = entry.getValue();
@@ -80,18 +93,26 @@ public class HelixSetupUtils {
           if (existingValue == null) {
             newConfigs.put(key, value);
           } else if (!existingValue.equals(value)) {
-            nonDefaultConfigs.put(key, existingValue);
+            ignoredConfigs.put(key, existingValue);
           }
         }
-        if (!newConfigs.isEmpty()) {
-          admin.setConfig(configScope, newConfigs);
-          LOGGER.info("Updated helix cluster: {} with new configs: {}, non-default configs: {}", clusterName,
-              newConfigs, nonDefaultConfigs);
-        } else if (!nonDefaultConfigs.isEmpty()) {
-          LOGGER.info("No config change needed for Helix cluster: {} with non-default configs: {}", clusterName,
-              nonDefaultConfigs);
+        if (newConfigs.isEmpty()) {
+          if (ignoredConfigs.isEmpty()) {
+            LOGGER.info("No config change needed for Helix cluster: {}. All configs are using default values",
+                clusterName);
+          } else {
+            LOGGER.info("No config change needed for Helix cluster: {}. Ignored configs using non-default values: {}",
+                clusterName, ignoredConfigs);
+          }
         } else {
-          LOGGER.info("No config change needed for Helix cluster: {} with only default configs", clusterName);
+          admin.setConfig(configScope, newConfigs);
+          if (ignoredConfigs.isEmpty()) {
+            LOGGER.info("Updated helix cluster: {} with new configs: {}. All other configs are using default values",
+                clusterName, newConfigs);
+          } else {
+            LOGGER.info("Updated helix cluster: {} with new configs: {}. Ignored configs using non-default values: {}",
+                clusterName, newConfigs, ignoredConfigs);
+          }
         }
       } else {
         LOGGER.info("Creating a new Helix cluster: {} with default configs: {}", clusterName, defaultConfigs);
