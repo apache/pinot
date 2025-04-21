@@ -156,6 +156,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
     tableConfig.getIndexingConfig().setStreamConfigs(null);
     tableConfig.setIngestionConfig(ingestionConfig);
+
     addTableConfig(tableConfig);
   }
 
