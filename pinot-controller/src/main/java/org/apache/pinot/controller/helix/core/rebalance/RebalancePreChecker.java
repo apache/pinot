@@ -22,10 +22,63 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public interface RebalancePreChecker {
-  void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService);
-  Map<String, String> check(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig);
+  void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService,
+      double diskUtilizationThreshold);
+
+  class PreCheckContext {
+    private final String _rebalanceJobId;
+    private final String _tableNameWithType;
+    private final TableConfig _tableConfig;
+    private final Map<String, Map<String, String>> _currentAssignment;
+    private final Map<String, Map<String, String>> _targetAssignment;
+    private final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+    private final RebalanceConfig _rebalanceConfig;
+
+    public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
+        Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+        @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, RebalanceConfig rebalanceConfig) {
+      _rebalanceJobId = rebalanceJobId;
+      _tableNameWithType = tableNameWithType;
+      _tableConfig = tableConfig;
+      _currentAssignment = currentAssignment;
+      _targetAssignment = targetAssignment;
+      _tableSubTypeSizeDetails = tableSubTypeSizeDetails;
+      _rebalanceConfig = rebalanceConfig;
+    }
+
+    public String getRebalanceJobId() {
+      return _rebalanceJobId;
+    }
+
+    public String getTableNameWithType() {
+      return _tableNameWithType;
+    }
+
+    public TableConfig getTableConfig() {
+      return _tableConfig;
+    }
+
+    public Map<String, Map<String, String>> getCurrentAssignment() {
+      return _currentAssignment;
+    }
+
+    public Map<String, Map<String, String>> getTargetAssignment() {
+      return _targetAssignment;
+    }
+
+    public TableSizeReader.TableSubTypeSizeDetails getTableSubTypeSizeDetails() {
+      return _tableSubTypeSizeDetails;
+    }
+
+    public RebalanceConfig getRebalanceConfig() {
+      return _rebalanceConfig;
+    }
+  }
+
+  Map<String, RebalancePreCheckerResult> check(PreCheckContext preCheckContext);
 }

@@ -144,8 +144,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0);
-    _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMap);
+    _streamConfig = IngestionConfigUtils.getFirstStreamConfig(_tableConfig);
 
     StreamPartitionMsgOffsetFactory offsetFactory =
         StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
@@ -181,15 +180,18 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsHistoryFile);
 
     // Initialize mutable segment with configurations
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
-            .setSegmentName(_segmentName).setStreamName(_streamConfig.getTopicName())
-            .setSegmentZKMetadata(_segmentZKMetadata).setStatsHistory(statsHistory).setSchema(_schema)
-            .setCapacity(capacity).setAvgNumMultiValues(avgNumMultiValues)
-            .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
-            .setFieldConfigList(_tableConfig.getFieldConfigList()).setConsumerDir(_resourceDataDir.getAbsolutePath())
-            .setMemoryManager(
-                new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null));
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+        .setTableNameWithType(_tableNameWithType)
+        .setSegmentName(_segmentName)
+        .setStreamName(_streamConfig.getTopicName())
+        .setSchema(_schema)
+        .setCapacity(capacity)
+        .setAvgNumMultiValues(avgNumMultiValues)
+        .setSegmentZKMetadata(_segmentZKMetadata)
+        .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
+        .setMemoryManager(new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null))
+        .setStatsHistory(statsHistory)
+        .setConsumerDir(_resourceDataDir.getAbsolutePath());
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 

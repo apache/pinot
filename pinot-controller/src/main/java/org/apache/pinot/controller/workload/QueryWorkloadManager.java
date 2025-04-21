@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.controller.workload;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.DefaultPropagationScheme;
@@ -37,6 +32,12 @@ import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 /**
@@ -63,59 +64,58 @@ public class QueryWorkloadManager {
   /**
    * Propagate the workload to the relevant instances based on the PropagationScheme
    * @param queryWorkloadConfig The query workload configuration to propagate
+   * 1. Resolve the instances based on the node type and propagation scheme
+   * 2. Calculate the instance cost for each instance
+   * 3. Send the {@link QueryWorkloadRefreshMessage} to the instances
    */
   public void propagateWorkload(QueryWorkloadConfig queryWorkloadConfig) {
-    long startTime = System.currentTimeMillis();
     Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     nodeConfigs.forEach((nodeType, nodeConfig) -> {
+      // Resolve the instances based on the node type and propagation scheme
       Set<String> instances = resolveInstances(nodeType, nodeConfig);
       if (instances.isEmpty()) {
         String errorMsg = String.format("No instances found for Workload: %s", queryWorkloadName);
         LOGGER.warn(errorMsg);
-        System.out.println(errorMsg);
         return;
       }
-      long startTimeForCost = System.currentTimeMillis();
+      // Calculate the instance cost for each instance
       Map<String, InstanceCost> instanceCostMap = _costSplitter.getInstanceCostMap(nodeConfig,
           new InstancesInfo(instances));
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey,
               entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
-      long endTimeForCost = System.currentTimeMillis();
-      System.out.printf("Query workload cost calculation time %dms for workload: %s%n",
-          (endTimeForCost - startTimeForCost), queryWorkloadName);
+      // Send the QueryWorkloadRefreshMessage to the instances
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
-      long endTime = System.currentTimeMillis();
-      System.out.printf("Query workload propagation time %dms for workload: %s%n", (endTime - startTime),
-          queryWorkloadName);
     });
   }
 
   /**
    * Propagate the workload for the given table name
+   * @param tableName The table name to propagate the workload for, it can be a rawTableName or a tableNameWithType
+   * if rawTableName is provided, it will resolve all available tableTypes and propagate the workload for each table type
+   *
+   * This method performs the following steps:
    * 1. Find all the helix tags associated with the table
    * 2. Find all the {@link QueryWorkloadConfig} associated with the helix tags
    * 3. Propagate the workload cost for instances associated with the workloads
-   *
-   * @param tableName The table name to propagate the workload for
    */
   public void propagateWorkloadFor(String tableName) {
-    long startTime = System.currentTimeMillis();
     try {
       // Get the helixTags associated with the table
       Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
-      Set<QueryWorkloadConfig> allqueryWorkloadConfigs = new HashSet<>();
+      Set<QueryWorkloadConfig> tablesQueryWorkloadConfigs = new HashSet<>();
       Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
           = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
       // Find all workloads associated with the helix tags
       for (String helix : helixTags) {
         Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
         if (queryWorkloadConfigs != null) {
-          allqueryWorkloadConfigs.addAll(queryWorkloadConfigs);
+          tablesQueryWorkloadConfigs.addAll(queryWorkloadConfigs);
         }
       }
-      for (QueryWorkloadConfig queryWorkloadConfig : allqueryWorkloadConfigs) {
+      // Propagate the workload for each QueryWorkloadConfig
+      for (QueryWorkloadConfig queryWorkloadConfig : tablesQueryWorkloadConfigs) {
         propagateWorkload(queryWorkloadConfig);
       }
     } catch (Exception e) {
@@ -123,8 +123,6 @@ public class QueryWorkloadManager {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
-    long endTime = System.currentTimeMillis();
-    System.out.printf("Query workload propagation time %dms ", (endTime - startTime));
   }
 
   /**

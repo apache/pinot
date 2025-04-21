@@ -291,9 +291,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     addSchema(_schema);
     _tableConfig = createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     _tableConfig.getValidationConfig().setDeletedSegmentsRetentionPeriod(null);
-    _tableConfig.getUpsertConfig().setMode(UpsertConfig.Mode.PARTIAL);
-    _tableConfig.getUpsertConfig().setPartialUpsertStrategies(new HashMap<>());
-    _tableConfig.getUpsertConfig().setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    upsertConfig.setMode(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
 
     addTableConfig(_tableConfig);

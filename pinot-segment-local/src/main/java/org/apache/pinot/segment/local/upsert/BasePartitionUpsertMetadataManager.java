@@ -34,9 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
@@ -107,7 +105,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
   protected volatile boolean _gotFirstConsumingSegment = false;
-  protected final ReadWriteLock _snapshotLock;
 
   protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
   protected int _numOutOfOrderEvents = 0;
@@ -147,7 +144,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _hashFunction = context.getHashFunction();
     _partialUpsertHandler = context.getPartialUpsertHandler();
     _enableSnapshot = context.isSnapshotEnabled();
-    _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
     _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
@@ -177,6 +173,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
+  }
+
+  @Override
+  public UpsertContext getContext() {
+    return _context;
   }
 
   @Override
@@ -284,9 +285,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
-    if (_enableSnapshot) {
-      _snapshotLock.readLock().lock();
-    }
     try {
       doAddSegment((ImmutableSegmentImpl) segment);
       _trackedSegments.add(segment);
@@ -294,9 +292,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     } finally {
-      if (_enableSnapshot) {
-        _snapshotLock.readLock().unlock();
-      }
       finishOperation();
     }
   }
@@ -404,13 +399,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-    _snapshotLock.readLock().lock();
     try {
       doPreloadSegment((ImmutableSegmentImpl) segment);
       _trackedSegments.add(segment);
       _updatedSegmentsSinceLastSnapshot.add(segment);
     } finally {
-      _snapshotLock.readLock().unlock();
       finishOperation();
     }
   }
@@ -573,9 +566,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip replacing segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
-    if (_enableSnapshot) {
-      _snapshotLock.readLock().lock();
-    }
     try {
       doReplaceSegment(segment, oldSegment);
       if (!(segment instanceof EmptyIndexSegment)) {
@@ -586,9 +576,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       _trackedSegments.remove(oldSegment);
     } finally {
-      if (_enableSnapshot) {
-        _snapshotLock.readLock().unlock();
-      }
       finishOperation();
     }
   }
@@ -716,9 +703,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-    if (_enableSnapshot) {
-      _snapshotLock.readLock().lock();
-    }
     try {
       // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
       // while creating new consuming segment in batches.
@@ -729,9 +713,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       _trackedSegments.remove(segment);
     } finally {
-      if (_enableSnapshot) {
-        _snapshotLock.readLock().unlock();
-      }
       finishOperation();
     }
   }
@@ -849,7 +830,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip taking snapshot because metadata manager is already stopped");
       return;
     }
-    _snapshotLock.writeLock().lock();
     try {
       long startTime = System.currentTimeMillis();
       doTakeSnapshot();
@@ -859,7 +839,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } catch (Exception e) {
       _logger.warn("Caught exception while taking snapshot", e);
     } finally {
-      _snapshotLock.writeLock().unlock();
       finishOperation();
     }
   }
@@ -879,6 +858,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
+    Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
     boolean isSegmentSkipped = false;
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
@@ -1121,12 +1101,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   private void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
-      _snapshotLock.readLock().lock();
-      try {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      } finally {
-        _snapshotLock.readLock().unlock();
-      }
+      _updatedSegmentsSinceLastSnapshot.add(segment);
     }
   }
 

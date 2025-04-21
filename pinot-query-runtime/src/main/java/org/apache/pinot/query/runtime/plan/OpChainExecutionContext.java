@@ -29,7 +29,6 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -51,19 +50,24 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  @Nullable
   private final ThreadExecutionContext _parentContext;
-
+  @Nullable
   private ServerPlanRequestContext _leafStageContext;
+  private final boolean _sendStats;
+
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext) {
+      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
+      boolean sendStats) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _deadlineMs = deadlineMs;
     _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _workerMetadata = workerMetadata;
+    _sendStats = sendStats;
     _server =
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), workerMetadata.getWorkerId());
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
@@ -121,6 +125,7 @@ public class OpChainExecutionContext {
     return _traceEnabled;
   }
 
+  @Nullable
   public ServerPlanRequestContext getLeafStageContext() {
     return _leafStageContext;
   }
@@ -134,15 +139,7 @@ public class OpChainExecutionContext {
     return _parentContext;
   }
 
-  public void registerInMdc() {
-    LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
-    LoggerConstants.WORKER_ID_KEY.registerInMdcIfNotSet(String.valueOf(_workerMetadata.getWorkerId()));
-    LoggerConstants.STAGE_ID_KEY.registerInMdcIfNotSet(String.valueOf(_stageMetadata.getStageId()));
-  }
-
-  public void unregisterFromMDC() {
-    LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
-    LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
-    LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
+  public boolean isSendStats() {
+    return _sendStats;
   }
 }

@@ -34,10 +34,10 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -53,7 +53,8 @@ public interface TableDataManager {
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
+      TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
@@ -93,10 +94,26 @@ public interface TableDataManager {
 
   /**
    * Adds a loaded immutable segment into the table.
+   * See {@link #addSegment(ImmutableSegment, SegmentZKMetadata)} for details.
+   */
+  @VisibleForTesting
+  default void addSegment(ImmutableSegment immutableSegment) {
+    addSegment(immutableSegment, null);
+  }
+
+  /**
+   * Adds a loaded immutable segment into the table.
+   * <p>If one segment already exists with the same name, replaces it with the new one.
+   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+   * segment (or the calling thread, if there are none) remove the segment.
+   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
+   * <p>Segment ZK metadata might not be available when replacing a CONSUMING segment with the locally sealed one or
+   * invoked from tests.
+   *
    * NOTE: This method is not designed to be directly used by the production code, but can be handy to set up tests.
    */
   @VisibleForTesting
-  void addSegment(ImmutableSegment immutableSegment);
+  void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata);
 
   /**
    * Adds an ONLINE segment into a table.
@@ -169,23 +186,24 @@ public interface TableDataManager {
 
   /**
    * Reloads an existing immutable segment for the table, which can be an OFFLINE or REALTIME table.
-   * A new segment may be downloaded if the local one has a different CRC; or can be forced to download
-   * if forceDownload flag is true. This operation is conducted within a failure handling framework
-   * and made transparent to ongoing queries, because the segment is in online serving state.
-   *
-   * TODO: Clean up this method to use the schema from the IndexLoadingConfig
-   *
-   * @param segmentName the segment to reload
-   * @param indexLoadingConfig the latest table config to load segment
-   * @param zkMetadata the segment metadata from zookeeper
-   * @param localMetadata the segment metadata object held by server right now,
-   *                      which must not be null to reload the segment
-   * @param schema the latest table schema to load segment
-   * @param forceDownload whether to force to download raw segment to reload
-   * @throws Exception thrown upon failure when to reload the segment
+   * A new segment may be downloaded if the local one has a different CRC; or can be forced to download if
+   * {@code forceDownload} flag is true.
+   * This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
+   * the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+  void reloadSegment(String segmentName, boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Reloads all segments.
+   */
+  void reloadAllSegments(boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Reloads a list of segments.
+   */
+  void reloadSegments(List<String> segmentNames, boolean forceDownload)
       throws Exception;
 
   /**
@@ -293,22 +311,15 @@ public interface TableDataManager {
   SegmentZKMetadata fetchZKMetadata(String segmentName);
 
   /**
-   * Fetches the table config and schema for the table from ZK.
-   */
-  Pair<TableConfig, Schema> fetchTableConfigAndSchema();
-
-  /**
    * Fetches the table config and schema for the table from ZK, then construct the index loading config with them.
    */
-  default IndexLoadingConfig fetchIndexLoadingConfig() {
-    Pair<TableConfig, Schema> tableConfigSchemaPair = fetchTableConfigAndSchema();
-    return getIndexLoadingConfig(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
-  }
+  IndexLoadingConfig fetchIndexLoadingConfig();
 
   /**
-   * Constructs the index loading config for the table with the given table config and schema.
+   * Returns the cached latest {@link IndexLoadingConfig} for the table. The cache is refreshed when invoking
+   * {@link #fetchIndexLoadingConfig()}.
    */
-  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema);
+  IndexLoadingConfig getIndexLoadingConfig();
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
@@ -328,9 +339,8 @@ public interface TableDataManager {
 
   /**
    * Return list of segment names that are stale along with reason.
-   * @param tableConfig Table Config of the table
-   * @param schema Schema of the table
+   *
    * @return List of {@link StaleSegment} with segment names and reason why it is stale
    */
-  List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema);
+  List<StaleSegment> getStaleSegments();
 }

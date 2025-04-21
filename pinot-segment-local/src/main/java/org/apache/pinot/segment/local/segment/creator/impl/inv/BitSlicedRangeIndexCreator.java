@@ -160,4 +160,10 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
     }
     return 0L;
   }
+
+  // used by e.g. startree json index
+  @SuppressWarnings({"unused"})
+  public File getRangeIndexFile() {
+    return _rangeIndexFile;
+  }
 }

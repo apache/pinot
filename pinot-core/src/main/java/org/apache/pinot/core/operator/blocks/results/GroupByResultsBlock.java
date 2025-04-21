@@ -62,6 +62,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 
   private boolean _numGroupsLimitReached;
+  private boolean _numGroupsWarningLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
 
@@ -139,6 +140,14 @@ public class GroupByResultsBlock extends BaseResultsBlock {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public boolean isNumGroupsWarningLimitReached() {
+    return _numGroupsWarningLimitReached;
+  }
+
+  public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
   }
 
   public int getNumResizes() {
@@ -243,8 +252,9 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         Object[] values = iterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {
           Object value = values[i];
-          assert value != null;
-          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+          if (value == null) {
+            dataTableBuilder.setNull(i);
+          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
             dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
           } else {
             setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
@@ -328,6 +338,9 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     Map<String, String> metadata = super.getResultsMetadata();
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+    }
+    if (_numGroupsWarningLimitReached) {
+      metadata.put(MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
     }
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));

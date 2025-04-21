@@ -395,13 +395,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryExceptions(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testQueryExceptions();
-  }
-
   @Test
   @Override
   public void testInstanceShutdown()

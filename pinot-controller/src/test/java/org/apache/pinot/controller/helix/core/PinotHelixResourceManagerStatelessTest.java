@@ -690,8 +690,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       try {
         _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
       } catch (InvalidTableConfigException e) {
-        assertEquals(e.getMessage(),
-            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME");
+        assertTrue(e.getMessage().contains(
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME"));
         throw e;
       }
     });
@@ -712,11 +712,18 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       try {
         _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
       } catch (InvalidTableConfigException e) {
-        assertEquals(e.getMessage(),
-            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME");
+        assertTrue(e.getMessage().contains(
+            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME"));
         throw e;
       }
     });
+
+    Map<String, String> taskWithWrongTenantButNotScheduled =
+        Map.of("tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
+            "minionInstanceTag", "anotherMinionTenant");
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
   }
 
   private void untagMinions() {

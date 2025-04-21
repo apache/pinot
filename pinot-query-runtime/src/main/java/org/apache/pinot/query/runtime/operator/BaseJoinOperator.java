@@ -25,18 +25,17 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -85,12 +84,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected final JoinOverFlowMode _joinOverflowMode;
 
   protected boolean _isRightTableBuilt;
-  protected TransferableBlock _upstreamErrorBlock;
-  protected MultiStageQueryStats _leftSideStats;
-  protected MultiStageQueryStats _rightSideStats;
-  // Used by non-inner join.
-  // Needed to indicate we have finished processing all results after returning last block.
-  protected boolean _isTerminated;
+  @Nullable
+  protected MseBlock.Eos _eos;
 
   public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -164,62 +159,55 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     if (!_isRightTableBuilt) {
       buildRightTable();
     }
-    if (_upstreamErrorBlock != null) {
-      LOGGER.trace("Returning upstream error block for join operator");
-      return _upstreamErrorBlock;
+    if (_eos != null) {
+      LOGGER.trace("Returning eos");
+      return _eos;
     }
-    TransferableBlock transferableBlock = buildJoinedDataBlock();
-    LOGGER.trace("Returning {} for join operator", transferableBlock);
-    return transferableBlock;
+    MseBlock mseBlock = buildJoinedDataBlock();
+    LOGGER.trace("Returning {} for join operator", mseBlock);
+    return mseBlock;
   }
 
   protected abstract void buildRightTable();
 
-  protected TransferableBlock buildJoinedDataBlock() {
+  protected MseBlock buildJoinedDataBlock() {
     LOGGER.trace("Building joined data block for join operator");
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
-      }
-      if (_isTerminated) {
-        assert _leftSideStats != null;
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+      if (_eos != null) {
+        return _eos;
       }
       LOGGER.trace("Processing next block on left input");
-      TransferableBlock leftBlock = _leftInput.nextBlock();
-      if (leftBlock.isErrorBlock()) {
-        return leftBlock;
-      }
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        assert _rightSideStats != null;
-        _leftSideStats = leftBlock.getQueryStats();
-        assert _leftSideStats != null;
-        _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
-        if (needUnmatchedRightRows()) {
-          List<Object[]> rows = buildNonMatchRightRows();
-          if (!rows.isEmpty()) {
-            _isTerminated = true;
-            return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      MseBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isEos()) {
+        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
+        if (eosBlock.isError()) {
+          return eosBlock;
+        } else {
+          if (needUnmatchedRightRows()) {
+            List<Object[]> rows = buildNonMatchRightRows();
+            if (!rows.isEmpty()) {
+              _eos = SuccessMseBlock.INSTANCE;
+              return new RowHeapDataBlock(rows, _resultSchema);
+            }
           }
+          return leftBlock;
         }
-        return leftBlock;
       }
-      assert leftBlock.isDataBlock();
-      List<Object[]> rows = buildJoinedRows(leftBlock);
+      List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
       sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
-        return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(rows, _resultSchema);
       }
     }
   }
 
-  protected abstract List<Object[]> buildJoinedRows(TransferableBlock leftBlock);
+  protected abstract List<Object[]> buildJoinedRows(MseBlock.Data leftBlock);
 
   protected abstract List<Object[]> buildNonMatchRightRows();
 
@@ -257,22 +245,17 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
 
   protected void earlyTerminateLeftInput() {
     _leftInput.earlyTerminate();
-    TransferableBlock leftBlock = _leftInput.nextBlock();
+    MseBlock leftBlock = _leftInput.nextBlock();
 
-    while (!leftBlock.isSuccessfulEndOfStreamBlock()) {
-      if (leftBlock.isErrorBlock()) {
-        _upstreamErrorBlock = leftBlock;
-        return;
-      }
+    while (leftBlock.isData()) {
       leftBlock = _leftInput.nextBlock();
     }
+    _eos = (MseBlock.Eos) leftBlock;
+  }
 
-    assert leftBlock.isSuccessfulEndOfStreamBlock();
-    assert _rightSideStats != null;
-    _leftSideStats = leftBlock.getQueryStats();
-    assert _leftSideStats != null;
-    _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
-    _isTerminated = true;
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   /**

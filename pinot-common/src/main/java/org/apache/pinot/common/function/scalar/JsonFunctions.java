@@ -19,6 +19,8 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
@@ -223,6 +225,62 @@ public class JsonFunctions {
       return Double.parseDouble(jsonValue.toString());
     } catch (Exception ignore) {
       return defaultValue;
+    }
+  }
+
+  /**
+   * Extract an array of key-value maps to a map.
+   * E.g. input: [{"key": "k1", "value": "v1"}, {"key": "k2", "value": "v2"}, {"key": "k3", "value": "v3"}]
+   *      output: {"k1": "v1", "k2": "v2", "k3": "v3"}
+   */
+  @ScalarFunction
+  public static Object jsonKeyValueArrayToMap(Object keyValueArray) {
+    return jsonKeyValueArrayToMap(keyValueArray, "key", "value");
+  }
+
+  @ScalarFunction
+  public static Object jsonKeyValueArrayToMap(Object keyValueArray, String keyColumnName, String valueColumnName) {
+    Map<String, String> result = new java.util.HashMap<>();
+    if (keyValueArray instanceof Object[]) {
+      Object[] array = (Object[]) keyValueArray;
+      for (Object obj : array) {
+        setValuesToMap(keyColumnName, valueColumnName, obj, result);
+      }
+    } else if (keyValueArray instanceof List) {
+      List<Object> list = (List<Object>) keyValueArray;
+      for (Object obj : list) {
+        setValuesToMap(keyColumnName, valueColumnName, obj, result);
+      }
+    } else {
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode arrayNode;
+      try {
+        arrayNode = mapper.readTree(keyValueArray.toString());
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
+      for (int i = 0; i < arrayNode.size(); i++) {
+        JsonNode node = arrayNode.get(i);
+        result.put(node.get(keyColumnName).asText(), node.get(valueColumnName).asText());
+      }
+    }
+    return result;
+  }
+
+  private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
+      Map<String, String> result) {
+    if (obj instanceof Map) {
+      Map<String, String> objMap = (Map) obj;
+      result.put(objMap.get(keyColumnName), objMap.get(valueColumnName));
+    } else {
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode mapNode;
+      try {
+        mapNode = mapper.readTree(obj.toString());
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
+      result.put(mapNode.get(keyColumnName).asText(), mapNode.get(valueColumnName).asText());
     }
   }
 

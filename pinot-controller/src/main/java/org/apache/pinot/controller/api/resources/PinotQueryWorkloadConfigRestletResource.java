@@ -24,20 +24,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.List;
-import java.util.Map;
-import javax.inject.Inject;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -53,7 +39,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.*;
+import javax.inject.Inject;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.util.List;
+import java.util.Map;
+
+import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 @Api(tags = Constants.QUERY_WORKLOAD_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -93,6 +94,37 @@ public class PinotQueryWorkloadConfigRestletResource {
 
   /**
    * API to specific query workload config
+   * @param queryWorkloadName Name of the query workload
+   * Example request:
+   * /queryWorkloadConfigs/workload-foo1
+   * Example response:
+   * {
+   *   "queryWorkloadName" : "workload-foo1",
+   *   "nodeConfigs" : {
+   *     "leafNode" : {
+   *       "enforcementProfile": {
+   *         "cpuCost": 500,
+   *         "memoryCost": 1000,
+   *         "enforcementPeriodMillis": 60000
+   *       },
+   *       "propagationScheme": {
+   *         "propagationType": "TABLE",
+   *         "values": ["airlineStats"]
+   *       }
+   *     },
+   *     "nonLeafNode" : {
+   *       "enforcementProfile": {
+   *         "cpuCost": 1500,
+   *         "memoryCost": 12000,
+   *         "enforcementPeriodMillis": 60000
+   *       },
+   *       "propagationScheme": {
+   *         "propagationType": "TENANT",
+   *         "values": ["DefaultTenant"]
+   *       }
+   *     }
+   *   }
+   * }
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -129,19 +161,17 @@ public class PinotQueryWorkloadConfigRestletResource {
    * @param instanceName Helix instance name
    * @param nodeTypeString  {@link NodeConfig.Type} string representation of the instance
    * @return Map of workload name to instance cost
-   * <p>
    * Example request:
    * /queryWorkloadConfigs/instance/Server_localhost_1234?nodeType=LEAF_NODE
-   * <p>
    * Example response:
    * {
    *  "workload1": {
-   *    "cpu": 100,
-   *    "memory":100
+   *    "cpuCost": 100,
+   *    "memoryCost":100
    *  },
    *  "workload2": {
-   *    "cpu": 50,
-   *    "memory": 50
+   *    "cpuCost": 50,
+   *    "memoryCost": 50
    *  }
    */
   @GET
@@ -173,6 +203,39 @@ public class PinotQueryWorkloadConfigRestletResource {
     }
   }
 
+  /**
+   * Updates the query workload config
+   * @param requestString JSON string representing the QueryWorkloadConfig
+   * Example request:
+   * {
+   *   "queryWorkloadName" : "workload-foo1",
+   *   "nodeConfigs" : {
+   *     "leafNode" : {
+   *       "enforcementProfile": {
+   *         "cpuCost": 500,
+   *         "memoryCost": 1000,
+   *         "enforcementPeriodMillis": 60000
+   *       },
+   *       "propagationScheme": {
+   *         "propagationType": "TABLE",
+   *         "values": ["airlineStats"]
+   *       }
+   *     },
+   *     "nonLeafNode" : {
+   *       "enforcementProfile": {
+   *         "cpuCost": 1500,
+   *         "memoryCost": 12000,
+   *         "enforcementPeriodMillis": 60000
+   *       },
+   *       "propagationScheme": {
+   *         "propagationType": "TENANT",
+   *         "values": ["DefaultTenant"]
+   *       }
+   *     }
+   *   }
+   * }
+   *
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/queryWorkloadConfigs")
@@ -195,6 +258,12 @@ public class PinotQueryWorkloadConfigRestletResource {
     }
   }
 
+  /**
+   * Deletes the query workload config
+   * @param queryWorkloadName Name of the query workload to be deleted
+   * Example request:
+   * /queryWorkloadConfigs/workload-foo1
+   */
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/queryWorkloadConfigs/{queryWorkloadName}")

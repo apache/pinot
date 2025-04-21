@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
-
 /**
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
@@ -101,7 +100,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     // fetch offset for _partitionId
     Shard foundShard = _kinesisConnectionHandler.getShards().stream()
-        .filter(shard -> shard.shardId().equals(SHARD_ID_PREFIX + _partitionId))
+        .filter(shard -> {
+          String shardId = shard.shardId();
+          int partitionGroupId = getPartitionGroupIdFromShardId(shardId);
+          return partitionGroupId == Integer.parseInt(_partitionId);
+        })
         .findFirst().orElseThrow(() -> new RuntimeException("Failed to find shard for partitionId: " + _partitionId));
     SequenceNumberRange sequenceNumberRange = foundShard.sequenceNumberRange();
     if (offsetCriteria.isSmallest()) {

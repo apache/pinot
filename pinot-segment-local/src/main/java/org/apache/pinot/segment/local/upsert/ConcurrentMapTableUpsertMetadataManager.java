@@ -47,9 +47,10 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
 
   @Override
   public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k -> _enableDeletedKeysCompactionConsistency
-        ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)
-        : new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+        k -> _context.isEnableDeletedKeysCompactionConsistency()
+            ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)
+            : new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
   }
 
   @Override
@@ -92,7 +93,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
     // Get queryableDocIds bitmaps from partitionMetadataManagers if any consistency mode is used.
     // Otherwise, get queryableDocIds bitmaps as kept by the segment objects directly as before.
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.NONE || QueryOptionsUtils.isSkipUpsertView(queryOptions)) {
+    if (_context.getConsistencyMode() == UpsertConfig.ConsistencyMode.NONE || QueryOptionsUtils.isSkipUpsertView(
+        queryOptions)) {
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
         segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));

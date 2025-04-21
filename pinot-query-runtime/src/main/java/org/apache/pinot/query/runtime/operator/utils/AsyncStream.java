@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
  *
  * These streams are designed to be consumed by a single thread and do not support null elements.
  *
- * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.TransferableBlock}
+ * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.MseBlock}
  */
 public interface AsyncStream<E> {
   /**
@@ -55,8 +55,6 @@ public interface AsyncStream<E> {
    * Once set, the callback cannot be changed. In order to call {@link #poll()}, a callback has to be registered.
    *
    * Only the consumer thread can call this method.
-   *
-   * @param onNewData
    */
   void addOnNewDataListener(OnNewData onNewData);
 

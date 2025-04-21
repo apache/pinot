@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.upsert;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
@@ -45,7 +44,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class PartialUpsertHandler {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;
-  private final TreeMap<String, FieldSpec> _fieldSpecMap;
   private final PartialUpsertMerger _partialUpsertMerger;
 
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
@@ -53,7 +51,6 @@ public class PartialUpsertHandler {
   public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig) {
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
     _comparisonColumns = comparisonColumns;
-    _fieldSpecMap = schema.getFieldSpecMap();
     _partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(_primaryKeyColumns, comparisonColumns, upsertConfig);
     // cache default null values to handle null merger results

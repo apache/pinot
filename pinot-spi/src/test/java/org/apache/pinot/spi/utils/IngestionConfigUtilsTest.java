@@ -47,8 +47,6 @@ public class IngestionConfigUtilsTest {
     try {
       IngestionConfigUtils.getStreamConfigMaps(tableConfig);
       Assert.fail("Should fail for OFFLINE table");
-      IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-      Assert.fail("Should fail for OFFLINE table");
     } catch (IllegalStateException e) {
       // expected
     }

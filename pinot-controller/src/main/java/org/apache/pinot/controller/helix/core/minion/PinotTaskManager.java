@@ -110,6 +110,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
   private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
 
+  private final boolean _isPinotTaskManagerSchedulerEnabled;
+
   // For metrics
   private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
   private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
@@ -135,9 +137,21 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoAccessor);
     _skipLateCronSchedule = controllerConf.isSkipLateCronSchedule();
     _maxCronScheduleDelayInSeconds = controllerConf.getMaxCronScheduleDelayInSeconds();
-    if (controllerConf.isPinotTaskManagerSchedulerEnabled()) {
+    _isPinotTaskManagerSchedulerEnabled = controllerConf.isPinotTaskManagerSchedulerEnabled();
+    if (_isPinotTaskManagerSchedulerEnabled) {
       try {
         _scheduler = new StdSchedulerFactory().getScheduler();
+      } catch (SchedulerException e) {
+        throw new RuntimeException("Caught exception while setting up the scheduler", e);
+      }
+    } else {
+      _scheduler = null;
+    }
+  }
+
+  public void init() {
+    if (_isPinotTaskManagerSchedulerEnabled) {
+      try {
         _scheduler.start();
         synchronized (_zkTableConfigChangeListener) {
           // Subscribe child changes before reading the data to avoid missing changes
@@ -153,8 +167,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } catch (SchedulerException e) {
         throw new RuntimeException("Caught exception while setting up the scheduler", e);
       }
-    } else {
-      _scheduler = null;
     }
   }
 

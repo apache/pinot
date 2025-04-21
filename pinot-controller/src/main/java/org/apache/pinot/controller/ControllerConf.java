@@ -198,6 +198,11 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.enableLocalTierMigration";
     public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
         "controller.segmentRelocator.rebalanceTablesSequentially";
+    public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
+        "controller.segmentRelocator.includeConsuming";
+    // Available options are: "ENABLE", "DISABLE", "DEFAULT"
+    public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
+        "controller.segmentRelocator.minimizeDataMovement";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
@@ -241,6 +246,10 @@ public class ControllerConf extends PinotConfiguration {
     public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
         "controller.realtime.segment.tmpFileRetentionInSeconds";
 
+    // Enables the deletion of untracked segments during the retention manager run.
+    // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
+    public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
+        "controller.retentionManager.untrackedSegmentDeletionEnabled";
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -300,15 +309,18 @@ public class ControllerConf extends PinotConfiguration {
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  private static final String REBALANCE_DISK_UTILIZATION_THRESHOLD = "controller.rebalance.disk.utilization.threshold";
   private static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
   private static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   private static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
   private static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
-  private static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
+  public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
   private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
+      "controller.enable.hybrid.table.retention.strategy";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -331,6 +343,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  private static final double DEFAULT_REBALANCE_DISK_UTILIZATION_THRESHOLD = 0.9;
   private static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
   private static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
   private static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
@@ -338,8 +351,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
-  // Disallow any high level consumer (HLC) table
-  private static final boolean DEFAULT_ALLOW_HLC_TABLES = false;
+  private static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
@@ -354,6 +366,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
+
+  public static final String EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = "controller.startup.exitOnTableConfigCheckFailure";
+  public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
+  public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
+  public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -788,6 +805,20 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
   }
 
+  public boolean isSegmentRelocatorIncludingConsuming() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING, false);
+  }
+
+  public RebalanceConfig.MinimizeDataMovementOptions getSegmentRelocatorRebalanceMinimizeDataMovement() {
+    String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT,
+        RebalanceConfig.MinimizeDataMovementOptions.ENABLE.name());
+    try {
+      return RebalanceConfig.MinimizeDataMovementOptions.valueOf(value.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      return RebalanceConfig.MinimizeDataMovementOptions.ENABLE;
+    }
+  }
+
   public boolean tieredSegmentAssignmentEnabled() {
     return getProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, false);
   }
@@ -1009,6 +1040,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(DISK_UTILIZATION_THRESHOLD, DEFAULT_DISK_UTILIZATION_THRESHOLD);
   }
 
+  public double getRebalanceDiskUtilizationThreshold() {
+    return getProperty(REBALANCE_DISK_UTILIZATION_THRESHOLD, DEFAULT_REBALANCE_DISK_UTILIZATION_THRESHOLD);
+  }
+
   public int getDiskUtilizationCheckTimeoutMs() {
     return getProperty(DISK_UTILIZATION_CHECK_TIMEOUT_MS, DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS);
   }
@@ -1027,6 +1062,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getEnableBatchMessageMode() {
     return getProperty(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
+  }
+
+  public boolean isHybridTableRetentionStrategyEnabled() {
+    return getProperty(ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
@@ -1079,6 +1118,14 @@ public class ControllerConf extends PinotConfiguration {
   public int getTmpSegmentRetentionInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
+  }
+
+  public boolean getUntrackedSegmentDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+  }
+
+  public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
+    setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {
@@ -1139,10 +1186,6 @@ public class ControllerConf extends PinotConfiguration {
         DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
   }
 
-  public boolean getHLCTablesAllowed() {
-    return DEFAULT_ALLOW_HLC_TABLES;
-  }
-
   public String getMetricsPrefix() {
     return getProperty(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
@@ -1185,12 +1228,20 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
   }
 
+  public boolean isExitOnTableConfigCheckFailure() {
+    return getProperty(EXIT_ON_TABLE_CONFIG_CHECK_FAILURE, DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE);
+  }
+
+  public boolean isExitOnSchemaCheckFailure() {
+    return getProperty(EXIT_ON_SCHEMA_CHECK_FAILURE, DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE);
+  }
+
   public void setEnableSwagger(boolean value) {
-    setProperty(ControllerConf.CONSOLE_SWAGGER_ENABLE, value);
+    setProperty(CONSOLE_SWAGGER_ENABLE, value);
   }
 
   public boolean isEnableSwagger() {
-    String enableSwagger = getProperty(ControllerConf.CONSOLE_SWAGGER_ENABLE);
+    String enableSwagger = getProperty(CONSOLE_SWAGGER_ENABLE);
     return enableSwagger == null || Boolean.parseBoolean(enableSwagger);
   }
 }
