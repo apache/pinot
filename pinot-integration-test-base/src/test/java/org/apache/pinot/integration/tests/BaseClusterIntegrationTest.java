@@ -62,6 +62,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -439,7 +440,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     if (upsertConfig == null) {
       upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-      upsertConfig.setEnableSnapshot(true);
+      upsertConfig.setSnapshot(Enablement.ENABLE);
     }
     if (kafkaTopicName == null) {
       kafkaTopicName = getKafkaTopic();

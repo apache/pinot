@@ -70,6 +70,9 @@ public enum AggregationFunctionType {
    * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
    */
   DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
+  DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
   DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
@@ -179,8 +182,12 @@ public enum AggregationFunctionType {
   // funnel aggregate functions
   FUNNELMAXSTEP("funnelMaxStep", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELCOMPLETECOUNT("funnelCompleteCount", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  FUNNELSTEPDURATIONSTATS("funnelStepDurationStats", new ArrayReturnTypeInference(SqlTypeName.DOUBLE),
+      OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELMATCHSTEP("funnelMatchStep", new ArrayReturnTypeInference(SqlTypeName.INTEGER), OperandTypes.VARIADIC,
       SqlTypeName.OTHER),
+  FUNNELEVENTSFUNCTIONEVAL("funnelEventsFunctionEval", new ArrayReturnTypeInference(SqlTypeName.VARCHAR),
+      OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELCOUNT("funnelCount", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.VARIADIC,
       SqlTypeName.OTHER),
 

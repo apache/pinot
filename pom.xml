@@ -136,6 +136,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
+    <arrow.version>18.2.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.1</parquet.version>
     <orc.version>1.9.5</orc.version>
@@ -144,11 +145,11 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.18.3</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
-    <async-http-client.version>3.0.1</async-http-client.version>
+    <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
-    <swagger-ui.version>5.20.1</swagger-ui.version>
+    <swagger-ui.version>5.20.7</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -157,7 +158,7 @@
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.20.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.21.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
@@ -175,34 +176,38 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.6</aws.sdk.version>
-    <azure.sdk.version>1.2.32</azure.sdk.version>
-    <azure.msal4j.version>1.19.1</azure.msal4j.version>
-    <joda-time.version>2.13.1</joda-time.version>
+    <aws.sdk.version>2.31.22</aws.sdk.version>
+    <azure.sdk.version>1.2.33</azure.sdk.version>
+    <azure.msal4j.version>1.20.1</azure.msal4j.version>
+    <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
-    <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
+    <fmpp.version>0.9.16</fmpp.version>
+    <s3mock.version>2.17.0</s3mock.version>
+    <localstack-utils.version>0.2.23</localstack-utils.version>
+    <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
-    <pulsar.version>4.0.3</pulsar.version>
+    <pulsar.version>4.0.4</pulsar.version>
     <flink.version>1.20.1</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
-    <commons-text.version>1.13.0</commons-text.version>
+    <commons-text.version>1.13.1</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.14.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-beanutils.version>1.10.1</commons-beanutils.version>
-    <commons-io.version>2.18.0</commons-io.version>
+    <commons-io.version>2.19.0</commons-io.version>
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
@@ -226,13 +231,13 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.4.2</httpclient5.version>
+    <httpclient5.version>5.4.3</httpclient5.version>
     <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.57.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.59.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.37.0</google.errorprone.version>
@@ -248,7 +253,7 @@
     <jline.version>3.29.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.0.2</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.2</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
@@ -259,11 +264,11 @@
     <jna.version>5.17.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.7.1</asm.version>
+    <asm.version>9.8</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
-    <okio.version>3.10.2</okio.version>
+    <okio.version>3.11.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
@@ -271,11 +276,29 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
+    <checker-qual.version>3.49.2</checker-qual.version>
+    <groovy-all.version>2.4.21</groovy-all.version>
+    <xml-apis.version>2.0.2</xml-apis.version>
+    <roaring-bitmap.version>1.3.0</roaring-bitmap.version>
+    <prometheus.jmx-exporter-javaagent.version>0.19.0</prometheus.jmx-exporter-javaagent.version>
+    <fastutil.version>8.5.15</fastutil.version>
+    <disruptor.version>4.0.0</disruptor.version>
+    <snakeyaml.version>2.4</snakeyaml.version>
+    <hadoop-shaded-protobuf_3_25.version>1.4.0</hadoop-shaded-protobuf_3_25.version>
+    <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
+    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <t-digest.version>3.2</t-digest.version>
+    <picocli.version>4.7.6</picocli.version>
+    <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
+    <jopt-simple.version>5.0.4</jopt-simple.version>
+    <ipaddress.version>5.5.1</ipaddress.version>
+    <openhft.posix.version>2.27ea1</openhft.posix.version>
+    <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
-    <mockito-core.version>5.16.1</mockito-core.version>
-    <equalsverifier.version>3.19.2</equalsverifier.version>
+    <mockito-core.version>5.17.0</mockito-core.version>
+    <equalsverifier.version>3.19.3</equalsverifier.version>
     <testcontainers.version>1.20.6</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
@@ -789,25 +812,37 @@
         <type>test-jar</type>
       </dependency>
 
+      <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-memory-netty</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.1</version>
+        <version>${checker-qual.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>2.4.21</version>
+        <version>${groovy-all.version}</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>2.0.2</version>
+        <version>${xml-apis.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.3.0</version>
+        <version>${roaring-bitmap.version}</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -829,7 +864,7 @@
       <dependency>
         <groupId>io.prometheus.jmx</groupId>
         <artifactId>jmx_prometheus_javaagent</artifactId>
-        <version>0.19.0</version>
+        <version>${prometheus.jmx-exporter-javaagent.version}</version>
         <scope>test</scope>
       </dependency>
 
@@ -855,7 +890,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.15</version>
+        <version>${fastutil.version}</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -983,7 +1018,7 @@
       <dependency>
         <groupId>com.lmax</groupId>
         <artifactId>disruptor</artifactId>
-        <version>4.0.0</version>
+        <version>${disruptor.version}</version>
       </dependency>
 
       <dependency>
@@ -994,7 +1029,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.4</version>
+        <version>${snakeyaml.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
@@ -1376,7 +1411,7 @@
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
-        <version>1.3.0</version>
+        <version>${hadoop-shaded-protobuf_3_25.version}</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1414,12 +1449,12 @@
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
-        <version>2.9.8</version>
+        <version>${clearspring-stream-lib.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>6.2.0</version>
+        <version>${datasketches-java.version}</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1429,7 +1464,7 @@
       <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
-        <version>3.2</version>
+        <version>${t-digest.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1559,17 +1594,17 @@
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.6</version>
+        <version>${picocli.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.2.0</version>
+        <version>${tyrus-standalone-client.version}</version>
       </dependency>
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
-        <version>5.0.4</version>
+        <version>${jopt-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1590,18 +1625,18 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.5.1</version>
+        <version>${ipaddress.version}</version>
       </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.27ea1</version>
+        <version>${openhft.posix.version}</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.27ea2</version>
+        <version>${openhft.chronicle-core.version}</version>
       </dependency>
 
       <dependency>
@@ -2070,7 +2105,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.44.3</version>
+          <version>2.44.4</version>
           <executions>
             <execution>
               <goals>
@@ -2137,7 +2172,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.12</version>
+          <version>0.8.13</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2197,6 +2232,9 @@
               --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
               -Dnet.bytebuddy.experimental=true
+              -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito-core.version}/mockito-core-${mockito-core.version}.jar
+              -Xshare:off
+              -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
           <!-- Explicitly select the test provider, instead of relying on the classpath -->
@@ -2330,7 +2368,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>javacc-maven-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>net.java.dev.javacc</groupId>
@@ -2343,7 +2381,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.2</version>
+          <version>4.9.5</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -2449,7 +2487,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.4</version>
+            <version>10.23.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2816,6 +2854,10 @@
             <relocation>
               <pattern>com.google.common</pattern>
               <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.scala-lang</pattern>
+              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
             </relocation>
           </relocations>
         </configuration>

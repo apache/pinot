@@ -27,15 +27,21 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  */
 public class JsonMatchPredicate extends BasePredicate {
   private final String _value;
+  private final String _countPredicate;
 
-  public JsonMatchPredicate(ExpressionContext lhs, String value) {
+  public JsonMatchPredicate(ExpressionContext lhs, String value, String minDocCount) {
     super(lhs);
+    _countPredicate = minDocCount;
     _value = value;
   }
 
   @Override
   public Type getType() {
     return Type.JSON_MATCH;
+  }
+
+  public String getCountPredicate() {
+    return _countPredicate;
   }
 
   public String getValue() {
@@ -51,16 +57,20 @@ public class JsonMatchPredicate extends BasePredicate {
       return false;
     }
     JsonMatchPredicate that = (JsonMatchPredicate) o;
-    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
+    return Objects.equals(_lhs, that._lhs) &&
+        Objects.equals(_value, that._value) &&
+        Objects.equals(_countPredicate, that._countPredicate);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _value);
+    return Objects.hash(_lhs, _value, _countPredicate);
   }
 
   @Override
   public String toString() {
-    return "json_match(" + _lhs + ",'" + _value + "')";
+    return "json_match(" + _lhs + ",'" + _value + "'" +
+        (_countPredicate != null ? "'" + _countPredicate + "'" : "")
+        + ")";
   }
 }

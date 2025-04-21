@@ -25,14 +25,17 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+// TODO: Replace the sleep in this test to condition wait
 public class ConsumerCoordinatorTest {
 
   private static class FakeRealtimeTableDataManager extends RealtimeTableDataManager {
@@ -74,7 +77,7 @@ public class ConsumerCoordinatorTest {
   private static class FakeConsumerCoordinator extends ConsumerCoordinator {
     private final Map<String, Map<String, String>> _segmentAssignmentMap;
 
-    public FakeConsumerCoordinator(boolean enforceConsumptionInOrder,
+    FakeConsumerCoordinator(boolean enforceConsumptionInOrder,
         RealtimeTableDataManager realtimeTableDataManager) {
       super(enforceConsumptionInOrder, realtimeTableDataManager);
       Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
@@ -93,13 +96,18 @@ public class ConsumerCoordinatorTest {
     }
 
     @Override
-    public Map<String, Map<String, String>> getSegmentAssignment() {
+    Map<String, Map<String, String>> getSegmentAssignment() {
       return _segmentAssignmentMap;
+    }
+
+    @Override
+    void checkSegmentStatus(String segmentName) {
+      // Do nothing
     }
   }
 
   @Test
-  public void testAwaitForPreviousSegmentSequenceNumber()
+  public void testWaitForPreviousSegment()
       throws InterruptedException {
     // 1. enable tracking segment seq num.
     FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null, false);
@@ -110,40 +118,24 @@ public class ConsumerCoordinatorTest {
     // 2. check if thread waits on prev segment seq
     AtomicBoolean atomicBoolean = new AtomicBoolean(false);
     Thread thread1 = new Thread(() -> {
-      LLCSegmentName llcSegmentName = getLLCSegment(101);
+      LLCSegmentName currentSegment = getLLCSegment(101);
       try {
-        boolean b = consumerCoordinator.awaitForPreviousSegmentSequenceNumber(llcSegmentName, 5000);
-        atomicBoolean.set(b);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
+        consumerCoordinator.waitForPreviousSegment(currentSegment, 100);
+        atomicBoolean.set(true);
+      } catch (Exception e) {
+        Assert.fail();
       }
     });
     thread1.start();
+    Thread.sleep(1000);
+    Assert.assertFalse(atomicBoolean.get());
 
     // 3. add prev segment and check if thread is unblocked.
-    consumerCoordinator.trackSegment(getLLCSegment(100));
+    consumerCoordinator.register(getLLCSegment(100));
 
-    TestUtils.waitForCondition(aVoid -> atomicBoolean.get(), 4000,
+    TestUtils.waitForCondition(aVoid -> atomicBoolean.get(), 5000,
         "Thread waiting on previous segment should have been unblocked.");
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 100);
-
-    // 4. check if second thread waits on prev segment seq until timeout and returns false
-    AtomicBoolean atomicBoolean2 = new AtomicBoolean(false);
-    Thread thread2 = new Thread(() -> {
-      LLCSegmentName llcSegmentName = getLLCSegment(102);
-      try {
-        boolean b = consumerCoordinator.awaitForPreviousSegmentSequenceNumber(llcSegmentName, 500);
-        atomicBoolean2.set(b);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    });
-    thread2.start();
-
-    Thread.sleep(1500);
-
-    Assert.assertFalse(atomicBoolean2.get());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 100);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 100);
   }
 
   @Test
@@ -178,15 +170,15 @@ public class ConsumerCoordinatorTest {
     Thread.sleep(1000);
 
     // 3. load segment 100, 101, 102
-    realtimeTableDataManager.registerSegment(getSegmentName(100), mockedRealtimeSegmentDataManager);
-    realtimeTableDataManager.registerSegment(getSegmentName(101), mockedRealtimeSegmentDataManager);
-    realtimeTableDataManager.registerSegment(getSegmentName(102), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(100));
+    consumerCoordinator.register(getLLCSegment(101));
+    consumerCoordinator.register(getLLCSegment(102));
     Thread.sleep(1000);
 
     // 4. check all of the above threads wait
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertFalse(consumerCoordinator.getFirstTransitionProcessed().get());
 
     thread2.start();
@@ -198,27 +190,27 @@ public class ConsumerCoordinatorTest {
     // 5. check that first thread acquiring semaphore is of segment 104
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
 
-    realtimeTableDataManager.registerSegment(getSegmentName(104), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(104));
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 104);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 104);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
 
     // 6. check the next threads acquiring semaphore is 106
     consumerCoordinator.getSemaphore().release();
-    realtimeTableDataManager.registerSegment(getSegmentName(106), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(106));
 
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 106);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 106);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
   }
@@ -242,26 +234,24 @@ public class ConsumerCoordinatorTest {
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), -1);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), -1);
     Assert.assertFalse(consumerCoordinator.getFirstTransitionProcessed().get());
 
-    RealtimeSegmentDataManager mockedRealtimeSegmentDataManager = getMockedRealtimeSegmentDataManager();
-
     // 3. register older segment and check seq num watermark and semaphore.
-    realtimeTableDataManager.registerSegment(getSegmentName(90), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(90));
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 90);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 90);
     Assert.assertFalse(consumerCoordinator.getFirstTransitionProcessed().get());
 
     // 4. register prev segment and check watermark and if thread was unblocked
-    realtimeTableDataManager.registerSegment(getSegmentName(91), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(91));
     Thread.sleep(1000);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 91);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
 
     // 5. check that all the following transitions rely on seq num watermark and gets blocked.
@@ -276,7 +266,7 @@ public class ConsumerCoordinatorTest {
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 91);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
 
     // 6. check that all above threads are still blocked even if semaphore is released.
@@ -286,25 +276,25 @@ public class ConsumerCoordinatorTest {
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 91);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
 
     // 6. mark 101 seg as complete. Check 102 acquired the semaphore.
-    realtimeTableDataManager.registerSegment(getSegmentName(101), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(101));
 
     Thread.sleep(1000);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 101);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 101);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
 
     // 7. register 102 seg, check if seg 103 is waiting on semaphore.
-    realtimeTableDataManager.registerSegment(getSegmentName(102), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(102));
 
     Thread.sleep(1000);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
@@ -313,16 +303,16 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.getSemaphore().release();
     Thread.sleep(1000);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
 
     // 8. register 103 seg and check if seg 104 is now queued on semaphore
-    realtimeTableDataManager.registerSegment(getSegmentName(103), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(103));
     Thread.sleep(1000);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 103);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 103);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
   }
@@ -347,14 +337,14 @@ public class ConsumerCoordinatorTest {
     Assert.assertNotNull(realtimeTableDataManager);
 
     // prev segment has seq 91, so registering seq 90 won't do anything.
-    realtimeTableDataManager.registerSegment(getSegmentName(90), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(90));
 
     Thread.sleep(2000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
 
     // 2. test that registering prev segment will unblock thread.
-    realtimeTableDataManager.registerSegment(getSegmentName(91), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(91));
 
     TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0), 5000,
         "Semaphore must be acquired after registering previous segment");
@@ -365,8 +355,8 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), -1);
-    realtimeTableDataManager.registerSegment(getSegmentName(101), mockedRealtimeSegmentDataManager);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
+    consumerCoordinator.register(getLLCSegment(101));
 
     // 3. test that segment 103 will be blocked.
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
@@ -394,7 +384,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
 
     // 4. registering seg 102 should unblock seg 103
-    realtimeTableDataManager.registerSegment(getSegmentName(102), mockedRealtimeSegmentDataManager);
+    consumerCoordinator.register(getLLCSegment(102));
 
     Thread.sleep(1000);
 
@@ -409,12 +399,12 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
-    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), -1);
+    Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
   }
 
   @Test
   public void testRandomOrder()
-      throws InterruptedException {
+      throws Exception {
     RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
     Mockito.when(realtimeTableDataManager.getTableName()).thenReturn("tableTest_REALTIME");
 
@@ -443,24 +433,60 @@ public class ConsumerCoordinatorTest {
     String segmentName = "tableTest_REALTIME__1__101__20250304T0035Z";
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     Assert.assertNotNull(llcSegmentName);
-    String previousSegment = consumerCoordinator.getPreviousSegmentFromIdealState(llcSegmentName);
-    Assert.assertEquals(previousSegment, "tableTest_REALTIME__1__91__20250304T0035Z");
+    int previousSegmentSequenceNumber =
+        consumerCoordinator.getPreviousSegmentSequenceNumberFromIdealState(llcSegmentName);
+    Assert.assertEquals(previousSegmentSequenceNumber, 91);
 
     consumerCoordinator.getSegmentAssignment().clear();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
       put("server_3", "ONLINE");
     }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
-    previousSegment = consumerCoordinator.getPreviousSegmentFromIdealState(llcSegmentName);
-    Assert.assertNull(previousSegment);
+    previousSegmentSequenceNumber = consumerCoordinator.getPreviousSegmentSequenceNumberFromIdealState(llcSegmentName);
+    Assert.assertEquals(previousSegmentSequenceNumber, -1);
+  }
+
+  @Test
+  public void testSegmentStatusCheck() {
+    RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
+    String segmentName = getSegmentName(101);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadataNullable(segmentName)).thenReturn(null);
+
+    ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(true, realtimeTableDataManager);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+
+    SegmentZKMetadata mockSegmentZKMetadata = Mockito.mock(SegmentZKMetadata.class);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadataNullable(segmentName)).thenReturn(mockSegmentZKMetadata);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.IN_PROGRESS);
+    verifySegmentStatus(consumerCoordinator, segmentName, false);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.COMMITTING);
+    verifySegmentStatus(consumerCoordinator, segmentName, false);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.DONE);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.UPLOADED);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+  }
+
+  private void verifySegmentStatus(ConsumerCoordinator consumerCoordinator, String segmentName,
+      boolean shouldNotConsumed) {
+    try {
+      consumerCoordinator.checkSegmentStatus(segmentName);
+      Assert.assertFalse(shouldNotConsumed);
+    } catch (ConsumerCoordinator.ShouldNotConsumeException e) {
+      Assert.assertTrue(shouldNotConsumed);
+    }
   }
 
   private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {
     return new Thread(() -> {
       try {
         consumerCoordinator.acquire(llcSegmentName);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
+      } catch (Exception e) {
+        Assert.fail();
       }
     }, String.valueOf(llcSegmentName.getSequenceNumber()));
   }

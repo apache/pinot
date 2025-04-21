@@ -72,7 +72,7 @@ public class S3PinotFSTest {
 
   @DataProvider(name = "scheme")
   public static Object[][] schemes() {
-    return new Object[][] { { S3_SCHEME }, { S3A_SCHEME } };
+    return new Object[][]{{S3_SCHEME}, {S3A_SCHEME}};
   }
 
   @BeforeClass
@@ -502,15 +502,48 @@ public class S3PinotFSTest {
     }
   }
 
+  public void testDeleteBatch()
+      throws IOException {
+    String[] originalFiles = new String[]{"a-delete-batch.txt", "b-delete-batch.txt", "c-delete-batch.txt"};
+    String folderName = "my-files-batch";
+
+    for (String fileName : originalFiles) {
+      createEmptyFile(folderName, fileName);
+    }
+    // Create a sub folder to delete
+    String subFolderName = folderName + DELIMITER + "subfolder";
+    for (String fileName : new String[] {"subfolder-a-delete-batch.txt", "subfolder-b-delete-batch.txt"}) {
+      createEmptyFile(subFolderName, fileName);
+    }
+
+    // Create a list of URIs to delete
+    List<URI> filesToDelete = Arrays.stream(originalFiles)
+        .map(fileName -> URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, folderName + DELIMITER + fileName)))
+        .collect(Collectors.toList());
+    filesToDelete.add(URI.create(String.format(FILE_FORMAT, S3_SCHEME, BUCKET, subFolderName)));
+
+    boolean deleteResult = _s3PinotFS.deleteBatch(filesToDelete, true);
+
+    Assert.assertTrue(deleteResult);
+
+    ListObjectsV2Response listObjectsV2Response =
+        _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
+    String[] actualResponse =
+        listObjectsV2Response.contents().stream().map(S3Object::key).filter(x -> x.contains("delete-batch"))
+            .toArray(String[]::new);
+
+    Assert.assertEquals(actualResponse.length, 0);
+  }
+
   @DataProvider(name = "storageClasses")
   public Object[][] createStorageClasses() {
-    return new Object[][] {
-      { null, S3_SCHEME },
-      { StorageClass.STANDARD, S3_SCHEME },
-      { StorageClass.INTELLIGENT_TIERING, S3_SCHEME },
-      { null, S3A_SCHEME },
-      { StorageClass.STANDARD, S3A_SCHEME },
-      { StorageClass.INTELLIGENT_TIERING, S3A_SCHEME },
+    return new Object[][]{
+        {null, S3_SCHEME},
+        {StorageClass.STANDARD, S3_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3_SCHEME},
+        {null, S3A_SCHEME},
+        {StorageClass.STANDARD, S3A_SCHEME},
+        {StorageClass.INTELLIGENT_TIERING, S3A_SCHEME},
     };
   }
 

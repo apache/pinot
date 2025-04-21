@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -456,6 +455,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+    public static final String CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN =
+            "pinot.broker.enable.dynamic.filtering.semijoin";
+    public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -739,6 +741,8 @@ public class CommonConstants {
       public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
       public static final String COMPRESSION = "compression";
       public static final String DEFAULT_COMPRESSION = "ZSTD";
+      public static final String ENCODING = "encoding";
+      public static final String DEFAULT_ENCODING = "JSON";
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
@@ -846,7 +850,7 @@ public class CommonConstants {
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_LIMIT;
     public static final int DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT = 100_000;
     public static final String NUM_GROUPS_WARN_LIMIT = "num.groups.warn.limit";
-    public static final String CONFIG_OF_NUM_GROUPS_WARN_LIMIT =
+    public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_WARN_LIMIT;
     public static final int DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT = 150_000;
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max.init.group.holder.capacity";
@@ -1092,6 +1096,32 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
         "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
+
+    /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
+    public static class Upsert {
+      public static final String CONFIG_PREFIX = "upsert";
+      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      public static final String DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
+      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+
+      /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+      @Deprecated
+      public static final String DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
+          "default.allow.partial.upsert.consumption.during.commit";
+    }
+
+    /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
+    public static class Dedup {
+      public static final String CONFIG_PREFIX = "dedup";
+      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+      public static final String DEFAULT_IGNORE_NON_DEFAULT_TIERS = "default.ignore.non.default.tiers";
+
+      /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+      @Deprecated
+      public static final String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
+          "default.allow.dedup.consumption.during.commit";
+    }
   }
 
   public static class Controller {
@@ -1114,6 +1144,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
     public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
         "pinot.controller.query.rewriter.class.names";
+
+    // Task Manager configuration
+    public static final String CONFIG_OF_TASK_MANAGER_CLASS = "pinot.controller.task.manager.class";
+    public static final String DEFAULT_TASK_MANAGER_CLASS =
+        "org.apache.pinot.controller.helix.core.minion.PinotTaskManager";
+
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
@@ -1245,9 +1281,6 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
-
-    public static final String CONFIG_OF_INSTANCE_TYPE = "accounting.instance.type";
-    public static final InstanceType DEFAULT_CONFIG_OF_INSTANCE_TYPE = InstanceType.SERVER;
 
     public static final String CONFIG_OF_GC_WAIT_TIME_MS = "accounting.gc.wait.time.ms";
     public static final int DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS = 0;

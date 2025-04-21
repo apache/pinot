@@ -96,6 +96,14 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static String resolveCaseInsensitiveKey(Object property) {
+    if (property instanceof String) {
+      return CONFIG_RESOLVER.get(((String) property).toLowerCase());
+    }
+    return null;
+  }
+
+  @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(QueryOptionKey.TIMEOUT_MS);
     return checkedParseLongPositive(QueryOptionKey.TIMEOUT_MS, timeoutMsString);

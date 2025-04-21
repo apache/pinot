@@ -19,7 +19,16 @@
 
 import jwtDecode from "jwt-decode";
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, InstanceType, SchemaInfo, SegmentMetadata, SqlException, SQLResult } from 'Models';
+import {
+  DataTable,
+  InstanceType,
+  RebalanceTableSegmentJob,
+  RebalanceTableSegmentJobs,
+  SchemaInfo,
+  SegmentMetadata,
+  SqlException,
+  SQLResult
+} from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -966,6 +975,18 @@ const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   return response.data;
 }
 
+const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTableSegmentJob[]> => {
+  const response = await getTableJobs(tableName, "TABLE_REBALANCE");
+  if (response.data.error) {
+    return [];
+  }
+
+  const rebalanceTableSegmentJobs: RebalanceTableSegmentJob[] = Object.keys(response.data as RebalanceTableSegmentJobs)
+      .map(jobId => response.data[jobId] as RebalanceTableSegmentJob)
+      .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
+  return rebalanceTableSegmentJobs;
+}
+
 const fetchSegmentReloadStatus = async (jobId: string) => {
   const response = await getSegmentReloadStatus(jobId);
   
@@ -1309,6 +1330,7 @@ export default {
   getAllPeriodicTaskNames,
   getAllTaskTypes,
   fetchTableJobs,
+  fetchRebalanceTableJobs,
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,

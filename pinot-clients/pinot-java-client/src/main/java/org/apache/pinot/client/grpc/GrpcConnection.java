@@ -38,6 +38,7 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.SimpleBrokerSelector;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.grpc.BrokerGrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -48,7 +49,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A grpc connection to Pinot, normally created through calls to the {@link org.apache.pinot.client.ConnectionFactory}.
  */
-public class GrpcConnection {
+public class GrpcConnection implements AutoCloseable {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcConnection.class);
 
@@ -188,13 +189,18 @@ public class GrpcConnection {
     }
     // Process schema
     JsonNode schemaJsonNode = null;
+    DataSchema dataSchema = null;
     if (response.hasNext()) {
-      schemaJsonNode = GrpcUtils.extractSchemaJson(response.next());
+      dataSchema = GrpcUtils.extractSchema(response.next());
+      schemaJsonNode = JsonUtils.objectToJsonNode(dataSchema);
     }
     // Process rows
     ArrayNode rows = JsonUtils.newArrayNode();
     while (response.hasNext()) {
-      rows.addAll(GrpcUtils.extractRowsJson(response.next()));
+      List<Object[]> resultTableRows = GrpcUtils.extractResultTable(response.next(), dataSchema).getRows();
+      for (Object[] row : resultTableRows) {
+        rows.add(JsonUtils.objectToJsonNode(row));
+      }
     }
     if (schemaJsonNode != null && rows != null) {
       ObjectNode resultTable = JsonUtils.newObjectNode();
@@ -245,6 +251,7 @@ public class GrpcConnection {
    *
    * @throws PinotClientException when connection is already closed
    */
+  @Override
   public void close()
       throws PinotClientException {
     _grpcQueryClient.shutdown();

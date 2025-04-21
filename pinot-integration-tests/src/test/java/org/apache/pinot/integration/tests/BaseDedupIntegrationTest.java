@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -37,6 +36,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -110,8 +110,9 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
-    DedupConfig dedupConfig =
-        new DedupConfig(true, HashFunction.NONE, null, new HashMap<>(), 30, getTimeColumnName(), true);
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(30);
+    dedupConfig.setPreload(Enablement.ENABLE);
     return new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
         .setTimeColumnName(getTimeColumnName())
         .setFieldConfigList(getFieldConfigs())

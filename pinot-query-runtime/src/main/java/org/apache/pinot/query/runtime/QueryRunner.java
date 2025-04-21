@@ -38,7 +38,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -50,6 +49,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -59,7 +59,7 @@ import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -103,11 +103,6 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
-  private String _hostname;
-  private int _port;
-  private HelixManager _helixManager;
-  private ServerMetrics _serverMetrics;
-
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
@@ -141,24 +136,20 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, HelixManager helixManager,
-      ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, @Nullable TlsConfig tlsConfig,
+      BooleanSupplier sendStats) {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
     int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
-    _hostname = hostname;
-    _port = port;
-    _helixManager = helixManager;
-    _serverMetrics = serverMetrics;
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
 
-    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_NUM_GROUPS_WARN_LIMIT);
+    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT);
     _numGroupsWarningLimit = numGroupsWarnLimitStr != null ? Integer.parseInt(numGroupsWarnLimitStr) : null;
 
     String mseMinGroupTrimSizeStr = config.getProperty(Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE);
@@ -192,6 +183,7 @@ public class QueryRunner {
         Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE
     );
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
     MetricsExecutor metricsExecutor = new MetricsExecutor(
         baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
@@ -209,8 +201,7 @@ public class QueryRunner {
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
-          serverMetrics);
+      _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -263,10 +254,10 @@ public class QueryRunner {
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-      TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
       int stageId = stageMetadata.getStageId();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-          stageId, errorBlock.getExceptions());
+          stageId, errorBlock);
       MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
       List<RoutingInfo> routingInfos = new ArrayList<>();
       for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
@@ -280,8 +271,12 @@ public class QueryRunner {
       for (RoutingInfo routingInfo : routingInfos) {
         try {
           StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-          _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-              routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
+          SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
+                routingInfo.getPort(), routingInfo.getMailboxId(), deadlineMs, statMap);
+            // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
+            //  current stage. We will need to fix this in future, but for now, we are sending the error block without
+            //  the stats.
+            sendingMailbox.send(errorBlock, Collections.emptyList());
         } catch (TimeoutException e) {
           LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
               routingInfo.getMailboxId(), requestId, stageId, e);
@@ -299,8 +294,8 @@ public class QueryRunner {
             workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
-          _leafQueryExecutor, _executorService);
+      opChain =
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
@@ -485,8 +480,9 @@ public class QueryRunner {
     OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, requestId, deadlineMs,
         opChainMetadata, stageMetadata, workerMetadata, null, null, false);
 
-    OpChain opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager,
-        _serverMetrics, _leafQueryExecutor, _executorService, leafNodesConsumer, true);
+    OpChain opChain =
+        ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+            leafNodesConsumer, true);
     opChain.close(); // probably unnecessary, but formally needed
 
     PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
@@ -534,8 +530,7 @@ public class QueryRunner {
       if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
         String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
         String[] segments = entry.getValue().split(",");
-        result.put(planId,
-            Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+        result.put(planId, Stream.of(segments).map(String::strip).collect(Collectors.toList()));
       }
     }
     return result;

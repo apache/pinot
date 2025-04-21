@@ -84,7 +84,9 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
         }
       });
     }
-    setAggregationResult(aggregationResultHolder, minMax.getMin(), minMax.getMax());
+    if (minMax.getMax() >= minMax.getMin()) {
+      setAggregationResult(aggregationResultHolder, minMax.getMin(), minMax.getMax());
+    }
   }
 
   protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double min, double max) {

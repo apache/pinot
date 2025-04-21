@@ -32,6 +32,10 @@ export const RebalanceServerRebalanceSummaryResponse = ({ response }) => {
         {
             name: 'II. Segment Information',
             key: 'segmentInfo'
+        },
+        {
+            name: 'III. Server Tags Information',
+            key: 'tagsInfo'
         }
     ];
 

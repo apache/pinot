@@ -192,7 +192,20 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
 
   // Metric used to track errors during the periodic table retention management
-  RETENTION_MANAGER_ERROR("retentionManagerError", false);
+  RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table
+  PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
+
+  // ZK JUTE max buffer size in bytes
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
 
   private final String _gaugeName;
   private final String _unit;

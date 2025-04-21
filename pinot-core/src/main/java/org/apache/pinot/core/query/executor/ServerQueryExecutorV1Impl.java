@@ -128,6 +128,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
+  public InstanceDataManager getInstanceDataManager() {
+    return _instanceDataManager;
+  }
+
+  @Override
   public synchronized void start() {
     LOGGER.info("Query executor started");
   }
@@ -222,7 +227,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
       TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
       boolean isUsingConsistencyMode =
-          rtdm.getTableUpsertMetadataManager().getUpsertConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+          rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
       if (isUsingConsistencyMode) {
         tumm.lockForSegmentContexts();
       }

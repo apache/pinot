@@ -25,11 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -40,7 +37,8 @@ import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPol
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -80,11 +78,10 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
-        "1");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.DEDUP_CONFIG_PREFIX,
-        TableDedupMetadataManagerFactory.DEDUP_DEFAULT_ENABLE_PRELOAD), "true");
+    serverConf.setProperty(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads", "1");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Dedup.CONFIG_PREFIX,
+            Server.Dedup.DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
@@ -166,7 +163,8 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, 0, null, true);
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setPreload(Enablement.ENABLE);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName())

@@ -228,6 +228,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///     - A table not authorized to read is used
   ///     - An exception during function execution due to errors in the data
   ///       (ie a division by zero or casting an illegal string as int)
+  ///     - Query is too heavy and reaches the allowed timeout.
   ///   - The error message will be sent to the user and the error messages will be logged without stack trace.
   /// 3. With yellow error: The request failed in a way that is controlled but probably internal.
   ///   - The error message will be sent to the user and the error message will be logged with stack trace.
@@ -311,6 +312,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_OF_SPOOLS);
     boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
+    boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
+        CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
     return QueryEnvironment.configBuilder()
         .database(database)
         .tableCache(_tableCache)
@@ -318,6 +322,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
+        .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .build();
   }
 
@@ -688,7 +693,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public static boolean isYellowError(QueryException e) {
     switch (e.getErrorCode()) {
       case QUERY_SCHEDULING_TIMEOUT:
-      case EXECUTION_TIMEOUT:
       case INTERNAL:
       case UNKNOWN:
       case MERGE_RESPONSE:

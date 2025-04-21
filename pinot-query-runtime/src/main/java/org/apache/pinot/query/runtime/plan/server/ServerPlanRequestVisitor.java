@@ -24,13 +24,13 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -47,7 +47,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -56,7 +56,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 /**
  * Plan visitor for direct leaf-stage server request.
  *
- * This should be merged with logics in {@link org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2} in the future
+ * This should be merged with logics in {@link InstancePlanMakerImplV2} in the future
  * to directly produce operator chain.
  *
  * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
@@ -156,15 +156,15 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (visit(left, context)) {
         PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
         int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
-        List<TransferableBlock> transferableBlocks =
-            pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
         List<Object[]> resultDataContainer = new ArrayList<>();
         DataSchema dataSchema = right.getDataSchema();
-        for (TransferableBlock block : transferableBlocks) {
-          if (block.getType() == DataBlock.Type.ROW) {
-            resultDataContainer.addAll(block.getContainer());
+        for (MseBlock block : blocks) {
+          if (block.isData()) {
+            resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
           }
         }
+        // TODO: we should keep query stats here as well
         ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
             resultDataContainer, dataSchema);
       }

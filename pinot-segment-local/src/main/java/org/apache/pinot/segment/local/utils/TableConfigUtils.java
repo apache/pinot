@@ -87,6 +87,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -377,7 +378,8 @@ public final class TableConfigUtils {
           try {
             FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
           } catch (Exception e) {
-            throw new IllegalStateException("Invalid filter function " + filterFunction, e);
+            throw new IllegalStateException(
+                "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
           }
         }
       }
@@ -538,7 +540,8 @@ public final class TableConfigUtils {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName
+                    + "', exception: " + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
@@ -727,10 +730,9 @@ public final class TableConfigUtils {
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      Preconditions.checkState(outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
-          "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
-
       if (outOfOrderRecordColumn != null) {
+        Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
+            "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
         FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
         Preconditions.checkState(
             fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
@@ -742,17 +744,18 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
             "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
 
-        // enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
-        Preconditions.checkState(!upsertConfig.isEnablePreload(),
-            "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+        // enableDeletedKeysCompactionConsistency shouldn't exist with preload enabled
+        Preconditions.checkState(upsertConfig.getPreload() != Enablement.ENABLE,
+            "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
 
         // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
         Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
             "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
 
-        // enableDeletedKeysCompactionConsistency should exist with enableSnapshot
-        Preconditions.checkState(upsertConfig.isEnableSnapshot(),
-            "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+        // enableDeletedKeysCompactionConsistency should exist with snapshot enabled
+        // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+        Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+            "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
 
         // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
@@ -800,7 +803,9 @@ public final class TableConfigUtils {
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
-      Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "Upsert TTL must have snapshot enabled");
     }
 
     if (upsertConfig.getDeletedKeysTTL() > 0) {
@@ -902,7 +907,7 @@ public final class TableConfigUtils {
     if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
       Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
           "If partialUpsertMergerClass is provided then partialUpsertStrategies should be empty");
-    } else {
+    } else if (MapUtils.isNotEmpty(partialUpsertStrategies)) {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       // validate partial upsert column mergers
       for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {

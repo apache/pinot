@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -138,8 +139,13 @@ public class SegmentCompletionManager {
     }
 
     if (factoryName == null) {
-      factoryName = PauselessConsumptionUtils.isPauselessEnabled(tableConfig)
-          ? _segmentCompletionConfig.getDefaultPauselessFsmScheme() : _segmentCompletionConfig.getDefaultFsmScheme();
+      if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+        factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+      } else {
+        factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
+      }
     }
 
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
@@ -258,6 +264,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_DISCARD;
     }
     _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    _fsmMap.remove(segmentName);
     return SegmentCompletionProtocol.RESP_PROCESSED;
   }
 
