@@ -79,7 +79,8 @@ if [ "${NEW_COMMIT_HASH}" == "${OLD_COMMIT_HASH}" ]; then
   exit 0
 fi
 
-FILES_TO_CHECK=("")
+FILES_TO_CHECK=("pinot/pinot-spi/src/main/java/org/apache/pinot/spi/config/table
+                 /TableConfig.java")
 len_arr="${#FILES_TO_CHECK[@]}"
 
 for ((i=0; i < len_arr; i++)); do
