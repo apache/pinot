@@ -89,6 +89,7 @@ for ((i=0; i < len_arr; i++)); do
   CONC=$(java git_diff_checker.java temp_diff_file.txt)
   if [[ "$CONC" == "true" ]]; then
     echo "unwanted change found"
+    exit 1
   fi
   rm temp_diff_file.txt
 done
