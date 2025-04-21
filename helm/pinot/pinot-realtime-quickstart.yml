@@ -801,7 +801,7 @@ spec:
     spec:
       containers:
         - name: pinot-add-example-realtime-table-json
-          image: pinot:inject_fail_2
+          image: pinot:inject_22
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/airlineStats_schema.json", "-tableConfigFile", "/var/pinot/examples/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -810,7 +810,7 @@ spec:
             - name: examples
               mountPath: /var/pinot/examples
         - name: pinot-add-example-realtime-table-avro
-          image: pinot:inject_fail_2
+          image: pinot:inject_22
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/airlineStatsAvro_schema.json", "-tableConfigFile", "/var/pinot/examples/airlineStatsAvro_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -835,10 +835,10 @@ spec:
     spec:
       containers:
         - name: loading-json-data-to-kafka
-          image: pinot:inject_fail_2
+          image: pinot:inject_22
           args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/rawdata/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
         - name: loading-avro-data-to-kafka
-          image: pinot:inject_fail_2
+          image: pinot:inject_22
           args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/rawdata/airlineStats_data.avro", "-kafkaTopic", "flights-realtime-avro", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181", "-outputFormat", "avro" ]
       restartPolicy: OnFailure
   backoffLimit: 3
