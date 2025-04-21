@@ -86,7 +86,7 @@ len_arr="${#FILES_TO_CHECK[@]}"
 for ((i=0; i < len_arr; i++)); do
   DIFF=`git diff "${OLD_COMMIT_HASH}".."${NEW_COMMIT_HASH}" "${FILES_TO_CHECK[i]}"`
   echo "$DIFF" > temp_diff_file.txt
-  CONC=$(java git_diff_checker.java temp_diff_file.txt)
+  CONC=$(java pinot/pinot-spi-change-checker/src/main/java/org/apache/pinot/GitDiffChecker.java temp_diff_file.txt)
   if [[ "$CONC" == "true" ]]; then
     echo "unwanted change found"
     exit 1
