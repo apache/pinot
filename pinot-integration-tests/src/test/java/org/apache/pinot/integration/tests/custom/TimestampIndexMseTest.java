@@ -36,7 +36,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
@@ -113,11 +113,31 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   @Test
   public void timestampIndexCompoundAggregateFilter()
       throws Exception {
-    JsonNode result = postQuery(
-        "SELECT DATE_TRUNC('SECOND', ArrTime), SUM(CASE WHEN ArrTime < now() THEN 2 ELSE 0 END) FILTER (WHERE "
-            + "AirlineID > 0 AND DayOfMonth = 1) FROM mytable GROUP BY DATE_TRUNC('SECOND', ArrTime) LIMIT 100");
+    setUseMultiStageQueryEngine(true);
+    String query =
+        "SELECT SUM(1) FILTER (WHERE AirlineID = 19393 AND DATE_TRUNC('SECOND', ArrTime) > 100) FROM "
+            + "mytable LIMIT 100";
+    JsonNode result = postQuery(query);
     assertNoError(result);
-    assertEquals(result.get("numRowsResultSet").asInt(), 4);
+    assertTrue(result.get("resultTable").get("rows").get(0).get(0).asInt() > 0);
+    explain(query, "Execution Plan\n"
+        + "LogicalSort(fetch=[100])\n"
+        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], "
+        + "isSortOnReceiver=[false])\n"
+        + "    LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
+        + "        PinotLogicalExchange(distribution=[hash])\n"
+        + "          LeafStageCombineOperator(table=[mytable])\n"
+        + "            StreamingInstanceResponse\n"
+        + "              CombineAggregate\n"
+        + "                AggregateFiltered(aggregations=[[sum('1'), count(*)]])\n"
+        + "                  Transform(expressions=[['1']])\n"
+        + "                    Project(columns=[[]])\n"
+        + "                      DocIdSet(maxDocs=[120000])\n"
+        + "                        FilterAnd\n"
+        + "                          FilterRangeIndex(predicate=[$ArrTime$SECOND > '100'], indexLookUp=[range_index],"
+        + " operator=[RANGE])\n"
+        + "                          FilterFullScan(predicate=[AirlineID = '19393'], operator=[EQ])\n");
   }
 
   @Test
