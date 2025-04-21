@@ -18,27 +18,29 @@
  */
 package org.apache.pinot.verifier;
 
-import java.io.File;
+//import java.io.File;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.IOException;
+//import java.nio.file.Files;
+//import java.nio.file.Path;
+//import java.nio.file.Paths;
 import java.util.List;
 import java.util.ArrayList;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.DocumentBuilder;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
+//import javax.xml.parsers.DocumentBuilderFactory;
+//import javax.xml.parsers.DocumentBuilder;
+//import org.w3c.dom.Element;
+//import org.w3c.dom.Node;
+//import org.w3c.dom.NodeList;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 // dont use *
 
 public class DepVerifier {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DepVerifier.class);
+  private DepVerifier() { }
 
   public static void main(String[] args) throws Exception {
     if (args.length == 0) {
-      LOGGER.info("No changed POM files detected. Skipping dependency verification.");
       return;
     }
 
@@ -46,7 +48,7 @@ public class DepVerifier {
       List<String> addedLines = getAddedLines(pomPath);
       for (String line: addedLines) {
         if (line.contains("<version>") && isHardcoded(line)) {
-          LOGGER.error("Hardcoded version found in root POM 'dependencyManagement'. Line: {}", line.trim());
+          System.out.println("Hardcoded version found: " + line.trim());
           System.exit(1);
         }
       }
@@ -55,10 +57,15 @@ public class DepVerifier {
     System.exit(0);
   }
 
-  private List<String> getAddedLines(String pomPath) {
+
+  /**
+   * Retrieves lines that were added to the specified POM file
+   * by comparing it to origin/main branch, excluding diff metadata (e.g., '+++').
+   */
+  public static List<String> getAddedLines(String pomPath) throws IOException, InterruptedException {
     List<String> added = new ArrayList<>();
 
-    ProcessBuilder pb = new ProcessBuilder("git", "diff", "origin/main", "--", filePath);
+    ProcessBuilder pb = new ProcessBuilder("git", "diff", "origin/main", "--", pomPath);
     Process process = pb.start();
     BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
@@ -73,9 +80,11 @@ public class DepVerifier {
     return added;
   }
 
-  private boolean isHardcoded(String line) throws Exception {
+  /**
+   * Checks if a given line contains a hardcoded version.
+   */
+  public static boolean isHardcoded(String line) throws Exception {
     line = line.trim();
-    return line.contains("<version>") &&
-        !line.contains("<version>${");
+    return line.contains("<version>") && !line.contains("<version>${");
   }
 }
