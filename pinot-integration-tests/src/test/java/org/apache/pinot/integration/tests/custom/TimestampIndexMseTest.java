@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
@@ -105,6 +108,16 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
             + "              Project(columns=[[]])\n"
             + "                DocIdSet(maxDocs=[120000])\n"
             + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
+  }
+
+  @Test
+  public void timestampIndexCompoundAggregateFilter()
+      throws Exception {
+    JsonNode result = postQuery(
+        "SELECT DATE_TRUNC('SECOND', ArrTime), SUM(CASE WHEN ArrTime < now() THEN 2 ELSE 0 END) FILTER (WHERE "
+            + "AirlineID > 0 AND DayOfMonth = 1) FROM mytable GROUP BY DATE_TRUNC('SECOND', ArrTime) LIMIT 100");
+    assertNoError(result);
+    assertEquals(result.get("numRowsResultSet").asInt(), 4);
   }
 
   @Test
