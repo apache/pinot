@@ -203,7 +203,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
                 : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
           return RebalancePreCheckerResult.warn(
-              "minimizeDataMovement is not enabled for CONSUMING segments but instance assignment is allowed");
+              "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
         }
         return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       }
