@@ -59,6 +59,7 @@
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
+    <module>pinot-spi-change-checker</module>
   </modules>
 
   <licenses>
