@@ -66,7 +66,8 @@ public class ControllerFilePathProvider {
     _dataDirURI = URIUtils.getUri(dataDir);
     LOGGER.info("Initializing data directory: {}", _dataDirURI);
     try {
-      try (PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme())) {
+      try {
+        PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
         if (pinotFS.exists(_dataDirURI)) {
           Preconditions.checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory",
               _dataDirURI);
