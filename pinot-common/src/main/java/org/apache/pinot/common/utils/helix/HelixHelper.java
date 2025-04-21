@@ -280,6 +280,10 @@ public class HelixHelper {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
+        if (idealState == null) {
+          LOGGER.warn("Broker IdealState is null, skipping removal of resource: {}", resourceTag);
+          return null;
+        }
         if (idealState.getPartitionSet().contains(resourceTag)) {
           idealState.getPartitionSet().remove(resourceTag);
           return idealState;
