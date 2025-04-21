@@ -162,7 +162,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   }
 
   @Override
-  public DataType getDataType() {
+  public DataType getValueType() {
     return _valueType;
   }
 
