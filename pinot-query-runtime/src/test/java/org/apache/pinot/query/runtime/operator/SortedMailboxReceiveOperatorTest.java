@@ -26,6 +26,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -50,6 +51,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -71,6 +73,8 @@ public class SortedMailboxReceiveOperatorTest {
   private AutoCloseable _mocks;
   @Mock
   private MailboxService _mailboxService;
+  @Mock
+  private TableCache _tableCache;
   @Mock
   private ReceivingMailbox _mailbox1;
   @Mock
@@ -94,6 +98,7 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getPort()).thenReturn(1234);
     when(_mailbox1.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
     when(_mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+    when(_tableCache.getActualTableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @AfterMethod
@@ -254,7 +259,8 @@ public class SortedMailboxReceiveOperatorTest {
 
   private SortedMailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
       DataSchema resultSchema, List<RelFieldCollation> collations, long deadlineMs) {
-    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata);
+    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(
+        _mailboxService, _tableCache, deadlineMs, stageMetadata);
     MailboxReceiveNode node = mock(MailboxReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);

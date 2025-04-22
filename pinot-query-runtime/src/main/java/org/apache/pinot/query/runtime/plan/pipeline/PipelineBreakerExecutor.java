@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -67,7 +68,7 @@ public class PipelineBreakerExecutor {
    */
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      MailboxService mailboxService, TableCache tableCache, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs,
       @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
@@ -78,7 +79,7 @@ public class PipelineBreakerExecutor {
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
-            new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
+            new OpChainExecutionContext(mailboxService, tableCache, requestId, deadlineMs, opChainMetadata,
                 stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {

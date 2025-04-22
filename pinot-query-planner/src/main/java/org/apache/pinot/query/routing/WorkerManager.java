@@ -35,6 +35,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
@@ -72,12 +73,15 @@ public class WorkerManager {
   private final String _instanceId;
   private final String _hostName;
   private final int _port;
+  private final TableCache _tableCache;
   private final RoutingManager _routingManager;
 
-  public WorkerManager(String instanceId, String hostName, int port, RoutingManager routingManager) {
+  public WorkerManager(String instanceId, String hostName, int port, TableCache tableCache,
+      RoutingManager routingManager) {
     _instanceId = instanceId;
     _hostName = hostName;
     _port = port;
+    _tableCache = tableCache;
     _routingManager = routingManager;
   }
 
@@ -386,6 +390,7 @@ public class WorkerManager {
   private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
+    tableName = _tableCache.getActualTableName(tableName);
     Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 

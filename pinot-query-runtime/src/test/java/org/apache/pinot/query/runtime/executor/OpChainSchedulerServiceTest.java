@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -42,6 +43,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -75,11 +77,13 @@ public class OpChainSchedulerServiceTest {
 
   private OpChain getChain(MultiStageOperator operator) {
     MailboxService mailboxService = mock(MailboxService.class);
+    TableCache tableCache = mock(TableCache.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, ImmutableMap.of(),
+        new OpChainExecutionContext(mailboxService, tableCache, 123L, Long.MAX_VALUE, ImmutableMap.of(),
             new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null, null,
             true);
     return new OpChain(context, operator);

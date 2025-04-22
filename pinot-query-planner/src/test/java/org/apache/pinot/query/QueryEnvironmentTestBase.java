@@ -307,7 +307,7 @@ public class QueryEnvironmentTestBase {
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
-        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
+        new WorkerManager("Broker_localhost", "localhost", reducerPort, tableCache, routingManager));
   }
 
   /**

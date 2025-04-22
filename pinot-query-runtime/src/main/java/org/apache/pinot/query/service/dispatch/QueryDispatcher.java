@@ -47,6 +47,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
@@ -105,6 +106,7 @@ public class QueryDispatcher {
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
 
   private final MailboxService _mailboxService;
+  private final TableCache _tableCache;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
@@ -116,13 +118,14 @@ public class QueryDispatcher {
       = new PhysicalTimeSeriesBrokerPlanVisitor();
   private final FailureDetector _failureDetector;
 
-  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
-    this(mailboxService, failureDetector, null, false);
+  public QueryDispatcher(MailboxService mailboxService, TableCache tableCache, FailureDetector failureDetector) {
+    this(mailboxService, tableCache, failureDetector, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
-      boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, TableCache tableCache, FailureDetector failureDetector,
+      @Nullable TlsConfig tlsConfig, boolean enableCancellation) {
     _mailboxService = mailboxService;
+    _tableCache = tableCache;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
@@ -147,7 +150,7 @@ public class QueryDispatcher {
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       try {
-        return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+        return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService, _tableCache);
       } finally {
         if (isQueryCancellationEnabled()) {
           _serversByQuery.remove(requestId);
@@ -475,7 +478,8 @@ public class QueryDispatcher {
       DispatchableSubPlan subPlan,
       long timeoutMs,
       Map<String, String> queryOptions,
-      MailboxService mailboxService) {
+      MailboxService mailboxService,
+      TableCache tableCache) {
 
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
@@ -496,7 +500,7 @@ public class QueryDispatcher {
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
+        new OpChainExecutionContext(mailboxService, tableCache, requestId, deadlineMs, queryOptions, stageMetadata,
             workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();

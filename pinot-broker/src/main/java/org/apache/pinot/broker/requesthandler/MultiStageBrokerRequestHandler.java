@@ -118,7 +118,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
+    _workerManager = new WorkerManager(_brokerId, hostname, port, tableCache, _routingManager);
     TlsConfig tlsConfig = config.getProperty(
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
@@ -126,8 +126,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
     _queryDispatcher =
-        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
-            this.isQueryCancellationEnabled());
+        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tableCache, failureDetector,
+            tlsConfig, this.isQueryCancellationEnabled());
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),

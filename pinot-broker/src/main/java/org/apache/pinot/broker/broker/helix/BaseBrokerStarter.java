@@ -370,7 +370,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
-      queryDispatcher = createQueryDispatcher(_brokerConf);
+      queryDispatcher = createQueryDispatcher(_brokerConf, tableCache);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
               _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector);
@@ -522,11 +522,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
-  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
+  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf, TableCache tableCache) {
     String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(_brokerConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf), _failureDetector);
+    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf), tableCache, _failureDetector);
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {

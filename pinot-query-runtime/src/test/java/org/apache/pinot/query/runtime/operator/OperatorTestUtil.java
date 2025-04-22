@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -42,6 +43,7 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -107,9 +109,9 @@ public class OperatorTestUtil {
     return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, serializedStats);
   }
 
-  public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
-      StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
+  public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, TableCache tableCache,
+      long deadlineMs, StageMetadata stageMetadata) {
+    return new OpChainExecutionContext(mailboxService, tableCache, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
         stageMetadata.getWorkerMetadataList().get(0), null, null, true);
   }
 
@@ -129,10 +131,12 @@ public class OperatorTestUtil {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
     StageMetadata stageMetadata = new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of());
-    OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE,
-        opChainMetadata, stageMetadata, workerMetadata, null, null, true);
+    OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(mailboxService, tableCache, 123L,
+        Long.MAX_VALUE, opChainMetadata, stageMetadata, workerMetadata, null, null, true);
 
     StagePlan stagePlan = new StagePlan(null, stageMetadata);
 

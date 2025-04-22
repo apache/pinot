@@ -148,6 +148,7 @@ public class ServerPlanRequestUtils {
       PinotQuery pinotQuery, InstanceDataManager instanceDataManager) {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
     String rawTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
+    rawTableName = executionContext.getTableCache().getActualTableName(rawTableName);
     Map<String, List<String>> tableSegmentsMap = executionContext.getWorkerMetadata().getTableSegmentsMap();
     assert tableSegmentsMap != null;
     TimeBoundaryInfo timeBoundary = stageMetadata.getTimeBoundary();

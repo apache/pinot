@@ -19,6 +19,7 @@
 package org.apache.pinot.server.worker;
 
 import javax.annotation.Nullable;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -35,13 +36,13 @@ public class WorkerQueryServer {
 
   private final QueryServer _queryWorkerService;
 
-  public WorkerQueryServer(PinotConfiguration configuration, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats) {
+  public WorkerQueryServer(PinotConfiguration configuration, HelixManager helixManager,
+      InstanceDataManager instanceDataManager, @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats) {
     _configuration = toWorkerQueryConfig(configuration);
     _queryServicePort = _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(_configuration, instanceDataManager, tlsConfig, sendStats::getSendStats);
+    queryRunner.init(_configuration, helixManager, instanceDataManager, tlsConfig, sendStats::getSendStats);
     _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig, configuration);
   }
 

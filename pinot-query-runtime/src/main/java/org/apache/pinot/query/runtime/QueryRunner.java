@@ -38,7 +38,9 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -103,10 +105,15 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
+  private HelixManager _helixManager;
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
+  private TableCache _tableCache;
   private QueryExecutor _leafQueryExecutor;
+
+  @Nullable
+  private boolean _caseInsensitive;
 
   // Group-by settings
   @Nullable
@@ -136,14 +143,18 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, @Nullable TlsConfig tlsConfig,
-      BooleanSupplier sendStats) {
+  public void init(PinotConfiguration config, HelixManager helixManager, InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+    _helixManager = helixManager;
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
     int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
+
+    _caseInsensitive = config.getProperty(
+        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
@@ -199,6 +210,10 @@ public class QueryRunner {
 
     _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
+
+    boolean caseInsensitive = config.getProperty(
+        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
+
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
       _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -249,8 +264,9 @@ public class QueryRunner {
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
+        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, getTableCache(),
+            workerMetadata, stagePlan, opChainMetadata, requestId, deadlineMs, parentContext,
+            _sendStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -290,8 +306,8 @@ public class QueryRunner {
 
     // run OpChain
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+        new OpChainExecutionContext(_mailboxService, getTableCache(), requestId, deadlineMs, opChainMetadata,
+            stageMetadata, workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
       opChain =
@@ -477,8 +493,8 @@ public class QueryRunner {
       }
     };
     // compile OpChain
-    OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, requestId, deadlineMs,
-        opChainMetadata, stageMetadata, workerMetadata, null, null, false);
+    OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, getTableCache(), requestId,
+        deadlineMs, opChainMetadata, stageMetadata, workerMetadata, null, null, false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
@@ -534,5 +550,12 @@ public class QueryRunner {
       }
     }
     return result;
+  }
+
+  private TableCache getTableCache() {
+    if (_tableCache == null) {
+      _tableCache = new TableCache(_helixManager.getHelixPropertyStore(), _caseInsensitive);
+    }
+    return _tableCache;
   }
 }

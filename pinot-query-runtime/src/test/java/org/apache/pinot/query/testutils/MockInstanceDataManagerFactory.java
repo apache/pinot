@@ -26,6 +26,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -132,6 +135,13 @@ public class MockInstanceDataManagerFactory {
       when(instanceDataManager.getTableDataManager(e.getKey())).thenReturn(e.getValue());
     }
     return instanceDataManager;
+  }
+
+  public HelixManager buildHelixManager() {
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    return helixManager;
   }
 
   public Map<String, Schema> getRegisteredSchemaMap() {

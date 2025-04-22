@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -53,6 +54,8 @@ public class MailboxSendOperatorTest {
   @Mock
   private MailboxService _mailboxService;
   @Mock
+  private TableCache _tableCache;
+  @Mock
   private MultiStageOperator _input;
   @Mock
   private BlockExchange _exchange;
@@ -64,6 +67,8 @@ public class MailboxSendOperatorTest {
     when(_mailboxService.getPort()).thenReturn(1234);
 
     when(_input.calculateStats()).thenReturn(MultiStageQueryStats.emptyStats(1));
+
+    when(_tableCache.getActualTableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @AfterMethod
@@ -196,8 +201,8 @@ public class MailboxSendOperatorTest {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
-            null, null, true);
+        new OpChainExecutionContext(_mailboxService, _tableCache, 123L, Long.MAX_VALUE, Map.of(), stageMetadata,
+            workerMetadata, null, null, true);
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
   }
 

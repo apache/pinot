@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class OpChainExecutionContext {
 
   private final MailboxService _mailboxService;
+  private final TableCache _tableCache;
   private final long _requestId;
   private final long _deadlineMs;
   private final Map<String, String> _opChainMetadata;
@@ -57,11 +59,12 @@ public class OpChainExecutionContext {
   private final boolean _sendStats;
 
 
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
+  public OpChainExecutionContext(MailboxService mailboxService, TableCache tableCache, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
       @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
       boolean sendStats) {
     _mailboxService = mailboxService;
+    _tableCache = tableCache;
     _requestId = requestId;
     _deadlineMs = deadlineMs;
     _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
@@ -78,6 +81,10 @@ public class OpChainExecutionContext {
 
   public MailboxService getMailboxService() {
     return _mailboxService;
+  }
+
+  public TableCache getTableCache() {
+    return _tableCache;
   }
 
   public long getRequestId() {

@@ -134,7 +134,7 @@ public class ServerInstance {
 
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
-      _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
+      _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _helixManager, _instanceDataManager,
           serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate);
     } else {
       _workerQueryServer = null;

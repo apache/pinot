@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -59,6 +60,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 
@@ -81,6 +83,8 @@ public class PipelineBreakerExecutorTest {
   @Mock
   private MailboxService _mailboxService;
   @Mock
+  private TableCache _tableCache;
+  @Mock
   private ReceivingMailbox _mailbox1;
   @Mock
   private ReceivingMailbox _mailbox2;
@@ -95,6 +99,8 @@ public class PipelineBreakerExecutorTest {
     when(_mailbox1.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
     when(_mailbox2.getId()).thenReturn("mailbox2");
     when(_mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+
+    when(_tableCache.getActualTableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @AfterMethod
@@ -105,10 +111,10 @@ public class PipelineBreakerExecutorTest {
 
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      MailboxService mailboxService, TableCache tableCache, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
-    return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
-        opChainMetadata, requestId, deadlineMs, null, true);
+    return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, tableCache, workerMetadata,
+        stagePlan, opChainMetadata, requestId, deadlineMs, null, true);
   }
 
   @AfterClass
@@ -132,7 +138,7 @@ public class PipelineBreakerExecutorTest {
         OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(1).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -171,7 +177,7 @@ public class PipelineBreakerExecutorTest {
         OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(2).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -199,7 +205,7 @@ public class PipelineBreakerExecutorTest {
 
     // when
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -227,7 +233,7 @@ public class PipelineBreakerExecutorTest {
     });
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, System.currentTimeMillis() + 100);
 
     // then
@@ -262,7 +268,7 @@ public class PipelineBreakerExecutorTest {
         OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -297,7 +303,7 @@ public class PipelineBreakerExecutorTest {
         OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
-        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _tableCache, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then

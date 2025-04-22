@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -60,8 +61,9 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
+    HelixManager helixManager = factory.buildHelixManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), helixManager, instanceDataManager, null, () -> true);
   }
 
   public int getPort() {

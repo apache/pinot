@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -95,6 +96,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected String _reducerHostname;
   protected int _reducerPort;
   protected MailboxService _mailboxService;
+  protected TableCache _tableCache;
   protected QueryEnvironment _queryEnvironment;
   protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
 
@@ -161,7 +163,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     // exception will be propagated through for assert purpose on runtime error
     return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
-        _mailboxService);
+        _mailboxService, _tableCache);
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
