@@ -35,16 +35,18 @@
 #  exit 0
 #fi
 
-echo "$OLD_COMMIT"
-echo "$NEW_COMMIT"
+#echo "$OLD_COMMIT"
+#echo "$NEW_COMMIT"
 
 FILES_TO_CHECK=("pinot-spi/src/main/java/org/apache/pinot/spi/config/table/TableConfig.java" "pinot-spi/src/main/java/org/apache/pinot/spi/metrics/PinotMetricsRegistry.java")
 len_arr="${#FILES_TO_CHECK[@]}"
 javac -d pinot-spi-change-checker/target/classes pinot-spi-change-checker/src/main/java/org/apache/pinot/changecheck/GitDiffChecker.java
 
 for ((i=0; i < len_arr; i++)); do
-  DIFF=$(git diff "${OLD_COMMIT}".."${NEW_COMMIT}" "${FILES_TO_CHECK[i]}")
+  #DIFF=$(git diff "${OLD_COMMIT}".."${NEW_COMMIT}" "${FILES_TO_CHECK[i]}")
+  DIFF=$(git diff origin/main -- "${FILES_TO_CHECK[i]}")
   #DIFF=$(git diff "$1".."$2" "${FILES_TO_CHECK[i]}")
+  #echo $DIFF
   echo "$DIFF" > temp_diff_file.txt
   CONC=$(java -cp pinot-spi-change-checker/target/classes org.apache.pinot.changecheck.GitDiffChecker temp_diff_file.txt)
   rm temp_diff_file.txt

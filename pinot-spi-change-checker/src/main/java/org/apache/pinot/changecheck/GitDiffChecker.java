@@ -29,7 +29,7 @@ public class GitDiffChecker {
         firstLineNum = li.substring(4, li.indexOf(','));
       }
 
-      if ((!li.isEmpty()) && (li.charAt(0)) == '-') {
+      if ((!li.isEmpty()) && (li.charAt(0) == '-') && (!li.startsWith("---"))) {
         Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-'
         Matcher matcher2 = annoDef.matcher(li.substring(1));
         if (matcher1.matches() || matcher2.matches()) {
