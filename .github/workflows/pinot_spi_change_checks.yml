@@ -22,10 +22,10 @@ on:
   workflow_dispatch:
     inputs:
       oldCommit:
-        description: "Git hash (or tag) for old commit. (required)"
+        description: "Git hash for old commit. (required)"
         required: true
       newCommit:
-        description: "Git hash (or tag) for new commit. (required)"
+        description: "Git hash for new commit. (required)"
         required: true
 
 jobs:
@@ -51,11 +51,10 @@ jobs:
 #          npm install -g npm@8.5.5
 #          npm --version
       - name: Pinot SPI Change Testing
-        if : ${{github.event_name == 'workflow_dispatch'}}
+        if: always()
         env:
           OLD_COMMIT: ${{ github.event.inputs.oldCommit }}
           NEW_COMMIT: ${{ github.event.inputs.newCommit }}
-          WORKING_DIR: /tmp/....
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
