@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -134,6 +136,21 @@ public class QueryEnvironment {
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, connectionConfig);
+    boolean makeCaseInsensitive = config.getTableCache() == null
+        ? CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+        : config.getTableCache().isIgnoreCase();
+    if (makeCaseInsensitive) {
+      SqlNameMatcher nameMatcher = _catalogReader.nameMatcher();
+      try {
+        // very controversial hack: we need to set the name matcher to be case insensitive without making the whole
+        // Calcite configuration case insensitive, cause that leads to transform everything internally to lower-case
+        Field field = nameMatcher.getClass().getDeclaredField("caseSensitive");
+        field.setAccessible(true);
+        field.set(nameMatcher, false);
+      } catch (Exception e) {
+        LOGGER.warn("Unable to force case-insensitiveness internally", e);
+      }
+    }
     _optProgram = getOptProgram();
   }
 
