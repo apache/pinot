@@ -25,7 +25,7 @@ on:
 
 jobs:
   spi-change-checker:
-    if: github.repository == 'apache/pinot'
+    #if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Pinot SPI Change Testing
     steps:
