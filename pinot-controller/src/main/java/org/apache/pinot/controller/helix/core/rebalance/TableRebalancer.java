@@ -1303,38 +1303,67 @@ public class TableRebalancer {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
     IdealState idealState;
-    do {
-      tableRebalanceLogger.debug("Start to check if ExternalView converges to IdealStates");
-      idealState = _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
-      // IdealState might be null if table got deleted, throwing exception to abort the rebalance
-      Preconditions.checkState(idealState != null, "Failed to find the IdealState");
+    int remainSegments = -1;
+    if (_tableRebalanceObserver instanceof ZkBasedTableRebalanceObserver) {
+      TableRebalanceProgressStats.RebalanceProgressStats overallStats =
+          ((ZkBasedTableRebalanceObserver) _tableRebalanceObserver).getOverallStats();
+      remainSegments =
+          overallStats._totalRemainingSegmentsToBeAdded + (lowDiskMode ? overallStats._totalRemainingSegmentsToBeDeleted
+              : 0);
+    }
+    while (true) {
+      do {
+        tableRebalanceLogger.debug("Start to check if ExternalView converges to IdealStates");
+        idealState = _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
+        // IdealState might be null if table got deleted, throwing exception to abort the rebalance
+        Preconditions.checkState(idealState != null, "Failed to find the IdealState");
 
-      ExternalView externalView =
-          _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
-      // ExternalView might be null when table is just created, skipping check for this iteration
-      if (externalView != null) {
-        // Record external view and ideal state convergence status
-        TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
-            estimateAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
-        _tableRebalanceObserver.onTrigger(
-            TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
-            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
-        // Update unique segment list as IS-EV trigger must have processed these
-        allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
-        if (_tableRebalanceObserver.isStopped()) {
-          throw new RuntimeException(
-              String.format("Rebalance has already stopped with status: %s", _tableRebalanceObserver.getStopStatus()));
+        ExternalView externalView =
+            _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
+        // ExternalView might be null when table is just created, skipping check for this iteration
+        if (externalView != null) {
+          // Record external view and ideal state convergence status
+          TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+              estimateAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
+          _tableRebalanceObserver.onTrigger(
+              TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+              externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
+          // Update unique segment list as IS-EV trigger must have processed these
+          allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
+          if (_tableRebalanceObserver.isStopped()) {
+            throw new RuntimeException(
+                String.format("Rebalance has already stopped with status: %s",
+                    _tableRebalanceObserver.getStopStatus()));
+          }
+          if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
+              idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor,
+              tableRebalanceLogger)) {
+            tableRebalanceLogger.info("ExternalView converged");
+            return idealState;
+          }
         }
-        if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-            idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger)) {
-          tableRebalanceLogger.info("ExternalView converged");
-          return idealState;
+        tableRebalanceLogger.debug("ExternalView has not converged to IdealStates. Retry after: {}ms",
+            externalViewCheckIntervalInMs);
+        Thread.sleep(externalViewCheckIntervalInMs);
+      } while (System.currentTimeMillis() < endTimeMs);
+      if (_tableRebalanceObserver instanceof ZkBasedTableRebalanceObserver) {
+        TableRebalanceProgressStats.RebalanceProgressStats overallStats =
+            ((ZkBasedTableRebalanceObserver) _tableRebalanceObserver).getOverallStats();
+        int newRemainSegments = overallStats._totalRemainingSegmentsToBeAdded + (lowDiskMode
+            ? overallStats._totalRemainingSegmentsToBeDeleted : 0);
+        // The timeout is extended if progress has been made. (Net count of segments remaining to be processed are
+        // reducing)
+        if (newRemainSegments < remainSegments) {
+          tableRebalanceLogger.info(
+              "Extending EV stabilization timeout for another {}ms, remaining {} segments to be processed.",
+              externalViewCheckIntervalInMs, newRemainSegments);
+          remainSegments = newRemainSegments;
+          endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
+          continue;
         }
       }
-      tableRebalanceLogger.debug("ExternalView has not converged to IdealStates. Retry after: {}ms",
-          externalViewCheckIntervalInMs);
-      Thread.sleep(externalViewCheckIntervalInMs);
-    } while (System.currentTimeMillis() < endTimeMs);
+      break;
+    }
 
     if (bestEfforts) {
       tableRebalanceLogger.warn(

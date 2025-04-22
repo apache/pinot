@@ -239,6 +239,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return _tableRebalanceContext;
   }
 
+  public TableRebalanceProgressStats.RebalanceProgressStats getOverallStats() {
+    return _tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
+  }
+
   private void trackStatsInZk() {
     Map<String, String> jobMetadata =
         createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats, _tableRebalanceContext);
