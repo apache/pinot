@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -55,6 +56,18 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
   @Override
   public BrokerRequest getRealtimeBrokerRequest() {
     return _realtimeBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public Set<ServerInstance> getOfflineExecutionServers() {
+    return _offlineRoutingTable != null ? _offlineRoutingTable.keySet() : null;
+  }
+
+  @Nullable
+  @Override
+  public Set<ServerInstance> getRealtimeExecutionServers() {
+    return _realtimeRoutingTable != null ? _realtimeRoutingTable.keySet() : null;
   }
 
   @Nullable

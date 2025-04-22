@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -51,8 +52,22 @@ public interface TableRouteInfo {
   BrokerRequest getRealtimeBrokerRequest();
 
   /**
+   * Get the set of servers that will execute the query on the segments of the OFFLINE table.
+   * @return the set of servers that will execute the query on the segments of the OFFLINE table
+   */
+  Set<ServerInstance> getOfflineExecutionServers();
+
+  /**
+   * Get the set of servers that will execute the query on the segments of the REALTIME table.
+   * @return the set of servers that will execute the query on the segments of the REALTIME table
+   */
+  Set<ServerInstance> getRealtimeExecutionServers();
+
+  /**
    * Gets the routing table for the offline table, if available.
-   *
+   * TODO: Note that this method cannot be supported for Logical Tables as the classes cannot be used to maintain a
+   * map of table to segment list. Once Logical Tables are supported in GRPC request handler, this method will be
+   * removed.
    * @return a map of server instances to their route information for the offline table, or null if not available
    */
   @Nullable
@@ -60,7 +75,9 @@ public interface TableRouteInfo {
 
   /**
    * Gets the routing table for the realtime table, if available.
-   *
+   * TODO: Note that this method cannot be supported for Logical Tables as the classes cannot be used to maintain a
+   * map of table to segment list. Once Logical Tables are supported in GRPC request handler, this method will be
+   * removed.
    * @return a map of server instances to their route information for the realtime table, or null if not available
    */
   @Nullable

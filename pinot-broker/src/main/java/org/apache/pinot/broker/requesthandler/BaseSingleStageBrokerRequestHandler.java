@@ -82,7 +82,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
-import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
@@ -540,8 +539,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         tableRouteInfo = routeProvider.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
         requestId);
 
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRouteInfo.getOfflineRoutingTable();
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRouteInfo.getRealtimeRoutingTable();
+    Set<ServerInstance> offlineExecutionServers = tableRouteInfo.getOfflineExecutionServers();
+    Set<ServerInstance> realtimeExecutionServers = tableRouteInfo.getRealtimeExecutionServers();
     List<String> unavailableSegments = routeProvider.getUnavailableSegments();
     int numPrunedSegmentsTotal = routeProvider.getNumPrunedSegmentsTotal();
 
@@ -636,11 +635,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Set the maximum serialized response size per server, and ask server to directly return final response when only
     // one server is queried
     int numServers = 0;
-    if (offlineRoutingTable != null) {
-      numServers += offlineRoutingTable.size();
+    if (offlineExecutionServers != null) {
+      numServers += offlineExecutionServers.size();
     }
-    if (realtimeRoutingTable != null) {
-      numServers += realtimeRoutingTable.size();
+    if (realtimeExecutionServers != null) {
+      numServers += realtimeExecutionServers.size();
     }
     if (offlineBrokerRequest != null) {
       Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
@@ -680,10 +679,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (pinotQuery.isExplain()) {
       // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
       // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
-      if (offlineRoutingTable != null) {
+      if (offlineExecutionServers != null) {
         // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
         realtimeBrokerRequest = null;
-        realtimeRoutingTable = null;
+        realtimeExecutionServers = null;
       }
     }
     BrokerResponseNative brokerResponse;
@@ -697,8 +696,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
       //       servers takes time, but will address later if needed.
       String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
-      onQueryStart(
-          requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
+      onQueryStart(requestId, clientRequestId, query,
+          new QueryServers(query, offlineExecutionServers, realtimeExecutionServers));
       try {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRouteInfo,
             remainingTimeMs, serverStats, requestContext);
@@ -1977,14 +1976,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
 
-    QueryServers(String query, @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-        @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+    QueryServers(String query, @Nullable Set<ServerInstance> offlineExecutionServers,
+        @Nullable Set<ServerInstance> realtimeExecutionServers) {
       _query = query;
-      if (offlineRoutingTable != null) {
-        _servers.addAll(offlineRoutingTable.keySet());
+      if (offlineExecutionServers != null) {
+        _servers.addAll(offlineExecutionServers);
       }
-      if (realtimeRoutingTable != null) {
-        _servers.addAll(realtimeRoutingTable.keySet());
+      if (realtimeExecutionServers != null) {
+        _servers.addAll(realtimeExecutionServers);
       }
     }
   }
