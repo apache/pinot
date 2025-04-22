@@ -25,7 +25,7 @@ on:
 
 jobs:
   spi-change-checker:
-    #if: github.repository == 'apache/pinot'
+    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Pinot SPI Change Testing
     steps:
@@ -36,7 +36,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Fetch base branch
-        run: git fetch origin main
+        run: git fetch origin master
 
       - name: Set up JDK 11
         uses: actions/setup-java@v4
@@ -44,5 +44,6 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
+
       - name: Run Shell Script
         run: .github/workflows/scripts/.pinot_spi_change_checker.sh
