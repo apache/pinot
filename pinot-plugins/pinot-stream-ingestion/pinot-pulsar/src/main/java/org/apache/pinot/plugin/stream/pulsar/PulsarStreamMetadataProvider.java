@@ -173,13 +173,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   }
 
   @Override
-  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
-      boolean forceGetOffsetFromStream) {
-    return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
-  }
-
-  @Override
   public void close()
       throws IOException {
     super.close();
