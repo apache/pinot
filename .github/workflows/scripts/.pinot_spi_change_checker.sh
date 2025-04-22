@@ -41,7 +41,7 @@ fi
 
 FILES_TO_CHECK=("pinot-spi/src/main/java/org/apache/pinot/spi/config/table/TableConfig.java" "pinot-spi/src/main/java/org/apache/pinot/spi/metrics/PinotMetricsRegistry.java")
 len_arr="${#FILES_TO_CHECK[@]}"
-mvn -pl pinot-spi-change-checker clean package -DskipTests
+javac -d pinot-spi-change-checker/target/classes pinot-spi-change-checker/src/main/java/org/apache/pinot/changecheck/GitDiffChecker.java
 
 for ((i=0; i < len_arr; i++)); do
   DIFF=$(git diff "${OLD_COMMIT_HASH}".."${NEW_COMMIT_HASH}" "${FILES_TO_CHECK[i]}")
@@ -53,5 +53,7 @@ for ((i=0; i < len_arr; i++)); do
     echo "Incorrect SPI change found in ${FILES_TO_CHECK[i]} at line $CONC"
     exit 1
   fi
+
+rm -rf pinot-spi-change-checker/target/
 echo "No incorrect SPI changes found!"
 done
