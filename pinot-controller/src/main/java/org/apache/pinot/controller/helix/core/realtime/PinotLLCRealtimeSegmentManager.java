@@ -1671,12 +1671,19 @@ public class PinotLLCRealtimeSegmentManager {
       List<StreamConfig> streamConfigs, IdealState idealState) {
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestOffset = new HashMap<>();
     for (StreamConfig streamConfig : streamConfigs) {
-
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
-
       OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+
+      // Kinesis shard-split flow requires us to pass currentPartitionGroupConsumptionStatusList so that
+      // we can check if its completely consumed
+      // However the kafka implementation of computePartitionGroupMetadata() breaks if we pass the current status
+      // This leads to streamSmallestOffset set to null in selectStartOffset() method
+      // The overall dependency isn't clean and is causing the issue and requires refactor
+      // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
+      // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
+      // while the kinesis implementation will use it.
       List<PartitionGroupMetadata> partitionGroupMetadataList =
           getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);

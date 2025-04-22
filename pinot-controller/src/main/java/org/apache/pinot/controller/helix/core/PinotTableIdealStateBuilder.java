@@ -85,7 +85,7 @@ public class PinotTableIdealStateBuilder {
    *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
-   * @param forceGetOffsetFromStream - more details in StreamMetadataProvider.computePartitionGroupMetadata()
+   * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, boolean forceGetOffsetFromStream) {
