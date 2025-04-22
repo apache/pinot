@@ -25,11 +25,18 @@ service PinotQueryServer {
   rpc Submit(ServerRequest) returns (stream ServerResponse);
 }
 
+message TableSegmentsInfo {
+  string tableName = 1;
+  repeated string segments = 2;
+  repeated string optionalSegments = 3;
+}
+
 message ServerRequest {
   map<string, string> metadata = 1;
   string sql = 2;
   repeated string segments = 3;
   bytes payload = 4;
+  repeated TableSegmentsInfo tableSegmentsInfo = 5;
 }
 
 message ServerResponse {

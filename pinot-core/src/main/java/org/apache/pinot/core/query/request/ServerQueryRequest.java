@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.core.query.request;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.TableSegmentsContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
@@ -54,6 +58,7 @@ public class ServerQueryRequest {
   private final boolean _enableStreaming;
   private final List<String> _segmentsToQuery;
   private final List<String> _optionalSegments;
+  private final List<TableSegmentsContext> _tableSegmentsContexts;
   private final QueryContext _queryContext;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
@@ -86,6 +91,16 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    if (instanceRequest.getTableSegmentsInfoListSize() > 0) {
+      _tableSegmentsContexts = new ArrayList<>(instanceRequest.getTableSegmentsInfoListSize());
+      for (TableSegmentsInfo tableSegmentsInfo : instanceRequest.getTableSegmentsInfoList()) {
+        _tableSegmentsContexts.add(
+            new TableSegmentsContext(tableSegmentsInfo.getTableName(), tableSegmentsInfo.getSegments(),
+                tableSegmentsInfo.getOptionalSegments()));
+      }
+    } else {
+      _tableSegmentsContexts = null;
+    }
   }
 
   /**
@@ -125,6 +140,17 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    if (serverRequest.getTableSegmentsInfoCount() > 0) {
+      _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
+      for (org.apache.pinot.common.proto.Server.TableSegmentsInfo tableSegmentsInfo :
+          serverRequest.getTableSegmentsInfoList()) {
+        _tableSegmentsContexts.add(
+            new TableSegmentsContext(tableSegmentsInfo.getTableName(), tableSegmentsInfo.getSegmentsList(),
+                tableSegmentsInfo.getOptionalSegmentsList()));
+      }
+    } else {
+      _tableSegmentsContexts = null;
+    }
   }
 
   /**
@@ -148,6 +174,7 @@ public class ServerQueryRequest {
     _optionalSegments = null;
 
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _tableSegmentsContexts = null;
   }
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
@@ -180,6 +207,11 @@ public class ServerQueryRequest {
 
   public List<String> getOptionalSegments() {
     return _optionalSegments;
+  }
+
+  @Nullable
+  public List<TableSegmentsContext> getTableSegmentsContexts() {
+    return _tableSegmentsContexts;
   }
 
   public QueryContext getQueryContext() {
