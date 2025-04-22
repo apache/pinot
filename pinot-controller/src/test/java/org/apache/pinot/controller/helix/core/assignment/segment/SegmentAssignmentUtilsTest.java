@@ -76,8 +76,7 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(
-        SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances, NUM_REPLICAS),
+    assertEquals(SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, instances, NUM_REPLICAS),
         currentAssignment);
 
     // Replace instance_0 with instance_10
@@ -85,8 +84,7 @@ public class SegmentAssignmentUtilsTest {
     String newInstanceName = INSTANCE_NAME_PREFIX + 10;
     newInstances.set(0, newInstanceName);
     Map<String, Map<String, String>> newAssignment =
-        SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
-            NUM_REPLICAS);
+        SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, newInstances, NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(currentAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -116,30 +114,29 @@ public class SegmentAssignmentUtilsTest {
     // }
     int newNumInstances = numInstances - 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
-        NUM_REPLICAS);
+    newAssignment =
+        SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, newInstances, NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
     for (Map<String, String> instanceStateMap : newAssignment.values()) {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
-    // The segments are not perfectly balanced, but should be deterministic
     numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, newInstances);
-    assertEquals(numSegmentsAssignedPerInstance[0], 56);
+    assertEquals(numSegmentsAssignedPerInstance[0], 60);
     assertEquals(numSegmentsAssignedPerInstance[1], 60);
     assertEquals(numSegmentsAssignedPerInstance[2], 60);
     assertEquals(numSegmentsAssignedPerInstance[3], 60);
-    assertEquals(numSegmentsAssignedPerInstance[4], 64);
+    assertEquals(numSegmentsAssignedPerInstance[4], 60);
     numSegmentsToMovePerInstance =
         SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
     assertEquals(numSegmentsToMovePerInstance.size(), numInstances);
-    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 0), IntIntPair.of(26, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 0), IntIntPair.of(30, 0));
     assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 1), IntIntPair.of(30, 0));
     assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 2), IntIntPair.of(30, 0));
     assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 3), IntIntPair.of(30, 0));
-    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 4), IntIntPair.of(34, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 4), IntIntPair.of(30, 0));
     for (int i = 5; i < 10; i++) {
       assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
     }
@@ -150,8 +147,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     newNumInstances = numInstances + 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
-        NUM_REPLICAS);
+    newAssignment =
+        SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, newInstances, NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -182,8 +179,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     String newInstanceNamePrefix = "i_";
     newInstances = SegmentAssignmentTestUtils.getNameList(newInstanceNamePrefix, numInstances);
-    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
-        NUM_REPLICAS);
+    newAssignment =
+        SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, newInstances, NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas

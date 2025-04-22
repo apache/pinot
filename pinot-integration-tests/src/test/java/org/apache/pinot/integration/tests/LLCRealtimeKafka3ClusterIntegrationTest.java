@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -34,7 +33,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -96,22 +95,17 @@ public class LLCRealtimeKafka3ClusterIntegrationTest extends LLCRealtimeClusterI
     }
 
     private int getSegmentSeqNum(int partition) {
-      IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName,
-          TableNameBuilder.REALTIME.tableNameWithType(_tableName));
-      AtomicInteger seqNum = new AtomicInteger(-1);
-      is.getPartitionSet().forEach(segmentNameStr -> {
-        if (LLCSegmentName.isLLCSegment(segmentNameStr)) {
-          if (is.getInstanceStateMap(segmentNameStr).values().contains(
-              CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-            LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-            if (segmentName.getPartitionGroupId() == partition) {
-              seqNum.set(segmentName.getSequenceNumber());
-            }
-          }
+      IdealState idealState =
+          _helixAdmin.getResourceIdealState(_helixClusterName, TableNameBuilder.REALTIME.tableNameWithType(_tableName));
+      for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+        LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
+        if (llcSegmentName != null && llcSegmentName.getPartitionGroupId() == partition && entry.getValue()
+            .containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+          return llcSegmentName.getSequenceNumber();
         }
-      });
-      assertTrue(seqNum.get() >= 0, "No consuming segment found in partition: " + partition);
-      return seqNum.get();
+      }
+      fail("No consuming segment found in partition: " + partition);
+      return -1;
     }
 
     public static class ExceptingKafka3Consumer extends KafkaPartitionLevelConsumer {
