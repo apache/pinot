@@ -65,256 +65,26 @@ import static org.testng.Assert.assertTrue;
 
 
 public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest {
-  private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+  private static String getQueryString(RebalanceConfig rebalanceConfig) {
+    return "dryRun=" + rebalanceConfig.isDryRun() + "&preChecks=" + rebalanceConfig.isPreChecks()
+        + "&reassignInstances=" + rebalanceConfig.isReassignInstances()
+        + "&includeConsuming=" + rebalanceConfig.isIncludeConsuming()
+        + "&minimizeDataMovement=" + rebalanceConfig.getMinimizeDataMovement()
+        + "&bootstrap=" + rebalanceConfig.isBootstrap() + "&downtime=" + rebalanceConfig.isDowntime()
+        + "&minAvailableReplicas=" + rebalanceConfig.getMinAvailableReplicas()
+        + "&bestEfforts=" + rebalanceConfig.isBestEfforts()
+        + "&externalViewCheckIntervalInMs=" + rebalanceConfig.getExternalViewCheckIntervalInMs()
+        + "&externalViewStabilizationTimeoutInMs=" + rebalanceConfig.getExternalViewStabilizationTimeoutInMs()
+        + "&updateTargetTier=" + rebalanceConfig.isUpdateTargetTier()
+        + "&heartbeatIntervalInMs=" + rebalanceConfig.getHeartbeatIntervalInMs()
+        + "&heartbeatTimeoutInMs=" + rebalanceConfig.getHeartbeatTimeoutInMs()
+        + "&maxAttempts=" + rebalanceConfig.getMaxAttempts()
+        + "&retryInitialDelayInMs=" + rebalanceConfig.getRetryInitialDelayInMs();
   }
 
-  @Test
-  public void testOfflineRebalancePreChecks()
-      throws Exception {
-    // setup the rebalance config
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(true);
-
-    TableConfig tableConfig = getOfflineTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
-
-    // Ensure pre-check status is null if not enabled
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNull(rebalanceResult.getPreChecksResult());
-
-    // Enable pre-checks, nothing is set
-    rebalanceConfig.setPreChecks(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Enable minimizeDataMovement
-    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Override minimizeDataMovement
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled in table config but it's overridden with disabled",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Use default minimizeDataMovement and disable it in table config
-    instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    updateTableConfig(tableConfig);
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is not enabled but instance assignment is allowed",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Undo minimizeDataMovement, update the table config to add a column to bloom filter
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
-    tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Undo tableConfig change
-    tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    // Validate that the status for reload is still PASS (i.e. even though an extra server is tagged which has no
-    // segments assigned for this table, we don't try to get needReload status from that extra server, otherwise
-    // ERROR status would be returned)
-    BaseServerStarter serverStarter0 = startOneServer(NUM_SERVERS);
-    createServerTenant(getServerTenant(), 1, 0);
-    rebalanceConfig.setReassignInstances(true);
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    rebalanceConfig.setReassignInstances(false);
-
-    // Stop the added server
-    serverStarter0.stop();
-    TestUtils.waitForCondition(
-        aVoid -> getHelixResourceManager().dropInstance(serverStarter0.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-
-    // Add a schema change. Notice that this may affect other following tests
-    Schema schema = createSchema();
-    schema.addField(new MetricFieldSpec("NewAddedIntMetricA", FieldSpec.DataType.INT, 1));
-    updateSchema(schema);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Keep schema change and update table config to add minimizeDataMovement
-    instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
-    instanceAssignmentConfigMap =
-        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(false, TableType.OFFLINE));
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    // Trigger rebalance config warning
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
-    createServerTenant(getServerTenant(), 1, 0);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setBestEfforts(true);
-    rebalanceConfig.setBootstrap(true);
-    rebalanceConfig.setMinAvailableReplicas(-1);
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "bestEfforts is enabled, only enable it if you know what you are doing\n"
-            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
-            + "intended", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // reload
-    response =
-        sendPostRequest(getControllerRequestURLBuilder().forTableReload(getTableName(), TableType.OFFLINE, true));
-    waitForReloadToComplete(getReloadJobIdFromResponse(response), 30_000);
-    // reload realtime table as well for other realtime tests
-    response =
-        sendPostRequest(getControllerRequestURLBuilder().forTableReload(getTableName(), TableType.REALTIME, false));
-    waitForReloadToComplete(getReloadJobIdFromResponse(response), 30_000);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "bestEfforts is enabled, only enable it if you know what you are doing\n"
-            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
-            + "intended", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Disable dry-run
-    rebalanceConfig.setBootstrap(false);
-    rebalanceConfig.setBestEfforts(false);
-    rebalanceConfig.setDryRun(false);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNull(rebalanceResult.getPreChecksResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-
-    // Stop the added server
-    serverStarter1.stop();
-    TestUtils.waitForCondition(
-        aVoid -> getHelixResourceManager().dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-    updateTableConfig(originalTableConfig);
+  private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
+    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
+        + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
   }
 
   @Test
@@ -815,14 +585,22 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
             + "\nCONSUMING segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
-    // Disable dry-run
-    rebalanceConfig.setBootstrap(false);
+    response =
+        sendPostRequest(getControllerRequestURLBuilder().forTableReload(getTableName(), TableType.REALTIME, false));
+    waitForReloadToComplete(getReloadJobIdFromResponse(response), 30_000);
+
     rebalanceConfig.setBestEfforts(false);
-    rebalanceConfig.setDryRun(false);
+    rebalanceConfig.setBootstrap(false);
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNull(rebalanceResult.getPreChecksResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "COMPLETED segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication()
+            + "\nCONSUMING segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Stop the added server
     serverStarter1.stop();
@@ -884,105 +662,6 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
             null);
     return new InstanceAssignmentConfig(instanceTagPoolConfig,
         instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
-  }
-
-  @Test
-  public void testOfflineRebalanceDryRunSummary()
-      throws Exception {
-    // setup the rebalance config
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(true);
-
-    TableConfig tableConfig = getOfflineTableConfig();
-    TableConfig originalTableConfig = new TableConfig(tableConfig);
-
-    // Ensure summary status is non-null always
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, NUM_SERVERS_OFFLINE,
-        NUM_SERVERS_OFFLINE,
-        tableConfig.getReplication(), false);
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
-    createServerTenant(getServerTenant(), 1, 0);
-    rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, NUM_SERVERS_OFFLINE,
-        NUM_SERVERS_OFFLINE + 1, tableConfig.getReplication(), false);
-
-    // Disable dry-run to do a real rebalance
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setDowntime(true);
-    rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, NUM_SERVERS_OFFLINE,
-        NUM_SERVERS_OFFLINE + 1, tableConfig.getReplication(), false);
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-
-    // Untag the added server
-    getHelixResourceManager().updateInstanceTags(serverStarter1.getInstanceId(), "", false);
-
-    // Re-enable dry-run
-    rebalanceConfig.setDryRun(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, NUM_SERVERS_OFFLINE + 1,
-        NUM_SERVERS_OFFLINE, tableConfig.getReplication(), false);
-
-    // Disable dry-run to do a real rebalance
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setDowntime(true);
-    rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-
-    // Stop the server
-    serverStarter1.stop();
-    TestUtils.waitForCondition(
-        aVoid -> getHelixResourceManager().dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-
-    // Try dry-run again
-    rebalanceConfig.setDryRun(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, NUM_SERVERS_OFFLINE,
-        NUM_SERVERS_OFFLINE,
-        tableConfig.getReplication(), false);
-
-    // Try dry-run with pre-checks
-    rebalanceConfig.setPreChecks(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, NUM_SERVERS_OFFLINE,
-        NUM_SERVERS_OFFLINE,
-        tableConfig.getReplication(), false);
-    assertNotNull(rebalanceResult.getPreChecksResult());
-    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
-    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-        "No need to reload");
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
-        "Instance assignment not allowed, no need for minimizeDataMovement");
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    updateTableConfig(originalTableConfig);
   }
 
   @Test
@@ -1140,31 +819,5 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
         return null;
       }
     }, 1000L, timeoutMs, "Failed to reload all segments");
-  }
-
-  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs) {
-    String jobId = rebalanceResult.getJobId();
-    if (rebalanceResult.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-      return;
-    }
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-
-          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
-              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
-          return status != RebalanceResult.Status.IN_PROGRESS;
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
-      } catch (Exception e) {
-        return null;
-      }
-    }, 1000L, timeoutMs, "Failed to load all segments after rebalance");
   }
 }

@@ -414,10 +414,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return RebalancePreCheckerResult.pass(message + tierMessage);
   }
 
-  private static boolean isReplicaGroupEnabled(TableConfig tableConfig, String tier) {
+  private static boolean isReplicaGroupEnabled(TableConfig tableConfig, String typeOrTier) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-    return instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(tier)
-        && instanceAssignmentConfigMap.get(tier).getReplicaGroupPartitionConfig().isReplicaGroupBased();
+    return instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(typeOrTier)
+        && instanceAssignmentConfigMap.get(typeOrTier).getReplicaGroupPartitionConfig().isReplicaGroupBased();
   }
 
   private static String getReplicaGroupInfo(TableConfig tableConfig, String typeOrTier) {

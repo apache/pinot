@@ -1000,6 +1000,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(false);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertNull(rebalanceResult.getPreChecksResult());
+    // Expect FAILED: Pre-checks can only be enabled in dry-run mode, not triggering rebalance
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Stop the added server

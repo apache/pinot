@@ -275,20 +275,6 @@ public class RebalanceConfig {
         + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
-  public String toQueryString() {
-    return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&reassignInstances=" + _reassignInstances
-        + "&includeConsuming=" + _includeConsuming + "&minimizeDataMovement=" + _minimizeDataMovement
-        + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime + "&minAvailableReplicas="
-        + _minAvailableReplicas + "&bestEfforts=" + _bestEfforts
-        + "&externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
-        + "&externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
-        + "&updateTargetTier=" + _updateTargetTier
-        + "&heartbeatIntervalInMs=" + _heartbeatIntervalInMs
-        + "&heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
-        + "&maxAttempts=" + _maxAttempts
-        + "&retryInitialDelayInMs=" + _retryInitialDelayInMs;
-  }
-
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
