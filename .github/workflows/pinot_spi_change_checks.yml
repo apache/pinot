@@ -20,8 +20,8 @@ name: Pinot SPI Change Tester
 
 on:
   pull_request:
-    branches:
-      - master
+#    branches:
+#      - master
 
 jobs:
   spi-change-checker:
