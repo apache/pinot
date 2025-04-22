@@ -40,16 +40,16 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: v16.15.0
-          cache: 'npm'
-          cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
-      - name: Install npm
-        run: |
-          npm install -g npm@8.5.5
-          npm --version
+#      - name: Setup node
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version: v16.15.0
+#          cache: 'npm'
+#          cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
+#      - name: Install npm
+#        run: |
+#          npm install -g npm@8.5.5
+#          npm --version
       - name: Pinot SPI Change Testing
         if : ${{github.event_name == 'workflow_dispatch'}}
         env:
@@ -66,14 +66,3 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/.pinot_spi_change_checker.sh
-#      - name: Archive artifacts into zip
-#        if: always()
-#        run: |
-#          zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
-#      - uses: actions/upload-artifact@v4
-#        name: Store SPI file diff work directory
-#        if: always()
-#        with:
-#          name: SPI_file_diff_work_dir
-#          retention-days: 3
-#          path: artifacts.zip

@@ -300,7 +300,7 @@ public class TableConfig extends BaseJsonConfig {
     return _instanceAssignmentConfigMap;
   }
 
-  public void setInstanceAssignmentConfigMap(Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+  public void setInstanceAssignmentConfigMap(Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 

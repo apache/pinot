@@ -21,49 +21,9 @@
 # Java version
 java -version
 
-# Check network
-ifconfig
-netstat -i
-
-df -h
-
-SETTINGS_FILE="../settings.xml"
-
-echo "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\""> ${SETTINGS_FILE}
-echo "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"">> ${SETTINGS_FILE}
-echo "      xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0">> ${SETTINGS_FILE}
-echo "                          https://maven.apache.org/xsd/settings-1.0.0.xsd\">">> ${SETTINGS_FILE}
-echo "  <mirrors>">> ${SETTINGS_FILE}
-echo "    <mirror>">> ${SETTINGS_FILE}
-echo "      <id>confluent-mirror</id>">> ${SETTINGS_FILE}
-echo "      <mirrorOf>confluent</mirrorOf>">> ${SETTINGS_FILE}
-echo "      <url>https://packages.confluent.io/maven/</url>">> ${SETTINGS_FILE}
-echo "      <blocked>false</blocked>">> ${SETTINGS_FILE}
-echo "    </mirror>">> ${SETTINGS_FILE}
-echo "  </mirrors>">> ${SETTINGS_FILE}
-
-echo "  <servers>">> ${SETTINGS_FILE}
-echo "    <server>">> ${SETTINGS_FILE}
-echo "      <id>central</id>">> ${SETTINGS_FILE}
-echo "      <configuration>">> ${SETTINGS_FILE}
-echo "        <httpConfiguration>">> ${SETTINGS_FILE}
-echo "          <all>">> ${SETTINGS_FILE}
-echo "            <connectionTimeout>120000</connectionTimeout>">> ${SETTINGS_FILE}
-echo "            <readTimeout>120000</readTimeout>">> ${SETTINGS_FILE}
-echo "            <retries>3</retries>">> ${SETTINGS_FILE}
-echo "          </all>">> ${SETTINGS_FILE}
-echo "        </httpConfiguration>">> ${SETTINGS_FILE}
-echo "      </configuration>">> ${SETTINGS_FILE}
-echo "    </server>">> ${SETTINGS_FILE}
-echo "  </servers>">> ${SETTINGS_FILE}
-
-echo "</settings>">> ${SETTINGS_FILE}
-
-# PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
-export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
-
 # Compare commit hash for compatibility verification
 git fetch --all
+echo "$OLD_COMMIT_HASH"
 OLD_COMMIT_HASH=$(git log -1 --pretty=format:'%h' "${OLD_COMMIT}")
 if [ $? -ne 0 ]; then
   echo "Failed to get commit hash for commit: \"${OLD_COMMIT}\""
@@ -79,17 +39,19 @@ if [ "${NEW_COMMIT_HASH}" == "${OLD_COMMIT_HASH}" ]; then
   exit 0
 fi
 
-FILES_TO_CHECK=("pinot/pinot-spi/src/main/java/org/apache/pinot/spi/config/table
-                 /TableConfig.java")
+FILES_TO_CHECK=("pinot-spi/src/main/java/org/apache/pinot/spi/config/table/TableConfig.java" "pinot-spi/src/main/java/org/apache/pinot/spi/metrics/PinotMetricsRegistry.java")
 len_arr="${#FILES_TO_CHECK[@]}"
+mvn -pl pinot-spi-change-checker clean package -DskipTests
 
 for ((i=0; i < len_arr; i++)); do
-  DIFF=`git diff "${OLD_COMMIT_HASH}".."${NEW_COMMIT_HASH}" "${FILES_TO_CHECK[i]}"`
+  DIFF=$(git diff "${OLD_COMMIT_HASH}".."${NEW_COMMIT_HASH}" "${FILES_TO_CHECK[i]}")
+  #DIFF=$(git diff 2bc229738fad28ac625a905e4bb78c448717b12e..ad3117fe38380a8a5949da29a8ad2d0f2f7d3806 "${FILES_TO_CHECK[i]}")
   echo "$DIFF" > temp_diff_file.txt
-  CONC=$(java GitDiffChecker.java temp_diff_file.txt)
-  if [[ "$CONC" == "true" ]]; then
-    echo "unwanted change found"
+  CONC=$(java -cp pinot-spi-change-checker/target/classes org.apache.pinot.changecheck.GitDiffChecker temp_diff_file.txt)
+  rm temp_diff_file.txt
+  if [[ "$CONC" != -1 ]]; then
+    echo "Incorrect SPI change found in ${FILES_TO_CHECK[i]} at line $CONC"
     exit 1
   fi
-  rm temp_diff_file.txt
+echo "No incorrect SPI changes found!"
 done
