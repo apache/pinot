@@ -85,6 +85,6 @@ public class DepVerifier {
    */
   public static boolean isHardcoded(String line) throws Exception {
     line = line.trim();
-    return line.contains("<version>") && !line.contains("<version>${");
+    return line.contains("<version>") && !line.matches(".*<version>\\$\\{[^}]+}</version>.*");
   }
 }
