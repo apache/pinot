@@ -142,8 +142,8 @@ public class ServerQueryRequest {
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (serverRequest.getTableSegmentsInfoCount() > 0) {
       _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
-      for (org.apache.pinot.common.proto.Server.TableSegmentsInfo tableSegmentsInfo :
-          serverRequest.getTableSegmentsInfoList()) {
+      for (org.apache.pinot.common.proto.Server.TableSegmentsInfo tableSegmentsInfo
+          : serverRequest.getTableSegmentsInfoList()) {
         _tableSegmentsContexts.add(
             new TableSegmentsContext(tableSegmentsInfo.getTableName(), tableSegmentsInfo.getSegmentsList(),
                 tableSegmentsInfo.getOptionalSegmentsList()));
