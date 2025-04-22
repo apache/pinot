@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.segment.index.column;
 
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -39,11 +41,7 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
-  private static final IndexReader[] EMPTY_READERS = new IndexReader[0];
-
-  private final short _shift;
-  //stores index readers ordered by index id, shifted by _shift to conserve memory
-  private final IndexReader[] _readers;
+  private IndexTypeMap _indexTypeMap;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -55,10 +53,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       fieldIndexConfigs = FieldIndexConfigs.EMPTY;
     }
 
-    ShortArrayList indexIds = new ShortArrayList();
+    ArrayList<IndexType> indexTypes = new ArrayList();
     ArrayList<IndexReader> readers = new ArrayList<>();
-    short min = Short.MAX_VALUE;
-    int max = -1;
 
     try {
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -67,14 +63,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           try {
             IndexReader reader = readerProvider.createIndexReader(segmentReader, fieldIndexConfigs, metadata);
             if (reader != null) {
-              short indexId = IndexService.getInstance().getNumericId(indexType);
-              if (indexId < min) {
-                min = indexId;
-              }
-              if (indexId > max) {
-                max = indexId;
-              }
-              indexIds.add(indexId);
+              indexTypes.add(indexType);
               readers.add(reader);
             }
           } catch (IndexReaderConstraintException ex) {
@@ -93,38 +82,85 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       throw t;
     }
 
-    if (indexIds.size() > 0) {
-      _shift = min;
-      int size = max - min + 1;
-      _readers = new IndexReader[size];
-      for (int i = 0, n = indexIds.size(); i < n; i++) {
-        short indexId = indexIds.getShort(i);
-        _readers[indexId - _shift] = readers.get(i);
-      }
-    } else {
-      _readers = EMPTY_READERS;
-      _shift = 0;
-    }
+    _indexTypeMap = IndexTypeMap.get(indexTypes, readers);
   }
 
   @SuppressWarnings("unchecked")
   @Nullable
   @Override
   public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
-    short indexId = IndexService.getInstance().getNumericId(indexType);
-    if (indexId >= _shift && indexId < _shift + _readers.length) {
-      return (I) _readers[indexId - _shift];
-    }
-    return null;
+    return _indexTypeMap.getIndex(indexType);
   }
 
   @Override
   public void close()
       throws IOException {
     // TODO (index-spi): Verify that readers can be closed in any order
-    for (IndexReader index : _readers) {
-      if (index != null) {
-        index.close();
+    _indexTypeMap.close();
+  }
+
+  static class IndexTypeMap implements Closeable {
+    private static final IndexReader[] EMPTY_READERS = new IndexReader[0];
+
+    public static final IndexTypeMap EMPTY = new IndexTypeMap((short) 0, EMPTY_READERS);
+
+    private final short _shift;
+    //stores index readers ordered by index id, shifted by _shift to conserve memory
+    private final IndexReader[] _readers;
+
+    private IndexTypeMap(short shift, IndexReader[] readers) {
+      _shift = shift;
+      _readers = readers;
+    }
+
+    static IndexTypeMap get(List<IndexType> indexTypes, List<IndexReader> readers) {
+      if (indexTypes.isEmpty()) {
+        return EMPTY;
+      }
+
+      short min = Short.MAX_VALUE;
+      int max = -1;
+
+      ShortArrayList indexIds = new ShortArrayList(indexTypes.size());
+      IndexService indexService = IndexService.getInstance();
+
+      for (int i = 0, n = indexTypes.size(); i < n; i++) {
+        short indexId = indexService.getNumericId(indexTypes.get(i));
+        indexIds.add(indexId);
+        if (indexId < min) {
+          min = indexId;
+        }
+        if (indexId > max) {
+          max = indexId;
+        }
+      }
+
+      short shift = min;
+      int size = max - min + 1;
+      IndexReader[] indexReaders = new IndexReader[size];
+      for (int i = 0, n = indexIds.size(); i < n; i++) {
+        short indexId = indexIds.getShort(i);
+        indexReaders[indexId - shift] = readers.get(i);
+      }
+      return new IndexTypeMap(shift, indexReaders);
+    }
+
+    @Nullable
+    public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
+      short indexId = IndexService.getInstance().getNumericId(indexType);
+      if (indexId >= _shift && indexId < _shift + _readers.length) {
+        return (I) _readers[indexId - _shift];
+      }
+      return null;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      for (IndexReader index : _readers) {
+        if (index != null) {
+          index.close();
+        }
       }
     }
   }
