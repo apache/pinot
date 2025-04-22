@@ -103,17 +103,18 @@ public class RangeIndexType
   @Override
   public CombinedInvertedIndexCreator createIndexCreator(IndexCreationContext context, RangeIndexConfig indexConfig)
       throws IOException {
-    if (indexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && context.getFieldSpec().isSingleValueField()) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    if (indexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && fieldSpec.isSingleValueField()) {
       if (context.hasDictionary()) {
-        return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getCardinality());
+        return new BitSlicedRangeIndexCreator(context.getIndexDir(), fieldSpec, context.getCardinality());
       }
-      return new BitSlicedRangeIndexCreator(context.getIndexDir(), context.getFieldSpec(), context.getMinValue(),
+      return new BitSlicedRangeIndexCreator(context.getIndexDir(), fieldSpec, context.getMinValue(),
           context.getMaxValue());
     }
     // default to RangeIndexCreator for the time being
-    return new RangeIndexCreator(context.getIndexDir(), context.getFieldSpec(),
-        context.hasDictionary() ? FieldSpec.DataType.INT : context.getFieldSpec().getDataType(), -1,
-        -1, context.getTotalDocs(), context.getTotalNumberOfEntries());
+    return new RangeIndexCreator(context.getIndexDir(), fieldSpec,
+        context.hasDictionary() ? FieldSpec.DataType.INT : fieldSpec.getDataType().getStoredType(), -1, -1,
+        context.getTotalDocs(), context.getTotalNumberOfEntries());
   }
 
   @Override

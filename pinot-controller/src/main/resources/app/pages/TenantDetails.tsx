@@ -45,7 +45,7 @@ import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
 import {
-  RebalanceServerStatusOp, RebalanceTableSegmentJobs
+  RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
 
 const useStyles = makeStyles((theme) => ({

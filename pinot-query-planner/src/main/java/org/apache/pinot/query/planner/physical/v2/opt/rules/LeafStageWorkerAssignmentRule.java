@@ -186,8 +186,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         String tableType = partitionedTableTypes.iterator().next();
         String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableType)).tableNameWithType(tableName);
         TableScanWorkerAssignmentResult assignmentResult = attemptPartitionedDistribution(tableNameWithType,
-            fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)),
-            tpiMap.get(tableType));
+            fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)), tpiMap.get(tableType));
         if (assignmentResult != null) {
           return assignmentResult;
         }
@@ -220,8 +219,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       }
       workers.add(String.format("%s@%s", workers.size(), instanceId));
     }
-    PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.RANDOM_DISTRIBUTED,
-        workers, workers.hashCode(), null, null);
+    RelDistribution.Type distType = workers.size() == 1 ? RelDistribution.Type.SINGLETON
+        : RelDistribution.Type.RANDOM_DISTRIBUTED;
+    PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(distType, workers, workers.hashCode(),
+        null, null);
     return new TableScanWorkerAssignmentResult(pinotDataDistribution, workerIdToSegmentsMap);
   }
 
@@ -233,7 +234,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
       List<String> fieldNames, Map<String, List<String>> instanceIdToSegmentsMap,
-      TablePartitionInfo tablePartitionInfo) {
+      @Nullable TablePartitionInfo tablePartitionInfo) {
+    if (tablePartitionInfo == null) {
+      return null;
+    }
     if (CollectionUtils.isNotEmpty(tablePartitionInfo.getSegmentsWithInvalidPartition())) {
       LOGGER.warn("Table {} has {} segments with invalid partition info. Will assume un-partitioned distribution",
           tableNameWithType, tablePartitionInfo.getSegmentsWithInvalidPartition().size());
@@ -251,6 +255,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
           fieldNames);
       return null;
     } else if (numPartitions < numSelectedServers) {
+      return null;
+    } else if (numSelectedServers == 1) {
+      // ==> scan will have a single stream, so partitioned distribution doesn't matter
       return null;
     }
     // Pre-compute segmentToServer map for quick lookup later.
@@ -332,7 +339,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       String realtimeTableType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       TablePartitionInfo tablePartitionInfo = _routingManager.getTablePartitionInfo(realtimeTableType);
       if (tablePartitionInfo != null) {
-        result.put("REALTIME", _routingManager.getTablePartitionInfo(tableName));
+        result.put("REALTIME", tablePartitionInfo);
       }
     }
     return result;
