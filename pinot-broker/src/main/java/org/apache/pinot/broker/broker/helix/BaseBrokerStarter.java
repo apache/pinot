@@ -162,10 +162,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
+    applyCustomConfigs(brokerConf);
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.valueOf(
-        _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(
+        _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
@@ -201,6 +201,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
 
     ContinuousJfrStarter.init(_brokerConf);
+  }
+
+  /// Can be overridden to apply custom configs to the broker conf.
+  protected void applyCustomConfigs(PinotConfiguration brokerConf) {
   }
 
   private void setupHelixSystemProperties() {

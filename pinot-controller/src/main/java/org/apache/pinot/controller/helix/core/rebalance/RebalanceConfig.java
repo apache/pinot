@@ -86,6 +86,7 @@ public class RebalanceConfig {
   // Whether to run Minimal Data Movement Algorithm, overriding the minimizeDataMovement flag in table config. If set
   // to default, the minimizeDataMovement flag in table config will be used to determine whether to run the Minimal
   // Data Movement Algorithm.
+  // TODO: Replace this with Enablement
   @ApiModel
   public enum MinimizeDataMovementOptions {
     ENABLE, DISABLE, DEFAULT

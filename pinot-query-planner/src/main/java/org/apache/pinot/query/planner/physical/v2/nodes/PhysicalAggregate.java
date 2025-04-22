@@ -113,4 +113,20 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
         getAggCallList(), _nodeId, _pRelInputs.get(0), _pinotDataDistribution, true, _aggType, _leafReturnFinalResult,
         _collations, _limit);
   }
+
+  public AggregateNode.AggType getAggType() {
+    return _aggType;
+  }
+
+  public boolean isLeafReturnFinalResult() {
+    return _leafReturnFinalResult;
+  }
+
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  public int getLimit() {
+    return _limit;
+  }
 }
