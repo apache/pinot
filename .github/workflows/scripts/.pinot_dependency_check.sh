@@ -26,7 +26,7 @@ cd "$REPO_ROOT"
 echo "Running Maven build for pinot-dependency-verifier..."
 mvn -pl pinot-dependency-verifier clean package -DskipTests
 
-CHANGED_POMS=$(git diff --name-only origin/main | grep pom.xml)
+CHANGED_POMS=$(git diff --name-only origin/master | grep pom.xml)
 
 # No changed POMs
 if [ -z "$CHANGED_POMS" ]; then
