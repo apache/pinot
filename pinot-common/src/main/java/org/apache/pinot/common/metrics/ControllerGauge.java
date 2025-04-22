@@ -181,6 +181,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
 
+  TABLE_REBALANCE_IN_PROGRESS_GLOBAL("jobs", true),
+
   // Number of reingested segments getting uploaded
   REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
 
