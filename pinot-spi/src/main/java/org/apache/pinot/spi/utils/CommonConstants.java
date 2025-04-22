@@ -256,6 +256,10 @@ public class CommonConstants {
         "pinot.beta.multistage.engine.max.server.query.threads.hardlimit.factor";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR = "4";
 
+    // Multi-stage query engine operator table configs
+    public static final String MSE_OPERATOR_TABLE_PREFIX = "pinot.multistage.engine.operator.table";
+    public static final String MSE_NOW_RETURN_LONG = MSE_OPERATOR_TABLE_PREFIX + ".now.returns.long";
+
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.preprocess.parallelism";

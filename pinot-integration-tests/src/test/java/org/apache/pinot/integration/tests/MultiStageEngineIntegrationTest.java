@@ -66,7 +66,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.assertj.core.api.Assertions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -1679,6 +1678,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     dropOfflineTable(tableConfig.getTableName());
   }
 
+  @Test
   public void testSearchLiteralFilter() throws Exception {
     String sqlQuery =
         "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
@@ -1714,6 +1714,42 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(query);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 2);
+  }
+
+  @Test
+  public void testConfigurableFunctionReturnType()
+      throws Exception {
+    String query = "SELECT NOW() FROM mytable LIMIT 1";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "TIMESTAMP");
+
+    // Update cluster config to make NOW() return LONG
+    postClusterConfig(Map.of(CommonConstants.Helix.MSE_NOW_RETURN_LONG, "true"));
+
+    TestUtils.waitForCondition(aVoid -> {
+      JsonNode result;
+      try {
+        result = postQuery(query);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      assertNoError(result);
+      return result.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText().equals("LONG");
+    }, 5000L, "Expected cluster config update to change return type of NOW() to LONG");
+
+    // Update cluster config to make NOW() return TIMESTAMP again
+    postClusterConfig(Map.of(CommonConstants.Helix.MSE_NOW_RETURN_LONG, "false"));
+    TestUtils.waitForCondition(aVoid -> {
+      JsonNode result;
+      try {
+        result = postQuery(query);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      assertNoError(result);
+      return result.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText().equals("TIMESTAMP");
+    }, 5000L, "Expected cluster config update to change return type of NOW() to TIMESTAMP");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)

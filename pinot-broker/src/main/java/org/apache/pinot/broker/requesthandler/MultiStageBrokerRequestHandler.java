@@ -20,9 +20,11 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,9 +45,15 @@ import javax.ws.rs.core.Response;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixConstants;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -101,7 +109,7 @@ import org.slf4j.LoggerFactory;
  * This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
  * to servers.
  */
-public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
+public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler implements ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
@@ -111,6 +119,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
+
+  private HelixAdmin _helixAdmin;
+  private HelixConfigScope _helixConfigScope;
+  private volatile Map<String, String> _operatorTableConfig = new HashMap<>();
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -145,6 +157,31 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public void start() {
     _queryDispatcher.start();
+  }
+
+  @Override
+  public void init(HelixManager helixManager) {
+    _helixAdmin = helixManager.getClusterManagmentTool();
+    _helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+        helixManager.getClusterName()).build();
+    updateOperatorTableConfig();
+  }
+
+  @Override
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions.checkArgument(changeType == HelixConstants.ChangeType.CLUSTER_CONFIG,
+        "MultiStageBrokerRequestHandler can only handle CLUSTER_CONFIG changes");
+    updateOperatorTableConfig();
+  }
+
+  private void updateOperatorTableConfig() {
+    List<String> configKeys = _helixAdmin.getConfigKeys(_helixConfigScope)
+        .stream()
+        .filter(config -> config.startsWith(CommonConstants.Helix.MSE_OPERATOR_TABLE_PREFIX))
+        .collect(Collectors.toList());
+    if (!configKeys.isEmpty()) {
+      _operatorTableConfig = _helixAdmin.getConfig(_helixConfigScope, configKeys);
+    }
   }
 
   @Override
@@ -276,7 +313,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions);
-      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _operatorTableConfig);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;

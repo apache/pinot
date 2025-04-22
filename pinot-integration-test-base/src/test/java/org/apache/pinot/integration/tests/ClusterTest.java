@@ -781,6 +781,11 @@ public abstract class ClusterTest extends ControllerTest {
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }
 
+  public void postClusterConfig(Map<String, String> clusterConfigs)
+      throws Exception {
+    sendPostRequest(getControllerBaseApiUrl() + "/cluster/configs", JsonUtils.objectToString(clusterConfigs));
+  }
+
   public List<String> getColumns(JsonNode response) {
     JsonNode resultTableJson = response.get("resultTable");
     Assert.assertNotNull(resultTableJson, "'resultTable' is null");

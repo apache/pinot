@@ -19,11 +19,10 @@
 package org.apache.pinot.calcite.sql.fun;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Suppliers;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
@@ -50,6 +49,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -67,10 +67,11 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {
-  private static final Supplier<PinotOperatorTable> INSTANCE = Suppliers.memoize(PinotOperatorTable::new);
+  /// Lookup map containing instances of this class keyed by configuration.
+  private static final Map<Map<String, String>, PinotOperatorTable> INSTANCES = new ConcurrentHashMap<>();
 
-  public static PinotOperatorTable instance() {
-    return INSTANCE.get();
+  public static PinotOperatorTable instance(Map<String, String> config) {
+    return INSTANCES.computeIfAbsent(config, PinotOperatorTable::new);
   }
 
   // The standard Calcite + and - operators don't support operations on TIMESTAMP types. However, Pinot supports these
@@ -289,9 +290,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // TODO: Consider unifying the return type to Timestamp
       new PinotSqlFunction("FROM_DATE_TIME", ReturnTypes.TIMESTAMP_NULLABLE, OperandTypes.family(
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
-          i -> i > 1)),
-
-      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC)
+          i -> i > 1))
   );
 
   private static final List<Pair<SqlOperator, List<String>>> PINOT_OPERATORS_WITH_ALIASES = List.of(
@@ -302,7 +301,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
   private final Map<String, SqlOperator> _operatorMap;
   private final List<SqlOperator> _operatorList;
 
-  private PinotOperatorTable() {
+  private PinotOperatorTable(Map<String, String> config) {
     Map<String, SqlOperator> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -320,6 +319,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
     for (SqlOperator operator : PINOT_OPERATORS) {
       register(operator.getName(), operator, operatorMap);
     }
+    registerOptionalOperators(config, operatorMap);
     for (Pair<SqlOperator, List<String>> pair : PINOT_OPERATORS_WITH_ALIASES) {
       SqlOperator operator = pair.getLeft();
       for (String name : pair.getRight()) {
@@ -333,6 +333,17 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
     _operatorMap = Map.copyOf(operatorMap);
     _operatorList = List.copyOf(operatorMap.values());
+  }
+
+  /// Register optional operators based on the configuration.
+  private void registerOptionalOperators(Map<String, String> config, Map<String, SqlOperator> operatorMap) {
+    // NOW should return TIMESTAMP unless explicitly configured to return LONG (for which no registration is needed
+    // because the scalar function returns long, for v1 compatibility)
+    if (!config.containsKey(CommonConstants.Helix.MSE_NOW_RETURN_LONG)
+        || !Boolean.parseBoolean(config.get(CommonConstants.Helix.MSE_NOW_RETURN_LONG))) {
+      PinotSqlFunction nowFunction = new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC);
+      register(nowFunction.getName(), nowFunction, operatorMap);
+    }
   }
 
   private void register(String name, SqlOperator sqlOperator, Map<String, SqlOperator> operatorMap) {

@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,20 +118,19 @@ public class QueryEnvironment {
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
   private final Config _envConfig;
-  private final PinotCatalog _catalog;
 
-  public QueryEnvironment(Config config) {
+  public QueryEnvironment(Config config, Map<String, String> operatorTableConfig) {
     _envConfig = config;
     String database = config.getDatabase();
-    _catalog = new PinotCatalog(config.getTableCache(), database);
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
+    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
     Properties connectionConfigProperties = new Properties();
     connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
         config.getTableCache() == null
             ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
             : !config.getTableCache().isIgnoreCase()));
     CalciteConnectionConfig connectionConfig = new CalciteConnectionConfigImpl(connectionConfigProperties);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
+    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance(operatorTableConfig))
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, connectionConfig);
     _optProgram = getOptProgram();
@@ -141,7 +141,7 @@ public class QueryEnvironment {
         .database(database)
         .tableCache(tableCache)
         .workerManager(workerManager)
-        .build());
+        .build(), Collections.emptyMap());
   }
 
   /**

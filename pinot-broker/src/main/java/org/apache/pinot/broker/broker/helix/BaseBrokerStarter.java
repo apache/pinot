@@ -378,6 +378,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
               _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector);
+      multiStageBrokerRequestHandler.init(_spectatorHelixManager);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -442,6 +443,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
     _clusterConfigChangeHandlers.add(_queryQuotaManager);
+    if (multiStageBrokerRequestHandler != null) {
+      _clusterConfigChangeHandlers.add(multiStageBrokerRequestHandler);
+    }
     if (_multiStageQueryThrottler != null) {
       _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
     }
