@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
@@ -51,6 +54,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class ColumnMetadataImpl implements ColumnMetadata {
@@ -187,7 +191,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   // size should be non-negative 48-bit value
   public void addIndexSize(short indexType, long size) {
     if (size < 0 || size > SIZE_MASK) {
-      size = 0;
+      throw new IllegalArgumentException(
+          "Index size should be a non-negative integer value between 0 and " + SIZE_MASK);
     }
     long typeAndSize = ((long) indexType) << 48 | (size & SIZE_MASK);
     _indexTypeSizeList.add(typeAndSize);
@@ -203,9 +208,26 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return (_indexTypeSizeList.getLong(i) & SIZE_MASK);
   }
 
+  @JsonIgnore
   @Override
   public int getIndexTypeSizesCount() {
     return _indexTypeSizeList.size();
+  }
+
+  // This method is only meant to retain compatibility of deserialization for
+  // /tables/{tableName}/segments/{segmentName}/metadata endpoint .
+  @SuppressWarnings("unused")
+  public JsonNode getIndexSizeMap() {
+    ObjectNode node = JsonUtils.newObjectNode();
+    IndexService service = IndexService.getInstance();
+
+    for (int i = 0, n = getIndexTypeSizesCount(); i < n; i++) {
+      short type = getIndexType(i);
+      long size = getIndexSize(i);
+      node.put(service.get(type).getId(), size);
+    }
+
+    return node;
   }
 
   @Override
