@@ -27,38 +27,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Sets;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import javax.annotation.Nullable;
-import javax.ws.rs.BadRequestException;
-import javax.ws.rs.ClientErrorException;
-import javax.ws.rs.NotFoundException;
-import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -162,8 +130,6 @@ import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObs
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
-import org.apache.pinot.controller.workload.splitter.CostSplitter;
-import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -196,6 +162,39 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.ClientErrorException;
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 
 public class PinotHelixResourceManager {
@@ -249,12 +248,11 @@ public class PinotHelixResourceManager {
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
   private final QueryWorkloadManager _queryWorkloadManager;
-  private final CostSplitter _costSplitter;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
+      @Nullable ExecutorService executorService, double diskUtilizationThreshold, boolean isQueryWorkloadEnabled) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -279,9 +277,7 @@ public class PinotHelixResourceManager {
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
-    // TODO: Make the cost splitter configurable
-    _costSplitter = new DefaultCostSplitter();
-    _queryWorkloadManager = new QueryWorkloadManager(this, _costSplitter);
+    _queryWorkloadManager = new QueryWorkloadManager(this, isQueryWorkloadEnabled);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -290,7 +286,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.isQueryWorkloadEnabled());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -299,7 +295,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.isQueryWorkloadEnabled());
   }
 
   /**
@@ -3440,28 +3436,6 @@ public class PinotHelixResourceManager {
       tableConfigs.add(realtimeTableConfig);
     }
     return tableConfigs;
-  }
-
-
-  public List<String> getServerInstancesFor(String tableName) {
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-    Set<String> serverInstances = new HashSet<>();
-    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
-    TenantConfig tenantConfig = null;
-    if (offlineTableConfig != null) {
-       tenantConfig = offlineTableConfig.getTenantConfig();
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
-    }
-    if (realtimeTableConfig != null) {
-      tenantConfig = realtimeTableConfig.getTenantConfig();
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
-      serverInstances.addAll(
-          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
-    }
-    return new ArrayList<>(serverInstances);
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {

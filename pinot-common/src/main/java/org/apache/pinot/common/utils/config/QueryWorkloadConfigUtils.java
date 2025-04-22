@@ -20,18 +20,39 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-import java.util.Map;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.http.HttpClientConfig;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.slf4j.Logger;
+
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 public class QueryWorkloadConfigUtils {
   private QueryWorkloadConfigUtils() {
   }
+
+  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(QueryWorkloadConfigUtils.class);
+  private static final HttpClient _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
+          TlsUtils.getSslContext());
 
   /**
    * Converts a ZNRecord into a QueryWorkloadConfig object by extracting mapFields.
@@ -100,6 +121,65 @@ public class QueryWorkloadConfigUtils {
       return JsonUtils.stringToObject(instanceCostJson, InstanceCost.class);
     } catch (Exception e) {
       String errorMessage = String.format("Failed to convert ZNRecord : %s to InstanceCost", znRecord);
+      throw new RuntimeException(errorMessage, e);
+    }
+  }
+
+  public static List<QueryWorkloadConfig> getQueryWorkloadConfigsFromController(String controllerUrl, String instanceId,
+                                                                                NodeConfig.Type nodeType) {
+    try {
+      if (controllerUrl == null || controllerUrl.isEmpty()) {
+        LOGGER.warn("Controller URL is empty, cannot fetch query workload configs for instance: {}", instanceId);
+        return Collections.emptyList();
+      }
+      URI queryWorkloadURI = new URI(controllerUrl + "/queryWorkloadConfigs/instance/" + instanceId + "?nodeType="
+              + nodeType);
+      ClassicHttpRequest request = ClassicRequestBuilder.get(queryWorkloadURI)
+              .setVersion(HttpVersion.HTTP_1_1)
+              .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
+              .build();
+      AtomicReference<List<QueryWorkloadConfig>> workloadConfigs = new AtomicReference<>(null);
+      RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 1.2f);
+      retryPolicy.attempt(() -> {
+        try {
+          SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+                  _httpClient.sendRequest(request, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)
+          );
+          if (response.getStatusCode() == HttpStatus.SC_OK) {
+            workloadConfigs.set(QueryWorkloadConfigUtils.getQueryWorkloadConfigs(response.getResponse()));
+            LOGGER.info("Successfully fetched query workload configs from controller: {}, Instance: {}",
+                    controllerUrl, instanceId);
+            return true;
+          } else if (response.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
+            LOGGER.info("No query workload configs found for controller: {}, Instance: {}", controllerUrl, instanceId);
+            workloadConfigs.set(Collections.emptyList());
+            return true;
+          } else {
+            LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}, Status: {}",
+                    controllerUrl, instanceId, response.getStatusCode());
+            return false;
+          }
+        } catch (Exception e) {
+          LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
+                  controllerUrl, instanceId, e);
+          return false;
+        }
+      });
+      return workloadConfigs.get();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
+              controllerUrl, instanceId, e);
+      return Collections.emptyList();
+    }
+  }
+
+  public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(String queryWorkloadConfigsJson) {
+    Preconditions.checkNotNull(queryWorkloadConfigsJson, "Query workload configs JSON cannot be null");
+    try {
+      return JsonUtils.stringToObject(queryWorkloadConfigsJson, new TypeReference<>() {});
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to convert query workload configs: %s to list of QueryWorkloadConfig",
+          queryWorkloadConfigsJson);
       throw new RuntimeException(errorMessage, e);
     }
   }

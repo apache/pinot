@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.spi.utils;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
+
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class CommonConstants {
@@ -618,9 +619,6 @@ public class CommonConstants {
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
-      // QueryWorkload can be applied to a collection of queries and it is unique across helix cluster.
-      // When specified in the query, based on node characteristics, the query will be routed to the appropriate node.
-      public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
     }
 
     public static class FailureDetector {
@@ -1126,6 +1124,10 @@ public class CommonConstants {
       public static final String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
           "default.allow.dedup.consumption.during.commit";
     }
+
+    public static final String QUERY_WORKLOAD_ENABLED = "pinot.server.queryWorkloadEnabled";
+    public static final boolean DEFAULT_QUERY_WORKLOAD_ENABLED = false;
+    public static final String CONTROLLER_URL = "pinot.server.controllerUrl";
   }
 
   public static class Controller {

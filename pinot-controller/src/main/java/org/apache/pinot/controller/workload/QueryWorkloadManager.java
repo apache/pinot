@@ -25,6 +25,7 @@ import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.controller.workload.scheme.TablePropagationScheme;
 import org.apache.pinot.controller.workload.scheme.TenantPropagationScheme;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
 import org.apache.pinot.controller.workload.splitter.InstancesInfo;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
@@ -52,10 +53,13 @@ public class QueryWorkloadManager {
   private final TenantPropagationScheme _tenantPropagationScheme;
   private final DefaultPropagationScheme _defaultPropagationScheme;
   private final CostSplitter _costSplitter;
+  private final boolean _enabled;
 
-  public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager, CostSplitter costSplitter) {
+  public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager, boolean enabled) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _costSplitter = costSplitter;
+    _enabled = enabled;
+    // TODO: To make this configurable once we have multiple cost splitters implementations
+    _costSplitter = new DefaultCostSplitter();
     _tablePropagationScheme = new TablePropagationScheme(pinotHelixResourceManager);
     _tenantPropagationScheme = new TenantPropagationScheme(pinotHelixResourceManager);
     _defaultPropagationScheme = new DefaultPropagationScheme(pinotHelixResourceManager);
@@ -81,10 +85,10 @@ public class QueryWorkloadManager {
       }
       // Calculate the instance cost for each instance
       Map<String, InstanceCost> instanceCostMap = _costSplitter.getInstanceCostMap(nodeConfig,
-          new InstancesInfo(instances));
+              new InstancesInfo(instances));
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
-          .collect(Collectors.toMap(Map.Entry::getKey,
-              entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
+              .collect(Collectors.toMap(Map.Entry::getKey,
+                      entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
       // Send the QueryWorkloadRefreshMessage to the instances
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
     });
@@ -101,27 +105,29 @@ public class QueryWorkloadManager {
    * 3. Propagate the workload cost for instances associated with the workloads
    */
   public void propagateWorkloadFor(String tableName) {
-    try {
-      // Get the helixTags associated with the table
-      Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
-      Set<QueryWorkloadConfig> tablesQueryWorkloadConfigs = new HashSet<>();
-      Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
-          = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
-      // Find all workloads associated with the helix tags
-      for (String helix : helixTags) {
-        Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
-        if (queryWorkloadConfigs != null) {
-          tablesQueryWorkloadConfigs.addAll(queryWorkloadConfigs);
+    if (_enabled) {
+      try {
+        // Get the helixTags associated with the table
+        Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
+        Set<QueryWorkloadConfig> tablesQueryWorkloadConfigs = new HashSet<>();
+        Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
+                = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
+        // Find all workloads associated with the helix tags
+        for (String helix : helixTags) {
+          Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
+          if (queryWorkloadConfigs != null) {
+            tablesQueryWorkloadConfigs.addAll(queryWorkloadConfigs);
+          }
         }
+        // Propagate the workload for each QueryWorkloadConfig
+        for (QueryWorkloadConfig queryWorkloadConfig : tablesQueryWorkloadConfigs) {
+          propagateWorkload(queryWorkloadConfig);
+        }
+      } catch (Exception e) {
+        String errorMsg = String.format("Failed to propagate workload for table: %s", tableName);
+        LOGGER.error(errorMsg, e);
+        throw new RuntimeException(errorMsg, e);
       }
-      // Propagate the workload for each QueryWorkloadConfig
-      for (QueryWorkloadConfig queryWorkloadConfig : tablesQueryWorkloadConfigs) {
-        propagateWorkload(queryWorkloadConfig);
-      }
-    } catch (Exception e) {
-      String errorMsg = String.format("Failed to propagate workload for table: %s", tableName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
     }
   }
 
