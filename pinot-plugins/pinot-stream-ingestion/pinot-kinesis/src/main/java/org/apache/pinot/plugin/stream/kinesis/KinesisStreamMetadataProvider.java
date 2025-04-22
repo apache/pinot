@@ -197,6 +197,14 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return newPartitionGroupMetadataList;
   }
 
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
+      boolean forceGetOffsetFromStream)
+      throws IOException, TimeoutException {
+    return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
+  }
+
   /**
    * Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId
    * e.g. "shardId-000000000001" becomes 1

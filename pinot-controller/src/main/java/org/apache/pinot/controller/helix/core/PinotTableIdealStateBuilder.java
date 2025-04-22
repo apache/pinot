@@ -85,11 +85,12 @@ public class PinotTableIdealStateBuilder {
    *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
+   * @param forceGetOffsetFromStream - more details in StreamMetadataProvider.computePartitionGroupMetadata()
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
-    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
-        new PartitionGroupMetadataFetcher(streamConfigs, partitionGroupConsumptionStatusList);
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, boolean forceGetOffsetFromStream) {
+    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
+        streamConfigs, partitionGroupConsumptionStatusList, forceGetOffsetFromStream);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
       return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();

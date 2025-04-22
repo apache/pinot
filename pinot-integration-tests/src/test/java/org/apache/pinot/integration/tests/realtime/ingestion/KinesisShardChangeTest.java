@@ -176,7 +176,7 @@ public class KinesisShardChangeTest extends BaseKinesisIntegrationTest {
   public Object[][] initialOffsetCombinations() {
     return new Object[][]{
         {"smallest", 50, 200},
-        {"largest", 50, 200}, // TODO - Fix. Table created with largest offset should not consume old records
+        {"largest", 50, 200}, // TODO - Validate if table created with largest offset should not consume old records
         {"lastConsumed", 50, 200}
     };
   }

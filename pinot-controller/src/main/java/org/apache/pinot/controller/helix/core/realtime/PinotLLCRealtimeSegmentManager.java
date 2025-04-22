@@ -1037,7 +1037,20 @@ public class PinotLLCRealtimeSegmentManager {
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
-        currentPartitionGroupConsumptionStatusList);
+        currentPartitionGroupConsumptionStatusList, false);
+  }
+
+  /**
+   * Fetches the latest state of the PartitionGroups for the stream
+   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
+   * it will be skipped from the result
+   */
+  @VisibleForTesting
+  List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+      boolean forceGetOffsetFromStream) {
+    return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
+        currentPartitionGroupConsumptionStatusList, forceGetOffsetFromStream);
   }
 
   /**
@@ -1665,7 +1678,7 @@ public class PinotLLCRealtimeSegmentManager {
       OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
       List<PartitionGroupMetadata> partitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
       for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
         partitionGroupIdToSmallestOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
@@ -1686,13 +1699,11 @@ public class PinotLLCRealtimeSegmentManager {
       StreamPartitionMsgOffset startOffsetInSegmentZkMetadata = offsetFactory.create(startOffsetInSegmentZkMetadataStr);
       StreamPartitionMsgOffset streamSmallestOffset = partitionGroupIdToSmallestStreamOffset.get(partitionGroupId);
       // Start offset in ZK must be higher than the start offset of the stream
-      if (streamSmallestOffset != null) {
-        if (streamSmallestOffset.compareTo(startOffsetInSegmentZkMetadata) > 0) {
-          LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}",
-              startOffsetInSegmentZkMetadata,
-              streamSmallestOffset, partitionGroupId, tableName);
-          _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-        }
+      if (streamSmallestOffset.compareTo(startOffsetInSegmentZkMetadata) > 0) {
+        LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffsetInSegmentZkMetadata,
+            streamSmallestOffset, partitionGroupId, tableName);
+        _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+        return streamSmallestOffset;
       }
       return startOffsetInSegmentZkMetadata;
     }
