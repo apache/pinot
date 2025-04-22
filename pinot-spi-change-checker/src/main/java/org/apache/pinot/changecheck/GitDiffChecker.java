@@ -25,16 +25,17 @@ public class GitDiffChecker {
     Pattern annoDef = Pattern.compile("\\s*?@.+?");
     while ((li = br.readLine()) != null) {
       if (li.startsWith("@@")) {
-        //this will always get the starting row in the original file
+        // this gets the starting row number of the original file
         firstLineNum = li.substring(4, li.indexOf(','));
       }
 
-      if ((li.charAt(0)) == '-') {
+      if ((!li.isEmpty()) && (li.charAt(0)) == '-') {
         Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-'
         Matcher matcher2 = annoDef.matcher(li.substring(1));
         if (matcher1.matches() || matcher2.matches()) {
           int secondLineNum = br.getLineNumber();
-          //return line number of spi change minus the repetitive lines at the top of git diff output
+          // return line number of spi change in original code
+          // minus the repetitive lines at the top of git diff output
           return Integer.parseInt(firstLineNum) + secondLineNum - 6;
         }
       }
