@@ -253,13 +253,19 @@ public class ColumnMetadataTest {
     meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.json()), 12345L);
     meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.h3()), 0xffffffffffffL);
     meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.vector()), 0);
-    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.fst()), -1);
 
-    Assert.assertEquals(meta.getIndexTypeSizesCount(), 4);
+    Assert.assertEquals(meta.getIndexTypeSizesCount(), 3);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.json()), 12345L);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.h3()), 0xffffffffffffL);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.vector()), 0);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.inverted()), ColumnMetadata.INDEX_NOT_FOUND);
-    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.fst()), 0);
+
+    try {
+      meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.fst()), -1);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(),
+          "Index size should be a non-negative integer value between 0 and 281474976710655");
+    }
   }
 }
