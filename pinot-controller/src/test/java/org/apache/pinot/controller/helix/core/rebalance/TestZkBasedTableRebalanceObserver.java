@@ -96,9 +96,9 @@ public class TestZkBasedTableRebalanceObserver {
         ControllerGauge.TABLE_REBALANCE_JOB_ADDITION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
     Long deletionProgress = controllerMetrics.getGaugeValue(
         ControllerGauge.TABLE_REBALANCE_JOB_DELETION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
-    assertEquals(additionProgress, (long) observer.getTableRebalanceProgressStats()
+    assertEquals(additionProgress, 100 - (long) observer.getTableRebalanceProgressStats()
         .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeAdded);
-    assertEquals(deletionProgress, (long) observer.getTableRebalanceProgressStats()
+    assertEquals(deletionProgress, 100 - (long) observer.getTableRebalanceProgressStats()
         .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeDeleted);
   }
 
