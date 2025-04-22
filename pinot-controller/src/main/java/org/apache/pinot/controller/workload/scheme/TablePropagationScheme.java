@@ -44,9 +44,10 @@ public class TablePropagationScheme implements PropagationScheme {
   public Set<String> resolveInstances(NodeConfig.Type nodeType, NodeConfig nodeConfig) {
     Set<String> instances = new HashSet<>();
     List<String> tableNames = nodeConfig.getPropagationScheme().getValues();
-    Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
-    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
-    long startTime = System.currentTimeMillis();
+    Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags
+            = WorkloadPropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
+    Map<String, Set<String>> helixTagToInstances
+            = WorkloadPropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
     for (String tableName : tableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       List<String> tablesWithType = new ArrayList<>();
@@ -58,7 +59,7 @@ public class TablePropagationScheme implements PropagationScheme {
         tablesWithType.add(tableName);
       }
       for (String tableWithType : tablesWithType) {
-        Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableToHelixTags.get(tableWithType);
+        Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableWithTypeToHelixTags.get(tableWithType);
         if (nodeToHelixTags != null) {
           Set<String> helixTags = nodeToHelixTags.get(nodeType);
           if (helixTags != null) {
@@ -72,9 +73,6 @@ public class TablePropagationScheme implements PropagationScheme {
         }
       }
     }
-    long endTime = System.currentTimeMillis();
-    // Instance Resolution log
-    System.out.println("TablePropagationScheme: Instance resolution took " + (endTime - startTime) + " ms for node type: " + nodeType);
     return instances;
   }
 }

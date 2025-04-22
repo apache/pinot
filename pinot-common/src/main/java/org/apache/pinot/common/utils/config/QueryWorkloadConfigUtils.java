@@ -51,7 +51,7 @@ public class QueryWorkloadConfigUtils {
   }
 
   private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(QueryWorkloadConfigUtils.class);
-  private static final HttpClient _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
+  private static final HttpClient HTTP_CLIENT = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG,
           TlsUtils.getSslContext());
 
   /**
@@ -143,7 +143,7 @@ public class QueryWorkloadConfigUtils {
       retryPolicy.attempt(() -> {
         try {
           SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-                  _httpClient.sendRequest(request, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)
+                  HTTP_CLIENT.sendRequest(request, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)
           );
           if (response.getStatusCode() == HttpStatus.SC_OK) {
             workloadConfigs.set(QueryWorkloadConfigUtils.getQueryWorkloadConfigs(response.getResponse()));
@@ -176,7 +176,7 @@ public class QueryWorkloadConfigUtils {
   public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(String queryWorkloadConfigsJson) {
     Preconditions.checkNotNull(queryWorkloadConfigsJson, "Query workload configs JSON cannot be null");
     try {
-      return JsonUtils.stringToObject(queryWorkloadConfigsJson, new TypeReference<>() {});
+      return JsonUtils.stringToObject(queryWorkloadConfigsJson, new TypeReference<>() { });
     } catch (Exception e) {
       String errorMessage = String.format("Failed to convert query workload configs: %s to list of QueryWorkloadConfig",
           queryWorkloadConfigsJson);

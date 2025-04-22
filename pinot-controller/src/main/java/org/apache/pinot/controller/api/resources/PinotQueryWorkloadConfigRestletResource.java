@@ -82,7 +82,7 @@ public class PinotQueryWorkloadConfigRestletResource {
   public String getQueryWorkloadConfigs(@Context HttpHeaders httpHeaders) {
     try {
       LOGGER.info("Received request to get all queryWorkloadConfigs");
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getQueryWorkloadConfigs();
+      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
       String response = JsonUtils.objectToString(queryWorkloadConfigs);
       LOGGER.info("Successfully fetched all queryWorkloadConfigs");
       return response;

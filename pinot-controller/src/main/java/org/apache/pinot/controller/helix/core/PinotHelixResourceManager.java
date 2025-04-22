@@ -4621,8 +4621,8 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public List<QueryWorkloadConfig> getQueryWorkloadConfigs() {
-    return ZKMetadataProvider.getQueryWorkloadConfigs(_propertyStore);
+  public List<QueryWorkloadConfig> getAllQueryWorkloadConfigs() {
+    return ZKMetadataProvider.getAllQueryWorkloadConfigs(_propertyStore);
   }
 
   @Nullable

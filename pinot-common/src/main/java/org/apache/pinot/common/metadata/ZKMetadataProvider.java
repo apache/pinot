@@ -823,7 +823,7 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static List<QueryWorkloadConfig> getAllQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
             CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
@@ -840,7 +840,7 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static QueryWorkloadConfig getQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String workloadName)  {
+      String workloadName) {
     ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForQueryWorkloadConfig(workloadName),
         null, AccessOption.PERSISTENT);
     if (znRecord == null) {

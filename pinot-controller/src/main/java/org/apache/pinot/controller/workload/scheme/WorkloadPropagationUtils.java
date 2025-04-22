@@ -23,13 +23,13 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -41,19 +41,15 @@ import java.util.Set;
 
 
 /**
- * PropagationUtils is used to get the mapping between
- * 1. Table to Helix tags
- * 2. Helix tags to instances
- * 3. Instance to Helix tags
- * 4. Helix tags to workload configs
+ * WorkloadPropagationUtils provides utility methods for workload propagation.
  */
-public class PropagationUtils {
+public class WorkloadPropagationUtils {
 
-  private PropagationUtils() {
+  private WorkloadPropagationUtils() {
   }
 
   /**
-   * Get the mapping table → {NON_LEAF_NODE→brokerTag, LEAF_NODE→(serverTag + overrides)}
+   * Get the mapping tableNameWithType → {NON_LEAF_NODE→brokerTag, LEAF_NODE→(serverTag + overrides)}
    * 1. Get all table configs from the PinotHelixResourceManager
    * 2. For each table config, extract the tenant config
    * 3. For each tenant config, get the broker and server tags
@@ -68,7 +64,7 @@ public class PropagationUtils {
 
       // Gather all relevant tags for this tenant
       Set<String> tenantTags = new HashSet<>();
-      collectTenantTags(tenantTags, tenantConfig, tableType);
+      collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
 
       // Populate the helix tags for NON_LEAF_NODE and LEAF_NODE separately to provide flexibility
       // in workload propagation to either leaf nodes or non-leaf nodes
@@ -87,21 +83,12 @@ public class PropagationUtils {
     return tableToTags;
   }
 
-  private static void collectTenantTags(Set<String> tagSet, TenantConfig tenantConfig, TableType tableType) {
+  private static void collectHelixTagsForTable(Set<String> tagSet, TenantConfig tenantConfig, TableType tableType) {
     tagSet.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
     if (tableType == TableType.OFFLINE) {
       tagSet.add(TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer()));
     } else {
       tagSet.add(TagNameUtils.getRealtimeTagForTenant(tenantConfig.getServer()));
-    }
-    TagOverrideConfig overrideConfig = tenantConfig.getTagOverrideConfig();
-    if (overrideConfig != null) {
-      if (overrideConfig.getRealtimeCompleted() != null) {
-        tagSet.add(overrideConfig.getRealtimeCompleted());
-      }
-      if (overrideConfig.getRealtimeConsuming() != null) {
-        tagSet.add(overrideConfig.getRealtimeConsuming());
-      }
     }
   }
 
@@ -121,7 +108,7 @@ public class PropagationUtils {
     for (String table : tablesWithType) {
       TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
       if (tableConfig != null) {
-        collectTenantTags(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
+        collectHelixTagsForTable(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
       }
     }
     return combinedTags;
@@ -156,66 +143,73 @@ public class PropagationUtils {
   }
 
   /**
-   * Get the mapping between helix tag -> QueryWorkloadConfig
-   * 1. Get all QueryWorkloadConfigs from PinotHelixResourceManager
-   * 2. For each QueryWorkloadConfig, get the node configs
-   * 3. For each node config, check the propagation scheme type
-   * 4. If the propagation type is TENANT, get the tenant names and add them to the helix tags
-   * 5. If the propagation type is TABLE, get the table names and resolve them to helix tags
+   * Returns a set of QueryWorkloadConfigs that are associated with the specified helix tags.
+   * The method performs the following:
+   * 1. Fetches all QueryWorkloadConfigs from the PinotHelixResourceManager.
+   * 2. For each config, iterates through node types and their propagation schemes.
+   * 3. For TENANT propagation:
+   *    - Resolves tenant values to helix tags (direct tag or expanded list).
+   *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
+   * 4. For TABLE propagation:
+   *    - Resolves table names to tableWithType forms.
+   *    - Maps each tableWithType and node type to helix tags via getTableToHelixTags.
+   *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
    */
-  public static Map<String, Set<QueryWorkloadConfig>> getHelixTagToWorkloadConfigs(
-      PinotHelixResourceManager pinotHelixResourceManager) {
-    Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs = new HashMap<>();
-    List<QueryWorkloadConfig> queryWorkloadConfigs = pinotHelixResourceManager.getQueryWorkloadConfigs();
+  public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
+      PinotHelixResourceManager pinotHelixResourceManager, Set<String> filterTags) {
+    Set<QueryWorkloadConfig> matchedConfigs = new HashSet<>();
+    List<QueryWorkloadConfig> queryWorkloadConfigs = pinotHelixResourceManager.getAllQueryWorkloadConfigs();
     if (queryWorkloadConfigs == null) {
-      return helixTagsToWorkloadConfigs;
+      return matchedConfigs;
     }
+
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = getTableToHelixTags(pinotHelixResourceManager);
+
     for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
-      Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
-      nodeConfigs.forEach((nodeType, nodeConfig) -> {
-        PropagationScheme.Type propagationType = nodeConfig.getPropagationScheme().getPropagationType();
-        if (propagationType == PropagationScheme.Type.TENANT) {
-          List<String> tenants = nodeConfig.getPropagationScheme().getValues();
-          for (String tenant : tenants) {
-            if (nodeType == NodeConfig.Type.LEAF_NODE) {
-              if (TagNameUtils.isOfflineServerTag(tenant) || TagNameUtils.isRealtimeServerTag(tenant)) {
-                helixTagsToWorkloadConfigs.computeIfAbsent(tenant, k -> new HashSet<>()).add(queryWorkloadConfig);
-              } else {
-                // Add both offline and realtime server tags
-                helixTagsToWorkloadConfigs.computeIfAbsent(TagNameUtils.getOfflineTagForTenant(tenant),
-                    k -> new HashSet<>()).add(queryWorkloadConfig);
-                helixTagsToWorkloadConfigs.computeIfAbsent(TagNameUtils.getRealtimeTagForTenant(tenant),
-                    k -> new HashSet<>()).add(queryWorkloadConfig);
-              }
-            } else if (nodeType == NodeConfig.Type.NON_LEAF_NODE) {
-              tenant = TagNameUtils.getBrokerTagForTenant(tenant);
-              helixTagsToWorkloadConfigs.computeIfAbsent(tenant, k -> new HashSet<>()).add(queryWorkloadConfig);
+      for (Map.Entry<NodeConfig.Type, NodeConfig> entry : queryWorkloadConfig.getNodeConfigs().entrySet()) {
+        NodeConfig.Type nodeType = entry.getKey();
+        NodeConfig nodeConfig = entry.getValue();
+        PropagationScheme scheme = nodeConfig.getPropagationScheme();
+
+        if (scheme.getPropagationType() == PropagationScheme.Type.TENANT) {
+          for (String tenant : scheme.getValues()) {
+            Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
+                    || TagNameUtils.isRealtimeServerTag(tenant) || TagNameUtils.isBrokerTag(tenant)
+                ? Collections.singleton(tenant)
+                : new HashSet<>(getAllPossibleHelixTagsFor(tenant));
+            if (!Collections.disjoint(resolvedTags, filterTags)) {
+              matchedConfigs.add(queryWorkloadConfig);
+              break;
             }
           }
-        } else if (propagationType == PropagationScheme.Type.TABLE) {
-          List<String> tableNames = nodeConfig.getPropagationScheme().getValues();
-          for (String tableName : tableNames) {
+        } else if (scheme.getPropagationType() == PropagationScheme.Type.TABLE) {
+          for (String tableName : scheme.getValues()) {
             TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
             List<String> tablesWithType = (tableType == null)
-                    ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
-                       TableNameBuilder.REALTIME.tableNameWithType(tableName))
-                    : Collections.singletonList(tableName);
+                ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+                    TableNameBuilder.REALTIME.tableNameWithType(tableName))
+                : Collections.singletonList(tableName);
             for (String tableWithType : tablesWithType) {
-              Map<NodeConfig.Type, Set<String>> tenants = tableToHelixTags.get(tableWithType);
-              if (tenants != null) {
-                Set<String> tenantNames = tenants.get(nodeType);
-                if (tenantNames != null) {
-                  for (String tenant : tenantNames) {
-                    helixTagsToWorkloadConfigs.computeIfAbsent(tenant, k -> new HashSet<>()).add(queryWorkloadConfig);
-                  }
-                }
+              Set<String> resolvedTags = tableToHelixTags
+                  .getOrDefault(tableWithType, Collections.emptyMap())
+                  .getOrDefault(nodeType, Collections.emptySet());
+              if (!Collections.disjoint(resolvedTags, filterTags)) {
+                matchedConfigs.add(queryWorkloadConfig);
+                break;
               }
             }
           }
         }
-      });
+      }
     }
-    return helixTagsToWorkloadConfigs;
+    return matchedConfigs;
+  }
+
+  private static List<String> getAllPossibleHelixTagsFor(String tenantName) {
+    List<String> helixTags = new ArrayList<>();
+    helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
+    helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
+    helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
+    return helixTags;
   }
 }

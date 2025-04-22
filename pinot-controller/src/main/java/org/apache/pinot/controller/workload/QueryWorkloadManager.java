@@ -21,7 +21,7 @@ package org.apache.pinot.controller.workload;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.DefaultPropagationScheme;
-import org.apache.pinot.controller.workload.scheme.PropagationUtils;
+import org.apache.pinot.controller.workload.scheme.WorkloadPropagationUtils;
 import org.apache.pinot.controller.workload.scheme.TablePropagationScheme;
 import org.apache.pinot.controller.workload.scheme.TenantPropagationScheme;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
@@ -35,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,7 +45,7 @@ import java.util.stream.Collectors;
  * refresh message to the relevant instances based on the node configurations.
  */
 public class QueryWorkloadManager {
-  public static final Logger LOGGER = LoggerFactory. getLogger(QueryWorkloadManager.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final TablePropagationScheme _tablePropagationScheme;
@@ -97,7 +96,7 @@ public class QueryWorkloadManager {
   /**
    * Propagate the workload for the given table name
    * @param tableName The table name to propagate the workload for, it can be a rawTableName or a tableNameWithType
-   * if rawTableName is provided, it will resolve all available tableTypes and propagate the workload for each table type
+   * if rawTableName is provided, it will resolve all available tableTypes and propagate the workload for each tableType
    *
    * This method performs the following steps:
    * 1. Find all the helix tags associated with the table
@@ -108,19 +107,12 @@ public class QueryWorkloadManager {
     if (_enabled) {
       try {
         // Get the helixTags associated with the table
-        Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
-        Set<QueryWorkloadConfig> tablesQueryWorkloadConfigs = new HashSet<>();
-        Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
-                = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
+        Set<String> helixTags = WorkloadPropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
         // Find all workloads associated with the helix tags
-        for (String helix : helixTags) {
-          Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
-          if (queryWorkloadConfigs != null) {
-            tablesQueryWorkloadConfigs.addAll(queryWorkloadConfigs);
-          }
-        }
+        Set<QueryWorkloadConfig> queryWorkloadConfigsForTags
+                = WorkloadPropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
         // Propagate the workload for each QueryWorkloadConfig
-        for (QueryWorkloadConfig queryWorkloadConfig : tablesQueryWorkloadConfigs) {
+        for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
           propagateWorkload(queryWorkloadConfig);
         }
       } catch (Exception e) {
@@ -146,22 +138,13 @@ public class QueryWorkloadManager {
       Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
       // Find all the helix tags associated with the instance
       Map<String, Set<String>> instanceToHelixTags
-          = PropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
+          = WorkloadPropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
       Set<String> helixTags = instanceToHelixTags.get(instanceName);
-
-      // Find all the workloads associated with the helix tags
-      Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
-          = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
-      Set<QueryWorkloadConfig> allQueryWorkloadConfigs = new HashSet<>();
-      for (String helixTag : helixTags) {
-        Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helixTag);
-        if (queryWorkloadConfigs == null) {
-          continue;
-        }
-        allQueryWorkloadConfigs.addAll(queryWorkloadConfigs);
-      }
+      // Find all workloads associated with the helix tags
+      Set<QueryWorkloadConfig> queryWorkloadConfigsForTags
+              = WorkloadPropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
       // Calculate the instance cost from each workload
-      for (QueryWorkloadConfig queryWorkloadConfig : allQueryWorkloadConfigs) {
+      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
         workloadToInstanceCostMap.computeIfAbsent(queryWorkloadConfig.getQueryWorkloadName(), k -> {
           Set<String> instances = resolveInstances(nodeType, queryWorkloadConfig.getNodeConfigs().get(nodeType));
           NodeConfig nodeConfig = queryWorkloadConfig.getNodeConfigs().get(nodeType);

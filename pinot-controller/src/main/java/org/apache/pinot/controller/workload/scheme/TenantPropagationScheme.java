@@ -41,7 +41,8 @@ public class TenantPropagationScheme implements PropagationScheme {
 
   @Override
   public Set<String> resolveInstances(NodeConfig.Type nodeType, NodeConfig nodeConfig) {
-    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
+    Map<String, Set<String>> helixTagToInstances
+            = WorkloadPropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
     Set<String> allInstances = new HashSet<>();
     List<String> tenantNames = nodeConfig.getPropagationScheme().getValues();
     // Get the unique set of helix tags for the tenants
