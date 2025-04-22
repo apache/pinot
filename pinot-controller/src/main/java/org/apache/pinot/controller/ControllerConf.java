@@ -35,8 +35,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
@@ -88,9 +86,6 @@ public class ControllerConf extends PinotConfiguration {
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerConf.class);
-
 
   public static class ControllerPeriodicTasksConf {
     // frequency configs
@@ -372,7 +367,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
 
-  private final Map<String, String> _warnings = new HashMap<>();
+  private final Map<String, String> _invalidConfigs = new HashMap<>();
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -1241,20 +1236,19 @@ public class ControllerConf extends PinotConfiguration {
     if (TimeUtils.isPeriodValid(periodStr)) {
       return true;
     } else {
-      String message = String.format(
-          "Invalid time spec '%s' for config '%s'. Falling back to default config.", periodStr,
-          propertyKey);
-      addControllerInvalidConfigs(propertyKey, message);
+      addControllerInvalidConfigs(propertyKey,
+          String.format("Invalid time spec '%s' for config '%s'. Falling back to default config.",
+              periodStr, propertyKey));
       return false;
     }
   }
 
   private void addControllerInvalidConfigs(String propertyKey, String errorMessage) {
-    _warnings.put(propertyKey, errorMessage);
+    _invalidConfigs.put(propertyKey, errorMessage);
   }
 
-  public Map<String, String> getControllerInvalidConfigs() {
-    return _warnings;
+  public Map<String, String> getInvalidConfigs() {
+    return _invalidConfigs;
   }
 
   private String getSupportedProtocol(String property) {

@@ -122,12 +122,12 @@ public class PinotControllerHealthCheck {
   }
 
   @GET
-  @Path("/pinot-controller/invalid/configs")
+  @Path("invalidconfigs")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List cluster config warnings")
+  @ApiOperation(value = "List invalid controller configs")
   public Response getConfigWarnings() {
-    Map<String, String> warnings = _controllerConf.getControllerInvalidConfigs();
+    Map<String, String> warnings = _controllerConf.getInvalidConfigs();
     if (warnings.isEmpty()) {
       return Response.ok(Collections.emptyMap()).build();
     }
