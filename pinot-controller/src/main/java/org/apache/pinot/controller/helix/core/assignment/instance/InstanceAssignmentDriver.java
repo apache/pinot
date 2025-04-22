@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,12 +56,12 @@ public class InstanceAssignmentDriver {
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
-    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions, (Boolean) null);
+    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions, Enablement.DEFAULT);
   }
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
-      @Nullable Boolean minimizeDataMovement) {
+      Enablement minimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
@@ -73,12 +74,12 @@ public class InstanceAssignmentDriver {
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
       @Nullable InstancePartitions preConfiguredInstancePartitions) {
     return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions,
-        preConfiguredInstancePartitions, null);
+        preConfiguredInstancePartitions, Enablement.DEFAULT);
   }
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
-      @Nullable InstancePartitions preConfiguredInstancePartitions, @Nullable Boolean minimizeDataMovement) {
+      @Nullable InstancePartitions preConfiguredInstancePartitions, Enablement minimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
@@ -90,12 +91,13 @@ public class InstanceAssignmentDriver {
 
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
-    return assignInstances(tierName, instanceConfigs, existingInstancePartitions, instanceAssignmentConfig, null);
+    return assignInstances(tierName, instanceConfigs, existingInstancePartitions, instanceAssignmentConfig,
+        Enablement.DEFAULT);
   }
 
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig,
-      @Nullable Boolean minimizeDataMovement) {
+      Enablement minimizeDataMovement) {
     return getInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableConfig.getTableName(), tierName),
         instanceAssignmentConfig, instanceConfigs, existingInstancePartitions, null, minimizeDataMovement);
@@ -104,17 +106,15 @@ public class InstanceAssignmentDriver {
   private InstancePartitions getInstancePartitions(String instancePartitionsName,
       InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions,
-      @Nullable InstancePartitions preConfiguredInstancePartitions, @Nullable Boolean minimizeDataMovementOverride) {
+      @Nullable InstancePartitions preConfiguredInstancePartitions, Enablement minimizeDataMovementEnablement) {
     String tableNameWithType = _tableConfig.getTableName();
 
     // minimizeDataMovement might be set back to false within InstanceTagPoolSelector and InstancePartitionSelector
     // if existingInstancePartitions is null.
     boolean minimizeDataMovement =
-        minimizeDataMovementOverride == null ? instanceAssignmentConfig.isMinimizeDataMovement()
-            : minimizeDataMovementOverride;
-    LOGGER.info("Starting {} instance assignment for table {}, original minimizeDataMovement: {}, "
-            + "overriding with minimizeDataMovementOverride: {}", instancePartitionsName, tableNameWithType,
-        instanceAssignmentConfig.isMinimizeDataMovement(), minimizeDataMovementOverride);
+        minimizeDataMovementEnablement.isEnabled(instanceAssignmentConfig::isMinimizeDataMovement);
+    LOGGER.info("Starting {} instance assignment for table: {} with minimizeDataMovement: {}", instancePartitionsName,
+        tableNameWithType, minimizeDataMovement);
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);
