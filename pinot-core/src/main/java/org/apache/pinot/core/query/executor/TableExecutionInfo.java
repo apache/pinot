@@ -45,12 +45,6 @@ public interface TableExecutionInfo {
   List<IndexSegment> getIndexSegments();
 
   /**
-   * Get a copy of the index segments for a table referenced in the query as some functions may mutate the list.
-   * @return A copy of the list of index segments for the table
-   */
-  List<IndexSegment> getCopyOfIndexSegments();
-
-  /**
    * Get the SegmentContext for all the index segments.
    * @return A map of index segments to their SegmentContext
    */
@@ -109,10 +103,6 @@ public interface TableExecutionInfo {
   /**
    * Get the selected segments and segment contexts for a table referenced in a query. The information is gathered
    * in a SelectSegmentsInfo object.
-   * @param queryContext
-   * @param timerContext
-   * @param executorService
-   * @param segmentPrunerService
    * @return A SelectSegmentsInfo object containing the selected segments and segment contexts
    */
   SelectedSegmentsInfo getSelectedSegmentsInfo(QueryContext queryContext, TimerContext timerContext,
@@ -176,12 +166,12 @@ public interface TableExecutionInfo {
    * number of segments selected and the number of total documents.
    */
   class SelectedSegmentsInfo {
-    public List<IndexSegment> _indexSegments;
-    public long _numTotalDocs;
-    public SegmentPrunerStatistics _prunerStats;
-    public int _numTotalSegments;
-    public int _numSelectedSegments;
-    public List<SegmentContext> _selectedSegmentContexts;
+    private List<IndexSegment> _indexSegments;
+    private long _numTotalDocs;
+    private SegmentPrunerStatistics _prunerStats;
+    private int _numTotalSegments;
+    private int _numSelectedSegments;
+    private List<SegmentContext> _selectedSegmentContexts;
 
     public SelectedSegmentsInfo(List<IndexSegment> indexSegments, long numTotalDocs,
         SegmentPrunerStatistics prunerStats, int numTotalSegments, int numSelectedSegments,
@@ -192,6 +182,30 @@ public interface TableExecutionInfo {
       _numTotalSegments = numTotalSegments;
       _numSelectedSegments = numSelectedSegments;
       _selectedSegmentContexts = selectedSegmentContexts;
+    }
+
+    public List<IndexSegment> getIndexSegments() {
+      return _indexSegments;
+    }
+
+    public long getNumTotalDocs() {
+      return _numTotalDocs;
+    }
+
+    public SegmentPrunerStatistics getPrunerStats() {
+      return _prunerStats;
+    }
+
+    public int getNumTotalSegments() {
+      return _numTotalSegments;
+    }
+
+    public int getNumSelectedSegments() {
+      return _numSelectedSegments;
+    }
+
+    public List<SegmentContext> getSelectedSegmentContexts() {
+      return _selectedSegmentContexts;
     }
   }
 }

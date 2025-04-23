@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -191,14 +190,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     }
 
-    TableExecutionInfo executionInfo;
-    try {
-      executionInfo =
-          SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
-              queryRequest.getOptionalSegments(), queryContext);
-    } catch (NoSuchElementException ne) {
+    TableExecutionInfo executionInfo =
+        SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
+            queryRequest.getOptionalSegments(), queryContext);
+
+    if (executionInfo == null) {
       String errorMessage =
-          "Failed to find table: " + ne.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
+          "Failed to find table: " + tableNameWithType + " on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -308,16 +306,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
         executionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, _segmentPrunerService);
 
-    InstanceResponseBlock instanceResponse = execute(selectedSegmentsInfo._indexSegments, queryContext, timerContext,
-        executorService, streamer, enableStreaming, selectedSegmentsInfo._selectedSegmentContexts);
+    InstanceResponseBlock instanceResponse =
+        execute(selectedSegmentsInfo.getIndexSegments(), queryContext, timerContext, executorService, streamer,
+            enableStreaming, selectedSegmentsInfo.getSelectedSegmentContexts());
 
     // Update the total docs in the metadata based on the un-pruned segments
-    instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(), Long.toString(selectedSegmentsInfo._numTotalDocs));
+    instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(),
+        Long.toString(selectedSegmentsInfo.getNumTotalDocs()));
 
     // Set the number of pruned segments. This count does not include the segments which returned empty filters
-    int prunedSegments = selectedSegmentsInfo._numTotalSegments - selectedSegmentsInfo._numSelectedSegments;
+    int prunedSegments = selectedSegmentsInfo.getNumTotalSegments() - selectedSegmentsInfo.getNumSelectedSegments();
     instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
-    addPrunerStats(instanceResponse, selectedSegmentsInfo._prunerStats);
+    addPrunerStats(instanceResponse, selectedSegmentsInfo.getPrunerStats());
 
     return instanceResponse;
   }

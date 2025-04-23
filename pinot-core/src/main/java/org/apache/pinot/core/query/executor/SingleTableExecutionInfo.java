@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
@@ -60,11 +59,12 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
   private final List<String> _optionalSegments;
   private final List<String> _notAcquiredSegments;
 
+  @Nullable
   public static SingleTableExecutionInfo create(InstanceDataManager instanceDataManager, String tableNameWithType,
       List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext) {
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      throw new NoSuchElementException(tableNameWithType);
+      return null;
     }
 
     List<String> notAcquiredSegments = new ArrayList<>();
@@ -182,11 +182,6 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     return _indexSegments;
   }
 
-  @Override
-  public List<IndexSegment> getCopyOfIndexSegments() {
-    return new ArrayList<>(_indexSegments);
-  }
-
   @Nullable
   @Override
   public Map<IndexSegment, SegmentContext> getProvidedSegmentContexts() {
@@ -261,7 +256,8 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
   @Override
   public SelectedSegmentsInfo getSelectedSegmentsInfo(QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, SegmentPrunerService segmentPrunerService) {
-    List<IndexSegment> indexSegments = getCopyOfIndexSegments();
+    // Make a copy of the segments to avoid modifying the original list
+    List<IndexSegment> indexSegments = new ArrayList<>(getIndexSegments());
     Map<IndexSegment, SegmentContext> providedSegmentContexts = getProvidedSegmentContexts();
 
     // Compute total docs for the table before pruning the segments
