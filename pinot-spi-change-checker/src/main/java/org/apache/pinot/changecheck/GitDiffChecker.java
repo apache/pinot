@@ -31,10 +31,10 @@ public class GitDiffChecker {
         }
       }
     }
-    return "";
+    return "0";
   }
 
   public static void main(String[] args) throws IOException {
-    findDiff(args[0]);
+    System.out.println(findDiff(args[0]));
   }
 }
