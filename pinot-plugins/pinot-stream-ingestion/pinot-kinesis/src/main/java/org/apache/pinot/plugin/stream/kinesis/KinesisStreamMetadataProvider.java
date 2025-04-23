@@ -197,6 +197,15 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return newPartitionGroupMetadataList;
   }
 
+  /**
+   * Refer documentation for {@link #computePartitionGroupMetadata(String, StreamConfig, List, int)}
+   * @param forceGetOffsetFromStream - the flag is not required for Kinesis stream. Kinesis implementation
+   *                                 takes care of returning non-null offsets for all old and new partitions.
+   *                                 The flag is primarily required for Kafka stream which requires refactoring
+   *                                 to avoid this flag. More details in {@link
+   *                                 StreamMetadataProvider#computePartitionGroupMetadata(
+   *                                 String, StreamConfig, List, int, boolean)}
+   */
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,

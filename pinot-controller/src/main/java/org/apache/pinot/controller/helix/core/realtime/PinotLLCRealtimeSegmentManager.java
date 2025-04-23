@@ -994,17 +994,18 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
     Set<Integer> partitionIds = new HashSet<>();
-    boolean allPartitionIdsFetched = false;
+    boolean allPartitionIdsFetched = true;
     for (int i = 0; i < streamConfigs.size(); i++) {
       final int index = i;
       try {
         partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream()
             .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
             .collect(Collectors.toSet()));
-        allPartitionIdsFetched = true;
       } catch (UnsupportedOperationException ignored) {
+        allPartitionIdsFetched = false;
         // Stream does not support fetching partition ids. There is a log in the fallback code which is sufficient
       } catch (Exception e) {
+        allPartitionIdsFetched = false;
         LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfigs.get(i).getTopicName(), e);
       }
     }
