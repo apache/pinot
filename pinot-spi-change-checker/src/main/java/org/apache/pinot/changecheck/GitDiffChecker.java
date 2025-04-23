@@ -21,7 +21,7 @@ public class GitDiffChecker {
     BufferedReader br = new BufferedReader(new FileReader(fileName));
     String li;
     Pattern funcDef = Pattern.compile("^\\s*?.+?(.*?)[^{}]*?[{|;]");
-    Pattern annoDef = Pattern.compile("^\\s*?@\\S+?\\n");
+    Pattern annoDef = Pattern.compile("^\\s*?@\\S+?$");
     while ((li = br.readLine()) != null) {
       if ((!li.isEmpty()) && (li.charAt(0) == '-') && (!li.startsWith("---"))) {
         Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-' at the beginning
