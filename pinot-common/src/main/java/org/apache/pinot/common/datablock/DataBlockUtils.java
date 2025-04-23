@@ -81,6 +81,7 @@ public final class DataBlockUtils {
   private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
   private static final Pattern CAUSE_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Caused by: ");
   private static final Pattern SUPPRESSED_CAPTION_REGEXP = Pattern.compile("^([\\t]*)Suppressed: ");
+  private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = Collections.emptyList();
 
   static {
     SERDES = new EnumMap<>(DataBlockSerde.Version.class);
@@ -230,18 +231,26 @@ public final class DataBlockUtils {
     return byteString;
   }
 
-  public static List<ByteString> toByteStrings(DataBlock dataBlock, int maxBlockSize)
+  // Returns a list of ByteString instances hosting the bytes obtained from the input block serialization. Returned
+  // instances will not exceed the maximum size unless one single byte buffer from the serialization exceeds it.
+  public static List<ByteString> toByteStrings(DataBlock dataBlock, int maxByteStringSize)
       throws IOException {
     List<ByteBuffer> bytes = dataBlock.serialize();
     if (bytes.isEmpty()) {
-      return List.of(ByteString.EMPTY);
+      return EMPTY_BYTEBUFFER_LIST;
     }
 
-    List<ByteString> byteStrings = new ArrayList<>();
+    int totalBytes = 0;
+    for (ByteBuffer bb : bytes) {
+      totalBytes += bb.remaining();
+    }
+    int initialCapacity = (totalBytes / maxByteStringSize) + bytes.size();
+    List<ByteString> byteStrings = new ArrayList<>(initialCapacity);
+
     ByteString current = UnsafeByteOperations.unsafeWrap(bytes.get(0));
     for (int i = 1; i < bytes.size(); i++) {
       ByteBuffer bb = bytes.get(i);
-      if (current.size() + bb.remaining() > maxBlockSize) {
+      if (current.size() + bb.remaining() > maxByteStringSize) {
         byteStrings.add(current);
         current = UnsafeByteOperations.unsafeWrap(bb);
       } else {

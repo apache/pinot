@@ -48,12 +48,13 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private final MailboxService _mailboxService;
   private final StreamObserver<MailboxStatus> _responseObserver;
 
-  private List<ByteBuffer> _mailboxBuffers;
+  private final List<ByteBuffer> _mailboxBuffers;
   private transient ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(MailboxService mailboxService, StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
+    _mailboxBuffers = new ArrayList<>();
   }
 
   @Override
@@ -61,9 +62,6 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     String mailboxId = mailboxContent.getMailboxId();
     if (_mailbox == null) {
       _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
-    }
-    if (_mailboxBuffers == null) {
-      _mailboxBuffers = new ArrayList<>();
     }
     _mailboxBuffers.add(mailboxContent.getPayload().asReadOnlyByteBuffer());
     if (mailboxContent.getWaitForMore()) {

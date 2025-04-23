@@ -22,11 +22,11 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
@@ -63,6 +63,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
+  private final int _maxByteStringSize;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
@@ -76,6 +77,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
+    // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
+    _maxByteStringSize = _config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
+    ) / 2;
   }
 
   @Override
@@ -108,9 +114,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    for (MailboxContent content: toMailboxContents(block, serializedStats)) {
-      _contentObserver.onNext(content);
-    }
+    toMailboxContents(block, serializedStats).forEach(_contentObserver::onNext);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
@@ -141,9 +145,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
       MseBlock errorBlock = ErrorMseBlock.fromError(
           QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
-      for (MailboxContent content: toMailboxContents(errorBlock, List.of())) {
-        _contentObserver.onNext(content);
-      }
+      toMailboxContents(errorBlock, List.of()).forEach(_contentObserver::onNext);
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -167,41 +169,29 @@ public class GrpcSendingMailbox implements SendingMailbox {
         .open(_statusObserver);
   }
 
-  private List<MailboxContent> toMailboxContents(MseBlock block, List<DataBuffer> serializedStats)
+  private Stream<MailboxContent> toMailboxContents(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      List<ByteString> byteStrings = DataBlockUtils.toByteStrings(dataBlock, getMaxBlockSize() / 2);
-      int sizeInBytes = byteStrings.stream().map(ByteString::size).reduce(0, Integer::sum);
+      List<ByteString> byteStrings = DataBlockUtils.toByteStrings(dataBlock, _maxByteStringSize);
+      int sizeInBytes = byteStrings.stream().mapToInt(ByteString::size).reduce(0, Integer::sum);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-      List<MailboxContent> contents = new ArrayList<>();
-      for (int i = 0; i < byteStrings.size(); i++) {
-        contents.add(MailboxContent.newBuilder()
-            .setMailboxId(_id)
-            .setPayload(byteStrings.get(i))
-            .setWaitForMore(i < byteStrings.size() - 1)
-            .build());
-      }
-      return contents;
+      return byteStrings.stream().map(byteString -> MailboxContent.newBuilder()
+          .setMailboxId(_id)
+          .setPayload(byteString)
+          .setWaitForMore(true)
+          .build());
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
       throw t;
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
-  }
-
-  private int getMaxBlockSize() {
-    return _config.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
-    );
   }
 
   @Override
