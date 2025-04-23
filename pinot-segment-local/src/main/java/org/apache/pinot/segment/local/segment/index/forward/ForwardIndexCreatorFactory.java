@@ -42,17 +42,19 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ForwardIndexCreatorFactory {
-  private static final String FORWARD_INDEX_CREATOR_CLASS_NAME = "forwardIndexCreatorClassName";
   private ForwardIndexCreatorFactory() {
   }
 
   public static ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
-    if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_CREATOR_CLASS_NAME)) {
-      String className = indexConfig.getConfigs().get(FORWARD_INDEX_CREATOR_CLASS_NAME).toString();
+
+    if (indexConfig != null && indexConfig.getConfigs()
+        .containsKey(ForwardIndexType.FORWARD_INDEX_CREATOR_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(ForwardIndexType.FORWARD_INDEX_CREATOR_CLASS_NAME).toString();
       return (ForwardIndexCreator) Class.forName(className)
           .getConstructor(IndexCreationContext.class, ForwardIndexConfig.class).newInstance(context, indexConfig);
     }
+
     File indexDir = context.getIndexDir();
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();

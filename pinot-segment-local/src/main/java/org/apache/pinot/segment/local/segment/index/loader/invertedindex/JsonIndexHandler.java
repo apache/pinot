@@ -162,7 +162,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    try (
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
+            columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
@@ -184,7 +186,9 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    try (
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
+            columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         JsonIndexCreator jsonIndexCreator = StandardIndexes.json().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();

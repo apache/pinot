@@ -61,6 +61,9 @@ import org.apache.pinot.spi.data.Schema;
 
 public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "forward";
+  public static final String FORWARD_INDEX_READER_CLASS_NAME = "forwardIndexReaderClassName";
+  public static final String FORWARD_INDEX_CREATOR_CLASS_NAME = "forwardIndexCreatorClassName";
+
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -195,19 +198,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    *
    * This method will return the default reader, skipping any index overload.
    */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
-    return read(dataBuffer, columnMetadata);
-  }
-
-  /**
-   * Returns the forward index reader for the given column.
-   *
-   * This method will return the default reader, skipping any index overload.
-   */
-  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
+  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, FieldIndexConfigs fieldIndexConfigs,
+      ColumnMetadata metadata) {
+    return ForwardIndexReaderFactory.createIndexReader(dataBuffer,
+        fieldIndexConfigs.getConfig(StandardIndexes.forward()), metadata);
   }
 
   /**
@@ -216,7 +210,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    * This method will delegate on {@link StandardIndexes}, so the correct reader will be returned even when using
    * index overload.
    */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader,
+      @Nullable FieldIndexConfigs fieldIndexConfigs,
       ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
     return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);

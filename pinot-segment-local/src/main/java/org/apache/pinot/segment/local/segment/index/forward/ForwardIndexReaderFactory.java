@@ -50,7 +50,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
   private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
-  private static final String FORWARD_INDEX_READER_CLASS_NAME = "forwardIndexReaderClassName";
 
   public static void setInstance(ForwardIndexReaderFactory factory) {
     _instance = factory;
@@ -69,8 +68,8 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
       ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
-    if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_READER_CLASS_NAME)) {
-      String className = indexConfig.getConfigs().get(FORWARD_INDEX_READER_CLASS_NAME).toString();
+    if (indexConfig != null && indexConfig.getConfigs().containsKey(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME).toString();
       try {
         return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
             .newInstance(dataBuffer, metadata);
@@ -81,7 +80,21 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return createIndexReader(dataBuffer, metadata);
   }
 
-  public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+  public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ForwardIndexConfig indexConfig,
+      ColumnMetadata metadata) {
+    if (indexConfig != null && indexConfig.getConfigs().containsKey(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME).toString();
+      try {
+        return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
+            .newInstance(dataBuffer, metadata);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create ForwardIndexReader", e);
+      }
+    }
+    return createIndexReader(dataBuffer, metadata);
+  }
+
+  private static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
