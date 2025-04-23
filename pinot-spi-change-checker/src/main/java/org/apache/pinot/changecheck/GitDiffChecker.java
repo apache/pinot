@@ -33,7 +33,7 @@ public class GitDiffChecker {
         Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-' at the beginning
         Matcher matcher2 = annoDef.matcher(li.substring(1));
         if (matcher1.matches() || matcher2.matches()) {
-          return "line " + (lineNumberCalc[0] + br.getLineNumber() - lineNumberCalc[1]) + "in the original file:" + li.substring(1).trim();
+          return " line " + (lineNumberCalc[0] + br.getLineNumber() - lineNumberCalc[1] - 1) + "in the original file: " + li.substring(1).trim();
         }
       }
     }
