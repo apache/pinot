@@ -61,6 +61,12 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import org.apache.pinot.common.metrics.ServerGauge;
+
+
 
 // TODO: Plug in QueryScheduler
 public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBase {
@@ -107,17 +113,36 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     );
     _queryExecutor = queryExecutor;
     _serverMetrics = serverMetrics;
-    if (tlsConfig != null) {
-      try {
-        _server = NettyServerBuilder.forPort(port).sslContext(buildGrpcSslContext(tlsConfig))
-            .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes()).addService(this)
-            .addTransportFilter(new GrpcQueryTransportFilter()).build();
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to start secure grpcQueryServer", e);
+
+    try {
+      NettyServerBuilder builder = NettyServerBuilder.forPort(port);
+      if (tlsConfig != null) {
+        builder.sslContext(buildGrpcSslContext(tlsConfig));
       }
-    } else {
-      _server = ServerBuilder.forPort(port).addService(this).addTransportFilter(new GrpcQueryTransportFilter()).build();
+
+      // Add metrics for Netty buffer allocator
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      ServerMetrics metrics = ServerMetrics.get();
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+
+      _server = builder
+          .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+          .addService(this)
+          .addTransportFilter(new GrpcQueryTransportFilter())
+          .withOption(ChannelOption.ALLOCATOR, bufAllocator)
+          .build();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start secure grpcQueryServer", e);
     }
+
     _accessControl = accessControl;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
