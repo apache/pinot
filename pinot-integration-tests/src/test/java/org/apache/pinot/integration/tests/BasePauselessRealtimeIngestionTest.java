@@ -149,6 +149,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(

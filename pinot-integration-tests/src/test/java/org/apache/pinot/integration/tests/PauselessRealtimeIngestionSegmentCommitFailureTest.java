@@ -122,6 +122,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
