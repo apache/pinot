@@ -41,14 +41,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class DefaultRebalancePreChecker implements RebalancePreChecker {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalancePreChecker.class);
-
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
   public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
@@ -81,11 +80,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
     // Check for reload status
-    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType,
-        preCheckContext.getCurrentAssignment(), tableRebalanceLogger));
+    preCheckResult.put(NEEDS_RELOAD_STATUS,
+        checkReloadNeededOnServers(tableNameWithType, preCheckContext.getCurrentAssignment(), tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig
-    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
-        tableNameWithType, tableConfig, rebalanceConfig, tableRebalanceLogger));
+    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
+        checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
@@ -110,7 +109,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
    *       and add a pre-check here to call that API.
    */
-  private RebalancePreCheckerResult checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType,
+  private RebalancePreCheckerResult checkReloadNeededOnServers(String tableNameWithType,
       Map<String, Map<String, String>> currentAssignment, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Fetching whether reload is needed");
     Boolean needsReload = null;
@@ -153,21 +152,21 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   /**
    * Checks if minimize data movement is set for the given table in the TableConfig
    */
-  private RebalancePreCheckerResult checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig, RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
+  private RebalancePreCheckerResult checkIsMinimizeDataMovement(TableConfig tableConfig,
+      RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Checking whether minimizeDataMovement is set");
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
             InstancePartitionsType.OFFLINE);
         if (isInstanceAssignmentAllowed) {
-          if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
+          if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
             return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
           InstanceAssignmentConfig instanceAssignmentConfig =
               InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
           if (instanceAssignmentConfig.isMinimizeDataMovement()) {
-            return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
+            return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
                 ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
                 + "with disabled") : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
@@ -188,11 +187,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       // assignment config if presents
       if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
         if (isInstanceAssignmentAllowedConsuming) {
-          if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
+          if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
             return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
           if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
-            return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
+            return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
                 ? RebalancePreCheckerResult.warn(
                 "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden "
                     + "with disabled")
@@ -217,12 +216,12 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
         return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
-        if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()
             && instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
-          return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
               ? RebalancePreCheckerResult.warn(
               "minimizeDataMovement is enabled for both COMPLETED and CONSUMING segments in table config but it's "
                   + "overridden with disabled")
@@ -232,11 +231,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
             "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
                 + "assignment is allowed for both");
       } else if (instanceAssignmentConfigConsuming != null) {
-        if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
-          return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
               ? RebalancePreCheckerResult.warn(
               "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with "
                   + "disabled")
@@ -245,11 +244,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         return RebalancePreCheckerResult.warn(
             "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
       } else {
-        if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()) {
-          return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
               ? RebalancePreCheckerResult.warn(
               "minimizeDataMovement is enabled for COMPLETED segments in table config but it's overridden "
                   + "with disabled")
