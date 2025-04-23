@@ -105,6 +105,7 @@ public class BaseTableRouteTest {
 
   RoutingManager _routingManager;
   TableCache _tableCache;
+  ImplicitHybridTableRouteProvider _hybridTableRouteProvider;
 
 
   @BeforeClass
@@ -132,6 +133,7 @@ public class BaseTableRouteTest {
 
     _routingManager = factory.buildRoutingManager(null);
     _tableCache = factory.buildTableCache();
+    _hybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
   }
 
   @DataProvider(name = "offlineTableProvider")

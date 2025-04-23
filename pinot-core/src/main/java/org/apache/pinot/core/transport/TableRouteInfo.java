@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
@@ -34,6 +37,12 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
  * numPrunedSegmentsTotal() returns the number of segments that were pruned when calculating the routing table.
  */
 public interface TableRouteInfo {
+
+  @Nullable
+  String getOfflineTableName();
+
+  @Nullable
+  String getRealtimeTableName();
 
   /**
    * Gets the broker request for the offline table, if available.
@@ -50,6 +59,20 @@ public interface TableRouteInfo {
    */
   @Nullable
   BrokerRequest getRealtimeBrokerRequest();
+
+  /**
+   * Gets the table config for the offline table, if available.
+   * @return the table config for the offline table, or null if not available
+   */
+  @Nullable
+  TableConfig getOfflineTableConfig();
+
+  /**
+   * Gets the table config for the realtime table, if available.
+   * @return the table config for the realtime table, or null if not available
+   */
+  @Nullable
+  TableConfig getRealtimeTableConfig();
 
   /**
    * Get the set of servers that will execute the query on the segments of the OFFLINE table.
@@ -84,12 +107,92 @@ public interface TableRouteInfo {
   Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
 
   /**
+   * Checks if the table exists. A table exists if all required TableConfig objects are available.
+   *
+   * @return true if the table exists, false otherwise
+   */
+  boolean isExists();
+
+  /**
+   * Checks if there are both offline and realtime tables.
+   *
+   * @return true if the table is a hybrid table, false otherwise
+   */
+  boolean isHybrid();
+
+  /**
+   * Checks if the table has offline tables only
+   *
+   * @return true if the table has offline tables only, false otherwise
+   */
+  boolean isOffline();
+
+  /**
+   * Checks if the table has realtime tables only.
+   *
+   * @return true if the table table has realtime tables only, false otherwise
+   */
+  boolean isRealtime();
+
+  /**
+   * Checks if the table has at least 1 offline table. It may or may not have realtime tables as well.
+   *
+   * @return true if the table has at least 1 offline table, false otherwise
+   */
+  boolean hasOffline();
+
+  /**
+   * Checks if the table has at least 1 realtime table. It may or may not have offline tables as well.
+   *
+   * @return true if the table at least 1 realtime table, false otherwise
+   */
+  boolean hasRealtime();
+
+  /**
+   * Checks if the broker has routes for at least 1 of the physical tables.
+   *
+   * @return true if any route exists, false otherwise
+   */
+  boolean isRouteExists();
+
+  boolean isOfflineTableDisabled();
+
+  boolean isRealtimeTableDisabled();
+
+  /**
+   * Checks if all the physical tables are disabled.
+   *
+   * @return true if the table is disabled, false otherwise
+   */
+  boolean isDisabled();
+
+  @Nullable
+  List<String> getDisabledTableNames();
+
+  @Nullable
+  TimeBoundaryInfo getTimeBoundaryInfo();
+
+  /**
+   * Gets the list of unavailable segments for the table.
+   *
+   * @return a list of unavailable segment names
+   */
+  List<String> getUnavailableSegments();
+
+  /**
+   * Gets the total number of pruned segments for the table.
+   *
+   * @return the total number of pruned segments
+   */
+  int getNumPrunedSegmentsTotal();
+
+  /**
    * Gets the combined request map for the table, including both offline and realtime requests.
    *
    * @param requestId the request ID
    * @param brokerId the broker ID
    * @param preferTls whether to prefer TLS for the requests
-   * @return a map of server routing instances to their corresponding instance requests
+   * @return A map of ServerRoutingInstance and InstanceRequest
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
 }

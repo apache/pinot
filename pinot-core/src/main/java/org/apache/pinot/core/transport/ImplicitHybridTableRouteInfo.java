@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -26,16 +27,36 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
-  private final BrokerRequest _offlineBrokerRequest;
-  private final BrokerRequest _realtimeBrokerRequest;
-  private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
-  private final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+  private String _offlineTableName = null;
+  private boolean _isOfflineRouteExists;
+  private TableConfig _offlineTableConfig;
+  private boolean _isOfflineTableDisabled;
+
+  private String _realtimeTableName = null;
+  private boolean _isRealtimeRouteExists;
+  private TableConfig _realtimeTableConfig;
+  private boolean _isRealtimeTableDisabled;
+
+  private TimeBoundaryInfo _timeBoundaryInfo;
+
+  private List<String> _unavailableSegments;
+  private int _numPrunedSegmentsTotal;
+
+  private BrokerRequest _offlineBrokerRequest;
+  private BrokerRequest _realtimeBrokerRequest;
+  private Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
+  private Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+
+  public ImplicitHybridTableRouteInfo() {
+  }
 
   public ImplicitHybridTableRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
       Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
@@ -44,6 +65,54 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     _realtimeBrokerRequest = realtimeBrokerRequest;
     _offlineRoutingTable = offlineRoutingTable;
     _realtimeRoutingTable = realtimeRoutingTable;
+  }
+
+  @Nullable
+  @Override
+  public String getOfflineTableName() {
+    return _offlineTableName;
+  }
+
+  public void setOfflineTableName(String offlineTableName) {
+    _offlineTableName = offlineTableName;
+  }
+
+  @Nullable
+  @Override
+  public String getRealtimeTableName() {
+    return _realtimeTableName;
+  }
+
+  public void setRealtimeTableName(String realtimeTableName) {
+    _realtimeTableName = realtimeTableName;
+  }
+
+  @Nullable
+  @Override
+  public TableConfig getOfflineTableConfig() {
+    return _offlineTableConfig;
+  }
+
+  public void setOfflineBrokerRequest(BrokerRequest offlineBrokerRequest) {
+    _offlineBrokerRequest = offlineBrokerRequest;
+  }
+
+  public void setOfflineTableConfig(TableConfig offlineTableConfig) {
+    _offlineTableConfig = offlineTableConfig;
+  }
+
+  public void setRealtimeBrokerRequest(BrokerRequest realtimeBrokerRequest) {
+    _realtimeBrokerRequest = realtimeBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public TableConfig getRealtimeTableConfig() {
+    return _realtimeTableConfig;
+  }
+
+  public void setRealtimeTableConfig(TableConfig realtimeTableConfig) {
+    _realtimeTableConfig = realtimeTableConfig;
   }
 
   @Nullable
@@ -76,10 +145,164 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     return _offlineRoutingTable;
   }
 
+  public void setOfflineRoutingTable(Map<ServerInstance, ServerRouteInfo> offlineRoutingTable) {
+    _offlineRoutingTable = offlineRoutingTable;
+  }
+
   @Nullable
   @Override
   public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
     return _realtimeRoutingTable;
+  }
+
+  public void setRealtimeRoutingTable(Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+    _realtimeRoutingTable = realtimeRoutingTable;
+  }
+
+  @Override
+  public boolean isExists() {
+    return hasOffline() || hasRealtime();
+  }
+
+  @Override
+  public boolean isHybrid() {
+    return hasOffline() && hasRealtime();
+  }
+
+  @Override
+  public boolean isOffline() {
+    return hasOffline() && !hasRealtime();
+  }
+
+  @Override
+  public boolean isRealtime() {
+    return !hasOffline() && hasRealtime();
+  }
+
+  /**
+   * Offline if offline table config is present.
+   * @return true if there is an OFFLINE table, false otherwise
+   */
+  @Override
+  public boolean hasOffline() {
+    return _offlineTableConfig != null;
+  }
+
+  /**
+   * Realtime if realtime table config is present.
+   * @return true if there is a REALTIME table, false otherwise
+   */
+  @Override
+  public boolean hasRealtime() {
+    return _realtimeTableConfig != null;
+  }
+
+  /**
+   * Route exists if at least one of the physical tables has a route.
+   * @return true if a route exists, false otherwise
+   */
+  @Override
+  public boolean isRouteExists() {
+    if (isOffline()) {
+      return _isOfflineRouteExists;
+    } else if (isRealtime()) {
+      return _isRealtimeRouteExists;
+    } else {
+      return _isOfflineRouteExists || _isRealtimeRouteExists;
+    }
+  }
+
+  public boolean isOfflineRouteExists() {
+    return _isOfflineRouteExists;
+  }
+
+  public void setOfflineRouteExists(boolean offlineRouteExists) {
+    _isOfflineRouteExists = offlineRouteExists;
+  }
+
+  public boolean isRealtimeRouteExists() {
+    return _isRealtimeRouteExists;
+  }
+
+  public void setRealtimeRouteExists(boolean realtimeRouteExists) {
+    _isRealtimeRouteExists = realtimeRouteExists;
+  }
+
+  @Override
+  public boolean isOfflineTableDisabled() {
+    return _isOfflineTableDisabled;
+  }
+
+  public void setOfflineTableDisabled(boolean offlineTableDisabled) {
+    _isOfflineTableDisabled = offlineTableDisabled;
+  }
+
+  @Override
+  public boolean isRealtimeTableDisabled() {
+    return _isRealtimeTableDisabled;
+  }
+
+  public void setRealtimeTableDisabled(boolean realtimeTableDisabled) {
+    _isRealtimeTableDisabled = realtimeTableDisabled;
+  }
+
+  /**
+   * Disabled if all physical tables are disabled.
+   * @return true if the table is disabled, false
+   */
+  @Override
+  public boolean isDisabled() {
+    if (isOffline()) {
+      return _isOfflineTableDisabled;
+    } else if (isRealtime()) {
+      return _isRealtimeTableDisabled;
+    } else {
+      return _isOfflineTableDisabled && _isRealtimeTableDisabled;
+    }
+  }
+
+  @Nullable
+  @Override
+  public List<String> getDisabledTableNames() {
+    if (isOffline() && isOfflineTableDisabled()) {
+      return List.of(_offlineTableName);
+    } else if (isRealtime() && isRealtimeTableDisabled()) {
+      return List.of(_realtimeTableName);
+    } else if (isOfflineTableDisabled() && isRealtimeTableDisabled()) {
+      return List.of(_offlineTableName, _realtimeTableName);
+    } else if (isOfflineTableDisabled()) {
+      return List.of(_offlineTableName);
+    } else if (isRealtimeTableDisabled()) {
+      return List.of(_realtimeTableName);
+    }
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public TimeBoundaryInfo getTimeBoundaryInfo() {
+    return _timeBoundaryInfo;
+  }
+
+  public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
+    _timeBoundaryInfo = timeBoundaryInfo;
+  }
+
+  @Override
+  public List<String> getUnavailableSegments() {
+    return _unavailableSegments;
+  }
+
+  public void setUnavailableSegments(List<String> unavailableSegments) {
+    _unavailableSegments = unavailableSegments;
+  }
+
+  public int getNumPrunedSegmentsTotal() {
+    return _numPrunedSegmentsTotal;
+  }
+
+  public void setNumPrunedSegmentsTotal(int numPrunedSegmentsTotal) {
+    _numPrunedSegmentsTotal = numPrunedSegmentsTotal;
   }
 
   protected static Map<ServerRoutingInstance, InstanceRequest> getRequestMapFromRoutingTable(TableType tableType,
@@ -115,20 +338,19 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     return instanceRequest;
   }
 
+  @Override
   public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = null;
 
     if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
-      offlineRequestMap =
-          ImplicitHybridTableRouteInfo.getRequestMapFromRoutingTable(TableType.OFFLINE, _offlineRoutingTable,
+      offlineRequestMap = getRequestMapFromRoutingTable(TableType.OFFLINE, _offlineRoutingTable,
               _offlineBrokerRequest, requestId, brokerId, preferTls);
     }
 
     if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
-      realtimeRequestMap =
-          ImplicitHybridTableRouteInfo.getRequestMapFromRoutingTable(TableType.REALTIME, _realtimeRoutingTable,
+      realtimeRequestMap = getRequestMapFromRoutingTable(TableType.REALTIME, _realtimeRoutingTable,
               _realtimeBrokerRequest, requestId, brokerId, preferTls);
     }
 
