@@ -111,10 +111,11 @@ public class InstanceAssignmentDriver {
 
     // minimizeDataMovement might be set back to false within InstanceTagPoolSelector and InstancePartitionSelector
     // if existingInstancePartitions is null.
-    boolean minimizeDataMovement =
-        minimizeDataMovementEnablement.isEnabled(instanceAssignmentConfig::isMinimizeDataMovement);
-    LOGGER.info("Starting {} instance assignment for table: {} with minimizeDataMovement: {}", instancePartitionsName,
-        tableNameWithType, minimizeDataMovement);
+    boolean minimizeDataMovementFromTableConfig = instanceAssignmentConfig.isMinimizeDataMovement();
+    boolean minimizeDataMovement = minimizeDataMovementEnablement.isEnabled(minimizeDataMovementFromTableConfig);
+    LOGGER.info("Starting {} instance assignment for table: {} with minimizeDataMovement: {} (from table config: {}, "
+            + "override: {})", instancePartitionsName, tableNameWithType, minimizeDataMovement,
+        minimizeDataMovementFromTableConfig, minimizeDataMovementEnablement);
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);
