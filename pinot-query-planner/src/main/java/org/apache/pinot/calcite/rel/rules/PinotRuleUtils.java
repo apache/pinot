@@ -46,10 +46,15 @@ public class PinotRuleUtils {
   public static final RelBuilderFactory PINOT_REL_FACTORY =
       RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, PINOT_REL_CONFIG));
 
-  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG =
-      SqlToRelConverter.config().withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
-          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE)
-          .withRelBuilderFactory(PINOT_REL_FACTORY);
+  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG = SqlToRelConverter.config()
+      .withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
+      .withTrimUnusedFields(true)
+      // TODO: expansion is deprecated in Calcite; we need to move to the default value of false here which will be the
+      //       only supported option in Calcite going forward. This will probably require some changes in the planner
+      //       rules in order to support things like scalar query filters.
+      .withExpand(true)
+      .withInSubQueryThreshold(Integer.MAX_VALUE)
+      .withRelBuilderFactory(PINOT_REL_FACTORY);
 
   public static RelNode unboxRel(RelNode rel) {
     if (rel instanceof HepRelVertex) {

@@ -92,7 +92,7 @@ public class RexExpressionToProtoExpression {
           literalBuilder.setFloat((Float) value);
           break;
         case DOUBLE:
-          literalBuilder.setDouble((Double) value);
+          literalBuilder.setDouble(((Number) value).doubleValue());
           break;
         case BIG_DECIMAL:
           literalBuilder.setBytes(ByteString.copyFrom(BigDecimalUtils.serialize((BigDecimal) value)));
