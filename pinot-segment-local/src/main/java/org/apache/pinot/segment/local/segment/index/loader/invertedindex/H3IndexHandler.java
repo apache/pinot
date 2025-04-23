@@ -189,7 +189,9 @@ public class H3IndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    try (
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
+            columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         GeoSpatialIndexCreator h3IndexCreator = StandardIndexes.h3().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();
