@@ -20,11 +20,9 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -120,10 +118,10 @@ public class SchemaConformingTransformer implements RecordTransformer {
   private int _jsonKeyValueSeparatorByteCount;
   private long _mergedTextIndexDocumentBytesCount = 0L;
   private long _mergedTextIndexDocumentCount = 0L;
-  private GenericRow reusedOutputRecord = new GenericRow();
-  private Map<String, Object> reusedMergedTextIndexMap = new HashMap<>();
-  private Map<String, Object> reusedIndexableExtras = new HashMap<>();
-  private Map<String, Object> reusedUnindexableExtras = new HashMap<>();
+  private GenericRow _reusedOutputRecord = new GenericRow();
+  private Map<String, Object> _reusedMergedTextIndexMap = new HashMap<>();
+  private Map<String, Object> _reusedIndexableExtras = new HashMap<>();
+  private Map<String, Object> _reusedUnindexableExtras = new HashMap<>();
 
   public SchemaConformingTransformer(TableConfig tableConfig, Schema schema) {
     if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
@@ -321,10 +319,10 @@ public class SchemaConformingTransformer implements RecordTransformer {
   @Nullable
   @Override
   public GenericRow transform(GenericRow record) {
-    reusedOutputRecord.clear();
-    reusedMergedTextIndexMap.clear();
-    reusedIndexableExtras.clear();
-    reusedUnindexableExtras.clear();
+    _reusedOutputRecord.clear();
+    _reusedMergedTextIndexMap.clear();
+    _reusedIndexableExtras.clear();
+    _reusedUnindexableExtras.clear();
 
     try {
       List<String> jsonPath = new ArrayList<>();
@@ -332,24 +330,24 @@ public class SchemaConformingTransformer implements RecordTransformer {
         String recordKey = recordEntry.getKey();
         Object recordValue = recordEntry.getValue();
         jsonPath.add(recordKey);
-        processField(_schemaTree, jsonPath, recordValue, true, reusedOutputRecord,
-            reusedMergedTextIndexMap, reusedIndexableExtras, reusedUnindexableExtras);
+        processField(_schemaTree, jsonPath, recordValue, true, _reusedOutputRecord,
+            _reusedMergedTextIndexMap, _reusedIndexableExtras, _reusedUnindexableExtras);
         jsonPath.remove(jsonPath.size() - 1);
       }
 
       putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType,
-          reusedIndexableExtras, reusedOutputRecord);
+          _reusedIndexableExtras, _reusedOutputRecord);
       putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
-          reusedUnindexableExtras, reusedOutputRecord);
+          _reusedUnindexableExtras, _reusedOutputRecord);
 
       // Generate merged text index. This optional step puts all field + value pairs in the input record in a special
       // column "_mergedTextIndex" to perform full text indexing and search.
-      if (null != _mergedTextIndexFieldSpec && !reusedMergedTextIndexMap.isEmpty()) {
-        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(reusedMergedTextIndexMap);
+      if (null != _mergedTextIndexFieldSpec && !_reusedMergedTextIndexMap.isEmpty()) {
+        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(_reusedMergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
+          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
         } else {
-          reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
+          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
         }
       }
     } catch (Exception e) {
@@ -357,10 +355,10 @@ public class SchemaConformingTransformer implements RecordTransformer {
         throw e;
       }
       _logger.error("Couldn't transform record: {}", record.toString(), e);
-      reusedOutputRecord.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+      _reusedOutputRecord.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
     }
 
-    return reusedOutputRecord;
+    return _reusedOutputRecord;
   }
 
   /**
