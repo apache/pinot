@@ -46,10 +46,10 @@ public class ResourceUtils {
   }
 
   // Shared static variable
-  private static AtomicLong _deepStoreSegmentUploadCount = new AtomicLong(0);
-  private static AtomicLong _deepStoreSegmentBytesUploading = new AtomicLong(0);
-  private static AtomicLong _deepStoreSegmentDownloadCount = new AtomicLong(0);
-  private static AtomicLong _deepStoreSegmentBytesDownloading = new AtomicLong(0);
+  private static AtomicLong _deepStoreWriteOpsInProgress = new AtomicLong(0);
+  private static AtomicLong _deepStoreWriteBytesInProgress = new AtomicLong(0);
+  private static AtomicLong _deepStoreReadOpsInProgress = new AtomicLong(0);
+  private static AtomicLong _deepStoreReadBytesInProgress = new AtomicLong(0);
 
   public static List<String> getExistingTableNamesWithType(PinotHelixResourceManager pinotHelixResourceManager,
                                                            String tableName, @Nullable TableType tableType,
@@ -94,75 +94,74 @@ public class ResourceUtils {
 
   public static void emitPreSegmentUploadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
                                                  long segmentSizeInBytes) {
-    // Active segment uploads
-    long uploadCount = _deepStoreSegmentUploadCount.incrementAndGet();
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_UPLOAD_COUNT, uploadCount);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_UPLOAD_COUNT, uploadCount);
-    // Bytes uploading to deep store
-    long segmentBytesUploading = _deepStoreSegmentBytesUploading.addAndGet(segmentSizeInBytes);
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_SEGMENT_BYTES_UPLOADING,
+    long writeCount = _deepStoreWriteOpsInProgress.incrementAndGet();
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS,
+            writeCount);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS, writeCount);
+
+    long segmentBytesUploading = _deepStoreWriteBytesInProgress.addAndGet(segmentSizeInBytes);
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_BYTES_IN_PROGRESS,
             segmentBytesUploading);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_SEGMENT_BYTES_UPLOADING, segmentBytesUploading);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_BYTES_IN_PROGRESS, segmentBytesUploading);
   }
 
   public static void emitPostSegmentUploadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
                                                   long startTimeMs, long segmentSizeInBytes) {
-    // Active segment uploads
-    long uploadCount = _deepStoreSegmentUploadCount.decrementAndGet();
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_UPLOAD_COUNT, uploadCount);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_UPLOAD_COUNT, uploadCount);
-    // Bytes uploading to deep store
-    long segmentBytesUploading = _deepStoreSegmentBytesUploading.addAndGet(-segmentSizeInBytes);
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_SEGMENT_BYTES_UPLOADING,
+    long writeCount = _deepStoreWriteOpsInProgress.decrementAndGet();
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS,
+            writeCount);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS, writeCount);
+
+    long segmentBytesUploading = _deepStoreWriteBytesInProgress.addAndGet(-segmentSizeInBytes);
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS,
             segmentBytesUploading);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_SEGMENT_BYTES_UPLOADING, segmentBytesUploading);
-    // Segment upload time
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_WRITE_OPS_IN_PROGRESS, segmentBytesUploading);
+
     long durationMs = System.currentTimeMillis() - startTimeMs;
-    controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_UPLOAD_TIME_MS, durationMs,
+    controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_WRITE_TIME_MS, durationMs,
             TimeUnit.MILLISECONDS);
-    controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_UPLOAD_TIME_MS, durationMs,
+    controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_WRITE_TIME_MS, durationMs,
             TimeUnit.MILLISECONDS);
-    // Bytes uploaded to deep store
-    controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_SEGMENT_UPLOAD_BYTES,
+
+    controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_WRITE_BYTES_COMPLETED,
             segmentSizeInBytes);
-    controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_SEGMENT_UPLOAD_BYTES, segmentSizeInBytes);
+    controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_WRITE_BYTES_COMPLETED, segmentSizeInBytes);
   }
 
   public static void emitPreSegmentDownloadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
                                                    long segmentSizeInBytes) {
-    // Active segment downloads
-    long downloadCount = _deepStoreSegmentDownloadCount.incrementAndGet();
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_DOWNLOAD_COUNT, downloadCount);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_DOWNLOAD_COUNT, downloadCount);
-    // Bytes downloading from deep store
-    long segmentBytesDownloading = _deepStoreSegmentBytesDownloading.addAndGet(segmentSizeInBytes);
-    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_SEGMENT_BYTES_DOWNLOADING,
+    long readCount = _deepStoreReadOpsInProgress.incrementAndGet();
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS,
+            readCount);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
+
+    long segmentBytesDownloading = _deepStoreReadBytesInProgress.addAndGet(segmentSizeInBytes);
+    controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
             segmentBytesDownloading);
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_SEGMENT_BYTES_DOWNLOADING,
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
             segmentBytesDownloading);
   }
 
     public static void emitPostSegmentDownloadMetrics(ControllerMetrics controllerMetrics, String rawTableName,
                                                         long startTimeMs, long segmentSizeInBytes) {
-      // Active segment downloads
-      long downloadCount = _deepStoreSegmentDownloadCount.decrementAndGet();
-      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_DOWNLOAD_COUNT, downloadCount);
-      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_DOWNLOAD_COUNT, downloadCount);
-      // Bytes downloading from deep store
-      long segmentBytesDownloading = _deepStoreSegmentBytesDownloading.addAndGet(-segmentSizeInBytes);
-      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_SEGMENT_BYTES_DOWNLOADING,
+      long readCount = _deepStoreReadOpsInProgress.decrementAndGet();
+      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
+      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_OPS_IN_PROGRESS, readCount);
+
+      long segmentBytesDownloading = _deepStoreReadBytesInProgress.addAndGet(-segmentSizeInBytes);
+      controllerMetrics.setOrUpdateTableGauge(rawTableName, ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
               segmentBytesDownloading);
-      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_SEGMENT_BYTES_DOWNLOADING,
+      controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DEEP_STORE_READ_BYTES_IN_PROGRESS,
               segmentBytesDownloading);
-      // Segment download time
+
       long durationMs = System.currentTimeMillis() - startTimeMs;
-      controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_DOWNLOAD_TIME_MS,
+      controllerMetrics.addTimedTableValue(rawTableName, ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS,
               durationMs, TimeUnit.MILLISECONDS);
-      controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_DOWNLOAD_TIME_MS, durationMs,
+      controllerMetrics.addTimedValue(ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS, durationMs,
               TimeUnit.MILLISECONDS);
-      // Bytes downloaded from deep store
-      controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_SEGMENT_DOWNLOAD_BYTES,
+
+      controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED,
               segmentSizeInBytes);
-      controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_SEGMENT_DOWNLOAD_BYTES, segmentSizeInBytes);
+      controllerMetrics.addMeteredGlobalValue(ControllerMeter.DEEP_STORE_READ_BYTES_COMPLETED, segmentSizeInBytes);
     }
 }

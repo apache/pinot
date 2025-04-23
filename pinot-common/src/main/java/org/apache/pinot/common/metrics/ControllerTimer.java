@@ -31,10 +31,10 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true),
-  // Time taken to download the segment from deep store
-  DEEP_STORE_SEGMENT_DOWNLOAD_TIME_MS("deepStoreSegmentDownloadTimeMs", true),
-  // Time taken to upload the segment to deep store
-  DEEP_STORE_SEGMENT_UPLOAD_TIME_MS("deepStoreSegmentUploadTimeMs", true);
+  // Time taken to read the segment from deep store
+  DEEP_STORE_SEGMENT_READ_TIME_MS("deepStoreSegmentReadTimeMs", true),
+  // Time taken to write the segment to deep store
+  DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true);
 
 
   private final String _timerName;
