@@ -21,11 +21,13 @@ package org.apache.pinot.core.transport.grpc;
 import io.grpc.Attributes;
 import io.grpc.Grpc;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.ServerTransportFilter;
 import io.grpc.Status;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
@@ -41,6 +43,7 @@ import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -60,11 +63,6 @@ import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
-import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
-import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
-import org.apache.pinot.common.metrics.ServerGauge;
 
 
 
