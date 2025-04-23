@@ -580,7 +580,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               {tableType.toLowerCase() === TableType.REALTIME && (
                 <CustomButton
                   onClick={handleRepairTable}
-                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task"
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
                   enableTooltip={true}
                 >
                  Repair Table
