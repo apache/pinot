@@ -20,11 +20,11 @@ public class GitDiffChecker {
   public static String findDiff(String fileName) throws IOException {
     BufferedReader br = new BufferedReader(new FileReader(fileName));
     String li;
-    Pattern funcDef = Pattern.compile("^\\s*?\\b(public|private|protected)\\b.*?(.+?)[^{}]*?\\{");
-    Pattern annoDef = Pattern.compile("^\\s*?@(?:(?!Json).)+?");
+    Pattern funcDef = Pattern.compile("^\\s*?\\b(public|private|protected)\\b.+?(.*?)[^{}]*?\\{");
+    Pattern annoDef = Pattern.compile("^\\s*?@\\S+?\\n");
     while ((li = br.readLine()) != null) {
       if ((!li.isEmpty()) && (li.charAt(0) == '-') && (!li.startsWith("---"))) {
-        Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-'
+        Matcher matcher1 = funcDef.matcher(li.substring(1)); //gets rid of the '-' at the beginning
         Matcher matcher2 = annoDef.matcher(li.substring(1));
         if (matcher1.matches() || matcher2.matches()) {
           return li.substring(1).trim();
@@ -35,6 +35,6 @@ public class GitDiffChecker {
   }
 
   public static void main(String[] args) throws IOException {
-    System.out.println(findDiff(args[0]));
+    findDiff(args[0]);
   }
 }
