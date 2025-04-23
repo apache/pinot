@@ -205,7 +205,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
 
   // ZK JUTE max buffer size in bytes
-  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  DEEP_STORE_SEGMENT_BYTES_DOWNLOADING("deepStoreSegmentBytesDownloading", true),
+  DEEP_STORE_DOWNLOAD_COUNT("deepStoreDownloadCount", true),
+  DEEP_STORE_SEGMENT_BYTES_UPLOADING("deepStoreSegmentBytesUploading", true),
+  DEEP_STORE_UPLOAD_COUNT("deepStoreUploadCount", true);
 
   private final String _gaugeName;
   private final String _unit;

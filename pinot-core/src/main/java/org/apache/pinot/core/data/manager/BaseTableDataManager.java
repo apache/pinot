@@ -57,7 +57,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -104,7 +103,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,7 +120,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected SegmentLocks _segmentLocks;
   protected String _tableNameWithType;
-  protected String _rawTableName;
   protected String _tableDataDir;
   protected File _indexDir;
   protected File _resourceTmpDir;
@@ -173,7 +170,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
     _tableNameWithType = tableConfig.getTableName();
-    _rawTableName = TableNameBuilder.extractRawTableName(_tableNameWithType);
     _tableDataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableNameWithType;
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
@@ -438,22 +434,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    long downloadStartTimeMs = System.currentTimeMillis();
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
-    // Download the segment
     File indexDir = downloadSegment(zkMetadata);
-    long totalDownloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
-    _serverMetrics.addTimedValue(_rawTableName, ServerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS,
-            totalDownloadDurationMs, TimeUnit.MILLISECONDS);
-    _serverMetrics.addTimedValue(ServerTimer.SEGMENT_TOTAL_DOWNLOAD_TIME_MS, totalDownloadDurationMs,
-            TimeUnit.MILLISECONDS);
-    // Load the segment
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
-    long loadDurationMs = System.currentTimeMillis() - downloadStartTimeMs - totalDownloadDurationMs;
-    _serverMetrics.addTimedValue(_rawTableName, ServerTimer.SEGMENT_LOAD_TIME_MS, loadDurationMs,
-        TimeUnit.MILLISECONDS);
-    _serverMetrics.addTimedValue(ServerTimer.SEGMENT_LOAD_TIME_MS, loadDurationMs, TimeUnit.MILLISECONDS);
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
@@ -932,28 +915,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(downloadUrl != null,
         "Failed to find download URL in ZK metadata for segment: %s of table: %s", segmentName, _tableNameWithType);
     try {
-      File segment;
       if (!CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(downloadUrl)) {
         try {
-          segment = downloadSegmentFromDeepStore(zkMetadata);
+          return downloadSegmentFromDeepStore(zkMetadata);
         } catch (Exception e) {
           if (_peerDownloadScheme != null) {
             _logger.warn("Caught exception while downloading segment: {} from: {}, trying to download from peers",
                 segmentName, downloadUrl, e);
-            segment = downloadSegmentFromPeers(zkMetadata);
+            return downloadSegmentFromPeers(zkMetadata);
           } else {
             throw e;
           }
         }
       } else {
-        segment = downloadSegmentFromPeers(zkMetadata);
+        return downloadSegmentFromPeers(zkMetadata);
       }
-      if (segment != null) {
-        long segmentSizeBytes = segment.length();
-        _serverMetrics.addMeteredTableValue(_rawTableName, ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSizeBytes);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_SIZE_BYTES, segmentSizeBytes);
-      }
-      return segment;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1);
       throw e;
@@ -987,7 +963,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
                 + "queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
             segmentDownloadThrottler.getQueueLength());
       }
-      long downloadStartTimeMs = System.currentTimeMillis();
       try {
         File untarredSegmentDir;
         if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
@@ -1010,11 +985,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
               segmentTarFile, segmentTarFile.length());
           untarredSegmentDir = untarSegment(segmentName, segmentTarFile, tempRootDir);
         }
-        long downloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
-        _serverMetrics.addTimedValue(_rawTableName, ServerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
-                downloadDurationMs, TimeUnit.MILLISECONDS);
-        _serverMetrics.addTimedValue(ServerTimer.SEGMENT_DEEP_STORE_DOWNLOAD_TIME_MS,
-                downloadDurationMs, TimeUnit.MILLISECONDS);
         File indexDir = moveSegment(segmentName, untarredSegmentDir);
         _logger.info("Downloaded segment: {} from: {} to: {}", segmentName, downloadUrl, indexDir);
         return indexDir;
@@ -1055,20 +1025,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentDownloadThrottler.getQueueLength());
     }
     try {
-      long downloadStartTimeMs = System.currentTimeMillis();
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
             PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
                 _peerDownloadScheme);
-
         Collections.shuffle(peerServerURIs);
         return peerServerURIs;
       }, segmentTarFile, zkMetadata.getCrypterName());
-      long downloadDurationMs = System.currentTimeMillis() - downloadStartTimeMs;
-      _serverMetrics.addTimedValue(_rawTableName, ServerTimer.SEGMENT_PEER_DOWNLOAD_TIME_MS, downloadDurationMs,
-            TimeUnit.MILLISECONDS);
-        _serverMetrics.addTimedValue(ServerTimer.SEGMENT_PEER_DOWNLOAD_TIME_MS, downloadDurationMs,
-            TimeUnit.MILLISECONDS);
       _logger.info("Downloaded tarred segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       File indexDir = untarAndMoveSegment(segmentName, segmentTarFile, tempRootDir);

@@ -20,25 +20,10 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.nio.file.Files;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -59,6 +44,23 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 
 // Do NOT tag this class with @Api. We don't want these exposed in swagger.
 // @Api(tags = Constants.INTERNAL_TAG)
@@ -70,6 +72,9 @@ public class LLCSegmentCompletionHandlers {
 
   @Inject
   SegmentCompletionManager _segmentCompletionManager;
+
+  @Inject
+  ControllerMetrics _controllerMetrics;
 
   @VisibleForTesting
   public static String getScheme() {
@@ -227,7 +232,13 @@ public class LLCSegmentCompletionHandlers {
       URI segmentFileURI =
           URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
               URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
+      // Emit metrics related to deep-store upload operation
+      long startTimeMs = System.currentTimeMillis();
+      long segmentSizeBytes = localTempFile.length();
+      ResourceUtils.emitPreSegmentUploadMetrics(_controllerMetrics, rawTableName, segmentSizeBytes);
       PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
+      ResourceUtils.emitPostSegmentUploadMetrics(_controllerMetrics, rawTableName, startTimeMs, segmentSizeBytes);
+
       SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
           .withStreamPartitionMsgOffset(requestParams.getStreamPartitionMsgOffset())
           .withSegmentLocation(segmentFileURI.toString())
