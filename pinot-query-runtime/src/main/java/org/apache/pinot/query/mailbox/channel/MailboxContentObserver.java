@@ -30,6 +30,7 @@ import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,9 +125,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   public void onError(Throwable t) {
     LOGGER.warn("Error on receiver side", t);
     if (_mailbox != null) {
-      _mailbox.setErrorBlock(
-          ErrorMseBlock.fromException(new RuntimeException("Cancelled by sender", t)),
-          Collections.emptyList());
+      String msg = t != null ? t.getMessage() : "Unknown";
+      _mailbox.setErrorBlock(ErrorMseBlock.fromError(
+          QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg), List.of());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
     }

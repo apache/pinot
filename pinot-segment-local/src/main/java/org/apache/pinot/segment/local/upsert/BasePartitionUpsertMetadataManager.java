@@ -176,6 +176,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
+  public UpsertContext getContext() {
+    return _context;
+  }
+
+  @Override
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
@@ -853,6 +858,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
+    Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
     boolean isSegmentSkipped = false;
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {

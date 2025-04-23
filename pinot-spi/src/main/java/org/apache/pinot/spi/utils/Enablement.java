@@ -16,42 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.spi.utils;
 
-import java.util.Map;
+import java.util.function.BooleanSupplier;
+
 
 /**
- * Default No-op TableRebalanceObserver.
+ * This enum is used to represent the enablement status of a feature.
+ * It can be used to enable, disable, or use the default instance level enablement of a feature.
  */
-public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
-  @Override
-  public void onTrigger(TableRebalanceObserver.Trigger trigger, Map<String, Map<String, String>> initialState,
-      Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext) {
+public enum Enablement {
+  ENABLE,   // Enable a feature
+  DISABLE,  // Disable a feature
+  DEFAULT;  // Use the default enablement of the feature
+
+  public boolean isEnabled(boolean defaultValue) {
+    if (this == ENABLE) {
+      return true;
+    }
+    if (this == DISABLE) {
+      return false;
+    }
+    return defaultValue;
   }
 
-  @Override
-  public void onNoop(String msg) {
-  }
-
-  @Override
-  public void onSuccess(String msg) {
-  }
-
-  @Override
-  public void onError(String errorMsg) {
-  }
-
-  @Override
-  public void onRollback() {
-  }
-
-  @Override
-  public boolean isStopped() {
-    return false;
-  }
-
-  @Override
-  public RebalanceResult.Status getStopStatus() {
-    throw new UnsupportedOperationException();
+  public boolean isEnabled(BooleanSupplier defaultValueSupplier) {
+    if (this == ENABLE) {
+      return true;
+    }
+    if (this == DISABLE) {
+      return false;
+    }
+    return defaultValueSupplier.getAsBoolean();
   }
 }

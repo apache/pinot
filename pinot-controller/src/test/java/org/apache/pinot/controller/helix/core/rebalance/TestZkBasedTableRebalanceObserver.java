@@ -79,6 +79,9 @@ public class TestZkBasedTableRebalanceObserver {
         rebalanceContext);
     // Both of the changes above will update ZK for progress stats
     assertEquals(observer.getNumUpdatesToZk(), 4);
+    // Try a rollback and this should trigger a ZK update as well
+    observer.onRollback();
+    assertEquals(observer.getNumUpdatesToZk(), 5);
   }
 
   @Test

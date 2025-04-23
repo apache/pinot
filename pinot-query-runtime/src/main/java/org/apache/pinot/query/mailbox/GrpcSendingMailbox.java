@@ -139,8 +139,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-      MseBlock errorBlock = ErrorMseBlock.fromException(
-          new RuntimeException("Cancelled by sender with exception: " + msg, t));
+      MseBlock errorBlock = ErrorMseBlock.fromError(
+          QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
       for (MailboxContent content: toMailboxContents(errorBlock, List.of())) {
         _contentObserver.onNext(content);
       }

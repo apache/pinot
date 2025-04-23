@@ -324,7 +324,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * @param immutableSegment Immutable segment to add
    */
   @Override
-  public void addSegment(ImmutableSegment immutableSegment) {
+  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
@@ -437,7 +437,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -817,7 +817,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
           // No reprocessing needed, reuse the same segment
           ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-          addSegment(segment);
+          addSegment(segment, zkMetadata);
           return;
         }
         // Create backup directory to handle failure of segment reloading.
@@ -838,7 +838,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
-      addSegment(segment);
+      addSegment(segment, zkMetadata);
 
       // Remove backup directory to mark the completion of segment reloading.
       removeBackup(indexDir);
@@ -1217,7 +1217,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-      addSegment(segment);
+      addSegment(segment, zkMetadata);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
           TierConfigUtils.normalizeTierName(segmentTier));
       return true;
