@@ -27,7 +27,7 @@ for ((i=0; i < len_arr; i++)); do
   CONC=$(java -cp pinot-spi-change-checker/target/classes org.apache.pinot.changecheck.GitDiffChecker pinot-spi-change-checker/temp_diff_file.txt)
   rm pinot-spi-change-checker/temp_diff_file.txt
   if [[ "$CONC" != "0" ]]; then
-    echo "Incorrect SPI change found in ${FILES_TO_CHECK[i]} at this line in the original file: '$CONC'."
+    echo "Incorrect SPI change found in ${FILES_TO_CHECK[i]} at '$CONC'."
     exit 1
   fi
 done
