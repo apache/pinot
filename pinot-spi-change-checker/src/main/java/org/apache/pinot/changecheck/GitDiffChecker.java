@@ -20,7 +20,7 @@ public class GitDiffChecker {
   public static String findDiff(String fileName) throws IOException {
     BufferedReader br = new BufferedReader(new FileReader(fileName));
     String li;
-    Pattern funcDef = Pattern.compile("^\\s*?\\b(public|private|protected)\\b.+?(.*?)[^{}]*?\\{");
+    Pattern funcDef = Pattern.compile("^\\s*?.+?(.*?)[^{}]*?[{|;]");
     Pattern annoDef = Pattern.compile("^\\s*?@\\S+?\\n");
     while ((li = br.readLine()) != null) {
       if ((!li.isEmpty()) && (li.charAt(0) == '-') && (!li.startsWith("---"))) {
