@@ -630,8 +630,8 @@ public class PinotTableRestletResource {
           + "a single segment's step's replicas across steps (so some servers may get fewer segments). For strict "
           + "replica group based assignment, this is a per-server best effort value since each partition of a replica "
           + "group must be moved as a whole and at least one partition in a replica group should be moved. A value of "
-          + "Integer.MAX_VALUE is used to indicate an unlimited batch size, which is the non-batching behavior.")
-      @DefaultValue("2147483647") @QueryParam("batchSizePerServer") int batchSizePerServer,
+          + "-1 is used to disable batching (unlimited segments).")
+      @DefaultValue("-1") @QueryParam("batchSizePerServer") int batchSizePerServer,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
