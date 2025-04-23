@@ -534,18 +534,27 @@ public class PinotHelixResourceManager {
   }
 
   public List<InstanceConfig> getBrokerInstancesConfigsFor(String tableName) {
-    String brokerTenantName = null;
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-    if (offlineTableConfig != null) {
-      brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
-    } else {
-      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
-      }
-    }
+    String brokerTenantName = getBrokerTenantName(tableName);
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  private String getBrokerTenantName(String tableName) {
+    LogicalTable logicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (logicalTable != null) {
+      return logicalTable.getBrokerTenant();
+    }
+
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    if (offlineTableConfig != null) {
+      return offlineTableConfig.getTenantConfig().getBroker();
+    }
+
+    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    if (realtimeTableConfig != null) {
+      return realtimeTableConfig.getTenantConfig().getBroker();
+    }
+    return null;
   }
 
   public List<String> getAllBrokerInstances() {
@@ -2209,11 +2218,10 @@ public class PinotHelixResourceManager {
   public void addLogicalTable(LogicalTable logicalTable)
       throws TableAlreadyExistsException {
     String tableName = logicalTable.getTableName();
-    LOGGER.info("Adding logical table: {}", tableName);
+    LOGGER.info("Adding logical table: {} Add logical table started", tableName);
 
     // Check if the logical table name is already used
-    LogicalTable existingLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
-    if (existingLogicalTable != null) {
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
     }
 
@@ -2223,35 +2231,67 @@ public class PinotHelixResourceManager {
           throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
         });
 
+    LOGGER.info("Adding logical table {}: Creating logical table in the property store", tableName);
     ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
-    LOGGER.info("Added logical table: {}", tableName);
+
+    LOGGER.info("Adding logical table {}: Updating BrokerResource for logical table", tableName);
+    updateLogicalTableBrokerResource(logicalTable);
+
+    LOGGER.info("Adding logical table: {} Successfully added logical table", tableName);
   }
 
   public void updateLogicalTable(LogicalTable logicalTable)
       throws TableNotFoundException {
     String tableName = logicalTable.getTableName();
-    LOGGER.info("Updating logical table: {}", tableName);
+    LOGGER.info("Updating logical table: {} Update logical table started", tableName);
 
-    LogicalTable oldLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
-    if (oldLogicalTable == null) {
+    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
 
+    LOGGER.info("Updating logical table {}: Updating logical table in the property store", tableName);
     ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
-    LOGGER.info("Updated logical table: {}", tableName);
+
+    LOGGER.info("Updating logical table {}: Updating BrokerResource for logical table", tableName);
+    updateLogicalTableBrokerResource(logicalTable);
+
+    LOGGER.info("Updating logical table: {} Successfully updated logical table", tableName);
+  }
+
+  private void updateLogicalTableBrokerResource(LogicalTable logicalTable) {
+    List<String> brokers = HelixHelper.getInstancesWithTag(
+        _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTable.getBrokerTenant()));
+
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields()
+          .put(logicalTable.getTableName(),
+              SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
+      return is;
+    });
   }
 
   public boolean deleteLogicalTable(String tableName) {
-    LOGGER.info("Deleting logical table: {}", tableName);
-    boolean result = false;
+    LOGGER.info("Deleting logical table: {} Delete logical table started", tableName);
+    boolean result;
     String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
-    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    } else {
+
+    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new ControllerApplicationException(LOGGER,
           "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
     }
-    LOGGER.info("Deleted logical table: {}", tableName);
+    // Deletion operations should happen reverse of the add table operations
+    LOGGER.info("Deleting logical table {}: Removing BrokerResource for logical table", tableName);
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields().remove(tableName);
+      return is;
+    });
+
+    LOGGER.info("Deleting logical table {}: Removing logical table from the property store", tableName);
+    result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+
+    LOGGER.info("Deleting logical table: {} Successfully deleted logical table", tableName);
     return result;
   }
 

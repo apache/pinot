@@ -860,4 +860,8 @@ public class ZKMetadataProvider {
       return null;
     }
   }
+
+  public static boolean isLogicalTableExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    return propertyStore.exists(constructPropertyStorePathForLogical(tableName), AccessOption.PERSISTENT);
+  }
 }
