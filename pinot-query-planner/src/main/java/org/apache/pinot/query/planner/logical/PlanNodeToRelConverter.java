@@ -42,6 +42,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -330,7 +331,7 @@ public final class PlanNodeToRelConverter {
 
         Window.Group group =
             new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
-                orderKeys, aggCalls);
+                RexWindowExclusion.EXCLUDE_NO_OTHER, orderKeys, aggCalls);
 
         List<RexLiteral> constants =
             node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
