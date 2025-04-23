@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, List, ListItem, ListItemText } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo } from 'Models';
@@ -156,6 +156,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  // State for consuming segments info
   const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
   const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
   const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
@@ -416,18 +417,18 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const customMessage = (
       <Box>
         <Typography variant='inherit'>{result.status}</Typography>
-        <Button 
-          className={classes.copyIdButton} 
-          variant="outlined" 
-          color="inherit" 
-          size="small" 
+        <Button
+          className={classes.copyIdButton}
+          variant="outlined"
+          color="inherit"
+          size="small"
           onClick={handleCopyReloadJobId}
         >
           Copy Id
         </Button>
       </Box>
     )
-    
+
     syncResponse(result, reloadJobId && customMessage);
   };
 
@@ -444,7 +445,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         setShowReloadStatusModal(false);
         return;
       }
-      
+
       setReloadStatusData(reloadStatusData);
       setTableJobsData(tableJobsData);
     } catch(error) {
@@ -456,6 +457,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleRebalanceTableStatus = () => {
     setShowRebalanceServerStatus(true);
   };
+  // Handler to view consuming segments info
   const handleViewConsumingSegments = async () => {
     setShowConsumingSegmentsModal(true);
     setLoadingConsumingSegments(true);
@@ -478,7 +480,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     });
     setConfirmDialog(true);
   };
-  
+
   const rebalanceBrokers = async () => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
@@ -581,13 +583,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Rebalance Servers
               </CustomButton>
               <CustomButton
-                onClick={handleViewConsumingSegments}
-                tooltipTitle="View consuming segments info"
-                enableTooltip={true}
-              >
-                View Consuming Segments
-              </CustomButton>
-              <CustomButton
                   onClick={handleRebalanceTableStatus}
                   tooltipTitle="The status of table rebalance job"
                   enableTooltip={true}
@@ -609,6 +604,16 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 >
                  Repair Table
                 </CustomButton>
+              )}
+             {/* Button to view consuming segments info */}
+             {tableType.toLowerCase() === TableType.REALTIME && (
+              <CustomButton
+                onClick={handleViewConsumingSegments}
+                tooltipTitle="View offset and lag information about consuming segments"
+                enableTooltip={true}
+              >
+                View Consuming Segments
+              </CustomButton>
               )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
@@ -767,12 +772,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             tableName={tableName}
           />
         )}
+        {/* Consuming Segments Info Dialog */}
         {showConsumingSegmentsModal && (
           <CustomDialog
             open={showConsumingSegmentsModal}
             handleClose={() => setShowConsumingSegmentsModal(false)}
             title="Consuming Segments Info"
-            size="md"
+            size="lg"
             showOkBtn={false}
             btnCancelText="Close"
             disableBackdropClick
@@ -780,34 +786,91 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             {loadingConsumingSegments ? (
               <Typography>Loading consuming segments info...</Typography>
             ) : consumingSegmentsInfo ? (
-              <Box style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo.serversFailingToRespond}</Typography>
-                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo.serversUnparsableRespond}</Typography>
-                {Object.entries(consumingSegmentsInfo._segmentToConsumingInfoMap).map(([segment, infoList]) => (
-                  <SimpleAccordion key={segment} headerTitle={segment} showSearchBox={false}>
-                    {infoList.map((info, idx) => (
-                      <Box key={idx} mb={2}>
-                        <Typography><strong>Server Name:</strong> {info.serverName}</Typography>
-                        <Typography><strong>Consumer State:</strong> {info.consumerState}</Typography>
-                        <Typography><strong>Last Consumed:</strong> {Utils.formatTime(info.lastConsumedTimestamp)}</Typography>
-                        <CustomizedTables
-                          title="Partition Offsets"
-                          data={{
-                            columns: ['Partition', 'Current Offset', 'Latest Upstream Offset', 'Records Lag', 'Availability Lag (ms)'],
-                            records: Object.keys(info.partitionOffsetInfo.currentOffsetsMap).map(partition => [
-                              partition,
-                              info.partitionOffsetInfo.currentOffsetsMap[partition],
-                              info.partitionOffsetInfo.latestUpstreamOffsetMap[partition],
-                              info.partitionOffsetInfo.recordsLagMap[partition],
-                              info.partitionOffsetInfo.availabilityLagMsMap[partition],
-                            ]),
-                          }}
-                          showSearchBox={false}
-                        />
-                      </Box>
-                    ))}
-                  </SimpleAccordion>
-                ))}
+              <Box style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo.serversFailingToRespond || 'N/A'}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo.serversUnparsableRespond || 'N/A'}</Typography>
+                <Box mt={2}>
+                  {(() => {
+                    const columns = [
+                      'Segment Name',
+                      'Server Details',
+                      'Total Segment Lag',
+                      'Max Partition Availability Lag (ms)',
+                    ];
+                    const records = [];
+                    Object.entries(consumingSegmentsInfo._segmentToConsumingInfoMap || {}).forEach(([segment, infoList]) => {
+                      const serverDetailsList = [];
+                      let segmentTotalRecordsLag = 0;
+                      let segmentMaxAvailabilityLagMs = 0;
+
+                      (infoList || []).forEach(info => {
+                        let serverTotalPartitionLag = 0;
+                        let serverMaxPartitionLagMs = 0;
+
+                        // Calculate lag metrics per server across its partitions
+                        Object.values(info.partitionOffsetInfo.recordsLagMap || {}).forEach(lag => {
+                          if (lag !== null && Number(lag) > -1) {
+                            serverTotalPartitionLag = Math.max(serverTotalPartitionLag, Number(lag));
+                            segmentTotalRecordsLag = Math.max(segmentTotalRecordsLag, Number(lag));
+                          }
+                        });
+                        Object.values(info.partitionOffsetInfo.availabilityLagMsMap || {}).forEach(lagMs => {
+                           if (lagMs !== null && Number(lagMs) > -1) {
+                             serverMaxPartitionLagMs = Math.max(serverMaxPartitionLagMs, Number(lagMs));
+                             segmentMaxAvailabilityLagMs = Math.max(segmentMaxAvailabilityLagMs, Number(lagMs)); // Aggregate for segment max
+                           }
+                        });
+
+                        serverDetailsList.push({
+                          serverName: info.serverName,
+                          consumerState: info.consumerState,
+                          lag: serverTotalPartitionLag,
+                          availabilityMs: serverMaxPartitionLagMs
+                        });
+                      });
+
+                      if (serverDetailsList.length > 0) {
+                        records.push([
+                          segment,
+                          {
+                            customRenderer: (
+                              <List dense disablePadding style={{width: '100%'}}>
+                                {serverDetailsList.map((detail, index) => (
+                                  <ListItem key={index} dense disableGutters style={{ padding: '2px 0' }}>
+                                    <ListItemText
+                                      primary={`${detail.serverName}: ${detail.consumerState}`}
+                                      secondary={`Lag: ${detail.lag}, Availability: ${detail.availabilityMs}ms`}
+                                      primaryTypographyProps={{ variant: 'body2', style: { fontWeight: 500 } }}
+                                      secondaryTypographyProps={{ variant: 'caption', color: 'textSecondary' }}
+                                    />
+                                  </ListItem>
+                                ))}
+                              </List>
+                            )
+                          },
+                          segmentTotalRecordsLag,
+                          segmentMaxAvailabilityLagMs,
+                        ]);
+                      }
+                    });
+
+                    if (records.length === 0) {
+                      if (Object.keys(consumingSegmentsInfo._segmentToConsumingInfoMap || {}).length === 0) {
+                         return <Typography>No consuming segment data available.</Typography>;
+                      } else {
+                         return <Typography>Consuming segment data found, but no server details available.</Typography>;
+                      }
+                    }
+
+                    return (
+                      <CustomizedTables
+                        title="Consuming Segments Summary"
+                        data={{ columns, records }}
+                        showSearchBox={true}
+                      />
+                    );
+                  })()}
+                </Box>
               </Box>
             ) : (
               <Typography>No consuming segments data available.</Typography>
