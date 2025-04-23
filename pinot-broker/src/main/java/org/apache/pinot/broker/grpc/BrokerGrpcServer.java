@@ -24,11 +24,13 @@ import com.google.protobuf.ByteString;
 import io.grpc.Attributes;
 import io.grpc.Grpc;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.ServerTransportFilter;
 import io.grpc.Status;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
@@ -44,6 +46,7 @@ import org.apache.pinot.common.compression.CompressionFactory;
 import org.apache.pinot.common.compression.Compressor;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Broker;
@@ -106,28 +109,64 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     _queryClientConfig = createQueryClientConfig(brokerConf);
     LOGGER.info("gRPC query client config: usePlainText {}", _queryClientConfig.isUsePlainText());
     _secureGrpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PORT, -1);
-    if (_secureGrpcPort > 0) {
-      try {
-        TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_TLS_PREFIX);
-        LOGGER.info("Creating Secure gRPC Server in port {}", _secureGrpcPort);
-        _server =
-            NettyServerBuilder.forPort(_secureGrpcPort).sslContext(buildGRpcSslContext(tlsConfig)).addService(this)
-                .addTransportFilter(new BrokerGrpcTransportFilter()).build();
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to start secure grpcQueryServer", e);
-      }
-    } else if (_grpcPort > 0) {
-      LOGGER.info("Creating plain text gRPC Server in port {}", _grpcPort);
-      _server =
-          ServerBuilder.forPort(_grpcPort).addService(this).addTransportFilter(new BrokerGrpcTransportFilter()).build();
-    } else {
-      LOGGER.info("Not creating gRPC Server due to the grpc port is {} and secureGrpcPort is {}", _grpcPort,
-          _secureGrpcPort);
-      _server = null;
-    }
     _brokerId = brokerId;
     _brokerRequestHandler = brokerRequestHandler;
-    LOGGER.info("Initialized BrokerGrpcServer on port: {}", _grpcPort);
+
+    // Determine which port to use
+    int portToUse;
+    boolean isSecure = false;
+
+    if (_secureGrpcPort > 0) {
+      portToUse = _secureGrpcPort;
+      isSecure = true;
+      LOGGER.info("Creating Secure gRPC Server on port {}", portToUse);
+    } else if (_grpcPort > 0) {
+      portToUse = _grpcPort;
+      LOGGER.info("Creating plain text gRPC Server on port {}", portToUse);
+    } else {
+      LOGGER.info("Not creating gRPC Server due to the grpc port is {} and secureGrpcPort is {}",
+          _grpcPort, _secureGrpcPort);
+      _server = null;
+      return;
+    }
+
+    try {
+      // Create buffer allocator and register metrics
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      registerBufferMetrics(bufAllocator, brokerMetrics);
+
+      // Build the server with common configuration
+      NettyServerBuilder builder = NettyServerBuilder.forPort(portToUse)
+          .addService(this)
+          .addTransportFilter(new BrokerGrpcTransportFilter())
+          .withOption(ChannelOption.ALLOCATOR, bufAllocator);
+
+      // Add SSL context only for secure connection
+      if (isSecure) {
+        TlsConfig tlsConfig = TlsUtils.extractTlsConfig(brokerConf, CommonConstants.Broker.BROKER_TLS_PREFIX);
+        builder.sslContext(buildGRpcSslContext(tlsConfig));
+      }
+      _server = builder.build();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start gRPC server", e);
+    }
+
+    LOGGER.info("Initialized BrokerGrpcServer on port: {}", portToUse);
+  }
+
+  /**
+   * Registers buffer metrics for the given allocator.
+   */
+  private void registerBufferMetrics(PooledByteBufAllocator bufAllocator, BrokerMetrics brokerMetrics) {
+    PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+    brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
   }
 
   public void start() {
