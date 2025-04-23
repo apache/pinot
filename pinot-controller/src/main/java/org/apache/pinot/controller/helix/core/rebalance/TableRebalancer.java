@@ -226,7 +226,8 @@ public class TableRebalancer {
     boolean lowDiskMode = rebalanceConfig.isLowDiskMode();
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
     int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
-    Preconditions.checkState(batchSizePerServer != 0, "TableRebalance batchSizePerServer must be > 0 or -1 to disable");
+    Preconditions.checkState(batchSizePerServer != 0 && batchSizePerServer >= -1,
+        "TableRebalance batchSizePerServer must be > 0 or -1 to disable");
     long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
     long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
     Enablement minimizeDataMovement = rebalanceConfig.getMinimizeDataMovement();

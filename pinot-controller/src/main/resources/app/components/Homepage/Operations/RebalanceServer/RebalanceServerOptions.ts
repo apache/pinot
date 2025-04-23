@@ -115,6 +115,16 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "markWithWarningIcon": false
     },
     {
+        "name": "batchSizePerServer",
+        "defaultValue": -1,
+        "type": "INTEGER",
+        "label": "Batch Size Per Server",
+        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching.",
+        "isAdvancedConfig": false,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
         "name": "lowDiskMode",
         "defaultValue": false,
         "type": "BOOL",

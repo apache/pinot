@@ -769,7 +769,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testRebalanceBatchSizeZero()
+  public void testRebalanceBatchSizePerServerErrors()
       throws Exception {
     int numServers = 3;
     // Mock disk usage
@@ -810,10 +810,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(entry.getValue().size(), 1);
     }
 
-    // Rebalance should return NO_OP status since there has been no change
+    // Rebalance should throw an exception due to setting an unacceptable value for batchSizePerServer
     final RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setBatchSizePerServer(0);
     assertThrows(IllegalStateException.class, () -> tableRebalancer.rebalance(tableConfig, rebalanceConfig, null));
+
+    final RebalanceConfig rebalanceConfig2 = new RebalanceConfig();
+    rebalanceConfig2.setBatchSizePerServer(-2);
+    assertThrows(IllegalStateException.class, () -> tableRebalancer.rebalance(tableConfig, rebalanceConfig2, null));
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
 

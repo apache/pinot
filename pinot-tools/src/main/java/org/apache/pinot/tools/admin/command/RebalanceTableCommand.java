@@ -78,6 +78,11 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
           + "number of replicas allowed to be unavailable if value is negative (-1 by default)")
   private int _minAvailableReplicas = -1;
 
+  @CommandLine.Option(names = {"-batchSizePerServer"},
+      description = "Batch size per server to use to batch segments updated in IdealState per rebalance step. "
+          + "If set to -1, disables batching (-1 by default)")
+  private int _batchSizePerServer = -1;
+
   @CommandLine.Option(names = {"-lowDiskMode"}, description =
       "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
           + "segments will first be offloaded from servers, then added to servers after offload is done while "
@@ -112,8 +117,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     //       the default pre-checker
     PinotTableRebalancer tableRebalancer =
         new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming,
-            _minimizeDataMovement, _bootstrap, _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts,
-            _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs);
+            _minimizeDataMovement, _bootstrap, _downtime, _minAvailableReplicas, _batchSizePerServer, _lowDiskMode,
+            _bestEfforts, _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
         .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);
@@ -188,6 +193,13 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
             + "myTable_OFFLINE -minAvailableReplicas -1");
+    System.out.println();
+
+    System.out.println(
+        "Rebalance table with batch size per server specified to enable batching.");
+    System.out.println(
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -batchSizePerServer 10");
     System.out.println();
 
     System.out.println(
