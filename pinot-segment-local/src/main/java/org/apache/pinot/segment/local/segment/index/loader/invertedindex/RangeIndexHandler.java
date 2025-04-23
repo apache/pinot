@@ -161,7 +161,10 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    String columnName = columnMetadata.getColumnName();
+    try (
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
+            columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
@@ -184,7 +187,11 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    String columnName = columnMetadata.getColumnName();
+
+    try (
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
+            columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {

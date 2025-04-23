@@ -143,7 +143,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
 
     try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
         .createIndexCreator(context, IndexConfig.ENABLED)) {
-      try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+      try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter,
+          _fieldIndexConfigs.get(columnName), columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
