@@ -45,10 +45,12 @@ import {
   SegmentDebugDetails,
   QuerySchemas,
   TableType,
-  InstanceState, SegmentMetadata,
+  InstanceState,
+  SegmentMetadata,
   SchemaInfo,
   SegmentStatusInfo,
-  ServerToSegmentsCount
+  ServerToSegmentsCount,
+  ConsumingSegmentsInfo
 } from 'Models';
 
 const headers = {
@@ -109,6 +111,11 @@ export const getServerToSegmentsCount = (name: string, tableType: TableType, ver
 
 export const getSegmentsStatus = (name: string): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
   baseApi.get(`/tables/${name}/segmentsStatus`);
+
+// Fetch consuming segments information for a table
+// API: GET /tables/{tableName}/consumingSegmentsInfo
+export const getConsumingSegmentsInfo = (name: string): Promise<AxiosResponse<ConsumingSegmentsInfo>> =>
+  baseApi.get(`/tables/${name}/consumingSegmentsInfo`);
 
 export const getInstances = (): Promise<AxiosResponse<Instances>> =>
   baseApi.get('/instances');

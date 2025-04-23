@@ -22,7 +22,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -37,6 +37,7 @@ import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import ReloadStatusOp from '../components/Homepage/Operations/ReloadStatusOp';
 import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceServerTableOp';
 import Confirm from '../components/Confirm';
+import CustomDialog from '../components/CustomDialog';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
@@ -155,6 +156,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
+  const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
+  const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -452,6 +456,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleRebalanceTableStatus = () => {
     setShowRebalanceServerStatus(true);
   };
+  const handleViewConsumingSegments = async () => {
+    setShowConsumingSegmentsModal(true);
+    setLoadingConsumingSegments(true);
+    try {
+      const data = await PinotMethodUtils.getConsumingSegmentsInfoData(tableName);
+      setConsumingSegmentsInfo(data);
+    } catch (error) {
+      dispatch({ type: 'error', message: `Error fetching consuming segments info: ${error}` });
+      setShowConsumingSegmentsModal(false);
+    } finally {
+      setLoadingConsumingSegments(false);
+    }
+  };
 
   const handleRebalanceBrokers = () => {
     setDialogDetails({
@@ -564,6 +581,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Rebalance Servers
               </CustomButton>
               <CustomButton
+                onClick={handleViewConsumingSegments}
+                tooltipTitle="View consuming segments info"
+                enableTooltip={true}
+              >
+                View Consuming Segments
+              </CustomButton>
+              <CustomButton
                   onClick={handleRebalanceTableStatus}
                   tooltipTitle="The status of table rebalance job"
                   enableTooltip={true}
@@ -653,7 +677,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   autoCursor={false}
                 />
               </SimpleAccordion>
-            </div>
+              </div>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
               data={segmentList}
@@ -742,6 +766,53 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             tableType={tableType.toUpperCase()}
             tableName={tableName}
           />
+        )}
+        {showConsumingSegmentsModal && (
+          <CustomDialog
+            open={showConsumingSegmentsModal}
+            handleClose={() => setShowConsumingSegmentsModal(false)}
+            title="Consuming Segments Info"
+            size="md"
+            showOkBtn={false}
+            btnCancelText="Close"
+            disableBackdropClick
+          >
+            {loadingConsumingSegments ? (
+              <Typography>Loading consuming segments info...</Typography>
+            ) : consumingSegmentsInfo ? (
+              <Box style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo.serversFailingToRespond}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo.serversUnparsableRespond}</Typography>
+                {Object.entries(consumingSegmentsInfo._segmentToConsumingInfoMap).map(([segment, infoList]) => (
+                  <SimpleAccordion key={segment} headerTitle={segment} showSearchBox={false}>
+                    {infoList.map((info, idx) => (
+                      <Box key={idx} mb={2}>
+                        <Typography><strong>Server Name:</strong> {info.serverName}</Typography>
+                        <Typography><strong>Consumer State:</strong> {info.consumerState}</Typography>
+                        <Typography><strong>Last Consumed:</strong> {Utils.formatTime(info.lastConsumedTimestamp)}</Typography>
+                        <CustomizedTables
+                          title="Partition Offsets"
+                          data={{
+                            columns: ['Partition', 'Current Offset', 'Latest Upstream Offset', 'Records Lag', 'Availability Lag (ms)'],
+                            records: Object.keys(info.partitionOffsetInfo.currentOffsetsMap).map(partition => [
+                              partition,
+                              info.partitionOffsetInfo.currentOffsetsMap[partition],
+                              info.partitionOffsetInfo.latestUpstreamOffsetMap[partition],
+                              info.partitionOffsetInfo.recordsLagMap[partition],
+                              info.partitionOffsetInfo.availabilityLagMsMap[partition],
+                            ]),
+                          }}
+                          showSearchBox={false}
+                        />
+                      </Box>
+                    ))}
+                  </SimpleAccordion>
+                ))}
+              </Box>
+            ) : (
+              <Typography>No consuming segments data available.</Typography>
+            )}
+          </CustomDialog>
         )}
         {confirmDialog && dialogDetails && (
           <Confirm
