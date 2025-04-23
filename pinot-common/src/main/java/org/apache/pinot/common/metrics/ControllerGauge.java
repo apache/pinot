@@ -207,9 +207,13 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // ZK JUTE max buffer size in bytes
   ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
 
+  // Deep store segment bytes that are currently being downloaded
   DEEP_STORE_SEGMENT_BYTES_DOWNLOADING("deepStoreSegmentBytesDownloading", true),
+  // Count of deep store segment downloads that are currently in progress
   DEEP_STORE_DOWNLOAD_COUNT("deepStoreDownloadCount", true),
+  // Deep store segment bytes that are currently being uploaded
   DEEP_STORE_SEGMENT_BYTES_UPLOADING("deepStoreSegmentBytesUploading", true),
+  // Count of deep store segment uploads that are currently in progress
   DEEP_STORE_UPLOAD_COUNT("deepStoreUploadCount", true);
 
   private final String _gaugeName;

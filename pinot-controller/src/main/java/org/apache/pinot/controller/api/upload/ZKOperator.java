@@ -19,6 +19,15 @@
 package org.apache.pinot.controller.api.upload;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -40,17 +49,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-import java.io.File;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-
 
 /**
  * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will
@@ -64,7 +62,6 @@ public class ZKOperator {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
-  private static final AtomicLong deepStoreSegmentBytesRequested = new AtomicLong(0);
 
   public ZKOperator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
