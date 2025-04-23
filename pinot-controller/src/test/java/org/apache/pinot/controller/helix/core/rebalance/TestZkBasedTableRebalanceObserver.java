@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -92,14 +93,18 @@ public class TestZkBasedTableRebalanceObserver {
 
   private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
       ZkBasedTableRebalanceObserver observer) {
-    Long additionProgress = controllerMetrics.getGaugeValue(
+    Long additionGaugeValue = controllerMetrics.getGaugeValue(
         ControllerGauge.TABLE_REBALANCE_JOB_ADDITION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
-    Long deletionProgress = controllerMetrics.getGaugeValue(
+    Long deletionGaugeValue = controllerMetrics.getGaugeValue(
         ControllerGauge.TABLE_REBALANCE_JOB_DELETION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
-    assertEquals(additionProgress, 100 - (long) observer.getTableRebalanceProgressStats()
-        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeAdded);
-    assertEquals(deletionProgress, 100 - (long) observer.getTableRebalanceProgressStats()
-        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeDeleted);
+    assertNotNull(additionGaugeValue);
+    assertNotNull(deletionGaugeValue);
+    long additionProgressRemained = (long) observer.getTableRebalanceProgressStats()
+        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeAdded;
+    long deletionProgressRemained = (long) observer.getTableRebalanceProgressStats()
+        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeDeleted;
+    assertEquals(additionGaugeValue, additionProgressRemained > 100 ? 0 : 100 - additionProgressRemained);
+    assertEquals(deletionGaugeValue, deletionProgressRemained > 100 ? 0 : 100 - deletionProgressRemained);
   }
 
   @Test
