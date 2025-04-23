@@ -105,7 +105,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   @Test
   public void testRebalance()
       throws Exception {
-    for (int batchSizePerServer : Arrays.asList(Integer.MAX_VALUE, 1)) {
+    for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1, 2)) {
       int numServers = 3;
       // Mock disk usage
       Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
@@ -681,7 +681,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   @Test(timeOut = 60000)
   public void testRebalanceStrictReplicaGroup()
       throws Exception {
-    for (int batchSizePerServer : Arrays.asList(Integer.MAX_VALUE, 3)) {
+    for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 3, 1)) {
       int numServers = 3;
       // Mock disk usage
       Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
@@ -766,6 +766,61 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       }
       executorService.shutdown();
     }
+  }
+
+  @Test
+  public void testRebalanceBatchSizeZero()
+      throws Exception {
+    int numServers = 3;
+    // Mock disk usage
+    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo1 =
+          new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo1);
+    }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, executorService, 1);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
+    // Set up the table with 1 replication factor and strict replica group enabled
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+                false)).build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
+    for (Map.Entry<String, Map<String, String>> entry : oldSegmentAssignment.entrySet()) {
+      assertEquals(entry.getValue().size(), 1);
+    }
+
+    // Rebalance should return NO_OP status since there has been no change
+    final RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBatchSizePerServer(0);
+    assertThrows(IllegalStateException.class, () -> tableRebalancer.rebalance(tableConfig, rebalanceConfig, null));
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    executorService.shutdown();
   }
 
   @Test

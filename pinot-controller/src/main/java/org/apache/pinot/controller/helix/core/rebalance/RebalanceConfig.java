@@ -27,10 +27,10 @@ import org.apache.pinot.spi.utils.Enablement;
 
 @ApiModel
 public class RebalanceConfig {
+  public static final int DISABLE_BATCH_SIZE_PER_SERVER = -1;
   public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
-  public static final int DEFAULT_BATCH_SIZE_PER_SERVER = Integer.MAX_VALUE; // unlimited batch size
 
   // Whether to rebalance table in dry-run mode
   @JsonProperty("dryRun")
@@ -97,10 +97,11 @@ public class RebalanceConfig {
   // as closest estimated upper-bound. For strict replica group based assignment, there is the additional constraint
   // to move each partitionId replica as a whole rather than splitting it up. In this case the total segment adds per
   // server may be above the threshold to accommodate a full partition. The minReplicasAvailable invariant is also
-  // maintained, so fewer segments than the batchSizePerServer may also be selected. Batching is disabled by default.
+  // maintained, so fewer segments than the batchSizePerServer may also be selected. Batching is disabled by default by
+  // setting it to -1.
   @JsonProperty("batchSizePerServer")
   @ApiModelProperty(example = "100")
-  private int _batchSizePerServer = DEFAULT_BATCH_SIZE_PER_SERVER;
+  private int _batchSizePerServer = DISABLE_BATCH_SIZE_PER_SERVER;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
