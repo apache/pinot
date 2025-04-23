@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -34,7 +36,11 @@ public interface JsonIndexCreator extends IndexCreator {
   @Override
   default void add(@Nonnull Object value, int dictId)
       throws IOException {
-    add((String) value);
+    if (value instanceof Map) {
+      add(JsonUtils.objectToString(value));
+    } else {
+      add((String) value);
+    }
   }
 
   @Override

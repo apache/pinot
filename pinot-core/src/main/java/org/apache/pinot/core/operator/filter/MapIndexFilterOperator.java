@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -35,12 +34,7 @@ import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.MapDataSource;
-import org.apache.pinot.segment.spi.index.IndexReader;
-import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 
 
 /**
@@ -74,24 +68,15 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
 
     // Get JSON index and create operator
     DataSource dataSource = indexSegment.getDataSource(_columnName);
-
-    if (dataSource instanceof MapDataSource) {
-      MapDataSource mapDS = (MapDataSource) dataSource;
-      MapIndexReader mapIndexReader = mapDS.getMapIndex();
-      if (mapIndexReader != null && useJsonIndex(_predicate.getType())) {
-        Map<IndexType, IndexReader> indexes = mapIndexReader.getKeyIndexes(_keyName);
-        JsonIndexReader jsonIndex = (JsonIndexReader) indexes.get(StandardIndexes.json());
-        _jsonMatchPredicate = createJsonMatchPredicate();
-        _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, numDocs);
-        _expressionFilterOperator = null;
-      } else {
-        _jsonMatchPredicate = null;
-        _jsonMatchOperator = null;
-        _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
-      }
+    JsonIndexReader jsonIndex = dataSource.getJsonIndex();
+    if (jsonIndex != null && useJsonIndex(_predicate.getType())) {
+      _jsonMatchPredicate = createJsonMatchPredicate();
+      _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, numDocs);
+      _expressionFilterOperator = null;
     } else {
-      throw new IllegalStateException(
-          "Expected MapDataSource for column: " + _columnName + ", found: " + dataSource.getClass().getSimpleName());
+      _jsonMatchPredicate = null;
+      _jsonMatchOperator = null;
+      _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
     }
   }
 
