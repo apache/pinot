@@ -27,7 +27,8 @@ import {
   SchemaInfo,
   SegmentMetadata,
   SqlException,
-  SQLResult
+  SQLResult,
+  TaskType
 } from 'Models';
 import moment from 'moment';
 import {
@@ -1030,13 +1031,12 @@ const rebalanceBrokersForTableOp = (tableName) => {
     return response.data;
   });
 };
-// Runs the RealtimeSegmentValidationManager periodic task for a given table
+
 const repairTableOp = (tableName, tableType) => {
-  return runPeriodicTask('RealtimeSegmentValidationManager', tableName, tableType).then((response) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
     return response.data;
   });
 };
-
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;

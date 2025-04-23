@@ -470,15 +470,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleRepairTable = () => {
     setDialogDetails({
       title: 'Repair Table',
-      content: 'Are you sure want to repair the table?',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
       successCb: () => repairTable()
     });
     setConfirmDialog(true);
   };
 
   const repairTable = async () => {
-    const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
-    syncResponse(result);
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
   };
 
   const closeDialog = () => {
@@ -572,13 +577,15 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Rebalance Brokers
               </CustomButton>
-              <CustomButton
-                onClick={handleRepairTable}
-                tooltipTitle="Repair table"
-                enableTooltip={true}
-              >
-                Repair Table
-              </CustomButton>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task"
+                  enableTooltip={true}
+                >
+                 Repair Table
+                </CustomButton>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
