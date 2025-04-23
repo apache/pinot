@@ -125,5 +125,4 @@ public abstract class BaseDataSource implements DataSource {
   public VectorIndexReader getVectorIndex() {
     return getIndex(StandardIndexes.vector());
   }
-
 }
