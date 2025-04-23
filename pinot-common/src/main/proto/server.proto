@@ -36,7 +36,8 @@ message ServerRequest {
   string sql = 2;
   repeated string segments = 3;
   bytes payload = 4;
-  repeated TableSegmentsInfo tableSegmentsInfo = 5;
+  repeated string optionalSegments = 5;
+  repeated TableSegmentsInfo tableSegmentsInfo = 6;
 }
 
 message ServerResponse {
