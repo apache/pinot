@@ -487,10 +487,6 @@ public class PerfBenchmarkDriver {
     return driver;
   }
 
-  public PinotHelixResourceManager getHelixResourceManager() {
-    return _helixResourceManager;
-  }
-
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();

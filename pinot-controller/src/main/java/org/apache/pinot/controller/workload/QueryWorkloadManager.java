@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.controller.workload;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.DefaultPropagationScheme;
-import org.apache.pinot.controller.workload.scheme.WorkloadPropagationUtils;
 import org.apache.pinot.controller.workload.scheme.TablePropagationScheme;
 import org.apache.pinot.controller.workload.scheme.TenantPropagationScheme;
+import org.apache.pinot.controller.workload.scheme.WorkloadPropagationUtils;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
 import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
 import org.apache.pinot.controller.workload.splitter.InstancesInfo;
@@ -33,11 +37,6 @@ import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 
 /**

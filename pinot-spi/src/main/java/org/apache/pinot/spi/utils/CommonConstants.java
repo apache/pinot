@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.spi.utils;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.query.QueryThreadContext;
-
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class CommonConstants {
