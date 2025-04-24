@@ -37,6 +37,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -80,16 +81,25 @@ public class TableMetadataReader {
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
       int timeoutMs) throws InvalidConfigException {
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-    Set<String> serverInstanceSet = getCurrentlyAssignedServersFromExternalView(externalView);
+    Set<String> serverInstanceSet = new HashSet<>();
+    if (externalView != null) {
+      serverInstanceSet = getCurrentlyAssignedServersFromExternalView(externalView);
+    }
     return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet);
   }
 
   private Set<String> getCurrentlyAssignedServersFromExternalView(ExternalView externalView) {
-    Map<String, Map<String, String>> assignment = externalView != null ? externalView.getRecord().getMapFields()
-        : new HashMap<>();
+    Map<String, Map<String, String>> assignment = externalView.getRecord().getMapFields();
     Set<String> servers = new HashSet<>();
     for (Map<String, String> serverStateMap : assignment.values()) {
-      servers.addAll(serverStateMap.keySet());
+      for (Map.Entry<String, String> entry : serverStateMap.entrySet()) {
+        String state = entry.getValue();
+        // Skip adding the server if the segment is in ERROR or OFFLINE state
+        if (CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
+            || CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
+          servers.add(entry.getKey());
+        }
+      }
     }
     return servers;
   }
