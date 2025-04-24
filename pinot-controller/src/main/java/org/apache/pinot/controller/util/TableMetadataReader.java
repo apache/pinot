@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
@@ -60,7 +61,7 @@ public class TableMetadataReader {
   }
 
   /**
-   * Check if segments need a reload on any servers
+   * Check if segments need a reload on any servers. Server list is obtained from the ExternalView of the table
    * @return response containing a) number of failed responses, b) reload responses returned
    */
   public TableReloadJsonResponse getServerCheckSegmentsReloadMetadata(String tableNameWithType,
@@ -71,25 +72,26 @@ public class TableMetadataReader {
     return processSegmentMetadataReloadResponse(segmentsMetadataResponse);
   }
 
+  /**
+   * Only send needReload request to servers that are part of the ExternalView. The tagged server list should not be
+   * used as it may be outdated and may not handle scenarios like tiered storage and COMPLETED segments.
+   * needReload throws an exception for servers that don't contain segments for the given table
+   */
   public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
       int timeoutMs) throws InvalidConfigException {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
-    Set<String> serverInstanceSet = new HashSet<>(serverInstances);
+    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    Set<String> serverInstanceSet = getCurrentlyAssignedServersFromExternalView(externalView);
     return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet);
   }
 
-  /**
-   * Check if segments need a reload on any servers based on a provided server set (useful for rebalance where the
-   * currently assigned servers may not match the currently tagged server list)
-   * @return response containing a) number of failed responses, b) reload responses returned
-   */
-  public TableReloadJsonResponse getServerSetCheckSegmentsReloadMetadata(String tableNameWithType,
-      int timeoutMs, Set<String> serverSet)
-      throws InvalidConfigException, IOException {
-    ServerSegmentMetadataReader.TableReloadResponse segmentsMetadataResponse = getServerSetReloadCheckResponses(
-        tableNameWithType, timeoutMs, serverSet);
-    return processSegmentMetadataReloadResponse(segmentsMetadataResponse);
+  private Set<String> getCurrentlyAssignedServersFromExternalView(ExternalView externalView) {
+    Map<String, Map<String, String>> assignment = externalView != null ? externalView.getRecord().getMapFields()
+        : new HashMap<>();
+    Set<String> servers = new HashSet<>();
+    for (Map<String, String> serverStateMap : assignment.values()) {
+      servers.addAll(serverStateMap.keySet());
+    }
+    return servers;
   }
 
   public ServerSegmentMetadataReader.TableReloadResponse getServerSetReloadCheckResponses(String tableNameWithType,
