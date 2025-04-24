@@ -136,6 +136,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
           .addService(this)
           .addTransportFilter(new GrpcQueryTransportFilter())
           .withOption(ChannelOption.ALLOCATOR, bufAllocator)
+          .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
           .build();
     } catch (Exception e) {
       throw new RuntimeException("Failed to start secure grpcQueryServer", e);

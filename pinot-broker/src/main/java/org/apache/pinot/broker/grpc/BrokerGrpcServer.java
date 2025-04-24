@@ -139,6 +139,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       NettyServerBuilder builder = NettyServerBuilder.forPort(portToUse)
           .addService(this)
           .addTransportFilter(new BrokerGrpcTransportFilter())
+          .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
           .withOption(ChannelOption.ALLOCATOR, bufAllocator);
 
       // Add SSL context only for secure connection
