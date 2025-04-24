@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -59,12 +60,12 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
   private final List<String> _optionalSegments;
   private final List<String> _notAcquiredSegments;
 
-  @Nullable
   public static SingleTableExecutionInfo create(InstanceDataManager instanceDataManager, String tableNameWithType,
-      List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext) {
+      List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext)
+      throws TableNotFoundException {
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      return null;
+      throw new TableNotFoundException(tableNameWithType);
     }
 
     List<String> notAcquiredSegments = new ArrayList<>();

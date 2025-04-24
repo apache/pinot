@@ -33,6 +33,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -190,13 +191,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     }
 
-    TableExecutionInfo executionInfo =
-        SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
-            queryRequest.getOptionalSegments(), queryContext);
-
-    if (executionInfo == null) {
+    TableExecutionInfo executionInfo;
+    try {
+        executionInfo =
+            SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
+                queryRequest.getOptionalSegments(), queryContext);
+    } catch (TableNotFoundException exception) {
       String errorMessage =
-          "Failed to find table: " + tableNameWithType + " on server: " + _instanceDataManager.getInstanceId();
+          "Failed to find table: " + exception.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
