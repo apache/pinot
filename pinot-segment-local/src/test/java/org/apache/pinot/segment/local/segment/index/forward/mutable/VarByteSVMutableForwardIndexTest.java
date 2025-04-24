@@ -83,7 +83,6 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
     try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,
         "StringColumn", initialCapacity, estimatedAvgStringLength)) {
       int rows = 1000;
-      int totalLength = 0;
       Random random = new Random();
       String[] data = new String[rows];
 
