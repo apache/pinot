@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -323,13 +324,14 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, UpsertCompactionTask.SNAPSHOT);
     if (validDocIdsType.equals(ValidDocIdsType.SNAPSHOT.toString())) {
       UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-      Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-      Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
-          "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = "
-              + "%s", validDocIdsType));
+      assert upsertConfig != null;
+      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "'snapshot' from UpsertConfig must not be 'DISABLE' for UpsertCompactionTask with validDocIdsType = %s",
+          validDocIdsType);
     } else if (validDocIdsType.equals(ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())) {
       UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-      Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+      assert upsertConfig != null;
       Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
           "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
           validDocIdsType));

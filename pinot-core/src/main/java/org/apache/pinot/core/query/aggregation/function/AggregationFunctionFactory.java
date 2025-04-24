@@ -385,17 +385,17 @@ public class AggregationFunctionFactory {
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
-            return new CountMVAggregationFunction(arguments);
+            return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
-            return new MinMVAggregationFunction(arguments);
+            return new MinMVAggregationFunction(arguments, nullHandlingEnabled);
           case MAXMV:
-            return new MaxMVAggregationFunction(arguments);
+            return new MaxMVAggregationFunction(arguments, nullHandlingEnabled);
           case SUMMV:
-            return new SumMVAggregationFunction(arguments);
+            return new SumMVAggregationFunction(arguments, nullHandlingEnabled);
           case AVGMV:
-            return new AvgMVAggregationFunction(arguments);
+            return new AvgMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMAXRANGEMV:
-            return new MinMaxRangeMVAggregationFunction(arguments);
+            return new MinMaxRangeMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(arguments);
           case DISTINCTCOUNTBITMAPMV:

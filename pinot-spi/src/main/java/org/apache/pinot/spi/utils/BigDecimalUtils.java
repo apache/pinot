@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -56,6 +59,45 @@ public class BigDecimalUtils {
     valueBytes[1] = (byte) scale;
     System.arraycopy(unscaledValueBytes, 0, valueBytes, 2, unscaledValueBytes.length);
     return valueBytes;
+  }
+
+  /**
+   * Serialize big decimal directly to data output stream.
+   */
+  public static void serialize(BigDecimal value, DataOutputStream out)
+      throws IOException {
+    if (value == null) {
+      out.writeInt(-1);
+    } else {
+      int scale = value.scale();
+      BigInteger unscaledValue = value.unscaledValue();
+      byte[] unscaledValueBytes = unscaledValue.toByteArray();
+      // avoid creating another temp array by writing directly to output stream
+      out.writeInt(unscaledValueBytes.length + 2);
+      out.write((byte) (scale >> 8));
+      out.write((byte) scale);
+      out.write(unscaledValueBytes);
+    }
+  }
+
+  /**
+   * Deserialize big decimal directly from data input stream.
+   */
+  public static BigDecimal deserialize(DataInputStream in)
+      throws IOException {
+    int length = in.readInt();
+    if (length == -1) {
+      return null;
+    }
+
+    byte scale0 = in.readByte();
+    byte scale1 = in.readByte();
+
+    int scale = (short) ((scale0 & 0xFF) << 8) | (scale1 & 0xFF);
+    byte[] unscaledValueBytes = new byte[length - 2];
+    in.readFully(unscaledValueBytes);
+    BigInteger unscaledValue = new BigInteger(unscaledValueBytes);
+    return new BigDecimal(unscaledValue, scale);
   }
 
   public static byte[] serializeWithSize(BigDecimal value, int fixedSize) {

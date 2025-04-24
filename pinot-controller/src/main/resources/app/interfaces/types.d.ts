@@ -258,6 +258,20 @@ declare module 'Models' {
       tableName: string
     }
   }
+
+  type RebalanceTableSegmentJob = {
+    jobId: string;
+    messageCount: number;
+    submissionTimeMs: number;
+    jobType: string;
+    tableName: string;
+    REBALANCE_PROGRESS_STATS: string;
+    REBALANCE_CONTEXT: string;
+  }
+
+  export type RebalanceTableSegmentJobs = {
+    [key: string]: RebalanceTableSegmentJob;
+  }
   
   export interface TaskRuntimeConfig {
     ConcurrentTasksPerWorker: string,
@@ -316,5 +330,9 @@ declare module 'Models' {
   export interface SqlException {
     errorCode: number,
     message: string
+  }
+
+  export const enum TaskType {
+    RealtimeSegmentValidationManager = 'RealtimeSegmentValidationManager'
   }
 }

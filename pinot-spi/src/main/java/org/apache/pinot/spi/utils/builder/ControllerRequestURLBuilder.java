@@ -174,6 +174,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenant) + "?type=" + tenantType + "&state=" + state;
   }
 
+  public String forToggleTableState(String tableName, TableType type, boolean enable) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "state") + "?type=" + type
+        + "&state=" + (enable ? "enable" : "disable");
+  }
+
   public String forLiveBrokerTablesGet() {
     return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
   }

@@ -228,6 +228,7 @@ public class ControllerTest {
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
     overrideControllerConf(properties);
     return properties;
   }
@@ -689,6 +690,11 @@ public class ControllerTest {
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().updateTableConfig(tableConfig);
+  }
+
+  public void toggleTableState(String tableName, TableType type, boolean enable)
+      throws IOException {
+    getControllerRequestClient().toggleTableState(tableName, type, enable);
   }
 
   public TableConfig getOfflineTableConfig(String tableName) {

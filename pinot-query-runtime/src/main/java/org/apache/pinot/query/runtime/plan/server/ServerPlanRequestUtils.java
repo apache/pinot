@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,6 +55,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -357,8 +359,28 @@ public class ServerPlanRequestUtils {
           expressions.add(RequestUtils.getLiteralExpression(arrString[rowIdx]));
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] arrBigDecimal = new BigDecimal[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBigDecimal[rowIdx] = (BigDecimal) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBigDecimal);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBigDecimal[rowIdx]));
+        }
+        break;
+      case BYTES:
+        ByteArray[] arrBytes = new ByteArray[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBytes[rowIdx] = (ByteArray) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBytes);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBytes[rowIdx].getBytes()));
+        }
+        break;
       default:
-        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+        throw new IllegalStateException("Illegal SV data type for IN filter: " + storedType);
     }
     return expressions;
   }

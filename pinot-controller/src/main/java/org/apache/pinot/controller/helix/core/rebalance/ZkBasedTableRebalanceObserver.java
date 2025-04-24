@@ -46,6 +46,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
   private final TableRebalanceContext _tableRebalanceContext;
+  // These previous stats are used for rollback scenarios where the IdealState update fails dure to a version
+  // change and the rebalance loop is retried.
+  private TableRebalanceProgressStats.RebalanceProgressStats _previousStepStats;
+  private TableRebalanceProgressStats.RebalanceProgressStats _previousOverallStats;
   private long _lastUpdateTimeMs;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
@@ -64,6 +68,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
+    _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats();
+    _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats();
     _numUpdatesToZk = 0;
     _controllerMetrics = ControllerMetrics.get();
   }
@@ -83,6 +89,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         break;
       // Write to Zk if there's change since previous stats computation
       case IDEAL_STATE_CHANGE_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         latest = getDifferenceBetweenTableRebalanceStates(targetState, currentState);
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.IDEAL_STATE_CHANGE_TRIGGER, _tableRebalanceProgressStats);
@@ -100,6 +110,12 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         }
         break;
       case EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
+        _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         latest = getDifferenceBetweenTableRebalanceStates(targetState, currentState);
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, _tableRebalanceProgressStats);
@@ -118,6 +134,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         }
         break;
       case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
@@ -188,6 +208,15 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED);
     _tableRebalanceProgressStats.setCompletionStatusMsg(errorMsg);
+    trackStatsInZk();
+  }
+
+  @Override
+  public void onRollback() {
+    _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(
+        new TableRebalanceProgressStats.RebalanceProgressStats(_previousStepStats));
+    _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(
+        new TableRebalanceProgressStats.RebalanceProgressStats(_previousOverallStats));
     trackStatsInZk();
   }
 

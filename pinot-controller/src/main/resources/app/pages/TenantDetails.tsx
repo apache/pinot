@@ -45,7 +45,7 @@ import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
 import {
-  RebalanceServerStatusOp, RebalanceTableSegmentJobs
+  RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
 
 const useStyles = makeStyles((theme) => ({
@@ -466,6 +466,25 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
   };
+  
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
+  };
 
   const closeDialog = () => {
     setConfirmDialog(false);
@@ -558,6 +577,15 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Rebalance Brokers
               </CustomButton>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
+                  enableTooltip={true}
+                >
+                 Repair Table
+                </CustomButton>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
