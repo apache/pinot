@@ -98,10 +98,10 @@ public class TestZkBasedTableRebalanceObserver {
     assertNotNull(progressGaugeValue);
     TableRebalanceProgressStats.RebalanceProgressStats overallProgress =
         observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
-    long progressRemained = (long) TableRebalanceProgressStats.calculatePercentageChange(
+    long progressRemained = (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
         overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
         overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
-            + overallProgress._totalRemainingSegmentsToConverge);
+            + overallProgress._totalRemainingSegmentsToConverge));
     assertEquals(progressGaugeValue, progressRemained > 100 ? 0 : 100 - progressRemained);
   }
 
