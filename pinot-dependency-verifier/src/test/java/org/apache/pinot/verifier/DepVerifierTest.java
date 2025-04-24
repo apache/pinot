@@ -24,14 +24,15 @@ import org.testng.annotations.Test;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 
 public class DepVerifierTest {
 
   @Test
-  public void testDetectsHardcodedVersionInPomTrue() throws Exception {
+  public void testIsHardcodedTrue() throws Exception {
     InputStream inputStream = getClass().getClassLoader()
         .getResourceAsStream("test-root-pom-hardcoded.xml");
 
@@ -39,7 +40,6 @@ public class DepVerifierTest {
 
     boolean foundHardcoded = false;
     int lineNumber = 0;
-    List<Integer> lineNumberList = new ArrayList<>();
 
     try (BufferedReader reader = new BufferedReader(
         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
@@ -57,7 +57,7 @@ public class DepVerifierTest {
   }
 
   @Test
-  public void testDetectsHardcodedVersionInPomFalse() throws Exception {
+  public void testIsHardcodedFalse() throws Exception {
     InputStream inputStream = getClass().getClassLoader()
         .getResourceAsStream("test-root-pom-no-hardcode.xml");
 
@@ -65,7 +65,6 @@ public class DepVerifierTest {
 
     boolean foundHardcoded = false;
     int lineNumber = 0;
-    List<Integer> lineNumberList = new ArrayList<>();
 
     try (BufferedReader reader = new BufferedReader(
         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
@@ -80,5 +79,21 @@ public class DepVerifierTest {
     }
 
     Assert.assertFalse(foundHardcoded, "Hardcoded version detected in the root POM file.");
+  }
+
+  @Test
+  public void testIsInsideTagBlock() throws Exception {
+    List<String> fullLines = Files.readAllLines(Paths.get("./src/test/resources/test-root-pom.xml"));
+
+    Assert.assertTrue(DepVerifier.isInsideTagBlock(60, fullLines, "dependencyManagement"),
+        "Line 60 should be inside <dependencyMangement>");
+    Assert.assertFalse(DepVerifier.isInsideTagBlock(50, fullLines, "dependencyManagement"),
+        "Line 50 should be outside <dependencyMangement>");
+    Assert.assertFalse(DepVerifier.isInsideTagBlock(83, fullLines, "dependencyManagement"),
+        "Line 83 should be outside <dependencyMangement>");
+
+    Assert.assertTrue(DepVerifier.isInsideTagBlock(50, fullLines, "plugins"), "Line 50 should be inside <plugins>");
+    Assert.assertTrue(DepVerifier.isInsideTagBlock(83, fullLines, "plugins"), "Line 83 should be inside <plugins>");
+    Assert.assertFalse(DepVerifier.isInsideTagBlock(65, fullLines, "plugins"), "Line 65 should be outside <plugins>");
   }
 }

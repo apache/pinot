@@ -37,10 +37,6 @@ public class DepVerifier {
       "pinot-spi",
       "contrib"
   );
-  private static final List<String> SKIPPED_ARTIFACTS = Arrays.asList(
-      "checkstyle",
-      "javacc"
-  );
 
   private DepVerifier() { }
 
@@ -57,6 +53,9 @@ public class DepVerifier {
       for (int lineNum: addedVersionLineNums) {
         String line = fullLines.get(lineNum - 1);
         if (isHardcoded(line)) {
+          if (isRootPom(pomPath) && isInsideTagBlock(lineNum, fullLines, "plugins")) {
+            continue;
+          }
           if (!isMaven(fullLines, lineNum)) {
             System.out.println("A dependency/non-Maven plugin is defined with a hardcoded version in the file "
                 + pomPath + " line " + line.trim());
@@ -161,9 +160,5 @@ public class DepVerifier {
 
   public static boolean isInSkippedDirs(String pomPath) {
     return SKIPPED_DIRS.stream().anyMatch(pomPath::contains);
-  }
-
-  public static boolean isInSkippedArtifacts(String artifactId) {
-    return SKIPPED_ARTIFACTS.stream().anyMatch(artifactId::contains);
   }
 }
