@@ -1308,8 +1308,8 @@ public class TableRebalancer {
       TableRebalanceProgressStats.RebalanceProgressStats overallStats =
           ((ZkBasedTableRebalanceObserver) _tableRebalanceObserver).getOverallStats();
       remainSegments =
-          overallStats._totalRemainingSegmentsToBeAdded + (lowDiskMode ? overallStats._totalRemainingSegmentsToBeDeleted
-              : 0);
+          overallStats._totalRemainingSegmentsToBeAdded + overallStats._totalRemainingSegmentsToConverge + (lowDiskMode
+              ? overallStats._totalRemainingSegmentsToBeDeleted : 0);
     }
     while (true) {
       do {
@@ -1346,11 +1346,18 @@ public class TableRebalancer {
             externalViewCheckIntervalInMs);
         Thread.sleep(externalViewCheckIntervalInMs);
       } while (System.currentTimeMillis() < endTimeMs);
+      if (bestEfforts) {
+        tableRebalanceLogger.warn(
+            "ExternalView has not converged within: {}ms, continuing the rebalance (best-efforts)",
+            externalViewStabilizationTimeoutInMs);
+        return idealState;
+      }
       if (_tableRebalanceObserver instanceof ZkBasedTableRebalanceObserver) {
         TableRebalanceProgressStats.RebalanceProgressStats overallStats =
             ((ZkBasedTableRebalanceObserver) _tableRebalanceObserver).getOverallStats();
-        int newRemainSegments = overallStats._totalRemainingSegmentsToBeAdded + (lowDiskMode
-            ? overallStats._totalRemainingSegmentsToBeDeleted : 0);
+        int newRemainSegments =
+            overallStats._totalRemainingSegmentsToBeAdded + overallStats._totalRemainingSegmentsToConverge + (
+                lowDiskMode ? overallStats._totalRemainingSegmentsToBeDeleted : 0);
         // The timeout is extended if progress has been made. (Net count of segments remaining to be processed are
         // reducing)
         if (newRemainSegments < remainSegments) {
@@ -1362,15 +1369,6 @@ public class TableRebalancer {
           continue;
         }
       }
-      break;
-    }
-
-    if (bestEfforts) {
-      tableRebalanceLogger.warn(
-          "ExternalView has not converged within: {}ms, continuing the rebalance (best-efforts)",
-          externalViewStabilizationTimeoutInMs);
-      return idealState;
-    } else {
       throw new TimeoutException(String.format("ExternalView has not converged within: %d ms",
           externalViewStabilizationTimeoutInMs));
     }
