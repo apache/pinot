@@ -78,10 +78,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-    _maxByteStringSize = _config.getProperty(
+    _maxByteStringSize = Math.max(_config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
-    ) / 2;
+    ) / 2, 1);
   }
 
   @Override
@@ -181,10 +181,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
+
+      final int[] i = {0};
       return byteStrings.stream().map(byteString -> MailboxContent.newBuilder()
           .setMailboxId(_id)
           .setPayload(byteString)
-          .setWaitForMore(true)
+          .setWaitForMore(++i[0] < byteStrings.size())
           .build());
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
