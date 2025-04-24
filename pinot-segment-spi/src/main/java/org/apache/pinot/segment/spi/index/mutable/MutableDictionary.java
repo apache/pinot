@@ -50,7 +50,7 @@ public interface MutableDictionary extends Dictionary {
   }
 
   /**
-   * This method returns a boolean denoting whether the mutable index can consume any more rows or not.
+   * This method returns a boolean denoting whether the mutable dictionary can consume any more rows or not.
    */
   default boolean canAddMore() {
     return true;
