@@ -93,18 +93,16 @@ public class TestZkBasedTableRebalanceObserver {
 
   private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
       ZkBasedTableRebalanceObserver observer) {
-    Long additionGaugeValue = controllerMetrics.getGaugeValue(
-        ControllerGauge.TABLE_REBALANCE_JOB_ADDITION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
-    Long deletionGaugeValue = controllerMetrics.getGaugeValue(
-        ControllerGauge.TABLE_REBALANCE_JOB_DELETION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
-    assertNotNull(additionGaugeValue);
-    assertNotNull(deletionGaugeValue);
-    long additionProgressRemained = (long) observer.getTableRebalanceProgressStats()
-        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeAdded;
-    long deletionProgressRemained = (long) observer.getTableRebalanceProgressStats()
-        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeDeleted;
-    assertEquals(additionGaugeValue, additionProgressRemained > 100 ? 0 : 100 - additionProgressRemained);
-    assertEquals(deletionGaugeValue, deletionProgressRemained > 100 ? 0 : 100 - deletionProgressRemained);
+    Long progressGaugeValue = controllerMetrics.getGaugeValue(
+        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
+    assertNotNull(progressGaugeValue);
+    TableRebalanceProgressStats.RebalanceProgressStats overallProgress =
+        observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    long progressRemained = (long) TableRebalanceProgressStats.calculatePercentageChange(
+        overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
+        overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
+            + overallProgress._totalRemainingSegmentsToConverge);
+    assertEquals(progressGaugeValue, progressRemained > 100 ? 0 : 100 - progressRemained);
   }
 
   @Test
