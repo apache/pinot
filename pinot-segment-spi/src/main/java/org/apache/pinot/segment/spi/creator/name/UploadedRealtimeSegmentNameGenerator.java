@@ -66,8 +66,8 @@ public class UploadedRealtimeSegmentNameGenerator implements SegmentNameGenerato
     _tableName = tableName;
     _partitionId = partitionId;
     _creationTimeMillis = creationTimeMillis;
-    _prefix = prefix;
-    _suffix = suffix;
+    _prefix = prefix.trim().replaceAll("\\s+", "_");
+    _suffix = suffix != null ? suffix.trim().replaceAll("\\s+", "_") : null;
   }
 
   @Override

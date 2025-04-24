@@ -167,7 +167,7 @@ public class SegmentGenerationUtils {
             + baseInputDir);
     String outputDirStr = sanitizeURIString(outputDir.toString());
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
-    URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
+    URI relativeOutputURI = outputDir.resolve(relativePath.getPath().replaceAll("\\s+", "_")).resolve(".");
     return relativeOutputURI;
   }
 

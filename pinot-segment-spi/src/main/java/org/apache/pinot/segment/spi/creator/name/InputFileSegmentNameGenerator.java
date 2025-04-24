@@ -92,6 +92,7 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
         }
         segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), value);
       }
+      segmentName = segmentName.replaceAll("\\s+", "_");
     }
     return _appendUUIDToSegmentName ? JOINER.join(segmentName, UUID.randomUUID()) : segmentName;
   }
@@ -105,7 +106,7 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
     // Strip of leading '/' characters
     inputFilePath = inputFilePath.replaceFirst("^[/]+", "");
     // Try to create a valid filename by removing any '/' or '.' chars with '_'
-    return inputFilePath.replaceAll("[/\\.]", "_");
+    return inputFilePath.replaceAll("[/\\.\\s+]", "_");
   }
 
   @Override
