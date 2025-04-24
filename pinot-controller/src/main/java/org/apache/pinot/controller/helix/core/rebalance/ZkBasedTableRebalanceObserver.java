@@ -202,6 +202,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
     _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(progressStats);
     trackStatsInZk();
+    emitProgressMetricDone();
   }
 
   @Override
@@ -240,17 +241,30 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   /**
    * Emits the rebalance progress in percent to the metrics. Uses the percentage of remaining segments to be added as
    * the indicator of the overall progress.
+   * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
+   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become 0)
+   * Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
    * @param overallProgress the latest overall progress
    */
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
-    long progressPercent = 100 - (long) TableRebalanceProgressStats.calculatePercentageChange(
+    // Round this up so the metric is 100 only when no segment remains
+    long progressPercent = 100 - (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
         overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
         overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
-            + overallProgress._totalRemainingSegmentsToConverge);
+            + overallProgress._totalRemainingSegmentsToConverge));
     // Using the original job ID to group rebalance retries together with the same label
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
         ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
         progressPercent < 0 ? 0 : progressPercent);
+  }
+
+  /**
+   * Emits the rebalance progress as 100 (%) to the metrics. This is to ensure that the progress is at least aligned
+   * when the job done to avoid confusion
+   */
+  private void emitProgressMetricDone() {
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
+        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT, 100);
   }
 
   @VisibleForTesting
