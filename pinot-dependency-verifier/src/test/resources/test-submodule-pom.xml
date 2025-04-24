@@ -1,0 +1,17 @@
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.codehaus.mojo</groupId>
+      <artifactId>build-helper-maven-plugin</artifactId>
+      <version>3.6.0</version>
+    </plugin>
+  </plugins>
+</build>
+<dependencies>
+  <dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-sql_${scala.compat.version}</artifactId>
+    <version>${spark3.version}</version>
+    <scope>provided</scope>
+  </dependency>
+</dependencies>
