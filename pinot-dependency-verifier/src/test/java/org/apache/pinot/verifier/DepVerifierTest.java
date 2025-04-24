@@ -31,9 +31,35 @@ import java.util.List;
 public class DepVerifierTest {
 
   @Test
-  public void testDetectsHardcodedVersionInRootPom() throws Exception {
+  public void testDetectsHardcodedVersionInPomTrue() throws Exception {
     InputStream inputStream = getClass().getClassLoader()
         .getResourceAsStream("test-root-pom-hardcoded.xml");
+
+    Assert.assertNotNull(inputStream, "Test file not found");
+
+    boolean foundHardcoded = false;
+    int lineNumber = 0;
+    List<Integer> lineNumberList = new ArrayList<>();
+
+    try (BufferedReader reader = new BufferedReader(
+        new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        lineNumber++;
+        if (line.contains("<version>") && DepVerifier.isHardcoded(line)) {
+          System.out.println("Hardcoded version at line " + lineNumber + ": " + line.trim());
+          foundHardcoded = true;
+        }
+      }
+    }
+
+    Assert.assertTrue(foundHardcoded, "No hardcoded version detected in the root POM file.");
+  }
+
+  @Test
+  public void testDetectsHardcodedVersionInPomFalse() throws Exception {
+    InputStream inputStream = getClass().getClassLoader()
+        .getResourceAsStream("test-root-pom-no-hardcode.xml");
 
     Assert.assertNotNull(inputStream, "Test file not found");
 
