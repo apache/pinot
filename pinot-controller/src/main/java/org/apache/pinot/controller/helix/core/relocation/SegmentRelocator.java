@@ -48,6 +48,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +76,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
   private final boolean _includeConsuming;
-  private final RebalanceConfig.MinimizeDataMovementOptions _minimizeDataMovement;
+  private final Enablement _minimizeDataMovement;
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;

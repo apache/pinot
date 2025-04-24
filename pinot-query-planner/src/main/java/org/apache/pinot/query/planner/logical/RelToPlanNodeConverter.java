@@ -186,7 +186,7 @@ public final class RelToPlanNodeConverter {
       }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
+        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null);
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {
