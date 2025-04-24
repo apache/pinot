@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalIntersect;
@@ -154,7 +155,12 @@ public final class PlanNodeToRelConverter {
           conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
         }
 
-        _builder.join(node.getJoinType(), conditions);
+        if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
+          RexNode matchCondition = RexExpressionUtils.toRexNode(_builder, node.getMatchCondition());
+          _builder.asofJoin(node.getJoinType(), _builder.and(conditions), matchCondition);
+        } else {
+          _builder.join(node.getJoinType(), conditions);
+        }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),

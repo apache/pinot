@@ -84,11 +84,14 @@ enum JoinType {
   FULL = 3;
   SEMI = 4;
   ANTI = 5;
+  ASOF = 6;
+  LEFT_ASOF = 7;
 }
 
 enum JoinStrategy {
   HASH = 0;
   LOOKUP = 1;
+  AS_OF = 2;
 }
 
 message JoinNode {
@@ -97,6 +100,7 @@ message JoinNode {
   repeated int32 rightKeys = 3;
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
+  Expression matchCondition = 6;
 }
 
 enum ExchangeType {

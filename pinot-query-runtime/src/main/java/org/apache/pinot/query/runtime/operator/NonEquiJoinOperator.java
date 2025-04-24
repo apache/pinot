@@ -27,7 +27,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -57,42 +56,15 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable() {
-    LOGGER.trace("Building right table for join operator");
-    long startTime = System.currentTimeMillis();
-    MseBlock rightBlock = _rightInput.nextBlock();
-    while (rightBlock.isData()) {
-      List<Object[]> rows = ((MseBlock.Data) rightBlock).asRowHeap().getRows();
-      int numRowsInRightTable = _rightTable.size();
-      // Row based overflow check.
-      if (rows.size() + numRowsInRightTable > _maxRowsInJoin) {
-        if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwForJoinRowLimitExceeded(
-              "Cannot build in memory right table for join operator, reached number of rows limit: " + _maxRowsInJoin);
-        } else {
-          // Just fill up the buffer.
-          int remainingRows = _maxRowsInJoin - numRowsInRightTable;
-          rows = rows.subList(0, remainingRows);
-          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
-          _rightInput.earlyTerminate();
-        }
-      }
-      _rightTable.addAll(rows);
-      sampleAndCheckInterruption();
-      rightBlock = _rightInput.nextBlock();
+  protected void addRowsToRightTable(List<Object[]> rows) {
+    _rightTable.addAll(rows);
+  }
+
+  @Override
+  protected void finishBuildingRightTable() {
+    if (needUnmatchedRightRows()) {
+      _matchedRightRows = new BitSet(_rightTable.size());
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
-    } else {
-      _isRightTableBuilt = true;
-      if (needUnmatchedRightRows()) {
-        _matchedRightRows = new BitSet(_rightTable.size());
-      }
-    }
-    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
-    LOGGER.trace("Finished building right table for join operator");
   }
 
   @Override

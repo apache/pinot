@@ -28,6 +28,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
@@ -97,8 +98,14 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
 
     // TODO: Consider creating different JOIN Rel for each join strategy
-    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), newLeft, newRight, join.getJoinType(),
-        join.isSemiJoinDone()));
+    if (join instanceof LogicalAsofJoin) {
+      // Note that we don't use the MATCH_CONDITION in an ASOF JOIN to determine the distribution, only the join keys
+      // in the ON clause of the ASOF JOIN.
+      call.transformTo(((LogicalAsofJoin) join).copy(join.getTraitSet(), List.of(newLeft, newRight)));
+    } else {
+      call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), newLeft, newRight, join.getJoinType(),
+          join.isSemiJoinDone()));
+    }
   }
 
   private static PinotLogicalExchange createExchangeForLookupJoin(PinotHintOptions.DistributionType distributionType,
