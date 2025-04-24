@@ -331,4 +331,8 @@ declare module 'Models' {
     errorCode: number,
     message: string
   }
+
+  export const enum TaskType {
+    RealtimeSegmentValidationManager = 'RealtimeSegmentValidationManager'
+  }
 }

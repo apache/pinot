@@ -27,7 +27,8 @@ import {
   SchemaInfo,
   SegmentMetadata,
   SqlException,
-  SQLResult
+  SQLResult,
+  TaskType
 } from 'Models';
 import moment from 'moment';
 import {
@@ -39,6 +40,7 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -1030,6 +1032,11 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;
@@ -1360,6 +1367,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,
