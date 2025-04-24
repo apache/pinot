@@ -546,13 +546,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Check if response can be sent without server query evaluation.
-    if (offlineBrokerRequest != null && isFilterAlwaysFalse(offlineBrokerRequest.getPinotQuery())
-        && !hasFunctionsQuery(offlineBrokerRequest.getPinotQuery())) {
+    if (offlineBrokerRequest != null && isFilterAlwaysFalse(offlineBrokerRequest.getPinotQuery())) {
       // We don't need to evaluate offline request
       offlineBrokerRequest = null;
     }
-    if (realtimeBrokerRequest != null && isFilterAlwaysFalse(realtimeBrokerRequest.getPinotQuery())
-        && !hasFunctionsQuery(realtimeBrokerRequest.getPinotQuery())) {
+    if (realtimeBrokerRequest != null && isFilterAlwaysFalse(realtimeBrokerRequest.getPinotQuery())) {
       // We don't need to evaluate realtime request
       realtimeBrokerRequest = null;
     }
@@ -1663,15 +1661,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
     return true;
-  }
-
-  static boolean hasFunctionsQuery(PinotQuery pinotQuery) {
-    for (Expression expression : pinotQuery.getSelectList()) {
-      if (CalciteSqlParser.isFunction(expression)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**

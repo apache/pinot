@@ -361,10 +361,6 @@ public class CalciteSqlParser {
     return false;
   }
 
-  public static boolean isFunction(Expression expression) {
-    return ExpressionType.FUNCTION.equals(expression.getType());
-  }
-
   public static boolean isAsFunction(Expression expression) {
     Function function = expression.getFunctionCall();
     return function != null && function.getOperator().equals("as");
