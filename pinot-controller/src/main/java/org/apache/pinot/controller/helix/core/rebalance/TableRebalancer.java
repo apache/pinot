@@ -1686,9 +1686,9 @@ public class TableRebalancer {
       Map<String, String> instanceStateMap = assignment.getValue();
 
       int partitionId =
-          segmentPartitionIdMap.computeIntIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName));
-      partitionIdToCurrentAssignmentMap.putIfAbsent(partitionId, new TreeMap<>());
-      partitionIdToCurrentAssignmentMap.get(partitionId).put(segmentName, instanceStateMap);
+          segmentPartitionIdMap.computeIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName));
+      partitionIdToCurrentAssignmentMap.computeIfAbsent(partitionId,
+          k -> new TreeMap<>()).put(segmentName, instanceStateMap);
     }
 
     return partitionIdToCurrentAssignmentMap;
