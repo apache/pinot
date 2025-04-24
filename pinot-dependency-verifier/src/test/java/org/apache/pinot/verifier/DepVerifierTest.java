@@ -86,14 +86,24 @@ public class DepVerifierTest {
     List<String> fullLines = Files.readAllLines(Paths.get("./src/test/resources/test-root-pom.xml"));
 
     Assert.assertTrue(DepVerifier.isInsideTagBlock(60, fullLines, "dependencyManagement"),
-        "Line 60 should be inside <dependencyMangement>");
+        "Line 60 should be inside <dependencyManagement>");
     Assert.assertFalse(DepVerifier.isInsideTagBlock(50, fullLines, "dependencyManagement"),
-        "Line 50 should be outside <dependencyMangement>");
+        "Line 50 should be outside <dependencyManagement>");
     Assert.assertFalse(DepVerifier.isInsideTagBlock(83, fullLines, "dependencyManagement"),
-        "Line 83 should be outside <dependencyMangement>");
+        "Line 83 should be outside <dependencyManagement>");
 
     Assert.assertTrue(DepVerifier.isInsideTagBlock(50, fullLines, "plugins"), "Line 50 should be inside <plugins>");
     Assert.assertTrue(DepVerifier.isInsideTagBlock(83, fullLines, "plugins"), "Line 83 should be inside <plugins>");
     Assert.assertFalse(DepVerifier.isInsideTagBlock(65, fullLines, "plugins"), "Line 65 should be outside <plugins>");
+  }
+
+  @Test
+  public void testIsMaven() throws Exception {
+    List<String> fullLines = Files.readAllLines(Paths.get("./src/test/resources/test-submodule-pom.xml"));
+
+    Assert.assertTrue(DepVerifier.isMaven(fullLines, 6),
+        "Line 6 should be part of Maven plugin");
+    Assert.assertFalse(DepVerifier.isMaven(fullLines, 14),
+        "Line 27 should not be part of Maven plugin");
   }
 }
