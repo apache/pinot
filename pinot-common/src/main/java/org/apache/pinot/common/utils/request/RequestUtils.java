@@ -225,6 +225,8 @@ public class RequestUtils {
       BigDecimal bigDecimalValue = node.bigDecimalValue();
       assert bigDecimalValue != null;
       SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) node;
+      // TODO: this check doesn't protect from overflow during big decimal -> long conversion!
+      // e.g. 92233720368547758071 literal produces -9 of INT type
       if (sqlNumericLiteral.isExact() && sqlNumericLiteral.isInteger()) {
         long longValue = bigDecimalValue.longValue();
         if (longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE) {

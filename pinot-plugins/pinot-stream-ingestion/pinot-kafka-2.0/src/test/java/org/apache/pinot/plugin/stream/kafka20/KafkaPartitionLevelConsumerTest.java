@@ -116,7 +116,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -124,7 +123,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
@@ -158,7 +156,6 @@ public class KafkaPartitionLevelConsumerTest {
   public void testGetPartitionCount() {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -166,7 +163,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -178,7 +174,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -192,7 +187,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -200,7 +194,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -220,7 +213,6 @@ public class KafkaPartitionLevelConsumerTest {
   private void testFetchOffsets(String topic) {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -228,7 +220,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -261,7 +252,6 @@ public class KafkaPartitionLevelConsumerTest {
       throws TimeoutException {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -269,7 +259,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
@@ -382,7 +371,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", "kafka");
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_3);
     streamConfigMap.put("stream.kafka.broker.list", _kafkaBrokerAddress);
-    streamConfigMap.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("auto.offset.reset", "earliest");
@@ -407,7 +395,6 @@ public class KafkaPartitionLevelConsumerTest {
   public void testGetTopics() {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
     String tableNameWithType = "tableName_REALTIME";
 
@@ -415,7 +402,6 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("streamType", streamType);
     streamConfigMap.put("stream.kafka.topic.name", "NON_EXISTING_TOPIC");
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);

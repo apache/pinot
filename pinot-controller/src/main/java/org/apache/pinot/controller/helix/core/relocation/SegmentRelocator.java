@@ -48,6 +48,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final boolean _bestEfforts;
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
+  private final boolean _includeConsuming;
+  private final Enablement _minimizeDataMovement;
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
@@ -94,6 +97,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _downtime = config.getSegmentRelocatorDowntime();
     _minAvailableReplicas = config.getSegmentRelocatorMinAvailableReplicas();
     _bestEfforts = config.getSegmentRelocatorBestEfforts();
+    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
+    _minimizeDataMovement = config.getSegmentRelocatorRebalanceMinimizeDataMovement();
     // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
     long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
     _externalViewCheckIntervalInMs =
@@ -187,6 +192,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+    rebalanceConfig.setIncludeConsuming(_includeConsuming);
+    rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.

@@ -68,6 +68,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -161,11 +162,12 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _dedupTimeColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
-  private final String _upsertOutOfOrderRecordColumn;
   private final boolean _upsertDropOutOfOrderRecord;
+  private final String _upsertOutOfOrderRecordColumn;
+  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
+
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -388,23 +390,20 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
-    if (_partitionDedupMetadataManager != null) {
-      _dedupTimeColumn = config.getDedupTimeColumn() == null ? _timeColumnName : config.getDedupTimeColumn();
-    } else {
-      _dedupTimeColumn = null;
-    }
+    _dedupTimeColumn =
+        _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getDedupTimeColumn()
+            : null;
 
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
-    _upsertConsistencyMode = config.getUpsertConsistencyMode();
     if (_partitionUpsertMetadataManager != null) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
-      List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
-      _upsertComparisonColumns =
-          upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
-      _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
-      _upsertOutOfOrderRecordColumn = config.getUpsertOutOfOrderRecordColumn();
-      _upsertDropOutOfOrderRecord = config.isUpsertDropOutOfOrderRecord();
+      UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
+      _upsertComparisonColumns = upsertContext.getComparisonColumns();
+      _deleteRecordColumn = upsertContext.getDeleteRecordColumn();
+      _upsertDropOutOfOrderRecord = upsertContext.isDropOutOfOrderRecord();
+      _upsertOutOfOrderRecordColumn = upsertContext.getOutOfOrderRecordColumn();
+      _upsertConsistencyMode = upsertContext.getConsistencyMode();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
@@ -414,10 +413,11 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       _upsertComparisonColumns = null;
       _deleteRecordColumn = null;
+      _upsertDropOutOfOrderRecord = false;
+      _upsertOutOfOrderRecordColumn = null;
+      _upsertConsistencyMode = null;
       _validDocIds = null;
       _queryableDocIds = null;
-      _upsertOutOfOrderRecordColumn = null;
-      _upsertDropOutOfOrderRecord = false;
     }
   }
 

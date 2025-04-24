@@ -37,7 +37,7 @@ public class BrokerGrpcQueryClient extends BaseGrpcQueryClient<Broker.BrokerRequ
   }
 
   @Override
-  Iterator<Broker.BrokerResponse> submit(Broker.BrokerRequest request) {
+  public Iterator<Broker.BrokerResponse> submit(Broker.BrokerRequest request) {
     return _blockingStub.submit(request);
   }
 }

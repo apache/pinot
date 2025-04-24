@@ -24,15 +24,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
@@ -108,6 +111,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private String _authToken;
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
+  @CommandLine.Option(names = {"-enablePerQueryStats"}, required = false, description = "Enable per query stats "
+      + "reporting (default: false).")
+  private boolean _enablePerQueryStats = false;
 
   private enum QueryMode {
     FULL, RESAMPLE
@@ -186,7 +192,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         singleThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
-                _authTokenUrl, _authToken, _user, _password)));
+                _authTokenUrl, _authToken, _user, _password)), _enablePerQueryStats);
         break;
       case "multiThreads":
         if (_numThreads <= 0) {
@@ -201,7 +207,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         multiThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
-                _authTokenUrl, _authToken, _user, _password)));
+                _authTokenUrl, _authToken, _user, _password)), _enablePerQueryStats);
         break;
       case "targetQPS":
         if (_numThreads <= 0) {
@@ -222,7 +228,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(
-                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)),
+            _enablePerQueryStats);
         break;
       case "increasingQPS":
         if (_numThreads <= 0) {
@@ -254,7 +261,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         increasingQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS, _deltaQPS,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(
-                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)),
+            _enablePerQueryStats);
         break;
       default:
         LOGGER.error("Invalid mode: {}", _mode);
@@ -284,7 +292,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout,
-      Map<String, String> headers)
+      Map<String, String> headers, boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     int numQueriesExecuted = 0;
@@ -292,6 +300,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long totalBrokerTime = 0L;
     long totalClientTime = 0L;
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new HashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     final long startTimeAbsolute = System.currentTimeMillis();
     boolean timeoutReached = false;
@@ -315,8 +330,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         long clientTime = response.get("totalTime").asLong();
         totalClientTime += clientTime;
         boolean hasException = !response.get("exceptions").isEmpty();
+        if (hasException) {
+          LOGGER.error("Query: {} failed with errors: {}", query, response.get("exceptions").toString());
+        }
         numExceptions += hasException ? 1 : 0;
         statisticsList.get(0).addValue(clientTime);
+        if (queryStatMap != null) {
+          queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+        }
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -350,7 +371,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
-            statisticsList);
+            statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -386,7 +407,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
+      boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -395,12 +417,19 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -462,7 +491,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -499,7 +528,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
+      boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -508,12 +538,19 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -585,7 +622,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Target QPS: {}", startQPS);
@@ -627,7 +664,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout,
-      Map<String, String> headers)
+      Map<String, String> headers, boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -636,12 +673,19 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -735,7 +779,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Current Target QPS: {}", currentQPS);
@@ -783,7 +827,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
-      AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers)
+      AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers,
+      @Nullable Map<String, QueryStat> queryStatMap)
       throws Exception {
     JsonNode response = driver.postQuery(query, headers);
     numQueriesExecuted.getAndIncrement();
@@ -792,7 +837,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long clientTime = response.get("totalTime").asLong();
     totalClientTime.getAndAdd(clientTime);
     boolean hasException = !response.get("exceptions").isEmpty();
+    if (hasException) {
+      LOGGER.error("Query: {} failed with errors: {}", query, response.get("exceptions").toString());
+    }
     numExceptions.getAndAdd(hasException ? 1 : 0);
+    if (queryStatMap != null) {
+      queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+    }
 
     statisticsList.get(0).addValue(clientTime);
   }
@@ -806,10 +857,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final AtomicInteger _numExceptions;
     private final List<Statistics> _statisticsList;
     private final Map<String, String> _headers;
+    @Nullable
+    private final Map<String, QueryStat> _queryStatMap;
 
     private Worker(PerfBenchmarkDriver driver, Queue<String> queryQueue, AtomicInteger numQueriesExecuted,
         AtomicLong totalBrokerTime, AtomicLong totalClientTime, AtomicInteger numExceptions,
-        List<Statistics> statisticsList, Map<String, String> headers) {
+        List<Statistics> statisticsList, Map<String, String> headers, @Nullable Map<String, QueryStat> queryStatMap) {
       _driver = driver;
       _queryQueue = queryQueue;
       _numQueriesExecuted = numQueriesExecuted;
@@ -818,6 +871,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       _numExceptions = numExceptions;
       _statisticsList = statisticsList;
       _headers = headers;
+      _queryStatMap = queryStatMap;
     }
 
     @Override
@@ -834,7 +888,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         try {
           executeQueryInMultiThreads(_driver, query, _numQueriesExecuted, _totalBrokerTime, _totalClientTime,
-              _numExceptions, _statisticsList, _headers);
+              _numExceptions, _statisticsList, _headers, _queryStatMap);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running query: {}", query, e);
           return;
@@ -893,9 +947,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final double _avgBrokerTime;
     private final double _avgClientTime;
     private final List<Statistics> _statisticsList;
+    @Nullable
+    private final Map<String, QueryStat> _queryStats;
 
     private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions, long totalBrokerTime,
-        long totalClientTime, List<Statistics> statisticsList) {
+        long totalClientTime, List<Statistics> statisticsList, @Nullable Map<String, QueryStat> queryStats) {
       _timePassed = timePassed;
       _numQueriesExecuted = numQueriesExecuted;
       _numExceptions = numExceptions;
@@ -903,6 +959,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       _avgBrokerTime = totalBrokerTime / (double) numQueriesExecuted;
       _avgClientTime = totalClientTime / (double) numQueriesExecuted;
       _statisticsList = statisticsList;
+      _queryStats = queryStats;
     }
 
     public long getTimePassed() {
@@ -930,7 +987,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     public double getPercentile(double p) {
-      if (_statisticsList == null || _statisticsList.size() == 0) {
+      if (_statisticsList == null || _statisticsList.isEmpty()) {
         return 0.0;
       }
 
@@ -942,12 +999,49 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       return _statisticsList;
     }
 
+    @Nullable
+    public Map<String, QueryStat> getQueryStats() {
+      return _queryStats;
+    }
+
     @Override
     public String toString() {
       return String.format("Time Passed: %sms\nQueries Executed: %s\nExceptions: %s\n"
               + "Average QPS: %s\nAverage Broker Time: %sms\nAverage Client Time: %sms", _timePassed,
           _numQueriesExecuted,
           _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
+    }
+  }
+
+  public static class QueryStat {
+    private int _numExecutions = 0;
+    private int _numExceptionalExecutions = 0;
+    private double _totalBrokerTime = 0.0;
+    private double _totalClientTime = 0.0;
+
+    public synchronized void addExecution(double brokerTime, double clientTime, boolean hasException) {
+      _numExecutions++;
+      if (hasException) {
+        _numExceptionalExecutions++;
+      }
+      _totalBrokerTime += brokerTime;
+      _totalClientTime += clientTime;
+    }
+
+    public double getAvgBrokerTime() {
+      return _totalBrokerTime / _numExecutions;
+    }
+
+    public double getAvgClientTime() {
+      return _totalClientTime / _numExecutions;
+    }
+
+    public int getNumExecutions() {
+      return _numExecutions;
+    }
+
+    public int getNumExceptionalExecutions() {
+      return _numExceptionalExecutions;
     }
   }
 

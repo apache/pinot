@@ -34,7 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * to prevent garbage collection.
  */
 @SuppressWarnings("Duplicates")
-public class DataBlockCache {
+public class DataBlockCache implements AutoCloseable {
   private final DataFetcher _dataFetcher;
 
   // Mark whether data have been fetched, need to be cleared in initNewBlock()
@@ -242,6 +242,27 @@ public class DataBlockCache {
     return bytesValues;
   }
 
+  public int[] get32BitsMurmur3HashValuesForSVColumn(String column) {
+    // TODO: This is not cached
+    int[] hashValues = new int[_length];
+    _dataFetcher.fetch32BitsMurmur3HashValues(column, _docIds, _length, hashValues);
+    return hashValues;
+  }
+
+  public long[] get64BitsMurmur3HashValuesForSVColumn(String column) {
+    // TODO: This is not cached
+    long[] hashValues = new long[_length];
+    _dataFetcher.fetch64BitsMurmur3HashValues(column, _docIds, _length, hashValues);
+    return hashValues;
+  }
+
+  public long[][] get128BitsMurmur3HashValuesForSVColumn(String column) {
+    // TODO: This is not cached
+    long[][] hashValues = new long[_length][];
+    _dataFetcher.fetch128BitsMurmur3HashValues(column, _docIds, _length, hashValues);
+    return hashValues;
+  }
+
   /**
    * MULTI-VALUED COLUMN API
    */
@@ -405,5 +426,13 @@ public class DataBlockCache {
 
   public void addDataSource(String fullColumnKeyName, DataSource keyDataSource) {
     _dataFetcher.addDataSource(fullColumnKeyName, keyDataSource);
+  }
+
+  /**
+   * Close the data block cache and release all resources.
+   */
+  @Override
+  public void close() {
+    _dataFetcher.close();
   }
 }

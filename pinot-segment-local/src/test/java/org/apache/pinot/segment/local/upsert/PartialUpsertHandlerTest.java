@@ -52,6 +52,14 @@ public class PartialUpsertHandlerTest {
   }
 
   @Test
+  public void testForceOverwrite() {
+    testMerge(true, 0, true, 0, "field4", 0, true);
+    testMerge(true, 0, false, 1, "field4", 1, false);
+    testMerge(false, 0, true, 1, "field4", 1, true);
+    testMerge(false, 3, false, 5, "field4", 5, false);
+  }
+
+  @Test
   public void testNonOverwrite() {
     testMerge(true, 2, true, 2, "field2", 2, true);
     testMerge(true, 2, false, 8, "field2", 8, false);
@@ -106,13 +114,14 @@ public class PartialUpsertHandlerTest {
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
+    partialUpsertStrategies.put("field4", UpsertConfig.Strategy.FORCE_OVERWRITE);
 
     try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
         (mockReader, context) -> {
           when(mockReader.isNull(1)).thenReturn(isPreviousNull);
           when(mockReader.getValue(1)).thenReturn(previousValue);
         })) {
-      UpsertConfig upsertConfig = new UpsertConfig();
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
       upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
       PartialUpsertHandler handler =
@@ -145,7 +154,7 @@ public class PartialUpsertHandlerTest {
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
-    UpsertConfig upsertConfig = new UpsertConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     upsertConfig.setPartialUpsertMergerClass("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
 

@@ -19,7 +19,17 @@
 
 import jwtDecode from "jwt-decode";
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, InstanceType, SchemaInfo, SegmentMetadata, SqlException, SQLResult } from 'Models';
+import {
+  DataTable,
+  InstanceType,
+  RebalanceTableSegmentJob,
+  RebalanceTableSegmentJobs,
+  SchemaInfo,
+  SegmentMetadata,
+  SqlException,
+  SQLResult,
+  TaskType
+} from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -30,6 +40,7 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -321,6 +332,7 @@ const getQueryResults = (params) => {
       'numEntriesScannedInFilter',
       'numEntriesScannedPostFilter',
       'numGroupsLimitReached',
+      'numGroupsWarningLimitReached',
       'partialResponse',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
@@ -343,7 +355,7 @@ const getQueryResults = (params) => {
         columns: columnStats,
         records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
-          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
+          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
           queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
           queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
@@ -965,6 +977,18 @@ const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   return response.data;
 }
 
+const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTableSegmentJob[]> => {
+  const response = await getTableJobs(tableName, "TABLE_REBALANCE");
+  if (response.data.error) {
+    return [];
+  }
+
+  const rebalanceTableSegmentJobs: RebalanceTableSegmentJob[] = Object.keys(response.data as RebalanceTableSegmentJobs)
+      .map(jobId => response.data[jobId] as RebalanceTableSegmentJob)
+      .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
+  return rebalanceTableSegmentJobs;
+}
+
 const fetchSegmentReloadStatus = async (jobId: string) => {
   const response = await getSegmentReloadStatus(jobId);
   
@@ -1008,6 +1032,11 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;
@@ -1308,6 +1337,7 @@ export default {
   getAllPeriodicTaskNames,
   getAllTaskTypes,
   fetchTableJobs,
+  fetchRebalanceTableJobs,
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
@@ -1337,6 +1367,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,

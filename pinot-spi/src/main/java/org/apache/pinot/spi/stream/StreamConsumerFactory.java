@@ -19,12 +19,15 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
  * Factory for a stream which provides a consumer and a metadata provider for the stream
  */
 public abstract class StreamConsumerFactory {
+  private static final AtomicInteger CLIENT_ID_SEQ = new AtomicInteger(0);
+
   protected StreamConfig _streamConfig;
 
   /**
@@ -71,5 +74,12 @@ public abstract class StreamConsumerFactory {
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
       String groupId) {
     throw new UnsupportedOperationException();
+  }
+
+  public static String getUniqueClientId(String prefix) {
+    if (prefix == null) {
+      return String.valueOf(CLIENT_ID_SEQ.getAndIncrement());
+    }
+    return prefix + "-" + CLIENT_ID_SEQ.getAndIncrement();
   }
 }

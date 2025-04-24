@@ -44,6 +44,9 @@ import { get, isEmpty } from "lodash";
 import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
+import {
+  RebalanceServerStatusOp
+} from "../components/Homepage/Operations/RebalanceServerStatusOp";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -151,6 +154,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [tableJobsData, setTableJobsData] = useState<TableSegmentJobs | null>(null);
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
+  const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -445,6 +449,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     }
   };
 
+  const handleRebalanceTableStatus = () => {
+    setShowRebalanceServerStatus(true);
+  };
+
   const handleRebalanceBrokers = () => {
     setDialogDetails({
       title: (<>Rebalance brokers <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-brokers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>),
@@ -457,6 +465,25 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const rebalanceBrokers = async () => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
+  };
+  
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
   };
 
   const closeDialog = () => {
@@ -537,12 +564,28 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Rebalance Servers
               </CustomButton>
               <CustomButton
+                  onClick={handleRebalanceTableStatus}
+                  tooltipTitle="The status of table rebalance job"
+                  enableTooltip={true}
+              >
+                Rebalance Servers Status
+              </CustomButton>
+              <CustomButton
                 onClick={handleRebalanceBrokers}
                 tooltipTitle="Rebuilds brokerResource mapping for this table"
                 enableTooltip={true}
               >
                 Rebalance Brokers
               </CustomButton>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
+                  enableTooltip={true}
+                >
+                 Repair Table
+                </CustomButton>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
@@ -685,6 +728,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             reloadStatusData={reloadStatusData}
             tableJobsData={tableJobsData}
           />
+        )}
+        {showRebalanceServerStatus && (
+            <RebalanceServerStatusOp
+                hideModal={() => setShowRebalanceServerStatus(false)}
+                tableName={tableName} />
         )}
         {showRebalanceServerModal && (
           <RebalanceServerTableOp

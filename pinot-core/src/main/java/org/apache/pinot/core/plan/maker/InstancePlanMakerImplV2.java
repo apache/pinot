@@ -110,6 +110,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
   private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  // Warning limit on number of groups stored for each segment
+  private int _numGroupsWarningLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   // Used for SQL GROUP BY (server combine)
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
@@ -131,6 +133,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions.checkState(_minInitialIndexedTableCapacity <= _numGroupsLimit,
         "Invalid configuration: minInitialIndexedTableCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _minInitialIndexedTableCapacity, _numGroupsLimit);
+    _numGroupsWarningLimit = queryExecutorConfig.getProperty(Server.NUM_GROUPS_WARN_LIMIT,
+        Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT);
     _minSegmentGroupTrimSize = queryExecutorConfig.getProperty(Server.MIN_SEGMENT_GROUP_TRIM_SIZE,
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE);
     _minServerGroupTrimSize = queryExecutorConfig.getProperty(Server.MIN_SERVER_GROUP_TRIM_SIZE,
@@ -256,6 +260,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setNumGroupsLimit(_numGroupsLimit);
       }
+      // Set numGroupsWarningThreshold
+      queryContext.setNumGroupsWarningLimit(_numGroupsWarningLimit);
       // Set minSegmentGroupTrimSize
       Integer minSegmentGroupTrimSizeFromQuery = QueryOptionsUtils.getMinSegmentGroupTrimSize(queryOptions);
       if (minSegmentGroupTrimSizeFromQuery != null) {
@@ -374,8 +380,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       for (Pair<AggregationFunction, FilterContext> filteredAggregationFunction : filtAggrFuns) {
         FilterContext right = filteredAggregationFunction.getRight();
         if (right != null) {
-          Predicate predicate = right.getPredicate();
-          predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+          overrideWithExpressionHints(right, indexSegment, expressionOverrideHints);
         }
       }
     }

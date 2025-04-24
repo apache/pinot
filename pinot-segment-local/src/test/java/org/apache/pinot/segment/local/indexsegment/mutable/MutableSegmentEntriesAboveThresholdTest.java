@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URL;
-import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
@@ -77,10 +76,7 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
 
     _schema = config.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    return MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            Collections.emptyMap(),
-            false, false, null, null, null, null, null, null, Collections.emptyList());
+    return MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema);
   }
 
   @Test

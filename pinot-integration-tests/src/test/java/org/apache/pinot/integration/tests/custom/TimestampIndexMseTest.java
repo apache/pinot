@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
 
 
 public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
@@ -86,23 +89,6 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInFilters() {
-    setUseMultiStageQueryEngine(true);
-    explain("SELECT 1 FROM mytable where datetrunc('SECOND',ArrTime) > 1",
-        "Execution Plan\n"
-            + "PinotLogicalExchange(distribution=[broadcast])\n"
-            + "  LeafStageCombineOperator(table=[mytable])\n"
-            + "    StreamingInstanceResponse\n"
-            + "      StreamingCombineSelect\n"
-            + "        SelectStreaming(table=[mytable], totalDocs=[115545])\n"
-            + "          Transform(expressions=[['1']])\n"
-            + "            Project(columns=[[]])\n"
-            + "              DocIdSet(maxDocs=[120000])\n"
-            + "                FilterRangeIndex(predicate=[$ArrTime$SECOND > '1'], indexLookUp=[range_index], "
-            + "operator=[RANGE])\n");
-  }
-
-  @Test
   public void timestampIndexSubstitutedInAggregateFilter() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT sum(case when datetrunc('SECOND',ArrTime) > 1 then 2 else 0 end) FROM mytable",
@@ -122,6 +108,36 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
             + "              Project(columns=[[]])\n"
             + "                DocIdSet(maxDocs=[120000])\n"
             + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
+  }
+
+  @Test
+  public void timestampIndexCompoundAggregateFilter()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query =
+        "SELECT SUM(1) FILTER (WHERE AirlineID = 19393 AND DATE_TRUNC('SECOND', ArrTime) > 100) FROM "
+            + "mytable LIMIT 100";
+    JsonNode result = postQuery(query);
+    assertNoError(result);
+    assertTrue(result.get("resultTable").get("rows").get(0).get(0).asInt() > 0);
+    explain(query, "Execution Plan\n"
+        + "LogicalSort(fetch=[100])\n"
+        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], "
+        + "isSortOnReceiver=[false])\n"
+        + "    LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
+        + "        PinotLogicalExchange(distribution=[hash])\n"
+        + "          LeafStageCombineOperator(table=[mytable])\n"
+        + "            StreamingInstanceResponse\n"
+        + "              CombineAggregate\n"
+        + "                AggregateFiltered(aggregations=[[sum('1'), count(*)]])\n"
+        + "                  Transform(expressions=[['1']])\n"
+        + "                    Project(columns=[[]])\n"
+        + "                      DocIdSet(maxDocs=[120000])\n"
+        + "                        FilterAnd\n"
+        + "                          FilterRangeIndex(predicate=[$ArrTime$SECOND > '100'], indexLookUp=[range_index],"
+        + " operator=[RANGE])\n"
+        + "                          FilterFullScan(predicate=[AirlineID = '19393'], operator=[EQ])\n");
   }
 
   @Test

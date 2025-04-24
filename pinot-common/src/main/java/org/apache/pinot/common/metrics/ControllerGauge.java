@@ -54,8 +54,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // be queried from the table.
   SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
 
+  // Track response size of getChildren from /PROPERTYSTORE/SEGMENTS/<table>
+  PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE("propertystore", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
+  EXTERNALVIEW_ZNODE_SIZE("externalview", false),
+  EXTERNALVIEW_ZNODE_BYTE_SIZE("externalview", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
@@ -149,20 +153,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Consumption availability lag in ms at a partition level
   MAX_RECORD_AVAILABILITY_LAG_MS("maxRecordAvailabilityLagMs", false),
 
-  // Number of table schema got misconfigured
-  MISCONFIGURED_SCHEMA_TABLE_COUNT("misconfiguredSchemaTableCount", true),
+  // Number of table without table config
+  TABLE_WITHOUT_TABLE_CONFIG_COUNT("tableWithoutTableConfigCount", true),
 
-  // Number of table without schema
+  // Number of table with table config but without schema
   TABLE_WITHOUT_SCHEMA_COUNT("tableWithoutSchemaCount", true),
-
-  // Number of table schema got fixed
-  FIXED_SCHEMA_TABLE_COUNT("fixedSchemaTableCount", true),
-
-  // Number of tables that we want to fix but failed to copy schema from old schema name to new schema name
-  FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
-
-  // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
 
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE("LLCSegmentDeepStoreUploadRetryQueueSize", false),
 
@@ -186,11 +181,42 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
 
+  TABLE_REBALANCE_IN_PROGRESS_GLOBAL("jobs", true),
+
   // Number of reingested segments getting uploaded
   REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
 
   // Resource utilization is within limits or not for a table
-  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false);
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  // The number of segments in deepstore that do not have corresponding metadata in ZooKeeper.
+  // These segments are untracked and should be considered for deletion based on retention policies.
+  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
+
+  // Metric used to track errors during the periodic table retention management
+  RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table
+  PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
+
+  // ZK JUTE max buffer size in bytes
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  // Bytes to be read from deep store
+  DEEP_STORE_READ_BYTES_IN_PROGRESS("deepStoreReadBytesInProgress", true),
+  // Count of deep store segment downloads that are currently in progress
+  DEEP_STORE_READ_OPS_IN_PROGRESS("deepStoreReadOpsInProgress", true),
+  // Bytes to be written to deep store
+  DEEP_STORE_WRITE_BYTES_IN_PROGRESS("deepStoreWriteBytesInProgress", true),
+  // Count of deep store segment writes that are currently in progress
+  DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true);
 
   private final String _gaugeName;
   private final String _unit;

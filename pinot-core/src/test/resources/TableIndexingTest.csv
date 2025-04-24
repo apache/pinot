@@ -198,27 +198,49 @@ DECIMAL;sv_BIG;dict;range_index;true;
 DECIMAL;sv_BIG;dict;startree_index;true;
 DECIMAL;sv_BIG;dict;vector_index;false;Vector index is currently only supported on float array columns
 BOOLEAN;sv;raw;timestamp_index;true;
-BOOLEAN;sv;raw;bloom_filter;true;
+BOOLEAN;sv;raw;bloom_filter;false;Cannot create a bloom filter on boolean column col
 BOOLEAN;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 BOOLEAN;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;sv;raw;json_index;false;Json index is currently only supported on STRING columns
 BOOLEAN;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 BOOLEAN;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
-BOOLEAN;sv;raw;range_index;false;Unsupported data type BOOLEAN for range index
+BOOLEAN;sv;raw;range_index;true;
 BOOLEAN;sv;raw;startree_index;false;Dimension: col does not have dictionary
 BOOLEAN;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
 BOOLEAN;mv;raw;timestamp_index;false;Caught exception while reading data
-BOOLEAN;mv;raw;bloom_filter;true;
+BOOLEAN;mv;raw;bloom_filter;false;Cannot create a bloom filter on boolean column col
 BOOLEAN;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 BOOLEAN;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
 BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
 BOOLEAN;mv;raw;json_index;false;Json index is currently only supported on single-value columns
 BOOLEAN;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 BOOLEAN;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
-BOOLEAN;mv;raw;range_index;false;Range index is not supported for columns of data type:BOOLEAN
+BOOLEAN;mv;raw;range_index;true;
 BOOLEAN;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
 BOOLEAN;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+BOOLEAN;sv;dict;timestamp_index;true;
+BOOLEAN;sv;dict;bloom_filter;false;Cannot create a bloom filter on boolean column col
+BOOLEAN;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BOOLEAN;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+BOOLEAN;sv;dict;inverted_index;true;
+BOOLEAN;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+BOOLEAN;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;sv;dict;range_index;true;
+BOOLEAN;sv;dict;startree_index;true;
+BOOLEAN;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+BOOLEAN;mv;dict;timestamp_index;false;Caught exception while reading data
+BOOLEAN;mv;dict;bloom_filter;false;Cannot create a bloom filter on boolean column col
+BOOLEAN;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BOOLEAN;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+BOOLEAN;mv;dict;inverted_index;true;
+BOOLEAN;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+BOOLEAN;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;mv;dict;range_index;true;
+BOOLEAN;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+BOOLEAN;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
 TIMESTAMP;sv;raw;timestamp_index;true;
 TIMESTAMP;sv;raw;bloom_filter;true;
 TIMESTAMP;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
@@ -227,19 +249,19 @@ TIMESTAMP;sv;raw;inverted_index;false;Cannot create inverted index for raw index
 TIMESTAMP;sv;raw;json_index;false;Json index is currently only supported on STRING columns
 TIMESTAMP;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 TIMESTAMP;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
-TIMESTAMP;sv;raw;range_index;false;Unsupported data type TIMESTAMP for range index
+TIMESTAMP;sv;raw;range_index;true;
 TIMESTAMP;sv;raw;startree_index;false;Dimension: col does not have dictionary
 TIMESTAMP;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
 TIMESTAMP;mv;raw;timestamp_index;true;
 TIMESTAMP;mv;raw;bloom_filter;true;
 TIMESTAMP;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
-TIMESTAMP;mv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
 TIMESTAMP;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-TIMESTAMP;mv;raw;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;mv;raw;json_index;false;Json index is currently only supported on single-value columns
 TIMESTAMP;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 TIMESTAMP;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
-TIMESTAMP;mv;raw;range_index;false;Unsupported data type TIMESTAMP for range index
-TIMESTAMP;mv;raw;startree_index;false;Dimension: col does not have dictionary
+TIMESTAMP;mv;raw;range_index;true;
+TIMESTAMP;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
 TIMESTAMP;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
 TIMESTAMP;sv;dict;timestamp_index;true;
 TIMESTAMP;sv;dict;bloom_filter;true;
@@ -255,13 +277,13 @@ TIMESTAMP;sv;dict;vector_index;false;Vector index is currently only supported on
 TIMESTAMP;mv;dict;timestamp_index;true;
 TIMESTAMP;mv;dict;bloom_filter;true;
 TIMESTAMP;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
-TIMESTAMP;mv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
 TIMESTAMP;mv;dict;inverted_index;true;
-TIMESTAMP;mv;dict;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;mv;dict;json_index;false;Json index is currently only supported on single-value columns
 TIMESTAMP;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 TIMESTAMP;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 TIMESTAMP;mv;dict;range_index;true;
-TIMESTAMP;mv;dict;startree_index;true;
+TIMESTAMP;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
 TIMESTAMP;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
 STRING;sv;raw;timestamp_index;false;Caught exception while reading data
 STRING;sv;raw;bloom_filter;true;

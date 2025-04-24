@@ -29,7 +29,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
-import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -114,28 +113,23 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Reloads a segment in a table. This method can download a new segment to replace the local
-   * one before loading. Download happens when local segment's CRC mismatches the one of
-   * the remote segment; but can also be forced to do regardless of CRC.
+   * Reloads a segment in a table. This method can download a new segment to replace the local one before loading.
+   * Download happens when local segment's CRC mismatches the one of the remote segment; but can also be forced to do
+   * regardless of CRC.
    */
   void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception;
 
   /**
    * Reloads all segments of a table.
-   * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload,
-      SegmentRefreshSemaphore segmentRefreshSemaphore)
+  void reloadAllSegments(String tableNameWithType, boolean forceDownload)
       throws Exception;
 
   /**
    * Reload a list of segments in a table.
-   * @param segmentNames is the list of segment to reload
-   * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
    */
-  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
-      SegmentRefreshSemaphore segmentRefreshSemaphore)
+  void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload)
       throws Exception;
 
   /**
@@ -202,4 +196,9 @@ public interface InstanceDataManager {
    * Returns consumer directory paths on the instance
    */
   List<File> getConsumerDirPaths();
+
+  /**
+   * Returns the instance data directory
+   */
+  String getInstanceDataDir();
 }

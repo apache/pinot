@@ -41,6 +41,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 
@@ -54,10 +55,13 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
   public void setUpContextBuilder()
       throws IOException {
     FileUtils.forceMkdir(TEMP_DIR);
-    _dedupContextBuilder = new DedupContext.Builder();
-    _dedupContextBuilder.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
-        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setTableIndexDir(mock(File.class))
-        .setTableDataManager(mock(TableDataManager.class)).setTableIndexDir(TEMP_DIR);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
+    _dedupContextBuilder = new DedupContext.Builder()
+        .setTableConfig(mock(TableConfig.class))
+        .setSchema(mock(Schema.class))
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn"));
   }
 
   @AfterMethod

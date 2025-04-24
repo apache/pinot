@@ -21,11 +21,6 @@ package org.apache.pinot.query;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -33,16 +28,9 @@ import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 
 /**
@@ -59,9 +47,6 @@ import static org.mockito.Mockito.when;
  * multi-stage query communication.
  */
 public class QueryServerEnclosure {
-  private static final String TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE/";
-  private static final String SCHEMAS_PREFIX = "/SCHEMAS/";
-
   private final int _queryRunnerPort;
   private final QueryRunner _queryRunner;
 
@@ -75,33 +60,8 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
-    HelixManager helixManager = mockHelixManager(factory.buildSchemaMap());
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, helixManager, mockServiceMetrics(),
-        null);
-  }
-
-  private HelixManager mockHelixManager(Map<String, Schema> schemaMap) {
-    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore = mock(ZkHelixPropertyStore.class);
-    when(zkHelixPropertyStore.get(anyString(), any(), anyInt())).thenAnswer(invocationOnMock -> {
-      String path = invocationOnMock.getArgument(0);
-      if (path.startsWith(TABLE_CONFIGS_PREFIX)) {
-        // TODO: add table config mock.
-        return null;
-      } else if (path.startsWith(SCHEMAS_PREFIX)) {
-        String tableName = TableNameBuilder.extractRawTableName(path.substring(SCHEMAS_PREFIX.length()));
-        return SchemaUtils.toZNRecord(schemaMap.get(tableName));
-      } else {
-        return null;
-      }
-    });
-    HelixManager helixManager = mock(HelixManager.class);
-    when(helixManager.getHelixPropertyStore()).thenReturn(zkHelixPropertyStore);
-    return helixManager;
-  }
-
-  private ServerMetrics mockServiceMetrics() {
-    return mock(ServerMetrics.class);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
   }
 
   public int getPort() {
@@ -118,8 +78,11 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap, ThreadExecutionContext parentContext) {
-    return CompletableFuture.runAsync(
-        () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext),
-        _queryRunner.getExecutorService());
+    try (QueryThreadContext.CloseableContext closeMe1 = QueryThreadContext.openFromRequestMetadata(requestMetadataMap);
+        QueryThreadContext.CloseableContext closeMe2 = MseWorkerThreadContext.open()) {
+      return CompletableFuture.runAsync(
+          () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext),
+          _queryRunner.getExecutorService());
+    }
   }
 }

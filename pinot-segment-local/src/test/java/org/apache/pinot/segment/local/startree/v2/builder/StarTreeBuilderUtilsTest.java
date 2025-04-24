@@ -23,8 +23,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,32 +63,32 @@ public class StarTreeBuilderUtilsTest {
   @Test
   public void testAreStarTreeBuilderConfigListsEqual() {
     // Create StartTreeIndexConfigs to test for unequal starTree configs.
-    StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(List.of("Carrier", "Distance"), null,
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     // Different skip star node creation.
     StarTreeIndexConfig starTreeIndexConfig2 =
-        new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Collections.singletonList("Distance"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        new StarTreeIndexConfig(List.of("Carrier", "Distance"), List.of("Distance"),
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     // Different dimension split order.
-    StarTreeIndexConfig starTreeIndexConfig3 = new StarTreeIndexConfig(Arrays.asList("Distance", "Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig3 = new StarTreeIndexConfig(List.of("Distance", "Carrier"), null,
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     // Different max leaf records.
-    StarTreeIndexConfig starTreeIndexConfig4 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 200);
+    StarTreeIndexConfig starTreeIndexConfig4 = new StarTreeIndexConfig(List.of("Carrier", "Distance"), null,
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 200);
 
     // Create StartTreeAggregationConfigs with StarTreeAggregationConfig.
     StarTreeAggregationConfig starTreeAggregationConfig1 = new StarTreeAggregationConfig("Distance", "MAX");
 
     // Different AggregationConfig.
-    StarTreeIndexConfig starTreeIndexConfig5 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null, null,
-        Collections.singletonList(starTreeAggregationConfig1), 100);
+    StarTreeIndexConfig starTreeIndexConfig5 =
+        new StarTreeIndexConfig(List.of("Carrier", "Distance"), null, null, List.of(starTreeAggregationConfig1), 100);
 
     // Create StarTreeIndexConfig for equality check.
-    StarTreeIndexConfig starTreeIndexConfig6 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig6 = new StarTreeIndexConfig(List.of("Carrier", "Distance"), null,
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     // test unequal builder config size.
     List<StarTreeV2BuilderConfig> config1 = new ArrayList<>();
@@ -139,11 +137,15 @@ public class StarTreeBuilderUtilsTest {
 
     // Create Schema and SegmentMetadata for testing.
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.INT)
-        .addSingleValueDimension("d2", FieldSpec.DataType.LONG).addSingleValueDimension("d3", FieldSpec.DataType.FLOAT)
-        .addSingleValueDimension("d4", FieldSpec.DataType.DOUBLE).addMultiValueDimension("d5", FieldSpec.DataType.INT)
-        .addMetric("m1", FieldSpec.DataType.DOUBLE).addMetric("m2", FieldSpec.DataType.BYTES)
+        .addSingleValueDimension("d2", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("d3", FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension("d4", FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension("d5", FieldSpec.DataType.INT)
+        .addMetric("m1", FieldSpec.DataType.DOUBLE)
+        .addMetric("m2", FieldSpec.DataType.BYTES)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "t"), null)
-        .addDateTime("dt", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
+        .addDateTime("dt", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .build();
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getSchema()).thenReturn(schema);
     // Included
@@ -176,31 +178,30 @@ public class StarTreeBuilderUtilsTest {
 
     // // Create a list of string with column name, hasDictionary and cardinality.
     List<List<String>> columnList =
-        Arrays.asList(Arrays.asList("d1", "true", "200"), Arrays.asList("d2", "true", "400"),
-            Arrays.asList("d3", "true", "20000"), Arrays.asList("d4", "false", "100"),
-            Arrays.asList("d5", "true", "100"), Arrays.asList("m1", "false", "-1"), Arrays.asList("m2", "true", "100"),
-            Arrays.asList("t", "true", "20000"), Arrays.asList("dt", "true", "30000"));
+        List.of(List.of("d1", "true", "200"), List.of("d2", "true", "400"), List.of("d3", "true", "20000"),
+            List.of("d4", "false", "100"), List.of("d5", "true", "100"), List.of("m1", "false", "-1"),
+            List.of("m2", "true", "100"), List.of("t", "true", "20000"), List.of("dt", "true", "30000"));
 
     // Convert the list of string to JsonNode with appropriate key names and root node.
     JsonNode segmentMetadataAsJsonNode = convertStringListToJsonNode(columnList);
 
     // Create StartTreeIndexConfig for testing.
-    StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+    StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(List.of("Carrier", "Distance"), null,
+        List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     StarTreeIndexConfig starTreeIndexConfig2 =
-        new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Collections.singletonList("Distance"),
-            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+        new StarTreeIndexConfig(List.of("Carrier", "Distance"), List.of("Distance"),
+            List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 100);
 
     // Create StartTreeV2BuilderConfig from segmentMetadataImpl.
     List<StarTreeV2BuilderConfig> builderConfig1 =
-        StarTreeBuilderUtils.generateBuilderConfigs(Arrays.asList(starTreeIndexConfig1, starTreeIndexConfig2), true,
+        StarTreeBuilderUtils.generateBuilderConfigs(List.of(starTreeIndexConfig1, starTreeIndexConfig2), true,
             segmentMetadata);
 
     // Create StartTreeV2BuilderConfig from JsonNode.
     List<StarTreeV2BuilderConfig> builderConfig2 =
-        StarTreeBuilderUtils.generateBuilderConfigs(Arrays.asList(starTreeIndexConfig1, starTreeIndexConfig2), true,
-            schema, segmentMetadataAsJsonNode);
+        StarTreeBuilderUtils.generateBuilderConfigs(List.of(starTreeIndexConfig1, starTreeIndexConfig2), true, schema,
+            segmentMetadataAsJsonNode);
 
     // They should be equal.
     assertEquals(builderConfig1, builderConfig2);
@@ -215,16 +216,16 @@ public class StarTreeBuilderUtilsTest {
     StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("col1"), aggregationSpecs, 100, Set.of());
     StarTreeV2Metadata existingStarTreeMetadata = new StarTreeV2Metadata(metadataProperties);
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
-        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
-            null, null, null, null, null)), 100);
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null, List.of(
+        new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16), null, null, null,
+            null, null)), 100);
     assertFalse(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
         List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
 
     // Change log2m value
-    starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
-        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
-            null, null, null, null, null)), 100);
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null, List.of(
+        new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8), null, null, null,
+            null, null)), 100);
     assertTrue(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
         List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
   }
@@ -232,72 +233,76 @@ public class StarTreeBuilderUtilsTest {
   @Test
   public void testExpressionContextFromFunctionParameters() {
     // DISTINCTCOUNTHLL
-    DistinctCountHLLValueAggregator hllValueAggregator = (DistinctCountHLLValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLL,
-        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
-            Map.of(Constants.HLL_LOG2M_KEY, "10")));
+    DistinctCountHLLValueAggregator hllValueAggregator =
+        (DistinctCountHLLValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTHLL,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
+                Map.of(Constants.HLL_LOG2M_KEY, "10")));
     assertEquals(10, hllValueAggregator.getLog2m());
 
-    hllValueAggregator = (DistinctCountHLLValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLL,
-            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
-                Map.of()));
+    hllValueAggregator = (DistinctCountHLLValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTHLL,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
+            Map.of()));
     // Verify default value used
     assertEquals(8, hllValueAggregator.getLog2m());
 
     // DISTINCTCOUNTHLLPLUS
-    DistinctCountHLLPlusValueAggregator hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-            Map.of(Constants.HLLPLUS_ULL_P_KEY, "10", Constants.HLLPLUS_SP_KEY, 20)));
+    DistinctCountHLLPlusValueAggregator hllPlusValueAggregator =
+        (DistinctCountHLLPlusValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+                Map.of(Constants.HLLPLUS_ULL_P_KEY, "10", Constants.HLLPLUS_SP_KEY, 20)));
     assertEquals(10, hllPlusValueAggregator.getP());
     assertEquals(20, hllPlusValueAggregator.getSp());
 
-    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
         StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
             Map.of("garbage", "value")));
     // Verify default values used
     assertEquals(14, hllPlusValueAggregator.getP());
     assertEquals(0, hllPlusValueAggregator.getSp());
 
-    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
         StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
             Map.of(Constants.HLLPLUS_ULL_P_KEY, "10")));
     assertEquals(10, hllPlusValueAggregator.getP());
     assertEquals(0, hllPlusValueAggregator.getSp());
 
-    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-                Map.of(Constants.HLLPLUS_SP_KEY, 20)));
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            Map.of(Constants.HLLPLUS_SP_KEY, 20)));
     assertEquals(14, hllPlusValueAggregator.getP());
     assertEquals(20, hllPlusValueAggregator.getSp());
 
     // DISTINCTCOUNTULL
-    DistinctCountULLValueAggregator ullValueAggregator = (DistinctCountULLValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTULL,
-        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTULL,
-            Map.of(Constants.HLLPLUS_ULL_P_KEY, "10")));
+    DistinctCountULLValueAggregator ullValueAggregator =
+        (DistinctCountULLValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTULL,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTULL,
+                Map.of(Constants.HLLPLUS_ULL_P_KEY, "10")));
     assertEquals(10, ullValueAggregator.getP());
 
-    ullValueAggregator = (DistinctCountULLValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTULL,
+    ullValueAggregator = (DistinctCountULLValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTULL,
         StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTULL,
             Map.of("garbage", "value")));
     // Verify default value used
     assertEquals(12, ullValueAggregator.getP());
 
     // DISTINCTCOUNTCPCSKETCH
-    DistinctCountCPCSketchValueAggregator cpcSketchValueAggregator = (DistinctCountCPCSketchValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
-        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
-            Map.of(Constants.CPCSKETCH_LGK_KEY, 20)));
+    DistinctCountCPCSketchValueAggregator cpcSketchValueAggregator =
+        (DistinctCountCPCSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+                Map.of(Constants.CPCSKETCH_LGK_KEY, 20)));
     assertEquals(20, cpcSketchValueAggregator.getLgK());
 
-    cpcSketchValueAggregator = (DistinctCountCPCSketchValueAggregator)
-        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+    cpcSketchValueAggregator = (DistinctCountCPCSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
         StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
             Map.of()));
     // Verify default value used

@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function.funnel.window;
 import com.google.common.base.Preconditions;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -36,6 +37,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
@@ -46,6 +48,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   protected final FunnelModes _modes = new FunnelModes();
   protected final int _numSteps;
   protected long _maxStepDuration = 0L;
+  protected final Map<String, String> _extraArguments = new HashMap<>();
 
   public FunnelBaseAggregationFunction(List<ExpressionContext> arguments) {
     int numArguments = arguments.size();
@@ -80,7 +83,8 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
             }
             break;
           default:
-            throw new IllegalArgumentException("Unrecognized arguments: " + extraArgument);
+            _extraArguments.put(key, parsedExtraArguments[1]);
+            break;
         }
         continue;
       }
@@ -232,6 +236,9 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     if (intermediateResult2 == null) {
       return intermediateResult1;
     }
+
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }

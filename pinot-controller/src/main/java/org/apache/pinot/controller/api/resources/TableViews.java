@@ -28,9 +28,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -43,6 +45,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -96,10 +99,17 @@ public class TableViews {
   public TableView getIdealState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    return getTableState(tableName, IDEALSTATE, tableType);
+    TableViews.TableView tableIdealStateView = getTableState(tableName, IDEALSTATE, tableType);
+    if (StringUtils.isNotEmpty(segmentNames)) {
+      List<String> segmentNamesList =
+          Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+      return getSegmentsView(tableIdealStateView, segmentNamesList);
+    }
+    return tableIdealStateView;
   }
 
   @GET
@@ -110,10 +120,17 @@ public class TableViews {
   public TableView getExternalView(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    return getTableState(tableName, EXTERNALVIEW, tableType);
+    TableViews.TableView tableExternalView = getTableState(tableName, EXTERNALVIEW, tableType);
+    if (StringUtils.isNotEmpty(segmentNames)) {
+      List<String> segmentNamesList =
+          Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+      return getSegmentsView(tableExternalView, segmentNamesList);
+    }
+    return tableExternalView;
   }
 
   @GET
@@ -168,6 +185,29 @@ public class TableViews {
       }
     }
     return segmentStatusInfoList;
+  }
+
+  public TableView getSegmentsView(TableViews.TableView tableView, List<String> segmentNames) {
+    TableView tableViewResult = new TableView();
+    if (tableView._offline != null) {
+      tableViewResult._offline = getTableTypeSegmentsView(tableView._offline, segmentNames);
+    }
+    if (tableView._realtime != null) {
+      tableViewResult._realtime = getTableTypeSegmentsView(tableView._realtime, segmentNames);
+    }
+    return tableViewResult;
+  }
+
+  private Map<String, Map<String, String>> getTableTypeSegmentsView(Map<String, Map<String, String>> tableTypeView,
+      List<String> segmentNames) {
+    Map<String, Map<String, String>> tableTypeViewResult = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      Map<String, String> segmentView = tableTypeView.get(segmentName);
+      if (segmentView != null) {
+        tableTypeViewResult.put(segmentName, segmentView);
+      }
+    }
+    return tableTypeViewResult;
   }
 
   private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {

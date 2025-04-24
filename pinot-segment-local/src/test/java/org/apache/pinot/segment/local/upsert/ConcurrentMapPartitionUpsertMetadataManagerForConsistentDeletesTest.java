@@ -35,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -195,10 +196,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
 
   @BeforeMethod
   public void setUpContextBuilder() {
-    _contextBuilder = new UpsertContext.Builder().setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
-        .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS).setComparisonColumns(COMPARISON_COLUMNS)
-        .setEnableDeletedKeysCompactionConsistency(true).setTableIndexDir(INDEX_DIR).setEnableSnapshot(true)
-        .setDeleteRecordColumn(DELETE_RECORD_COLUMN).setDeletedKeysTTL(20);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(INDEX_DIR);
+    _contextBuilder = new UpsertContext.Builder()
+        .setTableConfig(mock(TableConfig.class))
+        .setSchema(mock(Schema.class))
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS)
+        .setComparisonColumns(COMPARISON_COLUMNS)
+        .setDeleteRecordColumn(DELETE_RECORD_COLUMN)
+        .setEnableSnapshot(true)
+        .setDeletedKeysTTL(20)
+        .setEnableDeletedKeysCompactionConsistency(true);
   }
 
   @AfterClass

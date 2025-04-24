@@ -150,6 +150,16 @@ public class PinotQueryRuleSets {
       PinotExchangeEliminationRule.INSTANCE,
 
       // Evaluate the Literal filter nodes
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotTableScanConverterRule.INSTANCE
+  );
+
+  public static final List<RelOptRule> PINOT_POST_RULES_V2 = List.of(
+      PinotTableScanConverterRule.INSTANCE,
+      PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
+      PinotLogicalAggregateRule.SortAggregate.INSTANCE,
+      PinotLogicalAggregateRule.PinotLogicalAggregateConverter.INSTANCE,
+      // Evaluate the Literal filter nodes
       CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
   //@formatter:on

@@ -44,7 +44,6 @@ import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -377,6 +376,15 @@ public class ZKMetadataProvider {
     return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
         AccessOption.PERSISTENT);
   }
+  public static boolean removePauselessDebugMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String pauselessDebugMetadataPath = constructPropertyStorePathForPauselessDebugMetadata(tableNameWithType);
+    if (propertyStore.exists(pauselessDebugMetadataPath, AccessOption.PERSISTENT)) {
+      return propertyStore.remove(pauselessDebugMetadataPath, AccessOption.PERSISTENT);
+    }
+    return true;
+  }
+
 
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
@@ -630,60 +638,16 @@ public class ZKMetadataProvider {
    */
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-
-    // For backward compatible where schema name is not the same as raw table name
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    // Try to fetch realtime schema first
-    if (tableType == null || tableType == TableType.REALTIME) {
-      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        String realtimeSchemaNameFromValidationConfig = realtimeTableConfig.getValidationConfig().getSchemaName();
-        if (realtimeSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, realtimeSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    // Try to fetch offline schema if realtime schema does not exist
-    if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
-      TableConfig offlineTableConfig = getOfflineTableConfig(propertyStore, tableName);
-      if (offlineTableConfig != null) {
-        String offlineSchemaNameFromValidationConfig = offlineTableConfig.getValidationConfig().getSchemaName();
-        if (offlineSchemaNameFromValidationConfig != null) {
-          schema = getSchema(propertyStore, offlineSchemaNameFromValidationConfig);
-        }
-      }
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
-    }
-    return schema;
+    return getSchema(propertyStore, TableNameBuilder.extractRawTableName(tableName));
   }
 
   /**
    * Get the schema associated with the given table.
    */
+  @Deprecated
   @Nullable
   public static Schema getTableSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    Schema schema = getSchema(propertyStore, rawTableName);
-    if (schema != null) {
-      return schema;
-    }
-    String schemaNameFromTableConfig = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaNameFromTableConfig != null) {
-      schema = getSchema(propertyStore, schemaNameFromTableConfig);
-    }
-    if (schema != null && LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Schema name does not match raw table name, schema name: {}, raw table name: {}",
-          schemaNameFromTableConfig, rawTableName);
-    }
-    return schema;
+    return getTableSchema(propertyStore, tableConfig.getTableName());
   }
 
   /**

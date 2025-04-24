@@ -19,8 +19,10 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import org.apache.pinot.spi.utils.Enablement;
 
 
 @ApiModel
@@ -82,6 +84,13 @@ public class RebalanceConfig {
   @JsonProperty("bestEfforts")
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
+
+  // Whether to run Minimal Data Movement Algorithm, overriding the minimizeDataMovement flag in table config. If set
+  // to DEFAULT, the minimizeDataMovement flag in table config will be used to determine whether to run the Minimal
+  // Data Movement Algorithm.
+  @JsonProperty("minimizeDataMovement")
+  @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
+  private Enablement _minimizeDataMovement = Enablement.ENABLE;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -244,16 +253,26 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
+  public Enablement getMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
+
+  public void setMinimizeDataMovement(Enablement minimizeDataMovement) {
+    Preconditions.checkArgument(minimizeDataMovement != null,
+        "'minimizeDataMovement' cannot be null, must be ENABLE, DISABLE or DEFAULT");
+    _minimizeDataMovement = minimizeDataMovement;
+  }
+
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks
-        + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _bootstrap="
-        + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas=" + _minAvailableReplicas
-        + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
-        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
-        + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
-        + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
-        + _retryInitialDelayInMs + '}';
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
+        + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
+        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs="
+        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
+        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
+        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
+        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {

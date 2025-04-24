@@ -118,6 +118,15 @@ public class DriverUtils {
     return controllerUrl;
   }
 
+
+  public static String getPinotScheme(String url) {
+    if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {
+      url = url.substring(5);
+    }
+    URI uri = URI.create(url);
+    return uri.getScheme();
+  }
+
   public static Map<String, String> getURLParams(String url) {
     if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {
       url = url.substring(SCHEME.length());
@@ -249,5 +258,32 @@ public class DriverUtils {
 
     optionBuilder.append(";\n");
     return optionBuilder.toString();
+  }
+
+  public static Object parseOptionValue(Object value) {
+    if (value instanceof String) {
+      String str = (String) value;
+      try {
+        Long numVal = Long.valueOf(str);
+        if (numVal != null) {
+          return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      try {
+        Double numVal = Double.valueOf(str);
+        if (numVal != null) {
+          return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
+      if (boolVal != null) {
+        return boolVal;
+      }
+    }
+    return value;
   }
 }

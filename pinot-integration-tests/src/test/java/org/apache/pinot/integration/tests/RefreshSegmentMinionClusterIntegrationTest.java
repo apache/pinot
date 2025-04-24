@@ -55,7 +55,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -151,13 +154,12 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     // Change datatype from INT -> LONG for airlineId
-    deleteSchema(getTableName());
     Schema schema = createSchema();
     schema.getFieldSpecFor("ArrTime").setDataType(FieldSpec.DataType.LONG);
     schema.getFieldSpecFor("AirlineID").setDataType(FieldSpec.DataType.STRING);
     schema.getFieldSpecFor("ActualElapsedTime").setDataType(FieldSpec.DataType.FLOAT);
     schema.getFieldSpecFor("DestAirportID").setDataType(FieldSpec.DataType.STRING);
-    addSchema(schema);
+    forceUpdateSchema(schema);
 
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
             .setTablesToSchedule(Collections.singleton(offlineTableName)))
@@ -209,13 +211,12 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     });
 
     // Reset the schema back to it's original state.
-    deleteSchema(getTableName());
     schema = createSchema();
     schema.getFieldSpecFor("ArrTime").setDataType(FieldSpec.DataType.INT);
     schema.getFieldSpecFor("AirlineID").setDataType(FieldSpec.DataType.LONG);
     schema.getFieldSpecFor("ActualElapsedTime").setDataType(FieldSpec.DataType.INT);
     schema.getFieldSpecFor("DestAirportID").setDataType(FieldSpec.DataType.INT);
-    addSchema(schema);
+    forceUpdateSchema(schema);
   }
 
   @Test(priority = 3)

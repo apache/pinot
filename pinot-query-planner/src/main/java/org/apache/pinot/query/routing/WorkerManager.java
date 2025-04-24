@@ -81,6 +81,22 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  public String getHostName() {
+    return _hostName;
+  }
+
+  public int getPort() {
+    return _port;
+  }
+
+  public RoutingManager getRoutingManager() {
+    return _routingManager;
+  }
+
   public void assignWorkers(PlanFragment rootFragment, DispatchablePlanContext context) {
     // ROOT stage doesn't have a QueryServer as it is strictly only reducing results, so here we simply assign the
     // worker instance with identical server/mailbox port number.
@@ -105,8 +121,18 @@ public class WorkerManager {
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
       if (children.size() == 1 && isLocalExchange(children.get(0), context)) {
         DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
-        metadata.setWorkerIdToServerInstanceMap(assignWorkersForLocalExchange(childMetadata));
+        Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = assignWorkersForLocalExchange(childMetadata);
+        metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
         metadata.setPartitionFunction(childMetadata.getPartitionFunction());
+        // Fake a segments map so that the worker can be correctly identified as leaf stage
+        // TODO: Add a query test for LOOKUP join
+        Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
+        Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+            Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
+        for (Integer workerId : workerIdToServerInstanceMap.keySet()) {
+          workerIdToSegmentsMap.put(workerId, segmentsMap);
+        }
+        metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
       } else {
         assignWorkersToLeafFragment(fragment, context);
       }

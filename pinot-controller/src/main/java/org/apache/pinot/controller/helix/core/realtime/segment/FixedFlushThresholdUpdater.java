@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
@@ -32,7 +31,6 @@ public class FixedFlushThresholdUpdater implements FlushThresholdUpdater {
 
   @Override
   public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
       int maxNumPartitionsPerInstance) {
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(_flushThreshold);
   }

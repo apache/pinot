@@ -83,9 +83,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -130,6 +128,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
+  public InstanceDataManager getInstanceDataManager() {
+    return _instanceDataManager;
+  }
+
+  @Override
   public synchronized void start() {
     LOGGER.info("Query executor started");
   }
@@ -142,25 +145,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
-      @Override
-      protected boolean alreadyRegistered() {
-        return LoggerConstants.QUERY_ID_KEY.isRegistered();
-      }
-
-      @Override
-      protected void registerInMdc() {
-        queryRequest.registerInMdc();
-      }
-
-      @Override
-      protected void unregisterFromMdc() {
-        queryRequest.unregisterFromMdc();
-      }
-    };
-
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -169,7 +155,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
@@ -241,7 +227,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
       TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
       boolean isUsingConsistencyMode =
-          rtdm.getTableUpsertMetadataManager().getUpsertConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+          rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
       if (isUsingConsistencyMode) {
         tumm.lockForSegmentContexts();
       }
