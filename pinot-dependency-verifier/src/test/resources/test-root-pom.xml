@@ -1,0 +1,87 @@
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<pluginManagement>
+  <plugins>
+    <plugin>
+      <groupId>com.diffplug.spotless</groupId>
+      <artifactId>spotless-maven-plugin</artifactId>
+      <version>2.44.4</version>
+      <executions>
+        <execution>
+          <goals>
+            <goal>check</goal>
+          </goals>
+        </execution>
+      </executions>
+      <configuration>
+        <java>
+          <includes>
+            <include>src/main/java/**/*.java</include>
+            <include>src/test/java/**/*.java</include>
+          </includes>
+          <importOrder>
+            <order>,\#</order>
+          </importOrder>
+          <removeUnusedImports />
+        </java>
+      </configuration>
+    </plugin>
+    <plugin>
+      <groupId>org.codehaus.mojo</groupId>
+      <artifactId>exec-maven-plugin</artifactId>
+      <version>3.5.0</version>
+    </plugin>
+  </plugins>
+</pluginManagement>
+
+<dependencyManagement>
+<dependencies>
+  <dependency>
+    <groupId>org.apache.pinot</groupId>
+    <artifactId>pinot-spi</artifactId>
+    <version>${project.version}</version>
+  </dependency>
+  <dependency>
+    <groupId>org.apache.pinot</groupId>
+    <artifactId>pinot-segment-spi</artifactId>
+    <version>${project.version}</version>
+  </dependency>
+  <dependency>
+    <groupId>org.apache.pinot</groupId>
+    <artifactId>pinot-common</artifactId>
+    <version>${project.version}</version>
+  </dependency>
+</dependencies>
+</dependencyManagement>
+
+<plugins>
+  <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+        <version>0.2.0</version>
+      </dependency>
+    </dependencies>
+  </plugin>
+</plugins>
