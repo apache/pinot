@@ -794,7 +794,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                     const columns = [
                       'Segment Name',
                       'Server Details',
-                      'Total Segment Lag',
+                      'Max Partition Offset Lag',
                       'Max Partition Availability Lag (ms)',
                     ];
                     const records = [];
