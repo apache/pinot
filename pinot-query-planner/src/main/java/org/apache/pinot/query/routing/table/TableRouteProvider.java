@@ -21,7 +21,6 @@ package org.apache.pinot.query.routing.table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.TableRouteInfo;
 
 
@@ -30,7 +29,7 @@ import org.apache.pinot.core.transport.TableRouteInfo;
  * of the metadata are table config, broker routing information and the broker request.
  */
 public interface TableRouteProvider {
-  ImplicitHybridTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache,
+  TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache,
       RoutingManager routingManager);
 
   /**
