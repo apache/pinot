@@ -784,9 +784,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             disableBackdropClick
           >
             {loadingConsumingSegments ? (
-              <Typography>Loading consuming segments info...</Typography>
+              <Box display="flex" justifyContent="center">
+                <CircularProgress />
+              </Box>
             ) : consumingSegmentsInfo ? (
-              <Box style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <Box style={{ height: '100%', overflowY: 'auto' }}>
                 <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo.serversFailingToRespond || 'N/A'}</Typography>
                 <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo.serversUnparsableRespond || 'N/A'}</Typography>
                 <Box mt={2}>
