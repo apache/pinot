@@ -131,6 +131,10 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
             _topicPartition.topic(), _topicPartition.partition());
       }
       ListOffsetsResult.ListOffsetsResultInfo info = offsets.get(_topicPartition);
+      if (info == null) {
+        throw new TransientConsumerException(new RuntimeException(
+            String.format("Failed to fetch offset for topic: %s partition: %d", _topic, _topicPartition.partition())));
+      }
       return new LongMsgOffset(info.offset());
     } catch (InterruptedException | ExecutionException | java.util.concurrent.TimeoutException e) {
       throw new TransientConsumerException(e);
