@@ -1142,6 +1142,12 @@ public class ControllerTest {
    * test functionality.
    */
   public void cleanup() {
+    // Delete logical tables
+    List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();
+    for (String logicalTableName : logicalTables) {
+      _helixResourceManager.deleteLogicalTable(logicalTableName);
+    }
+
     // Delete all tables
     List<String> tables = _helixResourceManager.getAllTables();
     for (String tableNameWithType : tables) {

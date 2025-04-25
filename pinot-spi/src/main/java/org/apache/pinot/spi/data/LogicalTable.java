@@ -25,11 +25,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LogicalTable {
+public class LogicalTable extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
 
