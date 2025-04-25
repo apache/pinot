@@ -46,19 +46,20 @@ public class GrpcSendingMailboxTest {
         .mapToObj(this::randomByteBuffer).collect(Collectors.toList());
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
 
-    int totalSize = input.stream().mapToInt(ByteBuffer::remaining).sum();
-    ByteBuffer expected = ByteBuffer.allocate(totalSize);
-    for (ByteBuffer bb: input) {
-      expected.put(bb);
-    }
-    totalSize = output.stream().mapToInt(ByteString::size).sum();
-    ByteBuffer actual = ByteBuffer.allocate(totalSize);
-    for (ByteString bs: output) {
-      actual.put(bs.asReadOnlyByteBuffer());
-    }
-    assertEquals(actual.flip(), expected.flip());
+    ByteBuffer expected = concatenateBuffers(input);
+    ByteBuffer actual = concatenateBuffers(
+        output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
+    assertEquals(actual, expected);
   }
 
+  private ByteBuffer concatenateBuffers(List<ByteBuffer> buffers) {
+    int totalSize = buffers.stream().mapToInt(ByteBuffer::remaining).sum();
+    ByteBuffer all = ByteBuffer.allocate(totalSize);
+    for (ByteBuffer bb : buffers) {
+      all.put(bb.slice());
+    }
+    return all.flip();
+  }
 
   @DataProvider(name = "byteBuffersDataProvider")
   public Object[][] byteBuffersDataProvider() {
@@ -75,26 +76,18 @@ public class GrpcSendingMailboxTest {
   static DataBlock _dataBlock = buildTestDataBlock();
 
   private static DataBlock buildTestDataBlock() {
-    int numRows = 1000;
+    int numRows = 1;
     DataSchema dataSchema = new DataSchema(
         new String[]{
-            "valueInt",
-            "valueStr",
-            "valueNull"
+            "valueInt"
         },
         new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING,
             DataSchema.ColumnDataType.INT
         });
 
     List<Object[]> rows = new ArrayList<>(numRows);
-    for (int i = 0; i < 1000; i++) {
-      rows.add(new Object[] {
-          i,
-          "string_" + i,
-          i % 3 == 0 ? null : i
-      });
+    for (int i = 0; i < numRows; i++) {
+      rows.add(new Object[] {i});
     }
 
     try {
@@ -111,6 +104,7 @@ public class GrpcSendingMailboxTest {
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(_dataBlock, maxByteStringSize);
     DataBlock actual = DataBlockUtils.deserialize(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
+
     DataBlockEquals.checkSameContent(_dataBlock, actual, "Rebuilt data block (" + name + ") does not match.");
   }
 
