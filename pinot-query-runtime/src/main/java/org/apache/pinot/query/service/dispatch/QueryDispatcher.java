@@ -161,7 +161,7 @@ public class QueryDispatcher {
       return tryRecover(context.getRequestId(), servers, ex);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, servers);
+      cancel(requestId);
       throw e;
     } finally {
       if (isQueryCancellationEnabled()) {
@@ -181,9 +181,10 @@ public class QueryDispatcher {
     } else if (ex instanceof QueryException) {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
+      cancel(requestId, servers);
       throw ex;
     }
-    MultiStageQueryStats stats = cancel(requestId, servers);
+    MultiStageQueryStats stats = cancelWithStats(requestId, servers);
     if (stats == null) {
       throw ex;
     }
@@ -475,14 +476,33 @@ public class QueryDispatcher {
 
   public boolean cancel(long requestId) {
     if (isQueryCancellationEnabled()) {
-      return cancel(requestId, _serversByQuery.remove(requestId)) != null;
+      return cancel(requestId, _serversByQuery.remove(requestId));
     } else {
       return false;
     }
   }
 
+  ///  Cancels a request without waiting for the stats in the response.
+  private boolean cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return false;
+    }
+    for (QueryServerInstance queryServerInstance : servers) {
+      try {
+        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId);
+      } catch (Throwable t) {
+        LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
+      }
+    }
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.remove(requestId);
+    }
+    return true;
+  }
+
+
   @Nullable
-  private MultiStageQueryStats cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
+  private MultiStageQueryStats cancelWithStats(long requestId, @Nullable Set<QueryServerInstance> servers) {
     if (servers == null) {
       return null;
     }
