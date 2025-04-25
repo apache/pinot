@@ -1791,8 +1791,8 @@ public class TableRebalancer {
                 updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(), k);
                 return availableInstances;
               } else {
-                // There are other segments assigned to the same instances, check the available instances to see if adding
-                // the new assignment can still hold the minimum available replicas requirement
+                // There are other segments assigned to the same instances, check the available instances to see if
+                // adding the new assignment can still hold the minimum available replicas requirement
                 availableInstances.retainAll(currentAvailableInstances);
                 if (availableInstances.size() >= minAvailableReplicas) {
                   // New assignment can be added
