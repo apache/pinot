@@ -102,6 +102,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -829,38 +830,60 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Enable minimizeDataMovement
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
+    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Override minimizeDataMovement
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DISABLE);
+    rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled in table config but it's overridden with disabled",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Use default minimizeDataMovement and disable it in table config
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(false));
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DEFAULT);
+    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(false);
+    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
+    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
+    rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled but instance assignment is allowed",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
-    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
+    rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
@@ -869,6 +892,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo tableConfig change
@@ -879,6 +904,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
@@ -893,6 +920,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     rebalanceConfig.setReassignInstances(false);
 
@@ -910,25 +939,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add minimizeDataMovement
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
+    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
+    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
+    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN,
         "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(false));
+    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(false);
+    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
+    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
+            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
+            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
+            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     // Trigger rebalance config warning
@@ -945,7 +990,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.WARN,
         "bestEfforts is enabled, only enable it if you know what you are doing\n"
             + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
-            + "intended", RebalancePreCheckerResult.PreCheckStatus.WARN);
+            + "intended", RebalancePreCheckerResult.PreCheckStatus.WARN,
+        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Disable dry-run
     rebalanceConfig.setBootstrap(false);
@@ -953,6 +1000,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(false);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertNull(rebalanceResult.getPreChecksResult());
+    // Expect FAILED: Pre-checks can only be enabled in dry-run mode, not triggering rebalance
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Stop the added server
@@ -964,16 +1012,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
       String expectedMinimizeDataMovement, RebalancePreCheckerResult.PreCheckStatus expectedMinimizeDataMovementStatus,
       String expectedNeedsReloadMessage, RebalancePreCheckerResult.PreCheckStatus expectedNeedsReloadStatus,
-      String expectedRebalanceConfig, RebalancePreCheckerResult.PreCheckStatus expectedRebalanceConfigStatus) {
+      String expectedRebalanceConfig, RebalancePreCheckerResult.PreCheckStatus expectedRebalanceConfigStatus,
+      String expectedReplicaGroupMessage, RebalancePreCheckerResult.PreCheckStatus expectedReplicaGroupStatus) {
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 5);
+    assertEquals(preChecksResult.size(), 6);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         expectedMinimizeDataMovementStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
@@ -986,6 +1036,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         expectedRebalanceConfigStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
         expectedRebalanceConfig);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
+        expectedReplicaGroupStatus);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+        expectedReplicaGroupMessage);
     // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
     // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
     // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if

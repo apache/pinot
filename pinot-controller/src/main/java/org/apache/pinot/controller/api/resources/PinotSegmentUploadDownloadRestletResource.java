@@ -214,8 +214,15 @@ public class PinotSegmentUploadDownloadRestletResource {
       segmentFile =
           org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
               "Invalid segment name: %s", segmentName);
-
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      // Emit metrics related to deep-store download operation
+      long deepStoreDownloadStartTimeMs = System.currentTimeMillis();
+      long segmentSizeInBytes = segmentFile.length();
+      ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
+      ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName,
+          System.currentTimeMillis() - deepStoreDownloadStartTimeMs, segmentSizeInBytes);
+
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
         try {
@@ -233,6 +240,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
+    long segmentUploadStartTimeMs = System.currentTimeMillis();
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -412,7 +420,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
           segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
           enableParallelPushProtection, allowRefresh, headers);
-
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
       throw e;

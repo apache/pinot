@@ -40,10 +40,12 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -771,16 +773,21 @@ public class ZKOperator {
     } else {
       // In push types other than METADATA, local segmentFile contains the complete segment.
       // Move local segment to final location
-      copyFromSegmentFileToDeepStore(segmentFile, finalSegmentLocationURI);
+      copyFromSegmentFileToDeepStore(segmentFile, finalSegmentLocationURI, tableNameWithType);
       LOGGER.info("Copied segment: {} of table: {} to final location: {}", segmentName, tableNameWithType,
           finalSegmentLocationURI);
     }
   }
 
-  private void copyFromSegmentFileToDeepStore(File segmentFile, URI finalSegmentLocationURI)
+  private void copyFromSegmentFileToDeepStore(File segmentFile, URI finalSegmentLocationURI, String tableNameWithType)
       throws Exception {
     LOGGER.info("Copying segment from: {} to: {}", segmentFile.getAbsolutePath(), finalSegmentLocationURI);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    long segmentSizeInBytes = segmentFile.length();
+    long startTimeMs = System.currentTimeMillis();
+    ResourceUtils.emitPreSegmentUploadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
     PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copyFromLocalFile(segmentFile, finalSegmentLocationURI);
+    ResourceUtils.emitPostSegmentUploadMetrics(_controllerMetrics, rawTableName, startTimeMs, segmentSizeInBytes);
   }
 
   private void copyFromSegmentURIToDeepStore(URI sourceDownloadURI, URI finalSegmentLocationURI)
