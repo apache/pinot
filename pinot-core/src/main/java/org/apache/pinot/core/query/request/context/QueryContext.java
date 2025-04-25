@@ -356,6 +356,10 @@ public class QueryContext {
     _skipScanFilterReorder = skipScanFilterReorder;
   }
 
+  public void setIsSelectStarQuery(boolean isSelectStarQuery) {
+    _isSelectStarQuery = isSelectStarQuery;
+  }
+
   public int getMaxExecutionThreads() {
     return _maxExecutionThreads;
   }

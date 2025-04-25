@@ -79,14 +79,13 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
                       .map(name -> mergedDataSchema.getColumnDataType(mergedBlockIndexMap.get(name)))
                       .toArray(DataSchema.ColumnDataType[]::new);
       mergedBlock.setDataSchema(new DataSchema(commonColumnNames, commonColumnTypes));
-      return;
     } else if (!mergedDataSchema.equals(dataSchemaToMerge)) {
       String errorMessage = String.format("Data schemas do not match between merged block: %s and block to merge: %s",
               mergedDataSchema, dataSchemaToMerge);
       LOGGER.debug(errorMessage);
       mergedBlock.addErrorMessage(QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage));
-      return;
+    } else {
+      SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
     }
-    SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
   }
 }

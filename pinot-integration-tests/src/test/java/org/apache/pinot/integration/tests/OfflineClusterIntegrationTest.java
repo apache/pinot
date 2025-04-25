@@ -62,6 +62,7 @@ import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -95,6 +96,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -4214,6 +4216,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getPreChecksResult().get(
             DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
+  }
+
+  @Test
+  public void testSelectStarOnNewColumnAddition() throws Exception {
+    JsonNode response = postQuery(SELECT_STAR_QUERY);
+    assertNoError(response);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assert !rows.isEmpty();
+
+    // Add new column
+    String testColumn = "TestColumn";
+    Schema schema = getSchema(DEFAULT_SCHEMA_NAME);
+    schema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
+    updateSchema(schema);
+
+    // Run query again and check that the new column is not present
+    response = postQuery(SELECT_STAR_QUERY);
+    assertNoError(response);
+    rows = response.get("resultTable").get("rows");
+    JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
+    DataSchema dataSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
+    assert !rows.isEmpty() && Arrays.stream(dataSchema.getColumnNames()).noneMatch(testColumn::equals);
+
+    // Partially reload one segment
+    String segmentName = listSegments(DEFAULT_TABLE_NAME).get(0);
+    reloadOfflineSegment(DEFAULT_TABLE_NAME, segmentName, true);
+
+    // Run query again and check that the new column should still not be present
+    response = postQuery(SELECT_STAR_QUERY);
+    assertNoError(response);
+    rows = response.get("resultTable").get("rows");
+    jsonSchema = response.get("resultTable").get("dataSchema");
+    dataSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
+    assert !rows.isEmpty() && Arrays.stream(dataSchema.getColumnNames()).noneMatch(testColumn::equals);
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
