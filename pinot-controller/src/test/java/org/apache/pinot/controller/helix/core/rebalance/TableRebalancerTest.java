@@ -2295,5 +2295,248 @@ public class TableRebalancerTest {
         isStrictRealtimeSegmentAssignment = true;
       }
     }
+
+    // Try an assignment with 3 unique partitions but with different assignments and batchSizePerServer = 1 to force
+    // strict replica group routing only to go through 2 loops
+    // Non-strict replica group based should not matter
+    // Current assignment:
+    // {
+    //   "segment__1__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment__1__1__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__1__2__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment__2__1__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host7": "ONLINE"
+    //   },
+    //   "segment__2__2__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment__3__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment__3__1__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
+    //   },
+    //   "segment__3__2__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host6": "ONLINE"
+    //   }
+    // }
+    currentAssignment = new TreeMap<>();
+    currentAssignment.put("segment__1__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment__1__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__1__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host6"), ONLINE));
+    currentAssignment.put("segment__2__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    currentAssignment.put("segment__2__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host7"), ONLINE));
+    currentAssignment.put("segment__3__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__3__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__3__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host6"), ONLINE));
+
+    // Target assignment 5:
+    // {
+    //   "segment__1__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__1__1__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__1__2__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__2__1__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__2__2__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__3__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__3__1__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__3__2__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host5": "ONLINE"
+    //   }
+    // }
+    targetAssignment = new TreeMap<>();
+    targetAssignment.put("segment__1__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment__1__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__1__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__2__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment__2__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment__3__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__3__1__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__3__2__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+
+    // Number of segments to offload:
+    // {
+    //   "host1": 0,
+    //   "host2": 4,
+    //   "host3": 2,
+    //   "host4": 0,
+    //   "host5": -6,
+    //   "host6": -1,
+    //   "host7": 1
+    // }
+    numSegmentsToOffloadMap =
+        TableRebalancer.getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
+    assertEquals(numSegmentsToOffloadMap.size(), 7);
+    assertEquals((int) numSegmentsToOffloadMap.get("host1"), 0);
+    assertEquals((int) numSegmentsToOffloadMap.get("host2"), 4);
+    assertEquals((int) numSegmentsToOffloadMap.get("host3"), 2);
+    assertEquals((int) numSegmentsToOffloadMap.get("host4"), 0);
+    assertEquals((int) numSegmentsToOffloadMap.get("host5"), -6);
+    assertEquals((int) numSegmentsToOffloadMap.get("host6"), -1);
+    assertEquals((int) numSegmentsToOffloadMap.get("host7"), 1);
+
+    // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
+    // assignment after three steps if strict replica group is disabled . With strict replica groups it should reach
+    // the target assignment in two steps since the full partition must be selected for movement. Only testing this
+    // assignment with isStrictRealtimeSegmentAssignment=false since the assignments usually don't differ for
+    // isStrictRealtimeSegmentAssignment=true. Batch size = 1, unique partitionIds
+    isStrictRealtimeSegmentAssignment = false;
+    for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
+      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+              2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, isStrictRealtimeSegmentAssignment);
+      if (!enableStrictReplicaGroup) {
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host7")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, isStrictRealtimeSegmentAssignment);
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, isStrictRealtimeSegmentAssignment);
+      } else {
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, isStrictRealtimeSegmentAssignment);
+      }
+      assertEquals(nextAssignment, targetAssignment);
+    }
   }
 }
