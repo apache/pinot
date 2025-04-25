@@ -34,7 +34,6 @@ public class DepVerifier {
       "pinot-connectors",
       "pinot-integration-tests",
       "pinot-tools",
-      "pinot-spi",
       "contrib"
   );
 
@@ -53,7 +52,8 @@ public class DepVerifier {
       for (int lineNum: addedVersionLineNums) {
         String line = fullLines.get(lineNum - 1);
         if (isHardcoded(line)) {
-          if (isRootPom(pomPath) && isInsideTagBlock(lineNum, fullLines, "plugins")) {
+          if (isRootPom(pomPath) && isInsideTagBlock(lineNum, fullLines, "plugins")
+              || !isInsideTagBlock(lineNum, fullLines, "dependencyManagement")) {
             continue;
           }
           if (!isMaven(fullLines, lineNum)) {
