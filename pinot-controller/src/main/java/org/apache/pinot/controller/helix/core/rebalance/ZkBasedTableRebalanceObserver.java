@@ -242,7 +242,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * Emits the rebalance progress in percent to the metrics. Uses the percentage of remaining segments to be added as
    * the indicator of the overall progress.
    * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
-   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become 0)
+   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
+   * 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
+   * `totalRemainingSegmentsToBeDeleted`, and `totalRemainingSegmentsToConverge` become 0)
    * Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
    * @param overallProgress the latest overall progress
    */
