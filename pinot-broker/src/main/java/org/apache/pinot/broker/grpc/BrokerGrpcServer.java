@@ -132,7 +132,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
 
     try {
       // Create buffer allocator and register metrics
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
       registerBufferMetrics(bufAllocator, brokerMetrics);
 
       // Build the server with common configuration

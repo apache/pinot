@@ -119,7 +119,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       }
 
       // Add metrics for Netty buffer allocator
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
       ServerMetrics metrics = ServerMetrics.get();
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
