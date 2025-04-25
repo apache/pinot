@@ -101,7 +101,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     try {
-      // Prepare AdminClient-based offset lookup
+      // Build the offset spec request for this partition
       Map<TopicPartition, OffsetSpec> request = new HashMap<>();
       if (offsetCriteria.isLargest()) {
         request.put(_topicPartition, OffsetSpec.latest());
@@ -116,10 +116,12 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       } else {
         throw new IllegalArgumentException("Unknown offset criteria: " + offsetCriteria);
       }
+      // Query via AdminClient (thread-safe)
       ListOffsetsResult result = _adminClient.listOffsets(request);
       Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets =
           result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
-      if (offsets == null || offsets.isEmpty()) {
+      if (offsets == null || offsets.isEmpty() || !offsets.containsKey(_topicPartition)
+          || offsets.get(_topicPartition).offset() < 0) {
         // fetch endOffsets as fallback
         request.put(_topicPartition, OffsetSpec.latest());
         result = _adminClient.listOffsets(request);
@@ -129,7 +131,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
                 + "topic {} partition {}", offsetCriteria, offsets.get(_topicPartition).offset(),
             _topicPartition.topic(), _topicPartition.partition());
       }
-
       ListOffsetsResult.ListOffsetsResultInfo info = offsets.get(_topicPartition);
       return new LongMsgOffset(info.offset());
     } catch (InterruptedException | ExecutionException | java.util.concurrent.TimeoutException e) {

@@ -120,7 +120,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       ListOffsetsResult result = _adminClient.listOffsets(request);
       Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets =
           result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
-      if (offsets == null || offsets.isEmpty()) {
+      if (offsets == null || offsets.isEmpty() || !offsets.containsKey(_topicPartition)
+          || offsets.get(_topicPartition).offset() < 0) {
         // fetch endOffsets as fallback
         request.put(_topicPartition, OffsetSpec.latest());
         result = _adminClient.listOffsets(request);
