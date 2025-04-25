@@ -1323,6 +1323,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _partitionMetadataProvider.close();
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
+      } finally {
+        // Clear reference so future offset fetches recreate a fresh provider
+        _partitionMetadataProvider = null;
       }
     }
   }
@@ -1848,6 +1851,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
+    } catch (IllegalStateException ise) {
+      // Consumer or provider already closed; skip offset fetch without warning
+      _segmentLogger.debug("Skip fetching stream offset (consumer closed) for clientId {} partitionGroupId {}",
+          _clientId, _partitionGroupId, ise);
     } catch (Exception e) {
       String logMessage = "Cannot fetch stream offset with criteria " + offsetCriteria + " for clientId " + _clientId
           + " and partitionGroupId " + _partitionGroupId + " with maxWaitTime " + maxWaitTimeMs;
