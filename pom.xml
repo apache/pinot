@@ -176,7 +176,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.27</aws.sdk.version>
+    <aws.sdk.version>2.31.28</aws.sdk.version>
     <azure.sdk.version>1.2.33</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -299,7 +299,7 @@
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
     <equalsverifier.version>3.19.3</equalsverifier.version>
-    <testcontainers.version>1.20.6</testcontainers.version>
+    <testcontainers.version>1.21.0</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
