@@ -594,12 +594,13 @@ public class TableRebalancer {
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
+      boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
       PartitionIdFetcher partitionIdFetcher = new PartitionIdFetcherImpl(tableNameWithType,
-          TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
-          (segmentAssignment instanceof StrictRealtimeSegmentAssignment));
+          TableConfigUtils.getPartitionColumn(tableConfig), _helixManager, isStrictRealtimeSegmentAssignment);
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-              lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
+              lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher,
+              isStrictRealtimeSegmentAssignment, tableRebalanceLogger);
       tableRebalanceLogger.info(
           "Got the next assignment with number of segments to be added/removed for each instance: {}",
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
@@ -1541,9 +1542,10 @@ public class TableRebalancer {
   static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher) {
+      PartitionIdFetcher partitionIdFetcher, boolean isStrictRealtimeSegmentAssignment) {
     return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, LOGGER);
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, isStrictRealtimeSegmentAssignment,
+        LOGGER);
   }
 
   /**
@@ -1551,15 +1553,29 @@ public class TableRebalancer {
    * the minimum available replicas requirement. For strict replica-group mode, track the available instances for all
    * the segments with the same instances in the next assignment, and ensure the minimum available replicas requirement
    * is met. If adding the assignment for a segment breaks the requirement, use the current assignment for the segment.
+   *
+   * For strict replica group routing only (where the segment assignment is not StrictRealtimeSegmentAssignment)
+   * if batching is enabled, don't group the assignment by partitionId, since the segments of the same partitionId do
+   * not need to be assigned to the same servers. For strict replica group routing with strict replica group
+   * assignment on the other hand, group the assignment by partitionId since a partition must move as a whole, and they
+   * have the same servers assigned across all segments belonging to the same partitionId.
+   *
+   * TODO: Ideally if strict replica group routing is enabled then StrictRealtimeSegmentAssignment should be used, but
+   *       this is not enforced in the code today. Once enforcement is added, there will no longer be any need to
+   *       handle strict replica group routing only v.s. strict replica group routing + assignment. Remove the
+   *       getNextStrictReplicaGroupRoutingOnlyAssignment() function.
    */
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher, Logger tableRebalanceLogger) {
-    return enableStrictReplicaGroup ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment,
-        minAvailableReplicas, lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher,
-        tableRebalanceLogger)
-        : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
+      PartitionIdFetcher partitionIdFetcher, boolean isStrictRealtimeSegmentAssignment, Logger tableRebalanceLogger) {
+    return (enableStrictReplicaGroup && isStrictRealtimeSegmentAssignment)
+        ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas, lowDiskMode,
+        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger)
+        : enableStrictReplicaGroup
+            ? getNextStrictReplicaGroupRoutingOnlyAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
+            lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger)
+            : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
             lowDiskMode, batchSizePerServer);
   }
 
@@ -1674,7 +1690,7 @@ public class TableRebalancer {
    * @param currentAssignment the current assignment
    * @param segmentPartitionIdMap cache to store the partition ids to avoid fetching ZK segment metadata
    * @param partitionIdFetcher function to fetch the partition id
-   * @return a mapping from partitionId to the segment assignment map of all segments that map to that partition
+   * @return a mapping from partitionId to the segment assignment map of all segments that map to that partitionId
    */
   private static Map<Integer, Map<String, Map<String, String>>> getPartitionIdToCurrentAssignmentMap(
       Map<String, Map<String, String>> currentAssignment, Object2IntOpenHashMap<String> segmentPartitionIdMap,
@@ -1692,6 +1708,157 @@ public class TableRebalancer {
     }
 
     return partitionIdToCurrentAssignmentMap;
+  }
+
+  private static Map<String, Map<String, String>> getNextStrictReplicaGroupRoutingOnlyAssignment(
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
+      Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher,
+      Logger tableRebalanceLogger) {
+    Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
+    Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
+    Map<Integer, Map<Set<String>, Map<String, Map<String, String>>>>
+        partitionIdToAssignedInstancesToCurrentAssignmentMap;
+    if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
+      // Don't calculate the partition id to assigned instances to current assignment mapping if batching is disabled
+      // since we want to update the next assignment based on all partitions in this case. Use partitionId as 0
+      // and a dummy set for the assigned instances.
+      partitionIdToAssignedInstancesToCurrentAssignmentMap = new TreeMap<>();
+      partitionIdToAssignedInstancesToCurrentAssignmentMap.put(0, new HashMap<>());
+      partitionIdToAssignedInstancesToCurrentAssignmentMap.get(0).put(Set.of(""), currentAssignment);
+    } else {
+      partitionIdToAssignedInstancesToCurrentAssignmentMap =
+          getPartitionIdToAssignedInstancesToCurrentAssignmentMap(currentAssignment, segmentPartitionIdMap,
+              partitionIdFetcher);
+    }
+    Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
+    Map<Set<String>, Set<String>> availableInstancesMap = new HashMap<>();
+
+    Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
+    for (Map<Set<String>, Map<String, Map<String, String>>> assignedInstancesToCurrentAssignment
+        : partitionIdToAssignedInstancesToCurrentAssignmentMap.values()) {
+      boolean isPartitionIdSelectedToMove = true;
+      // Check if the servers of the first assignment for each unique set of assigned instances has any space left
+      // to move this partition. If so, let's mark the partitions as to be moved, otherwise we mark the partition
+      // as a whole as not moveable.
+      for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
+        Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
+        // All segments should be assigned to the same set of servers so it is enough to check for whether any server
+        // for one segment is above the limit or not
+        Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
+        SingleSegmentAssignment firstAssignment =
+            getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
+                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+        Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
+            firstAssignment._instanceStateMap);
+        if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
+          for (String server : serversAdded) {
+            if (serverToNumSegmentsAddedSoFar.getOrDefault(server, 0) >= batchSizePerServer) {
+              isPartitionIdSelectedToMove = false;
+              break;
+            }
+          }
+        }
+        if (!isPartitionIdSelectedToMove) {
+          break;
+        }
+      }
+      for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
+        if (!isPartitionIdSelectedToMove) {
+          // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
+          for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
+            String segmentName = entry.getKey();
+            Map<String, String> currentInstanceStateMap = entry.getValue();
+            nextAssignment.put(segmentName, currentInstanceStateMap);
+          }
+        } else {
+          // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSizePerServer
+          // Can only do bestEfforts w.r.t. StrictReplicaGroup since a whole partition must be moved together for
+          // maintaining consistency
+          for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
+            String segmentName = entry.getKey();
+            Map<String, String> currentInstanceStateMap = entry.getValue();
+            Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
+            SingleSegmentAssignment assignment =
+                getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
+                    lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+            Set<String> assignedInstances = assignment._instanceStateMap.keySet();
+            Set<String> availableInstances = assignment._availableInstances;
+            availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
+              if (currentAvailableInstances == null) {
+                // First segment assigned to these instances, use the new assignment and update the available instances
+                nextAssignment.put(segmentName, assignment._instanceStateMap);
+                updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(), k);
+                return availableInstances;
+              } else {
+                // There are other segments assigned to the same instances, check the available instances to see if adding
+                // the new assignment can still hold the minimum available replicas requirement
+                availableInstances.retainAll(currentAvailableInstances);
+                if (availableInstances.size() >= minAvailableReplicas) {
+                  // New assignment can be added
+                  nextAssignment.put(segmentName, assignment._instanceStateMap);
+                  updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(), k);
+                  return availableInstances;
+                } else {
+                  // New assignment cannot be added, use the current instance state map
+                  nextAssignment.put(segmentName, currentInstanceStateMap);
+                  return currentAvailableInstances;
+                }
+              }
+            });
+
+            if (!nextAssignment.get(segmentName).equals(currentInstanceStateMap)) {
+              Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
+                  nextAssignment.get(segmentName));
+              for (String server : serversAddedForSegment) {
+                int numSegmentsAdded = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
+                serverToNumSegmentsAddedSoFar.put(server, numSegmentsAdded + 1);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    int maxSegmentsAddedToAnyServer = serverToNumSegmentsAddedSoFar.isEmpty() ? 0
+        : Collections.max(serverToNumSegmentsAddedSoFar.values());
+    if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
+        && maxSegmentsAddedToAnyServer > batchSizePerServer) {
+      tableRebalanceLogger.warn("Found at least one server with {} segments added which is larger than "
+          + "batchSizePerServer: {}", maxSegmentsAddedToAnyServer, batchSizePerServer);
+    }
+    return nextAssignment;
+  }
+
+  /**
+   * Create a mapping of partitionId to the mapping of assigned instances to the current assignment of segments that
+   * belong to that partitionId and assigned instances. This is to be used for batching purposes for StrictReplicaGroup
+   * routing only with non-StrictRealtimeSegmentAssignment
+   * @param currentAssignment the current assignment
+   * @param segmentPartitionIdMap cache to store the partition ids to avoid fetching ZK segment metadata
+   * @param partitionIdFetcher function to fetch the partition id
+   * @return a mapping from partitionId to the assigned instances to the segment assignment map of all segments that
+   *         map to that partitionId and assigned instances
+   */
+  private static Map<Integer, Map<Set<String>, Map<String, Map<String, String>>>>
+  getPartitionIdToAssignedInstancesToCurrentAssignmentMap(Map<String, Map<String, String>> currentAssignment,
+      Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher) {
+    Map<Integer, Map<Set<String>, Map<String, Map<String, String>>>>
+        partitionIdToAssignedInstancesToCurrentAssignmentMap = new TreeMap<>();
+
+    for (Map.Entry<String, Map<String, String>> assignment : currentAssignment.entrySet()) {
+      String segmentName = assignment.getKey();
+      Map<String, String> instanceStateMap = assignment.getValue();
+
+      int partitionId =
+          segmentPartitionIdMap.computeIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName));
+      Set<String> assignedInstances = instanceStateMap.keySet();
+      partitionIdToAssignedInstancesToCurrentAssignmentMap.putIfAbsent(partitionId, new HashMap<>());
+      partitionIdToAssignedInstancesToCurrentAssignmentMap.get(partitionId)
+          .computeIfAbsent(assignedInstances, k -> new TreeMap<>()).put(segmentName, instanceStateMap);
+    }
+
+    return partitionIdToAssignedInstancesToCurrentAssignmentMap;
   }
 
   @VisibleForTesting
