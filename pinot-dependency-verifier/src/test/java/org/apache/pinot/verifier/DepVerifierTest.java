@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class DepVerifierTest {
+  private static final String SUBMODULE_PATH = "../pinot-spi/pom.xml";
 
   @Test
   public void testIsHardcodedTrue() throws Exception {
@@ -101,9 +102,44 @@ public class DepVerifierTest {
   public void testIsMaven() throws Exception {
     List<String> fullLines = Files.readAllLines(Paths.get("./src/test/resources/test-submodule-pom.xml"));
 
-    Assert.assertTrue(DepVerifier.isMaven(fullLines, 6),
+    Assert.assertTrue(DepVerifier.isMaven(fullLines, 26),
         "Line 6 should be part of Maven plugin");
-    Assert.assertFalse(DepVerifier.isMaven(fullLines, 14),
+    Assert.assertFalse(DepVerifier.isMaven(fullLines, 34),
         "Line 27 should not be part of Maven plugin");
+  }
+
+  @Test
+  public void testRootPomFormat() throws Exception {
+    List<String> fullLines = Files.readAllLines(Paths.get("../pom.xml"));
+
+    for (int lineNum = 1; lineNum <= fullLines.size(); lineNum++) {
+      String line = fullLines.get(lineNum - 1);
+      if (DepVerifier.isHardcoded(line) && DepVerifier.isInsideTagBlock(lineNum, fullLines, "plugins")
+      || !DepVerifier.isInsideTagBlock(lineNum, fullLines, "dependencyManagement")) {
+        continue;
+      }
+      Assert.assertFalse(DepVerifier.isHardcoded(line),
+          "Hardcoded version detected in the root POM file on line " + lineNum);
+    }
+  }
+
+  @Test
+  public void testSubmodulePomFormat() throws Exception {
+    List<String> fullLines = Files.readAllLines(Paths.get(SUBMODULE_PATH));
+
+    for (int lineNum = 1; lineNum <= fullLines.size(); lineNum++) {
+      String line = fullLines.get(lineNum - 1);
+      if (DepVerifier.isHardcoded(line) && DepVerifier.isInsideTagBlock(lineNum, fullLines, "plugins")
+          || !DepVerifier.isMaven(fullLines, lineNum)) {
+        continue;
+      }
+      Assert.assertFalse(DepVerifier.isHardcoded(line), "Hardcoded version detected in the file on line " + lineNum);
+
+      if (DepVerifier.isInsideTagBlock(lineNum, fullLines, "plugins")
+          || !DepVerifier.isInsideTagBlock(lineNum, fullLines, "dependencyManagement")) {
+        continue;
+      }
+      Assert.assertFalse(line.contains("<version>"), "<version> tag is found on line " + lineNum);
+    }
   }
 }
