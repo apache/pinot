@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, List, ListItem, ListItemText } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo } from 'Models';
@@ -48,6 +48,7 @@ import NotFound from '../components/NotFound';
 import {
   RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
+import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -783,98 +784,21 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             btnCancelText="Close"
             disableBackdropClick
           >
-            {loadingConsumingSegments ? (
+            {loadingConsumingSegments && (
               <Box display="flex" justifyContent="center">
                 <CircularProgress />
               </Box>
-            ) : consumingSegmentsInfo ? (
+            )}
+            {!loadingConsumingSegments && consumingSegmentsInfo && (
               <Box style={{ height: '100%', overflowY: 'auto' }}>
-                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo.serversFailingToRespond || 'N/A'}</Typography>
-                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo.serversUnparsableRespond || 'N/A'}</Typography>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo?.serversFailingToRespond ?? 'N/A'}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo?.serversUnparsableRespond ?? 'N/A'}</Typography>
                 <Box mt={2}>
-                  {(() => {
-                    const columns = [
-                      'Segment Name',
-                      'Server Details',
-                      'Max Partition Offset Lag',
-                      'Max Partition Availability Lag (ms)',
-                    ];
-                    const records = [];
-                    Object.entries(consumingSegmentsInfo._segmentToConsumingInfoMap || {}).forEach(([segment, infoList]) => {
-                      const serverDetailsList = [];
-                      let segmentTotalRecordsLag = 0;
-                      let segmentMaxAvailabilityLagMs = 0;
-
-                      (infoList || []).forEach(info => {
-                        let serverTotalPartitionLag = 0;
-                        let serverMaxPartitionLagMs = 0;
-
-                        // Calculate lag metrics per server across its partitions
-                        Object.values(info.partitionOffsetInfo.recordsLagMap || {}).forEach(lag => {
-                          if (lag !== null && Number(lag) > -1) {
-                            serverTotalPartitionLag = Math.max(serverTotalPartitionLag, Number(lag));
-                            segmentTotalRecordsLag = Math.max(segmentTotalRecordsLag, Number(lag));
-                          }
-                        });
-                        Object.values(info.partitionOffsetInfo.availabilityLagMsMap || {}).forEach(lagMs => {
-                           if (lagMs !== null && Number(lagMs) > -1) {
-                             serverMaxPartitionLagMs = Math.max(serverMaxPartitionLagMs, Number(lagMs));
-                             segmentMaxAvailabilityLagMs = Math.max(segmentMaxAvailabilityLagMs, Number(lagMs)); // Aggregate for segment max
-                           }
-                        });
-
-                        serverDetailsList.push({
-                          serverName: info.serverName,
-                          consumerState: info.consumerState,
-                          lag: serverTotalPartitionLag,
-                          availabilityMs: serverMaxPartitionLagMs
-                        });
-                      });
-
-                      if (serverDetailsList.length > 0) {
-                        records.push([
-                          segment,
-                          {
-                            customRenderer: (
-                              <List dense disablePadding style={{width: '100%'}}>
-                                {serverDetailsList.map((detail, index) => (
-                                  <ListItem key={index} dense disableGutters style={{ padding: '2px 0' }}>
-                                    <ListItemText
-                                      primary={`${detail.serverName}: ${detail.consumerState}`}
-                                      secondary={`Lag: ${detail.lag}, Availability: ${detail.availabilityMs}ms`}
-                                      primaryTypographyProps={{ variant: 'body2', style: { fontWeight: 500 } }}
-                                      secondaryTypographyProps={{ variant: 'caption', color: 'textSecondary' }}
-                                    />
-                                  </ListItem>
-                                ))}
-                              </List>
-                            )
-                          },
-                          segmentTotalRecordsLag,
-                          segmentMaxAvailabilityLagMs,
-                        ]);
-                      }
-                    });
-
-                    if (records.length === 0) {
-                      if (Object.keys(consumingSegmentsInfo._segmentToConsumingInfoMap || {}).length === 0) {
-                         return <Typography>No consuming segment data available.</Typography>;
-                      } else {
-                         return <Typography>Consuming segment data found, but no server details available.</Typography>;
-                      }
-                    }
-
-                    return (
-                      <CustomizedTables
-                        title="Consuming Segments Summary"
-                        data={{ columns, records }}
-                        showSearchBox={true}
-                      />
-                    );
-                  })()}
+                  <ConsumingSegmentsTable info={consumingSegmentsInfo} />
                 </Box>
               </Box>
-            ) : (
+            )}
+            {!loadingConsumingSegments && !consumingSegmentsInfo && (
               <Typography>No consuming segments data available.</Typography>
             )}
           </CustomDialog>
