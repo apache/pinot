@@ -29,12 +29,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
-import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -97,45 +100,39 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    long offset;
     try {
+      // Prepare AdminClient-based offset lookup
+      Map<TopicPartition, OffsetSpec> request = new HashMap<>();
       if (offsetCriteria.isLargest()) {
-        offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-            .get(_topicPartition);
+        request.put(_topicPartition, OffsetSpec.latest());
       } else if (offsetCriteria.isSmallest()) {
-        offset =
-            _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-                .get(_topicPartition);
+        request.put(_topicPartition, OffsetSpec.earliest());
       } else if (offsetCriteria.isPeriod()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
-                Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString())))
-            .get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
-        }
+        long ts = Clock.systemUTC().millis() - TimeUtils.convertPeriodToMillis(offsetCriteria.getOffsetString());
+        request.put(_topicPartition, OffsetSpec.forTimestamp(ts));
       } else if (offsetCriteria.isTimestamp()) {
-        OffsetAndTimestamp offsetAndTimestamp = _consumer.offsetsForTimes(Collections.singletonMap(_topicPartition,
-            TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString()))).get(_topicPartition);
-        if (offsetAndTimestamp == null) {
-          offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
-              .get(_topicPartition);
-          LOGGER.warn(
-              "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
-                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
-        } else {
-          offset = offsetAndTimestamp.offset();
-        }
+        long ts = TimeUtils.convertTimestampToMillis(offsetCriteria.getOffsetString());
+        request.put(_topicPartition, OffsetSpec.forTimestamp(ts));
       } else {
-        throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+        throw new IllegalArgumentException("Unknown offset criteria: " + offsetCriteria);
       }
-      return new LongMsgOffset(offset);
-    } catch (TimeoutException e) {
+      ListOffsetsResult result = _adminClient.listOffsets(request);
+      Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets =
+          result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
+      if (offsets == null || offsets.isEmpty()) {
+        // fetch endOffsets as fallback
+        request.put(_topicPartition, OffsetSpec.latest());
+        result = _adminClient.listOffsets(request);
+        offsets = result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
+        LOGGER.warn(
+            "initial offset type is {} and its value evaluates to null hence proceeding with offset {} " + "for "
+                + "topic {} partition {}", offsetCriteria, offsets.get(_topicPartition).offset(),
+            _topicPartition.topic(), _topicPartition.partition());
+      }
+
+      ListOffsetsResult.ListOffsetsResultInfo info = offsets.get(_topicPartition);
+      return new LongMsgOffset(info.offset());
+    } catch (InterruptedException | ExecutionException | java.util.concurrent.TimeoutException e) {
       throw new TransientConsumerException(e);
     }
   }
