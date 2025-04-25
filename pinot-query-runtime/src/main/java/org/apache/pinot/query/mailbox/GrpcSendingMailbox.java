@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
@@ -54,6 +58,8 @@ import org.slf4j.LoggerFactory;
  */
 public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
+
+  private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = Collections.emptyList();
 
   private final PinotConfiguration _config;
   private final String _id;
@@ -175,7 +181,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      List<ByteString> byteStrings = DataBlockUtils.toByteStrings(dataBlock, _maxByteStringSize);
+      List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
       int sizeInBytes = byteStrings.stream().mapToInt(ByteString::size).reduce(0, Integer::sum);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
@@ -246,6 +252,66 @@ public class GrpcSendingMailbox implements SendingMailbox {
       } else {
         return MetadataBlock.newError(errorMessagesByInt);
       }
+    }
+  }
+
+  @VisibleForTesting
+  public static List<ByteString> toByteStrings(DataBlock dataBlock, int maxByteStringSize)
+      throws IOException {
+    return toByteStrings(dataBlock.serialize(), maxByteStringSize);
+  }
+
+  @VisibleForTesting
+  public static List<ByteString> toByteStrings(List<ByteBuffer> bytes, int maxByteStringSize) {
+    if (bytes.isEmpty()) {
+      return EMPTY_BYTEBUFFER_LIST;
+    }
+
+    int totalBytes = 0;
+    for (ByteBuffer bb : bytes) {
+      totalBytes += bb.remaining();
+    }
+    int initialCapacity = (totalBytes / maxByteStringSize) + bytes.size();
+    List<ByteString> result = new ArrayList<>(initialCapacity);
+
+    ByteString acc = ByteString.EMPTY;
+    int available = maxByteStringSize;
+
+    for (ByteBuffer bb: bytes) {
+      int from = bb.position();
+      int remaining = bb.limit() - from;
+      while (remaining > 0) {
+        if (remaining <= available) {
+          acc = acc.concat(UnsafeByteOperations.unsafeWrap(sliceByteBuffer(bb, from, from + remaining)));
+          available -= remaining;
+          remaining = 0;
+        } else {
+          acc = acc.concat(UnsafeByteOperations.unsafeWrap(sliceByteBuffer(bb, from, from + available)));
+          from += available;
+          remaining -= available;
+          result.add(acc);
+          acc = ByteString.EMPTY;
+          available = maxByteStringSize;
+        }
+      }
+    }
+    result.add(acc);
+
+    return result;
+  }
+
+  // polyfill because ByteBuffer.slice(pos, lim) is not available until Java 13
+  private static ByteBuffer sliceByteBuffer(ByteBuffer bb, int position, int limit) {
+    int oldPosition = bb.position();
+    int oldLimit = bb.limit();
+
+    try {
+      bb.position(position);
+      bb.limit(limit);
+      return bb.slice();
+    } finally {
+      bb.position(oldPosition);
+      bb.limit(oldLimit);
     }
   }
 }
