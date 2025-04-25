@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -69,7 +68,6 @@ public abstract class PinotPrometheusMetricsTest {
   protected static final String PARTITION_GROUP_ID = "partitionGroupId";
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
-  protected static final String REBALANCE_JOB_ID = UUID.randomUUID().toString();
 
   protected HttpClient _httpClient;
 
@@ -338,9 +336,6 @@ public abstract class PinotPrometheusMetricsTest {
     public static final List<String> TASKTYPE_TABLENAME_TABLETYPE =
         List.of(TASKTYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TABLE, ExportedLabelValues.TABLENAME,
             TABLETYPE, TABLETYPE_REALTIME);
-
-    public static final List<String> JOBID_TABLENAME_TABLETYPE =
-        List.of(JOBID, REBALANCE_JOB_ID, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME);
   }
 
   public static class ExportedLabelKeys {
@@ -353,7 +348,6 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String PERIODIC_TASK = "periodicTask";
     public static final String STATUS = "status";
     public static final String DATABASE = "database";
-    public static final String JOBID = "jobId";
   }
 
   public static class ExportedLabelValues {
