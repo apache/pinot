@@ -185,7 +185,8 @@ public class SelectionOperatorUtils {
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions == null || queryContext.getLimit() == 0) {
       // For 'SELECT *', use the server response data schema as the final results data schema.
-      if ((numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR))) {
+      if ((numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR))
+              || queryContext.isSelectStarQuery()) {
         int[] columnIndices = new int[numColumnsInDataSchema];
         for (int i = 0; i < numColumnsInDataSchema; i++) {
           columnIndices[i] = i;
@@ -298,6 +299,52 @@ public class SelectionOperatorUtils {
     int numRowsToMerge = Math.min(selectionSize - mergedRows.size(), rowsToMerge.size());
     if (numRowsToMerge > 0) {
       mergedRows.addAll(rowsToMerge.subList(0, numRowsToMerge));
+    }
+  }
+
+  public static void mergeMatchingColumns(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge,
+                                          int selectionSize, List<Integer> mergedIndices,
+                                          List<Integer> toMergeIndices) {
+    // Step 1: Project existing rows in mergedBlock to only common columns
+    List<Object[]> mergedRows = mergedBlock.getRows();
+    List<Object[]> reprojectedMergedRows = new ArrayList<>(mergedRows.size());
+
+    for (Object[] row : mergedRows) {
+      Object[] projected = new Object[mergedIndices.size()];
+      for (int i = 0; i < mergedIndices.size(); i++) {
+        int idx = mergedIndices.get(i);
+        if (idx >= row.length) {
+          throw new IllegalStateException(String.format(
+                  "Invalid mergedIndex %d for row of length %d. Row: %s",
+                  idx, row.length, Arrays.toString(row)));
+        }
+        projected[i] = row[idx];
+      }
+      reprojectedMergedRows.add(projected);
+    }
+
+    // Overwrite the original merged rows with reprojected ones
+    mergedRows.clear();
+    mergedRows.addAll(reprojectedMergedRows);
+
+    // Step 2: Project and append rows from blockToMerge
+    List<Object[]> rowsToMerge = blockToMerge.getRows();
+    for (Object[] row : rowsToMerge) {
+      if (mergedRows.size() >= selectionSize) {
+        break;
+      }
+
+      Object[] projected = new Object[toMergeIndices.size()];
+      for (int i = 0; i < toMergeIndices.size(); i++) {
+        int idx = toMergeIndices.get(i);
+        if (idx >= row.length) {
+          throw new IllegalStateException(String.format(
+                  "Invalid toMergeIndex %d for row of length %d. Row: %s",
+                  idx, row.length, Arrays.toString(row)));
+        }
+        projected[i] = row[idx];
+      }
+      mergedRows.add(projected);
     }
   }
 

@@ -32,7 +32,7 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;
-  14: optional bool selectStar;
+  14: optional bool selectStarQuery;
 }
 
 struct DataSource {

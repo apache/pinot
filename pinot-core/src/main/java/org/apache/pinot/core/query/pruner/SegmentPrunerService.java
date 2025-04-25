@@ -142,12 +142,11 @@ public class SegmentPrunerService {
     int invalid = 0;
     for (IndexSegment segment : segments) {
       if (!isEmptySegment(segment)) {
-//        if (isInvalidSegment(segment, query)) {
-//          invalid++;
-//        } else {
-//          segments.set(selected++, segment);
-//        }
-        segments.set(selected++, segment);;
+        if (isInvalidSegment(segment, query)) {
+          invalid++;
+        } else {
+          segments.set(selected++, segment);
+        }
       }
     }
     stats.setInvalidSegments(invalid);
@@ -159,6 +158,9 @@ public class SegmentPrunerService {
   }
 
   private static boolean isInvalidSegment(IndexSegment segment, QueryContext query) {
+    if (query.isSelectStarQuery()) {
+      return false;
+    }
     return !segment.getColumnNames().containsAll(query.getColumns());
   }
 }

@@ -136,12 +136,15 @@ public class QueryContext {
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
+  private boolean _isSelectStarQuery;
+
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain,
+      boolean isSelectStarQuery) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -156,6 +159,7 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
+    _isSelectStarQuery = isSelectStarQuery;
   }
 
   /**
@@ -420,6 +424,10 @@ public class QueryContext {
     return _chunkSizeExtractFinalResult;
   }
 
+  public boolean isSelectStarQuery() {
+    return _isSelectStarQuery;
+  }
+
   public void setChunkSizeExtractFinalResult(int chunkSizeExtractFinalResult) {
     _chunkSizeExtractFinalResult = chunkSizeExtractFinalResult;
   }
@@ -504,6 +512,7 @@ public class QueryContext {
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private ExplainMode _explain = ExplainMode.NONE;
+    private boolean _isSelectStarQuery;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -584,6 +593,11 @@ public class QueryContext {
       return this;
     }
 
+    public Builder setIsSelectStarQuery(boolean isSelectStarQuery) {
+      _isSelectStarQuery = isSelectStarQuery;
+      return this;
+    }
+
     public QueryContext build() {
       // TODO: Add validation logic here
 
@@ -593,7 +607,7 @@ public class QueryContext {
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
               _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
-              _expressionOverrideHints, _explain);
+              _expressionOverrideHints, _explain, _isSelectStarQuery);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(

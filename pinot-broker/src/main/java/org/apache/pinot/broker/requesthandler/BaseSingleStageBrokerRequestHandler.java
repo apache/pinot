@@ -1713,6 +1713,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           hasStar = true;
         }
       }
+      pinotQuery.setSelectStarQuery(hasStar);
       //if query has a '*' selection along with other columns
       if (hasStar) {
         expandStarExpressionsToActualColumns(pinotQuery, columnNameMap);

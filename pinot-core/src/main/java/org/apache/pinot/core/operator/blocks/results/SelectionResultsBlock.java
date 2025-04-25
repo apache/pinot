@@ -32,7 +32,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  * Results block for selection queries.
  */
 public class SelectionResultsBlock extends BaseResultsBlock {
-  private final DataSchema _dataSchema;
+  private DataSchema _dataSchema;
   private final Comparator<? super Object[]> _comparator;
   private final QueryContext _queryContext;
   private List<Object[]> _rows;
@@ -51,6 +51,10 @@ public class SelectionResultsBlock extends BaseResultsBlock {
 
   public void setRows(List<Object[]> rows) {
     _rows = rows;
+  }
+
+  public void setDataSchema(DataSchema dataSchema) {
+    _dataSchema = dataSchema;
   }
 
   @Nullable
