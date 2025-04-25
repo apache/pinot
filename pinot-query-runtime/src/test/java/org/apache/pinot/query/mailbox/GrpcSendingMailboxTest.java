@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,6 +32,9 @@ import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -106,6 +110,26 @@ public class GrpcSendingMailboxTest {
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
     DataBlockEquals.checkSameContent(_dataBlock, actual, "Rebuilt data block (" + name + ") does not match.");
+  }
+
+  @Test(dataProvider = "testDataBlockToByteStringsProvider")
+  public void testToByteStringDataBuffers(String name, int maxByteStringSize) throws IOException {
+    List<ByteBuffer> byteBuffers = _dataBlock.serialize();
+    List<ByteString> byteStrings = GrpcSendingMailbox.toByteStrings(_dataBlock, maxByteStringSize);
+
+    List<DataBuffer> asGrpc = byteStrings.stream()
+        .map(ByteString::asReadOnlyByteBuffer)
+        .map(bb -> PinotByteBuffer.wrap(bb.slice()))
+        .collect(Collectors.toList());
+    List<DataBuffer> directSerialize = byteBuffers.stream()
+        .map(PinotByteBuffer::wrap)
+        .collect(Collectors.toList());
+
+    try (CompoundDataBuffer grpc = new CompoundDataBuffer(asGrpc, ByteOrder.BIG_ENDIAN, false);
+        CompoundDataBuffer direct = new CompoundDataBuffer(directSerialize, ByteOrder.BIG_ENDIAN, false)
+    ) {
+      assertEquals(grpc, direct);
+    }
   }
 
   @DataProvider(name = "testDataBlockToByteStringsProvider")
