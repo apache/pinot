@@ -303,8 +303,7 @@ public final class TableConfigUtils {
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
     if (peerSegmentDownloadScheme != null) {
-      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
-          && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
+      if (!isValidPeerDownloadScheme(peerSegmentDownloadScheme)) {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
@@ -315,6 +314,11 @@ public final class TableConfigUtils {
     }
 
     validateRetentionConfig(tableConfig);
+  }
+
+  private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {
+    return CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
+        || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme);
   }
 
   /**
@@ -367,9 +371,17 @@ public final class TableConfigUtils {
 
         boolean isPauselessEnabled = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
         if (isPauselessEnabled) {
-          String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-          Preconditions.checkState(StringUtils.isNotEmpty(peerSegmentDownloadScheme),
-              "Must have peerSegmentDownloadScheme set in validation config for pauseless consumption");
+          int replication = tableConfig.getReplication();
+          // We are checking for this only when replication is greater than 1 because in test environments
+          // users still prefer to create pauseless tables with replication 1
+          if (replication > 1) {
+            String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+            Preconditions.checkState(StringUtils.isNotEmpty(peerSegmentDownloadScheme) && isValidPeerDownloadScheme(
+                    peerSegmentDownloadScheme),
+                "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
+          } else {
+            LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
+          }
         }
       }
 
