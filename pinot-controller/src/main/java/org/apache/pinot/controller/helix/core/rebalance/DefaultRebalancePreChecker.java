@@ -20,8 +20,10 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -31,24 +33,29 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.utils.Enablement;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class DefaultRebalancePreChecker implements RebalancePreChecker {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalancePreChecker.class);
-
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
   public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
   public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
+  public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
+  public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
 
   private static double _diskUtilizationThreshold;
 
@@ -68,14 +75,18 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     String rebalanceJobId = preCheckContext.getRebalanceJobId();
     String tableNameWithType = preCheckContext.getTableNameWithType();
     TableConfig tableConfig = preCheckContext.getTableConfig();
-    LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
+    RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
+    Logger tableRebalanceLogger =
+        LoggerFactory.getLogger(getClass().getSimpleName() + '-' + tableNameWithType + '-' + rebalanceJobId);
+
+    tableRebalanceLogger.info("Start pre-checks");
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
     // Check for reload status
-    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType));
+    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(tableNameWithType, tableRebalanceLogger));
     // Check whether minimizeDataMovement is set in TableConfig
-    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
-        tableNameWithType, tableConfig));
+    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
+        checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
@@ -87,7 +98,12 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
             preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));
 
-    LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
+    preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
+        preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment()));
+
+    preCheckResult.put(REPLICA_GROUPS_INFO, checkReplicaGroups(tableConfig, rebalanceConfig));
+
+    tableRebalanceLogger.info("End pre-checks");
     return preCheckResult;
   }
 
@@ -97,13 +113,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
    *       and add a pre-check here to call that API.
    */
-  private RebalancePreCheckerResult checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType) {
-    LOGGER.info("Fetching whether reload is needed for table: {} with rebalanceJobId: {}", tableNameWithType,
-        rebalanceJobId);
+  private RebalancePreCheckerResult checkReloadNeededOnServers(String tableNameWithType, Logger tableRebalanceLogger) {
+    tableRebalanceLogger.info("Fetching whether reload is needed");
     Boolean needsReload = null;
     if (_executorService == null) {
-      LOGGER.warn("Executor service is null, skipping needsReload check for table: {} rebalanceJobId: {}",
-          tableNameWithType, rebalanceJobId);
+      tableRebalanceLogger.warn("Executor service is null, skipping needsReload check");
       return RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually");
     }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
@@ -113,16 +127,17 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           metadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType, 30_000);
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
-      LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
-          + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
+      tableRebalanceLogger.info("Received {} needs reload responses and {} failed responses from servers assigned "
+              + "to table", needsReloadMetadata.size(), failedResponses);
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
-        LOGGER.warn("Received {} failed responses from servers and needsReload is false from returned responses, "
-            + "check needsReload status manually", failedResponses);
+        tableRebalanceLogger.warn(
+            "Received {} failed responses from servers and needsReload is false from returned responses, "
+                + "check needsReload status manually", failedResponses);
         needsReload = null;
       }
     } catch (InvalidConfigException | IOException e) {
-      LOGGER.warn("Caught exception while trying to fetch reload status from servers", e);
+      tableRebalanceLogger.warn("Caught exception while trying to fetch reload status from servers", e);
     }
 
     return needsReload == null
@@ -134,27 +149,28 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   /**
    * Checks if minimize data movement is set for the given table in the TableConfig
    */
-  private RebalancePreCheckerResult checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig) {
-    LOGGER.info("Checking whether minimizeDataMovement is set for table: {} with rebalanceJobId: {}", tableNameWithType,
-        rebalanceJobId);
+  private RebalancePreCheckerResult checkIsMinimizeDataMovement(TableConfig tableConfig,
+      RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
+    tableRebalanceLogger.info("Checking whether minimizeDataMovement is set");
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
             InstancePartitionsType.OFFLINE);
-        RebalancePreCheckerResult rebalancePreCheckerResult;
         if (isInstanceAssignmentAllowed) {
+          if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
+            return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+          }
           InstanceAssignmentConfig instanceAssignmentConfig =
               InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
-          rebalancePreCheckerResult = instanceAssignmentConfig.isMinimizeDataMovement()
-              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-              : RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment "
-                  + "is allowed");
-        } else {
-          rebalancePreCheckerResult =
-              RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
+          if (instanceAssignmentConfig.isMinimizeDataMovement()) {
+            return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
+                ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
+                + "with disabled") : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+          }
+          return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment is "
+              + "allowed");
         }
-        return rebalancePreCheckerResult;
+        return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       }
 
       boolean isInstanceAssignmentAllowedConsuming = InstanceAssignmentConfigUtils.allowInstanceAssignment(
@@ -164,19 +180,24 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         instanceAssignmentConfigConsuming =
             InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.CONSUMING);
       }
-      // For REALTIME tables need to check for both CONSUMING and COMPLETED segments if relocation is enabled
+      // For REALTIME tables if COMPLETED segments are not to be relocated, check for only CONSUMING segment instance
+      // assignment config if presents
       if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
-        RebalancePreCheckerResult rebalancePreCheckerResult;
         if (isInstanceAssignmentAllowedConsuming) {
-          rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-              : RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment "
-                  + "is allowed");
-        } else {
-          rebalancePreCheckerResult =
-              RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
+          if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
+            return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+          }
+          if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
+            return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
+                ? RebalancePreCheckerResult.warn(
+                "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden "
+                    + "with disabled")
+                : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+          }
+          return RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
         }
-        return rebalancePreCheckerResult;
+        return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       }
 
       boolean isInstanceAssignmentAllowedCompleted = InstanceAssignmentConfigUtils.allowInstanceAssignment(
@@ -187,25 +208,57 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
             InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
       }
 
-      RebalancePreCheckerResult rebalancePreCheckerResult;
+      // COMPLETED segments are to be relocated, check both COMPLETED and CONSUMING segment instance assignment config
+      // that present
       if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
-        rebalancePreCheckerResult =
-            RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
+        return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
-        rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-            && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
-            ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-            : RebalancePreCheckerResult.warn("minimizeDataMovement may not enabled for consuming or completed "
-                + "but instance assignment is allowed for both");
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
+          return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()
+            && instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for both COMPLETED and CONSUMING segments in table config but it's "
+                  + "overridden with disabled")
+              : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        return RebalancePreCheckerResult.warn(
+            "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
+                + "assignment is allowed for both");
+      } else if (instanceAssignmentConfigConsuming != null) {
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
+          return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with "
+                  + "disabled")
+              : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        return RebalancePreCheckerResult.warn(
+            "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
       } else {
-        rebalancePreCheckerResult = RebalancePreCheckerResult.warn("minimizeDataMovement may not enabled for "
-            + "consuming or completed but instance assignment is allowed for at least one");
+        if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
+          return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()) {
+          return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for COMPLETED segments in table config but it's overridden "
+                  + "with disabled")
+              : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+        }
+        return RebalancePreCheckerResult.warn(
+            "minimizeDataMovement is not enabled for COMPLETED segments, but instance assignment is allowed");
       }
-      return rebalancePreCheckerResult;
     } catch (IllegalStateException e) {
-      LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
-      return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
+      tableRebalanceLogger.warn(
+          "Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
     }
+    return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
   }
 
   private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
@@ -277,6 +330,96 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return isDiskUtilSafe ? RebalancePreCheckerResult.pass(
         String.format("Within threshold (<%d%%)", (short) (threshold * 100)))
         : RebalancePreCheckerResult.error(message.toString());
+  }
+
+  private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
+    List<String> warnings = new ArrayList<>();
+    boolean pass = true;
+    if (rebalanceConfig.isBestEfforts()) {
+      pass = false;
+      warnings.add("bestEfforts is enabled, only enable it if you know what you are doing");
+    }
+    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+
+    if (rebalanceConfig.isDowntime()) {
+      int numReplicas = Integer.MAX_VALUE;
+      for (String segment : segmentsToMove) {
+        numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
+      }
+      if (!segmentsToMove.isEmpty() && numReplicas > 1) {
+        pass = false;
+        warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
+      }
+    }
+
+    if (!rebalanceConfig.isIncludeConsuming() && tableConfig.getTableType() == TableType.REALTIME) {
+      pass = false;
+      warnings.add("includeConsuming is disabled for a realtime table.");
+    }
+    if (rebalanceConfig.isBootstrap()) {
+      pass = false;
+      warnings.add(
+          "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended");
+    }
+
+    return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
+        : RebalancePreCheckerResult.warn(StringUtil.join("\n", warnings.toArray(String[]::new)));
+  }
+
+  private RebalancePreCheckerResult checkReplicaGroups(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
+    String message;
+    boolean hasAnyReplicaGroup;
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      message = "OFFLINE segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.OFFLINE.toString());
+      hasAnyReplicaGroup = isReplicaGroupEnabled(tableConfig, InstancePartitionsType.OFFLINE.toString());
+    } else {
+      // for realtime table
+      message =
+          "COMPLETED segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.COMPLETED.toString()) + "\n"
+              + "CONSUMING segments - " + getReplicaGroupInfo(tableConfig, InstancePartitionsType.CONSUMING.toString());
+      hasAnyReplicaGroup =
+          isReplicaGroupEnabled(tableConfig, InstancePartitionsType.COMPLETED.toString()) || isReplicaGroupEnabled(
+              tableConfig, InstancePartitionsType.CONSUMING.toString());
+    }
+    String tierMessage = "";
+    if (tableConfig.getTierConfigsList() != null) {
+      List<String> tierMessageList = new ArrayList<>();
+      for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+        tierMessageList.add(tierConfig.getName() + " tier - " + getReplicaGroupInfo(tableConfig, tierConfig.getName()));
+        hasAnyReplicaGroup |= isReplicaGroupEnabled(tableConfig, tierConfig.getName());
+      }
+      tierMessage = "\n" + StringUtil.join("\n", tierMessageList.toArray(String[]::new));
+    }
+    if (hasAnyReplicaGroup && !rebalanceConfig.isReassignInstances()) {
+      return RebalancePreCheckerResult.warn(
+          "reassignInstances is disabled, replica groups may not be updated.\n" + message + tierMessage);
+    }
+    return RebalancePreCheckerResult.pass(message + tierMessage);
+  }
+
+  private static boolean isReplicaGroupEnabled(TableConfig tableConfig, String typeOrTier) {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    return instanceAssignmentConfigMap != null && instanceAssignmentConfigMap.containsKey(typeOrTier)
+        && instanceAssignmentConfigMap.get(typeOrTier).getReplicaGroupPartitionConfig().isReplicaGroupBased();
+  }
+
+  private static String getReplicaGroupInfo(TableConfig tableConfig, String typeOrTier) {
+    if (!isReplicaGroupEnabled(tableConfig, typeOrTier)) {
+      return "Replica Groups are not enabled, replication: " + tableConfig.getReplication();
+    }
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        instanceAssignmentConfigMap.get(typeOrTier).getReplicaGroupPartitionConfig();
+
+    int numReplicaGroups = instanceReplicaGroupPartitionConfig.getNumReplicaGroups();
+    int numInstancePerReplicaGroup = instanceReplicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
+    if (numInstancePerReplicaGroup == 0) {
+      return "numReplicaGroups: " + numReplicaGroups
+          + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
+    }
+    return "numReplicaGroups: " + numReplicaGroups
+        + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {

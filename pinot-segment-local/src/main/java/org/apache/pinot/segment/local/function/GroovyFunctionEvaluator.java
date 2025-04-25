@@ -83,7 +83,12 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     _numArguments = _arguments.size();
     _binding = new Binding();
     String scriptText = matcher.group(SCRIPT_GROUP_NAME);
-    _script = createSafeShell(_binding).parse(scriptText);
+    try {
+      _script = createSafeShell(_binding).parse(scriptText);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to compile groovy script: " + closure + ", exception: " + e.getMessage(),
+          e);
+    }
   }
 
   public static String getGroovyExpressionPrefix() {

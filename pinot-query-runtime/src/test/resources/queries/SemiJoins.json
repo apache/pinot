@@ -1,0 +1,75 @@
+{
+  "semi_join_queries": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "long_col", "type": "LONG"},
+          {"name": "float_col", "type": "FLOAT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "big_decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "bytes_col", "type": "BYTES"}
+        ],
+        "inputs": [
+          [1, 1, 1.0, 1.0, "a", 1.0, "AA"],
+          [2, 2, 2.0, 2.0, "b", 2.0, "BB"],
+          [3, 3, 3.0, 3.0, "c", 3.0, "CC"],
+          [4, 4, 4.0, 4.0, "d", 4.0, "DD"],
+          [5, 5, 5.0, 5.0, "e", 5.0, "EE"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Semi join using IN clause with INT",
+        "sql": "SELECT int_col FROM {tbl} WHERE int_col IN (SELECT int_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          [3]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with LONG",
+        "sql": "SELECT long_col FROM {tbl} WHERE long_col IN (SELECT long_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          [3]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with FLOAT",
+        "sql": "SELECT float_col FROM {tbl} WHERE float_col IN (SELECT float_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          [3.0]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with DOUBLE",
+        "sql": "SELECT double_col FROM {tbl} WHERE double_col IN (SELECT double_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          [3.0]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with STRING",
+        "sql": "SELECT string_col FROM {tbl} WHERE string_col IN (SELECT string_col FROM {tbl} WHERE int_col = 3)",
+        "outputs": [
+          ["c"]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with BIG_DECIMAL",
+        "sql": "SELECT big_decimal_col FROM {tbl} WHERE big_decimal_col IN (SELECT big_decimal_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          ["3.0"]
+        ]
+      },
+      {
+        "description": "Semi join using IN clause with BYTES",
+        "sql": "SELECT bytes_col FROM {tbl} WHERE bytes_col IN (SELECT bytes_col FROM {tbl} WHERE string_col = 'c')",
+        "outputs": [
+          ["cc"]
+        ]
+      }
+    ]
+  }
+}

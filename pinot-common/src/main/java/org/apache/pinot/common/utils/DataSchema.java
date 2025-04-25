@@ -626,6 +626,8 @@ public class DataSchema {
           return BytesUtils.toHexString((byte[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((Timestamp[]) value);
+        case BYTES_ARRAY:
+          return formatBytesArray((byte[][]) value);
         default:
           return (Serializable) value;
       }
@@ -820,6 +822,15 @@ public class DataSchema {
         formattedTimestampArray[i] = timestampArray[i].toString();
       }
       return formattedTimestampArray;
+    }
+
+    private static String[] formatBytesArray(byte[][] byteArray) {
+      int length = byteArray.length;
+      String[] formattedBytesArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBytesArray[i] = BytesUtils.toHexString(byteArray[i]);
+      }
+      return formattedBytesArray;
     }
 
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {

@@ -1630,21 +1630,10 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
   }
 
-  /**
-   * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
-   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE,
-   * this method can return null.
-   */
+  @Deprecated
   @Nullable
   public Schema getSchemaForTableConfig(TableConfig tableConfig) {
-    Schema schema = getSchema(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
-    if (schema == null) {
-      String schemaName = tableConfig.getValidationConfig().getSchemaName();
-      if (schemaName != null) {
-        schema = getSchema(schemaName);
-      }
-    }
-    return schema;
+    return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
   public List<String> getSchemaNames() {
@@ -2130,13 +2119,23 @@ public class PinotHelixResourceManager {
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(tableNameWithType, getSegmentsFromPropertyStore(tableNameWithType),
+    _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
+        getSegmentsFromPropertyStore(tableNameWithType),
         retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
     // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
+
+    // Remove COMMITTING segment list
+    if (TableNameBuilder.REALTIME.equals(tableType)) {
+      if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
+        LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+      } else {
+        LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+      }
+    }
 
     // Remove instance partitions
     if (tableType == TableType.OFFLINE) {
@@ -2547,7 +2546,7 @@ public class PinotHelixResourceManager {
           InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
               InstancePartitionsType.OFFLINE));
     }
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+    if (tableConfig.isUpsertEnabled()) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       return Collections.singletonMap(InstancePartitionsType.CONSUMING,
@@ -4466,7 +4465,7 @@ public class PinotHelixResourceManager {
         if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
           InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
           hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-              Integer.parseInt(instanceConfig.getPort())));
+              Integer.parseInt(instanceConfig.getPort()), Integer.parseInt(HelixHelper.getGrpcPort(instanceConfig))));
         }
       }
       if (!hosts.isEmpty()) {

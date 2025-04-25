@@ -87,8 +87,12 @@ public class TableConfigTest {
   public void testCopyConstructor() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);
+    ingestionConfig.setRetryOnSegmentBuildPrecheckFailure(true);
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setSegmentTimeValueCheck(false);
+
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setHashFunction(HashFunction.MD5);
 
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
@@ -96,8 +100,8 @@ public class TableConfigTest {
         .setRetentionTimeValue("5")
         .setRetentionTimeUnit("DAYS")
         .setNumReplicas(2)
-        .setDedupConfig(new DedupConfig(true, HashFunction.MD5))
         .setIngestionConfig(ingestionConfig)
+        .setDedupConfig(dedupConfig)
         .setQueryConfig(new QueryConfig(2000L, true, false, Collections.emptyMap(), 100_000L, 100_000L))
         .setTierConfigList(List.of(new TierConfig("name", "type", null, null, "storageType", null, null, null)))
         .build();

@@ -154,26 +154,24 @@ public class PredownloadZKClient implements AutoCloseable {
    * @param tableInfoMap               Map of table name to table info to be filled with table config.
    */
   public void updateSegmentMetadata(List<PredownloadSegmentInfo> predownloadSegmentInfoList,
-      Map<String, PredownloadTableInfo> tableInfoMap,
-      InstanceDataManagerConfig instanceDataManagerConfig) {
+      Map<String, PredownloadTableInfo> tableInfoMap, InstanceDataManagerConfig instanceDataManagerConfig) {
     // fallback path comes from ZKHelixManager.class getHelixPropertyStore method
     ZkHelixPropertyStore<ZNRecord> propertyStore = new AutoFallbackPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient),
         PropertyPathBuilder.propertyStore(_clusterName), String.format("/%s/%s", _clusterName, "HELIX_PROPERTYSTORE"));
     for (PredownloadSegmentInfo predownloadSegmentInfo : predownloadSegmentInfoList) {
-      tableInfoMap.computeIfAbsent(predownloadSegmentInfo.getTableNameWithType(), name -> {
-        TableConfig tableConfig =
-            ZKMetadataProvider.getTableConfig(propertyStore, predownloadSegmentInfo.getTableNameWithType());
+      String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
+      tableInfoMap.computeIfAbsent(tableNameWithType, name -> {
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
         if (tableConfig == null) {
           LOGGER.warn("Cannot predownload segment {} because not able to get its table config from ZK",
               predownloadSegmentInfo.getSegmentName());
           return null;
         }
-        Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableConfig);
+        Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
         return new PredownloadTableInfo(name, tableConfig, schema, instanceDataManagerConfig);
       });
-      SegmentZKMetadata segmentZKMetadata =
-          ZKMetadataProvider.getSegmentZKMetadata(propertyStore, predownloadSegmentInfo.getTableNameWithType(),
-              predownloadSegmentInfo.getSegmentName());
+      SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType,
+          predownloadSegmentInfo.getSegmentName());
       if (segmentZKMetadata == null) {
         LOGGER.warn("Cannot predownload segment {} because not able to get its metadata from ZK",
             predownloadSegmentInfo.getSegmentName());

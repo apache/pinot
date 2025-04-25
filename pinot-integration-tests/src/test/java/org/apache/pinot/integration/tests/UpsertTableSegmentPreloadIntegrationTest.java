@@ -28,17 +28,15 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -104,14 +102,14 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
+    serverConf.setProperty(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_SNAPSHOT), "true");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_PRELOAD), "true");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+            Server.Upsert.DEFAULT_ENABLE_SNAPSHOT), "true");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+            Server.Upsert.DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
@@ -223,7 +221,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       for (BaseServerStarter serverStarter : _serverStarters) {
-        String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
+        String segmentDir = serverStarter.getConfig().getProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR);
         File[] files = new File(segmentDir, realtimeTableName).listFiles((dir, name) -> name.startsWith(rawTableName));
         assertNotNull(files);
         for (File file : files) {

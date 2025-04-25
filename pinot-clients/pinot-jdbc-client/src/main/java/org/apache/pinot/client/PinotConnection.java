@@ -31,15 +31,12 @@ import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 public class PinotConnection extends AbstractBaseConnection {
 
-  protected static final String[] POSSIBLE_QUERY_OPTIONS = {
-    QueryOptionKey.ENABLE_NULL_HANDLING,
-    QueryOptionKey.USE_MULTISTAGE_ENGINE
-  };
   private org.apache.pinot.client.Connection _session;
   private boolean _closed;
   private String _controllerURL;
@@ -70,42 +67,14 @@ public class PinotConnection extends AbstractBaseConnection {
     }
     _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
 
-    for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
-      Object property = properties.getProperty(possibleQueryOption);
-      if (property != null) {
-        _queryOptions.put(possibleQueryOption, parseOptionValue(property));
+    for (Map.Entry<Object, Object> property : properties.entrySet()) {
+      String configKey = QueryOptionsUtils.resolveCaseInsensitiveKey(property.getKey());
+      if (configKey != null) {
+        _queryOptions.put(configKey, DriverUtils.parseOptionValue(property.getValue()));
       }
     }
   }
 
-  private Object parseOptionValue(Object value) {
-    if (value instanceof String) {
-      String str = (String) value;
-
-      try {
-        Long numVal = Long.valueOf(str);
-        if (numVal != null) {
-            return numVal;
-        }
-      } catch (NumberFormatException e) {
-      }
-
-      try {
-          Double numVal = Double.valueOf(str);
-          if (numVal != null) {
-              return numVal;
-          }
-      } catch (NumberFormatException e) {
-      }
-
-      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
-      if (boolVal != null) {
-          return boolVal;
-      }
-    }
-
-    return value;
-  }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;

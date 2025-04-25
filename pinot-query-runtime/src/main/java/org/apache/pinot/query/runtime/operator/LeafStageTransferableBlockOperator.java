@@ -34,7 +34,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
@@ -58,12 +57,14 @@ import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
@@ -128,10 +129,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return _dataSchema;
   }
 
-  public MultiStageQueryStats getQueryStats() {
-    return MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
-  }
-
   @Override
   public void registerExecution(long time, int numRows) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
@@ -159,13 +156,13 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
+  protected MseBlock getNextBlock()
       throws InterruptedException, TimeoutException {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
     if (_isEarlyTerminated) {
-      return constructMetadataBlock();
+      return SuccessMseBlock.INSTANCE;
     }
     BaseResultsBlock resultsBlock =
         _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
@@ -175,14 +172,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     // Terminate when receiving exception block
     Map<Integer, String> exceptions = _exceptions;
     if (exceptions != null) {
-      return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
+      return new ErrorMseBlock(QueryErrorCode.fromKeyMap(exceptions));
     }
     if (resultsBlock == LAST_RESULTS_BLOCK) {
-      return constructMetadataBlock();
+      return SuccessMseBlock.INSTANCE;
     } else {
       // Regular data block
-      return composeTransferableBlock(resultsBlock);
+      return composeMseBlock(resultsBlock);
     }
+  }
+
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   @Override
@@ -250,6 +252,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           case NUM_GROUPS_LIMIT_REACHED:
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
             break;
+          case NUM_GROUPS_WARNING_LIMIT_REACHED:
+            _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+            break;
           case TIME_USED_MS:
             _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
             break;
@@ -304,11 +309,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         }
       }
     }
-  }
-
-  private TransferableBlock constructMetadataBlock() {
-    MultiStageQueryStats multiStageQueryStats = MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
   }
 
   public ExplainedNode explain() {
@@ -478,47 +478,32 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
   }
 
-  // TODO: Revisit the stats aggregation logic
-  private void aggregateExecutionStats(Map<String, String> stats1, Map<String, String> stats2) {
-    for (Map.Entry<String, String> entry : stats2.entrySet()) {
-      String k2 = entry.getKey();
-      String v2 = entry.getValue();
-      stats1.merge(k2, v2, (val1, val2) -> {
-        try {
-          return Long.toString(Long.parseLong(val1) + Long.parseLong(val2));
-        } catch (Exception e) {
-          return val1 + "\n" + val2;
-        }
-      });
-    }
-  }
-
   @Override
   public void close() {
     cancelSseTasks();
   }
 
   /**
-   * Composes the {@link TransferableBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
+   * Composes the {@link MseBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
    * converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
    */
-  private TransferableBlock composeTransferableBlock(BaseResultsBlock resultsBlock) {
+  private RowHeapDataBlock composeMseBlock(BaseResultsBlock resultsBlock) {
     if (resultsBlock instanceof SelectionResultsBlock) {
-      return composeSelectTransferableBlock((SelectionResultsBlock) resultsBlock);
+      return composeSelectMseBlock((SelectionResultsBlock) resultsBlock);
     } else {
-      return composeDirectTransferableBlock(resultsBlock);
+      return composeDirectMseBlock(resultsBlock);
     }
   }
 
   /**
    * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
    */
-  private TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock) {
+  private RowHeapDataBlock composeSelectMseBlock(SelectionResultsBlock resultsBlock) {
     int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
-      return composeColumnIndexedTransferableBlock(resultsBlock, columnIndices);
+      return composeColumnIndexedMseBlock(resultsBlock, columnIndices);
     } else {
-      return composeDirectTransferableBlock(resultsBlock);
+      return composeDirectMseBlock(resultsBlock);
     }
   }
 
@@ -550,7 +535,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return true;
   }
 
-  private TransferableBlock composeColumnIndexedTransferableBlock(SelectionResultsBlock block, int[] columnIndices) {
+  private RowHeapDataBlock composeColumnIndexedMseBlock(SelectionResultsBlock block, int[] columnIndices) {
     List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
@@ -574,7 +559,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         convertedRows.add(reorderRow(row, columnIndices));
       }
     }
-    return new TransferableBlock(convertedRows, _dataSchema, DataBlock.Type.ROW);
+    return new RowHeapDataBlock(convertedRows, _dataSchema);
   }
 
   private static Object[] reorderAndConvertRow(Object[] row, ColumnDataType[] inputStoredTypes,
@@ -604,7 +589,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return resultRow;
   }
 
-  private TransferableBlock composeDirectTransferableBlock(BaseResultsBlock block) {
+  private RowHeapDataBlock composeDirectMseBlock(BaseResultsBlock block) {
     List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
@@ -615,8 +600,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         convertRow(row, inputStoredTypes, outputStoredTypes);
       }
     }
-    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW,
-        _requests.get(0).getQueryContext().getAggregationFunctions());
+    return new RowHeapDataBlock(resultRows, _dataSchema, _requests.get(0).getQueryContext().getAggregationFunctions());
   }
 
   public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {
@@ -673,6 +657,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),

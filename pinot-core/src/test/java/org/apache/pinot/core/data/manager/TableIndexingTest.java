@@ -149,7 +149,7 @@ public class TableIndexingTest {
       String schemaName = enc + "_" + cardType + "_" + dataType;
       TestCase testCase = _testCaseMap.get(new TestCase(schemaName, -1, indexType));
       if (testCase == null) {
-        throw new AssertionError("Expected testCase not found: " + testCase);
+        Assert.fail("Expected testCase not found: " + schemaName);
       } else {
         testCase._expectedSuccess = Boolean.valueOf(result);
         testCase._expectedMessage = error;
@@ -164,19 +164,13 @@ public class TableIndexingTest {
       }
 
       for (String encoding : List.of("raw", "dict")) {
-        if (type == DataType.BOOLEAN && "dict".equals(encoding)) {
-          // pinot doesn't support dictionary encoding for boolean type
-          continue;
-        }
-
         if (type == DataType.TIMESTAMP) {
           //create separate tables for all data types
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_sv_" + type.name())
               .addDateTime(COLUMN_NAME, type, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
               .build());
-
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_mv_" + type.name())
-              .addDateTime(COLUMN_NAME, type, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+              .addMultiValueDimension(COLUMN_NAME, type)
               .build());
         } else {
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_sv_" + type.name())
@@ -509,13 +503,12 @@ public class TableIndexingTest {
     }
 
     if (testCase._expectedSuccess == null) {
-      throw new AssertionError("No expected status found for test case: " + testCase);
+      Assert.fail("No expected status found for test case: " + testCase);
     } else if (testCase._expectedSuccess && testCase._error != null) {
-      throw new AssertionError("Expected success for test case: " + testCase + " but got error: " + testCase._error);
+      Assert.fail("Expected success for test case: " + testCase + " but got error: " + testCase._error);
     } else if (!testCase._expectedSuccess && !testCase.getErrorMessage().equals(testCase._expectedMessage)) {
-      throw new AssertionError(
-          "Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
-              + testCase.getErrorMessage() + " \"");
+      Assert.fail("Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
+          + testCase.getErrorMessage() + "\"");
     }
   }
 

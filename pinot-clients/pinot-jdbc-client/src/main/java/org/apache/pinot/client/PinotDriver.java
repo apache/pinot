@@ -37,6 +37,7 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
+import org.apache.pinot.client.grpc.PinotGrpcConnection;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -46,6 +47,8 @@ import org.slf4j.LoggerFactory;
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
   private static final String URI_SCHEME = "pinot";
+  private static final String GRPC_URI_SCHEME = "pinotgrpc";
+
   public static final String INFO_TENANT = "tenant";
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String INFO_SCHEME = "scheme";
@@ -118,13 +121,18 @@ public class PinotDriver implements Driver {
         pinotControllerTransportFactory.setHeaders(headers);
       }
 
-      pinotClientTransport = factory.withConnectionProperties(info).buildTransport();
       pinotControllerTransport = pinotControllerTransportFactory
               .withConnectionProperties(info)
               .buildTransport();
       String controllerUrl = DriverUtils.getControllerFromURL(url);
+      String scheme = DriverUtils.getPinotScheme(url);
       String tenant = info.getProperty(INFO_TENANT, DEFAULT_TENANT);
-      return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
+      if (scheme.equalsIgnoreCase("pinot")) {
+        pinotClientTransport = factory.withConnectionProperties(info).buildTransport();
+        return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
+      } else {
+        return new PinotGrpcConnection(info, controllerUrl, tenant, pinotControllerTransport);
+      }
     } catch (Exception e) {
       closeResourcesSafely(pinotClientTransport, pinotControllerTransport);
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
@@ -167,7 +175,7 @@ public class PinotDriver implements Driver {
       throws SQLException {
     String cleanURI = url.substring(5);
     URI uri = URI.create(cleanURI);
-    return uri.getScheme().contentEquals(URI_SCHEME);
+    return uri.getScheme().contentEquals(URI_SCHEME) || uri.getScheme().contentEquals(GRPC_URI_SCHEME);
   }
 
   @Override

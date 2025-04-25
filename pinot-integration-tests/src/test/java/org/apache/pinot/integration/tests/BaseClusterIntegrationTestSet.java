@@ -41,7 +41,6 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -497,40 +496,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
     }
-  }
-
-  /**
-   * Test invalid queries which should cause query exceptions.
-   *
-   * @throws Exception
-   */
-  public void testQueryExceptions()
-      throws Exception {
-    testQueryException("POTATO", QueryErrorCode.SQL_PARSING);
-
-    // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
-    testQueryException("SELECT COUNT(*) FROM potato",
-        useMultiStageQueryEngine()
-            ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.TABLE_DOES_NOT_EXIST);
-
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable",
-        useMultiStageQueryEngine()
-            ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.QUERY_VALIDATION);
-
-    // ArrTime expects a numeric type
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        useMultiStageQueryEngine()
-            ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
-
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryErrorCode.QUERY_VALIDATION);
-  }
-
-  private void testQueryException(String query, QueryErrorCode errorCode)
-      throws Exception {
-    JsonNode jsonObject = postQuery(query);
-    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode.getId());
   }
 
   /**

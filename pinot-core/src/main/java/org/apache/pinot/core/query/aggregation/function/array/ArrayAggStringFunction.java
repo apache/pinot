@@ -39,7 +39,9 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] value = blockValSet.getStringValuesSV();
-    ObjectArrayList<String> valueArray = new ObjectArrayList<>(length);
+    ObjectArrayList<String> valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+            : new ObjectArrayList<>(length);
     forEachNotNull(length, blockValSet, (from, to) -> valueArray.addAll(Arrays.asList(value).subList(from, to)));
     aggregationResultHolder.setValue(valueArray);
   }

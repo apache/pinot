@@ -33,7 +33,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_
  *
  */
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
-
   private static final BrokerMetrics NOOP = new BrokerMetrics(new NoopPinotMetricsRegistry());
   private static final AtomicReference<BrokerMetrics> BROKER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 

@@ -35,7 +35,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 public class SumAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
-  private static final double DEFAULT_VALUE = 0.0;
+  protected static final double DEFAULT_VALUE = 0.0;
 
   public SumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "SUM"), nullHandlingEnabled);
@@ -145,7 +145,7 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
     updateAggregationResultHolder(aggregationResultHolder, sum);
   }
 
-  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Double sum) {
+  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Double sum) {
     if (sum != null) {
       if (_nullHandlingEnabled) {
         Double otherSum = aggregationResultHolder.getResult();

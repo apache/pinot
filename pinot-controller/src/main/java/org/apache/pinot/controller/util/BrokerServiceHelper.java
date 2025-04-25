@@ -23,15 +23,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -50,6 +51,7 @@ public class BrokerServiceHelper {
   private final ControllerConf _controllerConf;
   private final Executor _executorService;
   private final PoolingHttpClientConnectionManager _connectionManager;
+  private final AuthProvider _authProvider;
   private CompletionServiceHelper _completionServiceHelper;
 
   public BrokerServiceHelper(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
@@ -58,6 +60,7 @@ public class BrokerServiceHelper {
     _controllerConf = controllerConf;
     _executorService = executor;
     _connectionManager = connectionManager;
+    _authProvider = AuthProviderUtils.extractAuthProvider(controllerConf, ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX);
   }
 
   @VisibleForTesting
@@ -101,7 +104,7 @@ public class BrokerServiceHelper {
       String timeBoundaryInfoUri = endpoint + String.format(TIME_BOUNDARY_INFO_API_PATH, offlineTableName);
       timeBoundaryInfoUris.add(timeBoundaryInfoUri);
     }
-    Map<String, String> reqHeaders = new HashMap<>();
+    Map<String, String> reqHeaders = AuthProviderUtils.makeAuthHeadersMap(_authProvider);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(timeBoundaryInfoUris, offlineTableName, false, reqHeaders,
             DEFAULT_REQUEST_TIMEOUT_MS, "get time boundary information for table from broker instances");

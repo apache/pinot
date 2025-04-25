@@ -94,7 +94,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     // TODO: Instead of relying on needPreprocess(), process segment metadata file to determine if refresh is needed.
     // BaseDefaultColumnHandler part of needPreprocess() does not process any changes to existing columns like datatype,
     // change from dimension to metric, etc.
-    boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+    boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
     closeSegmentDirectoryQuietly(segmentDirectory);
     Set<String> refreshColumnSet = new HashSet<>();
 

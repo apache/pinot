@@ -186,7 +186,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
    */
   public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
+    return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig);
   }
 
   @Override

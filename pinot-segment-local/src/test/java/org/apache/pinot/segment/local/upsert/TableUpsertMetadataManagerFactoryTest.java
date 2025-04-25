@@ -18,47 +18,56 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server.Upsert;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class TableUpsertMetadataManagerFactoryTest {
   private static final String RAW_TABLE_NAME = "testTable";
-  private TableConfig _tableConfig;
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension("myCol", DataType.STRING)
+      .addDateTimeField("timeCol", DataType.LONG, "TIMESTAMP", "1:MILLISECONDS")
+      .setPrimaryKeyColumns(List.of("myCol"))
+      .build();
+
+  private TableConfig createTableConfig(UpsertConfig upsertConfig) {
+    return new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("timeCol")
+        .setUpsertConfig(upsertConfig)
+        .build();
+  }
 
   @Test
   public void testCreateForDefaultManagerClass() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setHashFunction(HashFunction.NONE);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
-    _tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
     TableUpsertMetadataManager tableUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
+        TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), createTableConfig(upsertConfig), SCHEMA,
+            tableDataManager);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
     assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
         0) instanceof ConcurrentMapPartitionUpsertMetadataManager);
   }
@@ -66,45 +75,36 @@ public class TableUpsertMetadataManagerFactoryTest {
   @Test
   public void testCreateForManagerClassWithConsistentDeletes() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setHashFunction(HashFunction.NONE);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setDeletedKeysTTL(1000L);
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
-    _tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
     TableUpsertMetadataManager tableUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
+        TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), createTableConfig(upsertConfig), SCHEMA,
+            tableDataManager);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
     assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
         0) instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
   }
 
+  @SuppressWarnings("deprecation")
   @Test
-  public void testEnablePreload() {
+  public void testEnablePreload()
+      throws IOException {
+    // Test legacy APIs first
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setHashFunction(HashFunction.NONE);
-    upsertConfig.setEnablePreload(true);
     upsertConfig.setEnableSnapshot(true);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).setPrimaryKeyColumns(Lists.newArrayList("myCol"))
-        .build();
-    _tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
-    TableUpsertMetadataManager tableUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
-    assertNotNull(tableUpsertMetadataManager);
+    upsertConfig.setEnablePreload(true);
+    TableConfig tableConfig = createTableConfig(upsertConfig);
 
-    // Preloading is not enabled even if enablePreload and enableSnapshot flags are true, as no threads for preloading.
+    // Preloading is not enabled as there is no preloading thread.
+    PinotConfiguration instanceUpsertConfig = new PinotConfiguration();
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
     when(tableDataManager.getSegmentPreloadExecutor()).thenReturn(null);
-    tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
-    assertFalse(tableUpsertMetadataManager.isEnablePreload());
+    verifyPreloadEnabled(instanceUpsertConfig, tableConfig, tableDataManager, false);
 
     // Preloading is enabled if there are threads for preloading and enablePreload and enableSnapshot flags are true.
     tableDataManager = mock(TableDataManager.class);
@@ -113,14 +113,34 @@ public class TableUpsertMetadataManagerFactoryTest {
     for (boolean[] flags : new boolean[][]{
         {true, false}, {false, true}, {false, false}, {true, true}
     }) {
+      // NOTE: Need to reset snapshot and preload enablement first
+      upsertConfig.setSnapshot(Enablement.DEFAULT);
       upsertConfig.setEnableSnapshot(flags[0]);
+      upsertConfig.setPreload(Enablement.DEFAULT);
       upsertConfig.setEnablePreload(flags[1]);
-      _tableConfig =
-          new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
-      tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(_tableConfig, null);
-      tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
-      assertEquals(tableUpsertMetadataManager.isEnablePreload(), flags[0] && flags[1],
-          String.format("enableSnapshot: %b, enablePreload: %b", flags[0], flags[1]));
+      verifyPreloadEnabled(instanceUpsertConfig, tableConfig, tableDataManager, flags[0] && flags[1]);
+    }
+
+    // Disabled via instance level config
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setPreload(Enablement.DEFAULT);
+    verifyPreloadEnabled(instanceUpsertConfig, tableConfig, tableDataManager, false);
+
+    // Enabled via instance level config
+    instanceUpsertConfig.setProperty(Upsert.DEFAULT_ENABLE_PRELOAD, true);
+    verifyPreloadEnabled(instanceUpsertConfig, tableConfig, tableDataManager, true);
+
+    // Disabled via table level config override
+    upsertConfig.setPreload(Enablement.DISABLE);
+    verifyPreloadEnabled(instanceUpsertConfig, tableConfig, tableDataManager, false);
+  }
+
+  private void verifyPreloadEnabled(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig,
+      TableDataManager tableDataManager, boolean expected)
+      throws IOException {
+    try (TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(
+        instanceUpsertConfig, tableConfig, SCHEMA, tableDataManager)) {
+      assertEquals(tableUpsertMetadataManager.getContext().isPreloadEnabled(), expected);
     }
   }
 }

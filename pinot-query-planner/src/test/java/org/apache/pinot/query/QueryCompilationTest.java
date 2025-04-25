@@ -439,7 +439,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3 RANGE BETWEEN UNBOUNDED PRECEDING AND 1 "
             + "FOLLOWING) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(sumQueryWithCustomRangeWindow));
-    assertTrue(e.getCause().getCause().getMessage()
+    assertTrue(e.getCause().getMessage()
         .contains("RANGE window frame with offset PRECEDING / FOLLOWING is not supported"));
 
     // RANK, DENSE_RANK, ROW_NUMBER, NTILE, LAG, LEAD with custom window frame are invalid
@@ -447,43 +447,49 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) "
             + "FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rankQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String denseRankQuery =
         "SELECT col1, col2, DENSE_RANK() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
             + "1 FOLLOWING) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(denseRankQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String rowNumberQuery =
         "SELECT col1, col2, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
             + "CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rowNumberQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String ntileQuery =
         "SELECT col1, col2, NTILE(10) OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
             + "CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String lagQuery =
         "SELECT col1, col2, LAG(col2, 1) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
             + "UNBOUNDED FOLLOWING) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(lagQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String leadQuery =
         "SELECT col1, col2, LEAD(col2, 1) OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN CURRENT ROW AND "
             + "UNBOUNDED FOLLOWING) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(leadQuery));
-    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+    assertTrue(e.getMessage().contains("ROW/RANGE not allowed"));
 
     String ntileQueryWithNoArg =
         "SELECT col1, col2, NTILE() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
             + "CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQueryWithNoArg));
-    assertTrue(e.getCause().getMessage().contains("expecting 1 argument"));
+    assertTrue(e.getMessage().contains("expecting 1 argument"));
+
+    String excludeCurrentRowQuery =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW EXCLUDE CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(excludeCurrentRowQuery));
+    assertTrue(e.getMessage().contains("EXCLUDE clauses for window functions are not currently supported"));
   }
 
   @Test

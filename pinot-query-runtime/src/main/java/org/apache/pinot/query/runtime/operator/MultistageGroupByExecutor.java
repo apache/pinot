@@ -39,7 +39,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
@@ -61,6 +61,7 @@ public class MultistageGroupByExecutor {
   private final boolean _leafReturnFinalResult;
   private final DataSchema _resultSchema;
   private final int _numGroupsLimit;
+  private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
 
   // Group By Result holders for each mode
@@ -85,6 +86,7 @@ public class MultistageGroupByExecutor {
     int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
 
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
+    _numGroupsWarningLimit = getNumGroupsWarningLimit(opChainMetadata);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
     // query option for improved performance.
@@ -120,6 +122,11 @@ public class MultistageGroupByExecutor {
     }
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     return numGroupsLimit != null ? numGroupsLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  }
+
+  private int getNumGroupsWarningLimit(Map<String, String> opChainMetadata) {
+    Integer numGroupsWarningLimit = QueryOptionsUtils.getNumGroupsWarningLimit(opChainMetadata);
+    return numGroupsWarningLimit != null ? numGroupsWarningLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   }
 
   private int getResolvedMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
@@ -166,10 +173,14 @@ public class MultistageGroupByExecutor {
     return _numGroupsLimit;
   }
 
+  public int getNumGroupsWarningLimit() {
+    return _numGroupsWarningLimit;
+  }
+
   /**
    * Performs group-by aggregation for the data in the block.
    */
-  public void processBlock(TransferableBlock block) {
+  public void processBlock(MseBlock.Data block) {
     if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block);
     } else {
@@ -277,11 +288,15 @@ public class MultistageGroupByExecutor {
     }
   }
 
+  public int getNumGroups() {
+    return _groupIdGenerator.getNumGroups();
+  }
+
   public boolean isNumGroupsLimitReached() {
     return _groupIdGenerator.getNumGroups() == _numGroupsLimit;
   }
 
-  private void processAggregate(TransferableBlock block) {
+  private void processAggregate(MseBlock.Data block) {
     if (_maxFilterArgId < 0) {
       processAggregateWithoutFilter(block);
     } else {
@@ -289,7 +304,7 @@ public class MultistageGroupByExecutor {
     }
   }
 
-  private void processAggregateWithoutFilter(TransferableBlock block) {
+  private void processAggregateWithoutFilter(MseBlock.Data block) {
     int[] intKeys = generateGroupByKeys(block);
     int numGroups = _groupIdGenerator.getNumGroups();
     for (int i = 0; i < _aggFunctions.length; i++) {
@@ -301,7 +316,7 @@ public class MultistageGroupByExecutor {
     }
   }
 
-  private void processAggregateWithFilter(TransferableBlock block) {
+  private void processAggregateWithFilter(MseBlock.Data block) {
     // In the first loop, generate all the group keys, cache the matching rows
     int[] intKeys = _filteredAggregationsSkipEmptyGroups ? null : generateGroupByKeys(block);
     RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
@@ -345,7 +360,7 @@ public class MultistageGroupByExecutor {
     }
   }
 
-  private void processMerge(TransferableBlock block) {
+  private void processMerge(MseBlock.Data block) {
     int[] groupByKeys = generateGroupByKeys(block);
     int numRows = groupByKeys.length;
     int numFunctions = _aggFunctions.length;
@@ -416,9 +431,10 @@ public class MultistageGroupByExecutor {
    * Creates the group by key for each row. Converts the key into a 0-index based int value that can be used by
    * GroupByAggregationResultHolders used in v1 aggregations.
    */
-  private int[] generateGroupByKeys(TransferableBlock block) {
-    return block.isContainerConstructed() ? generateGroupByKeys(block.getContainer())
-        : generateGroupByKeys(block.getDataBlock());
+  private int[] generateGroupByKeys(MseBlock.Data block) {
+    return block.isRowHeap()
+        ? generateGroupByKeys(block.asRowHeap().getRows())
+        : generateGroupByKeys(block.asSerialized().getDataBlock());
   }
 
   private int[] generateGroupByKeys(List<Object[]> rows) {
@@ -462,9 +478,10 @@ public class MultistageGroupByExecutor {
    * Creates the group by key for each row. Converts the key into a 0-index based int value that can be used by
    * GroupByAggregationResultHolders used in v1 aggregations.
    */
-  private int[] generateGroupByKeys(TransferableBlock block, int numMatchedRows, RoaringBitmap matchedBitmap) {
-    return block.isContainerConstructed() ? generateGroupByKeys(block.getContainer(), numMatchedRows, matchedBitmap)
-        : generateGroupByKeys(block.getDataBlock(), numMatchedRows, matchedBitmap);
+  private int[] generateGroupByKeys(MseBlock.Data block, int numMatchedRows, RoaringBitmap matchedBitmap) {
+    return block.isRowHeap()
+        ? generateGroupByKeys(block.asRowHeap().getRows(), numMatchedRows, matchedBitmap)
+        : generateGroupByKeys(block.asSerialized().getDataBlock(), numMatchedRows, matchedBitmap);
   }
 
   private int[] generateGroupByKeys(List<Object[]> rows, int numMatchedRows, RoaringBitmap matchedBitmap) {

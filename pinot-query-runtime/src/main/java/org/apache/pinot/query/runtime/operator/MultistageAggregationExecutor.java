@@ -27,7 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -72,7 +72,7 @@ public class MultistageAggregationExecutor {
   /**
    * Performs aggregation for the data in the block.
    */
-  public void processBlock(TransferableBlock block) {
+  public void processBlock(MseBlock.Data block) {
     if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block);
     } else {
@@ -112,7 +112,7 @@ public class MultistageAggregationExecutor {
     return Collections.singletonList(row);
   }
 
-  private void processAggregate(TransferableBlock block) {
+  private void processAggregate(MseBlock.Data block) {
     if (_maxFilterArgId < 0) {
       // No filter for any aggregation function
       for (int i = 0; i < _aggFunctions.length; i++) {
@@ -148,7 +148,7 @@ public class MultistageAggregationExecutor {
     }
   }
 
-  private void processMerge(TransferableBlock block) {
+  private void processMerge(MseBlock.Data block) {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
       Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block);

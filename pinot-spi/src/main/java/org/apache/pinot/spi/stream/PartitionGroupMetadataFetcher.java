@@ -78,15 +78,16 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
                       partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
               .collect(Collectors.toList());
       try (
-          StreamMetadataProvider streamMetadataProvider =
-              streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-        _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId,
-            _streamConfigs.get(i),
-            topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
-            metadata -> new PartitionGroupMetadata(
-                IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
-                    metadata.getPartitionGroupId(), index),
-                metadata.getStartOffset())).collect(Collectors.toList())
+          StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
+              StreamConsumerFactory.getUniqueClientId(clientId))) {
+        _newPartitionGroupMetadataList.addAll(
+            streamMetadataProvider.computePartitionGroupMetadata(StreamConsumerFactory.getUniqueClientId(clientId),
+                _streamConfigs.get(i),
+                topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
+                metadata -> new PartitionGroupMetadata(
+                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
+                        metadata.getPartitionGroupId(), index),
+                    metadata.getStartOffset())).collect(Collectors.toList())
         );
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info

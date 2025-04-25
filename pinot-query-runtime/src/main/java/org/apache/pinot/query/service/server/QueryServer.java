@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -36,6 +37,8 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -49,6 +52,8 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -76,17 +81,26 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private Server _server = null;
 
+  @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
+    this(port, queryRunner, tlsConfig, new PinotConfiguration());
+  }
+
+  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig, PinotConfiguration config) {
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
+
+    ExecutorService baseExecutor = Executors.newCachedThreadPool(
+        new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
+
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    MetricsExecutor withMetrics = new MetricsExecutor(
+        baseExecutor,
+        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
+        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
     _querySubmissionExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(
-            Executors.newCachedThreadPool(
-                new NamedThreadFactory("query_submission_executor_on_" + _port + "_port")
-            )
-        )
-    );
+        QueryThreadContext.contextAwareExecutorService(withMetrics));
   }
 
   public void start() {
@@ -237,7 +251,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // TODO: populate the thread context with TSE information
       QueryThreadContext.setQueryEngine("tse");
       _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), request.getMetadataMap(), responseObserver);
