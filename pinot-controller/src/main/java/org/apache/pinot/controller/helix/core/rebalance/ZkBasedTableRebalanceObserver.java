@@ -84,6 +84,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     switch (trigger) {
       case START_TRIGGER:
         updateOnStart(currentState, targetState, rebalanceContext);
+        emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         trackStatsInZk();
         updatedStatsInZk = true;
         break;
@@ -104,6 +105,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsOverall().equals(latestProgress)) {
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(latestProgress);
+            emitProgressMetric(latestProgress);
           }
           trackStatsInZk();
           updatedStatsInZk = true;
@@ -129,6 +131,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
             _tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(latestProgress);
           }
+          emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
           trackStatsInZk();
           updatedStatsInZk = true;
         }
@@ -199,6 +202,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
     _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(progressStats);
     trackStatsInZk();
+    emitProgressMetricDone();
   }
 
   @Override
@@ -232,6 +236,37 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   public int getNumUpdatesToZk() {
     return _numUpdatesToZk;
+  }
+
+  /**
+   * Emits the rebalance progress in percent to the metrics. Uses the percentage of remaining segments to be added as
+   * the indicator of the overall progress.
+   * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
+   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
+   * 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
+   * `totalRemainingSegmentsToBeDeleted`, and `totalRemainingSegmentsToConverge` become 0)
+   * Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
+   * @param overallProgress the latest overall progress
+   */
+  private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
+    // Round this up so the metric is 100 only when no segment remains
+    long progressPercent = 100 - (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
+        overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
+        overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
+            + overallProgress._totalRemainingSegmentsToConverge));
+    // Using the original job ID to group rebalance retries together with the same label
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
+        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
+        progressPercent < 0 ? 0 : progressPercent);
+  }
+
+  /**
+   * Emits the rebalance progress as 100 (%) to the metrics. This is to ensure that the progress is at least aligned
+   * when the job done to avoid confusion
+   */
+  private void emitProgressMetricDone() {
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
+        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT, 100);
   }
 
   @VisibleForTesting
@@ -295,6 +330,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           tableNameWithType, e);
     }
     return jobMetadata;
+  }
+
+  @VisibleForTesting
+  TableRebalanceProgressStats getTableRebalanceProgressStats() {
+    return _tableRebalanceProgressStats;
   }
 
   /**
