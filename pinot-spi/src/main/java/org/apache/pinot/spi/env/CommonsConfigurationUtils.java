@@ -25,10 +25,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -85,13 +87,18 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromPath(@Nullable String path, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    NoDuplicateKeyPropertiesConfiguration noDuplicateKeysConfig =
+        createNoDuplicateKeysPropertiesConfiguration(ioFactoryKind);
     // if provided path is non-empty, load the existing properties from provided file path
     if (StringUtils.isNotEmpty(path)) {
-      FileHandler fileHandler = new FileHandler(config);
+      FileHandler fileHandler = new FileHandler(noDuplicateKeysConfig);
       fileHandler.load(path);
     }
-    return config;
+    PropertiesConfiguration finalConfig = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    finalConfig.copy(noDuplicateKeysConfig);
+    finalConfig.setHeader(noDuplicateKeysConfig.getHeader());
+    finalConfig.setFooter(noDuplicateKeysConfig.getFooter());
+    return finalConfig;
   }
 
   /**
@@ -111,8 +118,8 @@ public class CommonsConfigurationUtils {
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream,
-      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     // if provided stream is not null, load the existing properties from provided input stream.
@@ -138,7 +145,7 @@ public class CommonsConfigurationUtils {
       ioFactoryKind = PropertyIOFactoryKind.VersionedIOFactory;
     }
 
-    return fromFile(file, setDefaultDelimiter, ioFactoryKind);
+    return fromFile(file, setDefaultDelimiter, ioFactoryKind, false);
   }
 
   /**
@@ -148,18 +155,19 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
-    return fromFile(file, true, PropertyIOFactoryKind.DefaultIOFactory);
+    return fromFile(file, true, PropertyIOFactoryKind.DefaultIOFactory, false);
   }
 
   /**
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * This method will merge duplicate keys to a list.
    * @param file containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromFile(@Nullable File file,
-      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+  public static PropertiesConfiguration fromFile(@Nullable File file, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     // check if file exists, load the existing properties.
@@ -168,6 +176,34 @@ public class CommonsConfigurationUtils {
       fileHandler.load(file);
     }
     return config;
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
+   * @param failOnDuplicateKeys fail the loading when seeing duplicate keys.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromFile(@Nullable File file, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind, boolean failOnDuplicateKeys)
+      throws ConfigurationException {
+    if (failOnDuplicateKeys) {
+      PropertiesConfiguration noDuplicateKeysConfig = createNoDuplicateKeysPropertiesConfiguration(ioFactoryKind);
+      // check if file exists, load the existing properties.
+      if (file != null && file.exists()) {
+        FileHandler fileHandler = new FileHandler(noDuplicateKeysConfig);
+        fileHandler.load(file);
+      }
+      PropertiesConfiguration finalConfig = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+      // copy the properties from the file to the new configuration.
+      finalConfig.copy(noDuplicateKeysConfig);
+      finalConfig.setHeader(noDuplicateKeysConfig.getHeader());
+      finalConfig.setFooter(noDuplicateKeysConfig.getFooter());
+      return finalConfig;
+    }
+    return fromFile(file, setDefaultDelimiter, ioFactoryKind);
   }
 
   /**
@@ -338,16 +374,16 @@ public class CommonsConfigurationUtils {
   }
 
   /**
-   * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
-   * with custom IO factory based on kind {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
-   * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
+   * creates the instance of the {@link PropertiesConfiguration}
+   * with custom IO factory based on kind {@link PropertiesConfiguration.IOFactory}
+   * and legacy list delimiter {@link LegacyListDelimiterHandler}
    *
    * @param setDefaultDelimiter sets the default list delimiter.
    * @param ioFactoryKind IOFactory kind, can be null.
    * @return PropertiesConfiguration
    */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
-     @Nullable PropertyIOFactoryKind ioFactoryKind) {
+      @Nullable PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory of the configuration.
@@ -359,7 +395,23 @@ public class CommonsConfigurationUtils {
     if (setDefaultDelimiter) {
       config.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
     }
+    return config;
+  }
 
+  /**
+   * creates the instance of the {@link NoDuplicateKeyPropertiesConfiguration}
+   * with custom IO factory based on kind {@link PropertiesConfiguration.IOFactory}
+   *
+   * @param ioFactoryKind IOFactory kind, can be null.
+   * @return PropertiesConfiguration
+   */
+  private static NoDuplicateKeyPropertiesConfiguration createNoDuplicateKeysPropertiesConfiguration(
+      @Nullable PropertyIOFactoryKind ioFactoryKind) {
+    NoDuplicateKeyPropertiesConfiguration config = new NoDuplicateKeyPropertiesConfiguration();
+    // setting IO Reader Factory of the configuration.
+    if (ioFactoryKind != null) {
+      config.setIOFactory(ioFactoryKind.getInstance());
+    }
     return config;
   }
 
@@ -385,8 +437,8 @@ public class CommonsConfigurationUtils {
           }
         }
       } catch (IOException exception) {
-        throw new ConfigurationException(
-            "Error occurred while reading configuration file " + file.getName(), exception);
+        throw new ConfigurationException("Error occurred while reading configuration file " + file.getName(),
+            exception);
       }
     }
     return versionValue;
@@ -410,5 +462,23 @@ public class CommonsConfigurationUtils {
         new PropertiesConfiguration.PropertiesWriter(writer, DEFAULT_LIST_DELIMITER_HANDLER);
     propertiesWriter.setGlobalSeparator(VERSIONED_CONFIG_SEPARATOR);
     return propertiesWriter;
+  }
+
+  /**
+   * A custom {@link PropertiesConfiguration} implementation that throws an exception when duplicate keys are added.
+   * This should only be used when reading from a file, after this, we should copy the content to
+   * a {@link PropertiesConfiguration} object.
+   */
+  public static class NoDuplicateKeyPropertiesConfiguration extends PropertiesConfiguration {
+    private final Set<String> _seenKeys = new HashSet<>();
+
+    @Override
+    protected void addPropertyDirect(String key, Object value) {
+      if (_seenKeys.contains(key)) {
+        throw new IllegalStateException("Duplicate key detected: " + key);
+      }
+      _seenKeys.add(key);
+      super.addPropertyDirect(key, value);
+    }
   }
 }
