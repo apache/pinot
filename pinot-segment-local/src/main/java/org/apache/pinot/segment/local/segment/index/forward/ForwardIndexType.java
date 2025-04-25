@@ -198,10 +198,23 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    *
    * This method will return the default reader, skipping any index overload.
    */
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata,
+      FieldIndexConfigs fieldIndexConfigs)
+      throws IOException {
+    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
+    return read(dataBuffer, fieldIndexConfigs, columnMetadata);
+  }
+
+  /**
+   * Returns the forward index reader for the given column.
+   *
+   * This method will return the default reader, skipping any index overload.
+   */
   public static ForwardIndexReader read(PinotDataBuffer dataBuffer, FieldIndexConfigs fieldIndexConfigs,
       ColumnMetadata metadata) {
-    return ForwardIndexReaderFactory.createIndexReader(dataBuffer,
-        fieldIndexConfigs.getConfig(StandardIndexes.forward()), metadata);
+    ForwardIndexConfig fwdIndexConfig =
+        fieldIndexConfigs == null ? null : fieldIndexConfigs.getConfig(StandardIndexes.forward());
+    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, fwdIndexConfig, metadata);
   }
 
   /**
@@ -210,8 +223,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    * This method will delegate on {@link StandardIndexes}, so the correct reader will be returned even when using
    * index overload.
    */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader,
-      @Nullable FieldIndexConfigs fieldIndexConfigs,
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
       ColumnMetadata metadata)
       throws IndexReaderConstraintException, IOException {
     return StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);

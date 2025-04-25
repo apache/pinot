@@ -97,7 +97,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         "Json index is currently only supported on single-value columns");
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING
             || context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.MAP,
-        "Json index is currently only supported on STRING or MAP columns");
+        "Json index is currently only supported on STRING columns");
     return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
         indexConfig)
         : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), indexConfig);

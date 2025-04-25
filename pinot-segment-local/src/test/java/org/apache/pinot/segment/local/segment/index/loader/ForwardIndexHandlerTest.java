@@ -1122,7 +1122,7 @@ public class ForwardIndexHandlerTest {
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, null, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column), null);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertEquals(forwardIndexReader.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
@@ -1149,7 +1149,7 @@ public class ForwardIndexHandlerTest {
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, null, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column), null);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertNull(forwardIndexReader.getDictIdCompressionType());
@@ -2039,7 +2039,7 @@ public class ForwardIndexHandlerTest {
     assertTrue(reader.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, null, columnMetadata);
+    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata, null);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertNotNull(fwdIndexCompressionType);
@@ -2048,7 +2048,7 @@ public class ForwardIndexHandlerTest {
       assertNull(fwdIndexCompressionType);
     }
 
-    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, null, columnMetadata)) {
+    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, columnMetadata, null)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
