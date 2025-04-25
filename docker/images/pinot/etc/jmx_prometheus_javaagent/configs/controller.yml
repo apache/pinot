@@ -48,15 +48,6 @@ rules:
     table: "$2$4"
     tableType: "$5"
     taskType: "$6"
-# Gauge for rebalanceJobId and tableNameWithType
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableRebalanceJobProgressPercent\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([0-9a-fA-F-]+)\"><>(\\w+)"
-  name: "pinot_controller_tableRebalanceJobProgressPercent_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    jobId: "$5"
   # Special handling for timers like cronSchedulerJobExecutionTimeMs and tableRebalanceExecutionTimeMs which use table name, table type and another string for status / taskType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobExecutionTimeMs_$6"
