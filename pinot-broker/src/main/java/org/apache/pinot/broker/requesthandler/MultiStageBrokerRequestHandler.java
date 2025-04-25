@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -122,9 +123,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
 
     failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    long cancelMillis = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_CANCEL_TIMEOUT_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
+    Duration cancelTimeout = Duration.ofMillis(cancelMillis);
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
-            this.isQueryCancellationEnabled());
+            this.isQueryCancellationEnabled(), cancelTimeout);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),

@@ -36,26 +36,42 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class OpChainSchedulerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
 
   private final ExecutorService _executorService;
-  private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap;
-  private final Cache<OpChainId, MultiStageOperator> _opChainCache = CacheBuilder.newBuilder()
-      .weigher((OpChainId key, MultiStageOperator value) -> countOperators(value))
-      .maximumWeight(1_000) // TODO: Make this configurable
-      .expireAfterWrite(1, TimeUnit.MINUTES) // TODO: Make this configurable
-      .build();
+  private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap = new ConcurrentHashMap<>();
+  private final Cache<OpChainId, MultiStageOperator> _opChainCache;
 
+
+  public OpChainSchedulerService(ExecutorService executorService, PinotConfiguration config) {
+    this(
+        executorService,
+        config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_MAX,
+            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_MAX),
+        config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_EXPIRE_MS,
+            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS)
+    );
+  }
 
   public OpChainSchedulerService(ExecutorService executorService) {
+    this(executorService, MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_MAX,
+        MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS);
+  }
+
+  public OpChainSchedulerService(ExecutorService executorService, int maxWeight, long expireAfterWriteMs) {
     _executorService = executorService;
-    _submittedOpChainMap = new ConcurrentHashMap<>();
+    _opChainCache = CacheBuilder.newBuilder()
+        .weigher((OpChainId key, MultiStageOperator value) -> countOperators(value))
+        .maximumWeight(maxWeight)
+        .expireAfterWrite(expireAfterWriteMs, TimeUnit.MILLISECONDS)
+        .build();
   }
 
   public void register(OpChain operatorChain) {

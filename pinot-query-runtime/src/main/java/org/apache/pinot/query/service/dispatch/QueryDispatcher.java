@@ -124,7 +124,7 @@ public class QueryDispatcher {
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
   private final FailureDetector _failureDetector;
-  private final Duration _cancelTimeout = Duration.ofMillis(10_000); // TODO: Make this configurable
+  private final Duration _cancelTimeout;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
     this(mailboxService, failureDetector, null, false);
@@ -132,6 +132,12 @@ public class QueryDispatcher {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, Duration.ofSeconds(1));
+  }
+
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout) {
+    _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
