@@ -53,9 +53,8 @@ public class TestZkBasedTableRebalanceObserver {
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
-    retryCtx.setOriginalJobId("testZkObserverTracking");
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "testZkObserverTracking", retryCtx, pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     target.put("segment1",
@@ -93,8 +92,8 @@ public class TestZkBasedTableRebalanceObserver {
 
   private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
       ZkBasedTableRebalanceObserver observer) {
-    Long progressGaugeValue = controllerMetrics.getGaugeValue(
-        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
+    Long progressGaugeValue =
+        controllerMetrics.getGaugeValue(ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT.getGaugeName() + ".dummy");
     assertNotNull(progressGaugeValue);
     TableRebalanceProgressStats.RebalanceProgressStats overallProgress =
         observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
