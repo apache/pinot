@@ -20,14 +20,13 @@ name: Pinot Dependency Check
 
 on:
   pull_request:
-#    branches:
-#      - master?
+    branches:
+      - master
     paths:
       - "**/pom.xml"
 
 jobs:
   check-dependency:
-    if: github.repository == 'apache/pinot'
     name: Validates PR Changes Against Dependency Guidelines
     runs-on: ubuntu-latest
     steps:
