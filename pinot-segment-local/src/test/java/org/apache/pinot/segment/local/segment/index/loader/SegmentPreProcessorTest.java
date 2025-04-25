@@ -804,7 +804,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       if (expectedCompressionType != null) {
         assertFalse(hasDictionary);
 
-        try (ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, null, columnMetadata)) {
+        try (ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata, null)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
           assertEquals(compressionType, expectedCompressionType);
         }
