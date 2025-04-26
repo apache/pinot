@@ -19,10 +19,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo, PauseStatusDetails } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -85,6 +86,20 @@ const useStyles = makeStyles((theme) => ({
   copyIdButton: {
     paddingBlock: 0,
     marginLeft: 10
+  }
+  ,
+  // Status pill styles
+  statusActive: {
+    backgroundColor: '#4CAF50',
+    color: 'white'
+  },
+  statusPaused: {
+    backgroundColor: '#f44336',
+    color: 'white'
+  },
+  statusPausing: {
+    backgroundColor: '#ff9800',
+    color: 'white'
   }
 }));
 
@@ -161,6 +176,15 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
   const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
   const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
+  // State for pause status of realtime tables
+  const [loadingPauseStatus, setLoadingPauseStatus] = useState(false);
+  const [pauseStatusData, setPauseStatusData] = useState<PauseStatusDetails | null>(null);
+  // State for rebalance operations menu
+  const [rebalanceMenuAnchorEl, setRebalanceMenuAnchorEl] = useState<null | HTMLElement>(null);
+  // State for pause/resume action progress and polling
+  const [isPauseActionInProgress, setIsPauseActionInProgress] = useState(false);
+  const [pauseActionType, setPauseActionType] = useState<'pause' | 'resume' | null>(null);
+  const pausePollingRef = useRef<number | null>(null);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -203,7 +227,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     PinotMethodUtils.getTableSummaryData(tableName).then((result) => {
       setTableSummary(result);
     });
-    fetchSegmentData()
+    fetchSegmentData();
+    // (pause status fetched by effect after tableType is set)
   }
 
   const fetchSegmentData = async () => {
@@ -279,6 +304,38 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   useEffect(() => {
     fetchTableData();
   }, []);
+  // Fetch pause status once tableType is known
+  useEffect(() => {
+    if (tableType.toLowerCase() === TableType.REALTIME) {
+      setLoadingPauseStatus(true);
+      PinotMethodUtils.getPauseStatusData(tableName)
+        .then((data: PauseStatusDetails) => setPauseStatusData(data))
+        .catch((error: any) => dispatch({ type: 'error', message: `Error fetching pause status: ${error}`, show: true }))
+        .finally(() => setLoadingPauseStatus(false));
+    } else {
+      setPauseStatusData(null);
+    }
+  }, [tableType, tableName]);
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+    };
+  }, []);
+  // Fetch pause status once tableType is known
+  useEffect(() => {
+    if (tableType.toLowerCase() === TableType.REALTIME) {
+      setLoadingPauseStatus(true);
+      PinotMethodUtils.getPauseStatusData(tableName)
+        .then((data: PauseStatusDetails) => setPauseStatusData(data))
+        .catch((error: any) => dispatch({ type: 'error', message: `Error fetching pause status: ${error}`, show: true }))
+        .finally(() => setLoadingPauseStatus(false));
+    } else {
+      setPauseStatusData(null);
+    }
+  }, [tableType, tableName]);
 
   const handleSwitchChange = (event) => {
     setDialogDetails({
@@ -505,6 +562,44 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
     }
   };
+  // Pause or resume consumption for realtime tables with polling status
+  const handlePauseResume = async () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setPauseActionType(willPause ? 'pause' : 'resume');
+    setIsPauseActionInProgress(true);
+    try {
+      const result: PauseStatusDetails = willPause
+        ? await PinotMethodUtils.pauseConsumptionOp(tableName, "Pause Triggered from Admin UI")
+        : await PinotMethodUtils.resumeConsumptionOp(tableName, "Resume Triggered from Admin UI", "lastConsumed");
+      dispatch({ type: 'success', message: result.comment, show: true });
+      // Start polling for updated pause status
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+      pausePollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await PinotMethodUtils.getPauseStatusData(tableName);
+          setPauseStatusData(status);
+          const settled = willPause
+            ? (status.pauseFlag && (!status.consumingSegments || status.consumingSegments.length === 0))
+            : !status.pauseFlag;
+          if (settled) {
+            if (pausePollingRef.current) {
+              clearInterval(pausePollingRef.current);
+            }
+            setIsPauseActionInProgress(false);
+            setPauseActionType(null);
+          }
+        } catch {
+          // ignore polling errors
+        }
+      }, 2000);
+    } catch (error) {
+      dispatch({ type: 'error', message: `Error during ${pauseStatusData?.pauseFlag ? 'resume' : 'pause'}: ${error}`, show: true });
+      setIsPauseActionInProgress(false);
+      setPauseActionType(null);
+    }
+  };
 
   const closeDialog = () => {
     setConfirmDialog(false);
@@ -576,27 +671,30 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Reload Status
               </CustomButton>
+              {/* Rebalance operations dropdown */}
               <CustomButton
-                onClick={()=>{setShowRebalanceServerModal(true);}}
-                tooltipTitle="Recalculates the segment to server mapping for this table"
-                enableTooltip={true}
+                onClick={(e) => setRebalanceMenuAnchorEl(e.currentTarget)}
+                tooltipTitle="Rebalance operations"
+                enableTooltip={false}
               >
-                Rebalance Servers
+                Rebalance <ArrowDropDownIcon />
               </CustomButton>
-              <CustomButton
-                  onClick={handleRebalanceTableStatus}
-                  tooltipTitle="The status of table rebalance job"
-                  enableTooltip={true}
+              <Menu
+                anchorEl={rebalanceMenuAnchorEl}
+                keepMounted
+                open={Boolean(rebalanceMenuAnchorEl)}
+                onClose={() => setRebalanceMenuAnchorEl(null)}
               >
-                Rebalance Servers Status
-              </CustomButton>
-              <CustomButton
-                onClick={handleRebalanceBrokers}
-                tooltipTitle="Rebuilds brokerResource mapping for this table"
-                enableTooltip={true}
-              >
-                Rebalance Brokers
-              </CustomButton>
+                <MenuItem onClick={() => { setShowRebalanceServerModal(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers
+                </MenuItem>
+                <MenuItem onClick={() => { setShowRebalanceServerStatus(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers Status
+                </MenuItem>
+                <MenuItem onClick={() => { handleRebalanceBrokers(); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Brokers
+                </MenuItem>
+              </Menu>
               {tableType.toLowerCase() === TableType.REALTIME && (
                 <CustomButton
                   onClick={handleRepairTable}
@@ -604,6 +702,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   enableTooltip={true}
                 >
                  Repair Table
+                </CustomButton>
+              )}
+              {/* Pause or resume realtime consumption */}
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handlePauseResume}
+                  tooltipTitle={pauseStatusData?.pauseFlag ? 'Resume consumption of realtime table' : 'Pause consumption of realtime table'}
+                  enableTooltip={true}
+                  isDisabled={isPauseActionInProgress}
+                >
+                  {isPauseActionInProgress
+                    ? (pauseActionType === 'pause' ? 'Pausing...' : 'Resuming...')
+                    : (pauseStatusData?.pauseFlag ? 'Resume Consumption' : 'Pause Consumption')}
                 </CustomButton>
               )}
              {/* Button to view consuming segments info */}
@@ -635,10 +746,43 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         <div className={classes.highlightBackground}>
           <TableToolbar name="Summary" showSearchBox={false} />
           <Grid container spacing={2} alignItems="center" className={classes.body}>
-            <Grid item xs={4}>
+            <Grid item xs={3}>
               <strong>Table Name:</strong> {tableSummary.tableName}
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            <Grid item xs={3}>
+              <Box display="flex" alignItems="center">
+                <strong>Consuming status:</strong>
+                {loadingPauseStatus ? (
+                  <CircularProgress size={16} style={{ marginLeft: 8 }} />
+                ) : pauseStatusData ? (
+                  <Chip
+                    label={
+                      isPauseActionInProgress
+                        ? (pauseActionType === 'pause' ? 'PAUSING...' : 'RESUMING...')
+                        : (pauseStatusData.pauseFlag
+                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                               ? 'PAUSING'
+                               : 'PAUSED')
+                            : 'ACTIVE')
+                    }
+                    className={
+                      isPauseActionInProgress
+                        ? classes.statusPausing
+                        : (pauseStatusData.pauseFlag
+                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                               ? classes.statusPausing
+                               : classes.statusPaused)
+                            : classes.statusActive)
+                    }
+                    size="small"
+                    style={{ marginLeft: 8 }}
+                  />
+                ) : (
+                  <Box ml={1}>N/A</Box>
+                )}
+              </Box>
+            </Grid>
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Uncompressed size of all data segments with replication" arrow placement="top">
                   <strong>Reported Size:</strong>
@@ -652,7 +796,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 }
               </Grid>
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Estimated size of all data segments with replication, in case any servers are not reachable for actual size" arrow placement="top-start">
                   <strong>Estimated Size: </strong>
