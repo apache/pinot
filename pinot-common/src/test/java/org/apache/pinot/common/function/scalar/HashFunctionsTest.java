@@ -25,6 +25,18 @@ import static org.testng.Assert.assertEquals;
 
 public class HashFunctionsTest {
 
+  //Strings of various lengths to cover all cases of the CityHash functions
+  private static final String INPUT_LEN_3 = "abc";
+  private static final String INPUT_LEN_7 = "abcdefg";
+  private static final String INPUT_LEN_13 = "abcefghijklmn";
+  private static final String INPUT_LEN_19 = "abcdefghijklmnopqrs";
+  private static final String INPUT_LEN_26 = "abcdefghijklmnopqrstuvwxyz";
+  private static final String INPUT_LEN_39 = "abcdefghijklmnopqrstuvwxyzabcefghijklmn";
+  private static final String INPUT_LEN_78 =
+          "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
+  private static final String INPUT_LEN_156 = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
+          + "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
+
   @Test
   public void testShaHash() {
     String input = "testString";
@@ -138,5 +150,51 @@ public class HashFunctionsTest {
   public void testCrc32c() {
     String input = "testString";
     assertEquals(HashFunctions.crc32c(input.getBytes()), -1608760557);
+  }
+
+  @Test
+  public void testCityHash32() {
+    assertEquals(HashFunctions.cityHash32(INPUT_LEN_3.getBytes()), 795041479);
+    assertEquals(HashFunctions.cityHash32(INPUT_LEN_7.getBytes()), 568243927);
+    assertEquals(HashFunctions.cityHash32(INPUT_LEN_13.getBytes()), -1658103047);
+    assertEquals(HashFunctions.cityHash32(INPUT_LEN_26.getBytes()), -1442658879);
+  }
+
+  @Test
+  public void testCityHash64() {
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_3.getBytes()), 2640714258260161385L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_19.getBytes()), -7582989256905268791L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_39.getBytes()), 2649092397580160289L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_78.getBytes()), 4095282343956748170L);
+  }
+
+  @Test
+  public void testCityHash64WithSeed() {
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_3.getBytes(), 10), -5393534126371324712L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_19.getBytes(), 10), 6644130553114817940L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_39.getBytes(), 10), 4996239180729703879L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_78.getBytes(), 10), 7728698838656230245L);
+  }
+
+  @Test
+  public void testCityHash64WithSeeds() {
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_3.getBytes(), 10438437, 399389834),
+            1535010434850606895L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_19.getBytes(), 10438437, 399389834),
+            3720925692744621932L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_39.getBytes(), 10438437, 399389834),
+            2833639334569022972L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_78.getBytes(), 10438437, 399389834),
+            8613575199633737553L);
+  }
+
+  @Test
+  public void testCityHash128() {
+    assertEquals(HashFunctions.cityHash128(INPUT_LEN_3.getBytes()),
+            new byte[] {57, -128, -78, -81, -46, 18, 108, 4, -96, -123, -16, -112, 19, 2, -98, 69});
+    assertEquals(HashFunctions.cityHash128(INPUT_LEN_39.getBytes()),
+            new byte[] {0, -44, 40, 93, -71, 96, 80, -45, -82, 111, -109, -116, 25, 32, 98, -7});
+    assertEquals(HashFunctions.cityHash128(INPUT_LEN_156.getBytes()),
+            new byte[] {114, 8, 23, 53, -124, 83, -28, 35, 27, -117, -59, 121, -108, -20, 59, 115});
   }
 }
