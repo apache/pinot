@@ -34,6 +34,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.fun.SqlSumAggFunction;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -99,9 +100,10 @@ public class PinotWindowExchangeNodeInsertRuleTest {
 
     List<Window.Group> groups = Collections.singletonList(
         new Window.Group(ImmutableBitSet.of(List.of(1)), true, RexWindowBounds.preceding(lowerBoundInputRef),
-            RexWindowBounds.following(upperBoundInputRef), RelCollations.of(2), List.of(
-            new Window.RexWinAggCall(new SqlSumAggFunction(intType), intType, List.of(windowFunctionInputRef), 0, false,
-                false))));
+            RexWindowBounds.following(upperBoundInputRef), RexWindowExclusion.EXCLUDE_NO_OTHER, RelCollations.of(2),
+            List.of(
+                new Window.RexWinAggCall(new SqlSumAggFunction(intType), intType, List.of(windowFunctionInputRef), 0,
+                    false, false))));
 
     List<RexLiteral> literals = List.of(REX_BUILDER.makeLiteral(5, intType), REX_BUILDER.makeLiteral(10, intType));
     LogicalWindow originalWindow = LogicalWindow.create(RelTraitSet.createEmpty(), _input, literals, intType, groups);
