@@ -99,6 +99,16 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   PREDOWNLOAD_SPEED("bytes", true),
   ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
 
+  // gRPC Netty buffer metrics
+  GRPC_NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  GRPC_NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  GRPC_NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  GRPC_NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
   // GrpcMailboxServer memory metrics
   MAILBOX_SERVER_USED_DIRECT_MEMORY("bytes", true),
   MAILBOX_SERVER_USED_HEAP_MEMORY("bytes", true),

@@ -79,6 +79,16 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
    */
   ESTIMATED_MSE_SERVER_THREADS("number", true),
 
+  // gRPC Netty buffer metrics
+  GRPC_NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  GRPC_NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  GRPC_NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  GRPC_NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
   // GrpcMailboxServer memory metrics
   MAILBOX_SERVER_USED_DIRECT_MEMORY("bytes", true),
   MAILBOX_SERVER_USED_HEAP_MEMORY("bytes", true),
