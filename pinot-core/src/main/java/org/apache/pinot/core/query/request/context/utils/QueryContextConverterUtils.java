@@ -181,7 +181,6 @@ public class QueryContextConverterUtils {
         .setQueryOptions(pinotQuery.getQueryOptions())
         .setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode)
-        .setIsSelectStarQuery(pinotQuery.isSelectStarQuery())
         .build();
   }
 

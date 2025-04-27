@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -105,8 +106,14 @@ public class BrokerReduceService extends BaseReduceService {
             // NOTE: Only compare the column data types, since the column names (string representation of expression)
             //       can change across different versions.
             if (!Arrays.equals(dataSchema.getColumnDataTypes(), dataSchemaFromNonEmptyDataTable.getColumnDataTypes())) {
-              serversWithConflictingDataSchema.add(entry.getKey());
-              iterator.remove();
+              if (queryOptions != null && QueryOptionsUtils.isSelectStarQuery(queryOptions)) {
+                // If the query is SELECT *, we can ignore the data schema mismatch.
+                dataSchemaFromNonEmptyDataTable = SelectionOperatorUtils.getCommonDataSchema(
+                    dataSchemaFromNonEmptyDataTable, dataSchema);
+              } else {
+                serversWithConflictingDataSchema.add(entry.getKey());
+                iterator.remove();
+              }
             }
           }
         }

@@ -279,7 +279,13 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     int numColumns = columns.size();
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
-      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      DataSource dataSource = _indexSegment.getDataSource(column);
+      if (dataSource != null) {
+        dataSourceMap.put(column, dataSource);
+      } else {
+        nonOrderByExpressions.remove(ExpressionContext.forIdentifier(column));
+        numExpressions--;
+      }
     }
 
     try (ProjectionOperator projectionOperator =

@@ -1729,8 +1729,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           hasStar = true;
         }
       }
-      pinotQuery.setSelectStarQuery(hasStar);
       //if query has a '*' selection along with other columns
+      pinotQuery.getQueryOptions().put(QueryOptionKey.IS_SELECT_STAR_QUERY, String.valueOf(hasStar));
       if (hasStar) {
         expandStarExpressionsToActualColumns(pinotQuery, columnNameMap);
       }

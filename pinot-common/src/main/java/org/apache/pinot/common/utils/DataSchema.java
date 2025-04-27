@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.type.RelDataType;
@@ -239,7 +240,7 @@ public class DataSchema {
   @JsonIgnore
   public Map<String, Integer> getColumnNameToIndexMap() {
     if (_columnNameToIndexMap == null) {
-      Map<String, Integer> map = new HashMap<>();
+      Map<String, Integer> map = new LinkedHashMap<>();
       for (int i = 0; i < _columnNames.length; i++) {
         map.put(_columnNames[i], i);
       }

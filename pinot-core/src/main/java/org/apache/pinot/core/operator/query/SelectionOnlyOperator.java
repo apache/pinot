@@ -68,8 +68,9 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     List<String> columnNamesList = new ArrayList<>();
     List<DataSchema.ColumnDataType> columnDataTypesList = new ArrayList<>();
     List<ExpressionContext> filteredExpressions = new ArrayList<>();
-
-    for (ExpressionContext expression : expressions) {
+    int numExpressions = expressions.size();
+    for (int i = 0; i < numExpressions; i++) {
+      ExpressionContext expression = expressions.get(i);
       ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
       if (columnContext != null) {
         columnNamesList.add(expression.toString());
@@ -81,9 +82,9 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     // Update _expressions to only valid expressions (retainAll to preserve ordering)
     _expressions = filteredExpressions;
 
-    int numExpressions = filteredExpressions.size();
-    _blockValSets = new BlockValSet[numExpressions];
-    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
+    int filteredNumExpressions = filteredExpressions.size();
+    _blockValSets = new BlockValSet[filteredNumExpressions];
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[filteredNumExpressions] : null;
     _dataSchema = new DataSchema(
         columnNamesList.toArray(new String[0]),
         columnDataTypesList.toArray(new DataSchema.ColumnDataType[0]));

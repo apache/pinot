@@ -18,11 +18,21 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -206,5 +216,92 @@ public class SelectionOperatorUtilsTest {
         new DataSchema(new String[]{"plus(col1,'1')", "plus(col2,'2')", "plus(col1,'1')"}, new ColumnDataType[]{
             ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING
         }));
+  }
+
+  @Test(dataProvider = "reduceResultsDataProvider")
+  public void testReduceResults(Collection<DataTable> dataTables, List<String> reducedColumns,
+                                Comparator<Object[]> comparator) {
+    int maxRows = 0;
+    for (DataTable dataTable : dataTables) {
+      maxRows += dataTable.getNumberOfRows();
+    }
+    List<Object[]> reducedRows = SelectionOperatorUtils.reduceResults(dataTables, maxRows, false, reducedColumns,
+            comparator);
+
+    assert reducedRows.get(0).length == reducedColumns.size();
+    assert reducedRows.size() == maxRows;
+
+    // Check values in reduced rows
+    for (int i = 0; i < reducedRows.size(); i++) {
+      Object[] row = reducedRows.get(i);
+      for (int j = 0; j < reducedColumns.size(); j++) {
+        assert row[j] != null : "Row " + i + ", column " + j + " is null";
+      }
+    }
+
+    // Optionally: if comparator != null, verify sorting
+    if (comparator != null) {
+      for (int i = 1; i < reducedRows.size(); i++) {
+        assert comparator.compare(reducedRows.get(i - 1), reducedRows.get(i)) <= 0
+                : "Rows not sorted as expected";
+      }
+    }
+  }
+
+  @DataProvider(name = "reduceResultsDataProvider")
+  private Object[][] provideReduceResultsData() throws IOException {
+    List<Object[]> testCases = new ArrayList<>();
+
+    // Test Case 1: Basic table with col1, col2, col3
+    Collection<DataTable> dataTables = new ArrayList<>();
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3"}, 3));
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3"}, 3));
+
+    testCases.add(new Object[]{
+        dataTables,
+        List.of("col1", "col2"), null
+    });
+
+    // Test Case 2: One table with col1, col2, col3 and another has additional col4
+    dataTables = new ArrayList<>();
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3"}, 3));
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3", "col4"}, 3));
+
+    testCases.add(new Object[]{
+        dataTables,
+        List.of("col1", "col2", "col3"), null
+    });
+
+    // Test Case 3: One table with col1, col2, col3 and another has additional col4, with sorting
+    dataTables = new ArrayList<>();
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3"}, 3));
+    dataTables.add(createDataTable(new String[]{"col1", "col2", "col3", "col4"}, 3));
+    Comparator<Object[]> comparator
+            = Comparator.comparingInt((Object[] o) -> (Integer) o[0]).thenComparingInt(o -> (Integer) o[1]);
+    testCases.add(new Object[]{
+        dataTables,
+        List.of("col1", "col2", "col3"), comparator
+    });
+
+    return testCases.toArray(new Object[0][]);
+  }
+
+
+  private static DataTable createDataTable(String[] columnNames, int numRows)
+      throws IOException {
+    int numColumns = columnNames.length;
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    Arrays.fill(columnDataTypes, ColumnDataType.INT);
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      dataTableBuilder.startRow();
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setColumn(colId, rowId);
+      }
+      dataTableBuilder.finishRow();
+    }
+    return dataTableBuilder.build();
   }
 }

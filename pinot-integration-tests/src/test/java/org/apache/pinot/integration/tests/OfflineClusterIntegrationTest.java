@@ -4336,36 +4336,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testSelectStarOnNewColumnAddition() throws Exception {
-    JsonNode response = postQuery(SELECT_STAR_QUERY);
-    assertNoError(response);
-    JsonNode rows = response.get("resultTable").get("rows");
-    assert !rows.isEmpty();
-
+    String tableNameWithType = DEFAULT_TABLE_NAME + "_" + TableType.OFFLINE;
     // Add new column
     String testColumn = "TestColumn";
     Schema schema = getSchema(DEFAULT_SCHEMA_NAME);
     schema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
     updateSchema(schema);
 
-    // Run query again and check that the new column is not present
-    response = postQuery(SELECT_STAR_QUERY);
-    assertNoError(response);
-    rows = response.get("resultTable").get("rows");
-    JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
-    DataSchema dataSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
-    assert !rows.isEmpty() && Arrays.stream(dataSchema.getColumnNames()).noneMatch(testColumn::equals);
+    // Run query and check that the new column is not present
+    runQueryAndAssert(testColumn, false);
 
     // Partially reload one segment
-    String segmentName = listSegments(DEFAULT_TABLE_NAME).get(0);
-    reloadOfflineSegment(DEFAULT_TABLE_NAME, segmentName, true);
+    String segmentName = listSegments(tableNameWithType).get(0);
+    reloadOfflineSegment(tableNameWithType, segmentName, true);
 
     // Run query again and check that the new column should still not be present
-    response = postQuery(SELECT_STAR_QUERY);
+    runQueryAndAssert(testColumn, false);
+
+    // Reload all segments on all servers
+    reloadOfflineTable(tableNameWithType, true);
+    // Run query again and check that the new column should be present
+    runQueryAndAssert(testColumn, true);
+  }
+
+  private void runQueryAndAssert(String newAddedColumn, boolean isPresent) throws Exception {
+    JsonNode response = postQuery(SELECT_STAR_QUERY);
     assertNoError(response);
-    rows = response.get("resultTable").get("rows");
-    jsonSchema = response.get("resultTable").get("dataSchema");
-    dataSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
-    assert !rows.isEmpty() && Arrays.stream(dataSchema.getColumnNames()).noneMatch(testColumn::equals);
+    JsonNode rows = response.get("resultTable").get("rows");
+    JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
+    DataSchema resultSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
+
+    assert !rows.isEmpty();
+    for (String columnName : resultSchema.getColumnNames()) {
+      assert !columnName.equals(newAddedColumn);
+    }
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,

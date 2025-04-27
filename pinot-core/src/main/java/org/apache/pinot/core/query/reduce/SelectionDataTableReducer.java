@@ -27,6 +27,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -57,17 +58,19 @@ public class SelectionDataTableReducer implements DataTableReducer {
       brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), Collections.emptyList()));
       return;
     }
+    boolean isSelectStarQuery = _queryContext.getQueryOptions() != null
+            && QueryOptionsUtils.isSelectStarQuery(_queryContext.getQueryOptions());
     if (_queryContext.getOrderByExpressions() == null) {
       // Selection only
       List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
-          _queryContext.isNullHandlingEnabled());
+          _queryContext.isNullHandlingEnabled(), isSelectStarQuery);
       brokerResponseNative.setResultTable(
           SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, pair.getLeft(), pair.getRight()));
     } else {
       // Selection order-by
       SelectionOperatorService selectionService =
           new SelectionOperatorService(_queryContext, pair.getLeft(), pair.getRight());
-      selectionService.reduceWithOrdering(dataTableMap.values());
+      selectionService.reduceWithOrdering(dataTableMap.values(), isSelectStarQuery);
       brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
     }
   }
