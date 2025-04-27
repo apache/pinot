@@ -18,6 +18,25 @@
 # under the License.
 #
 
+get_clean_table() {
+    local html_rows="$1"
+
+    # Using awk to process rows and output the cleaned data in required format
+    echo $html_rows | awk '
+    BEGIN { RS="</tr>"; rownum=1 }
+    {
+        gsub(/.*<tr[^>]*>/, "");          # Remove opening <tr> tag
+        gsub(/<\/td>/, "");               # Remove closing </td> tags
+        gsub(/<\/?[^>]+>/, " ");          # Remove all other HTML tags
+        gsub(/[ \t]+/, " ");              # Normalize spaces
+        gsub(/^[ \t]+|[ \t]+$/, "");      # Trim leading/trailing spaces
+        if (length($0) > 0) {
+            print $0
+        }
+    }'
+}
+
+
 # Java Version
 java -version
 
@@ -26,7 +45,6 @@ ifconfig
 netstat -i
 
 SETTINGS_FILE="../settings.xml"
-# PINOT_DISTRIBUTION_FILE="../../../pinot-distribution/pom.xml"
 PINOT_DISTRIBUTION_FILE="./pinot-distribution/pom.xml"
 PATH_OF_DEP_FILE="./pinot-distribution/target/reports/dependencies.html"
 
@@ -220,22 +238,39 @@ sed -i '/<\/dependencies>/i \
 </dependency>' $PINOT_DISTRIBUTION_FILE
 
 cat $PINOT_DISTRIBUTION_FILE
-read -p "ok?"
 
 # After adding dependecies, write:
 mvn -Ddependency.locations.enabled=false project-info-reports:dependencies -Ppresto-driver -pl :pinot-distribution
 
-SOURCE_HTML=$(curl -s "$PATH_OF_DEP_FILE")
-TMPFILE=$(mktemp)
-echo "$HTML" > "$TMPFILE"
 
 # Get compile time dependencies
 COMPILE_1_XPATH="/html/body/div/main/section[1]/section/table"
 COMPILE_2_XPATH="/html/body/div/main/section[2]/section[1]/table"
-ROWS_1=$(xmllint --html --xpath "$COMPILE_1_XPATH//tr" "$TMPFILE" 2>/dev/null)
-ROWS_2=$(xmllint --html --xpath "$COMPILE_2_XPATH//tr" "$TMPFILE" 2>/dev/null)
+ROWS_1=$(xmllint --html --xpath "$COMPILE_1_XPATH//tr" "$PATH_OF_DEP_FILE" 2>/dev/null)
+ROWS_2=$(xmllint --html --xpath "$COMPILE_2_XPATH" "$PATH_OF_DEP_FILE" 2>/dev/null)
 
-echo $ROWS_1 >> "~/test.txt"
-echo $ROWS_2 >> "~/test2.txt"
+CLEAN_ROWS_1=$(get_clean_table "$ROWS_1")
+echo "$CLEAN_ROWS_1" > "./pkg-dependencies-raw.txt"
+
+CLEAN_ROWS_2=$(get_clean_table "$ROWS_2")
+echo "$CLEAN_ROWS_2" > "./pkg-dependencies-raw.txt"
 
 # Get runtime dependencies
+RUNTIME_XPATH="/html/body/div/main/section[2]/section[2]/table"
+ROWS=$(xmllint --html --xpath "$RUNTIME_XPATH" "$PATH_OF_DEP_FILE" 2>/dev/null)
+echo $ROWS
+CLEAN_ROWS=$(get_clean_table "$ROWS")
+
+echo "$CLEAN_ROWS" > "./runtime-dependencies-raw.txt"
+
+# Process new list of dependencies
+cat pkg-dependencies-raw.txt | awk '{printf("%s:%s:%s\n", $1, $2, $3);}' | grep -v org.apache.pinot | sort | uniq > /tmp/x1
+cat runtime-dependencies-raw.txt | awk '{printf("%s:%s:%s\n", $1, $2, $3);}' | grep -v org.apache.pinot | sort | uniq >> /tmp/x1
+sort /tmp/x1 > new-pkg-versions.txt
+
+cp LICENSE-binary current-pkg-versions.txt.unsorted
+data=$(cat current-pkg-versions.txt.unsorted | awk '/License Version 2.0/{flag=1; next} flag' | sed '/^[^[:space:]]/ {N; /-\{3,\}/d}' | sed '/(.*)/d' | sed '/^$/d')
+echo "$data" > current-pkg-versions.txt.unsorted
+
+# sort
+sort current-pkg-versions.txt.unsorted | uniq > current-pkg-versions.txt
