@@ -77,7 +77,17 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /**
    * The estimated number of query server threads for all currently running multi-stage queries.
    */
-  ESTIMATED_MSE_SERVER_THREADS("number", true);
+  ESTIMATED_MSE_SERVER_THREADS("number", true),
+
+  // GrpcMailboxServer memory metrics
+  MAILBOX_SERVER_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_SERVER_USED_HEAP_MEMORY("bytes", true),
+  MAILBOX_SERVER_ARENAS_DIRECT("arenas", true),
+  MAILBOX_SERVER_ARENAS_HEAP("arenas", true),
+  MAILBOX_SERVER_CACHE_SIZE_SMALL("bytes", true),
+  MAILBOX_SERVER_CACHE_SIZE_NORMAL("bytes", true),
+  MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
+  MAILBOX_SERVER_CHUNK_SIZE("bytes", true);
 
   private final String _brokerGaugeName;
   private final String _unit;
