@@ -269,8 +269,11 @@ cat runtime-dependencies-raw.txt | awk '{printf("%s:%s:%s\n", $1, $2, $3);}' | g
 sort /tmp/x1 > new-pkg-versions.txt
 
 cp LICENSE-binary current-pkg-versions.txt.unsorted
-data=$(cat current-pkg-versions.txt.unsorted | awk '/License Version 2.0/{flag=1; next} flag' | sed '/^[^[:space:]]/ {N; /-\{3,\}/d}' | sed '/(.*)/d' | sed '/^$/d')
+data=$(cat current-pkg-versions.txt.unsorted | awk '/License Version 2.0/{flag=1; next} flag' | sed '/^[^[:space:]]/ {N; /-\{3,\}/d}' | sed '/(.*)/d' | sed '/^$/d' | sed '/This section summarizes those components and their licenses. See "licenses\/" for text/d')
 echo "$data" > current-pkg-versions.txt.unsorted
 
-# sort
+# sort packages to generate a valid diff
 sort current-pkg-versions.txt.unsorted | uniq > current-pkg-versions.txt
+
+# Remove unused dependencies
+diff -y current-pkg-versions.txt new-pkg-versions.txt | grep "<" | awk '{print $1}' | xargs -I {} sed -i '/{}\b/d' LICENSE-binary
