@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.avro.Conversion;
 import org.apache.avro.Conversions;
@@ -183,7 +184,7 @@ public class AvroSchemaUtil {
   private static Object applySchemaTypeLogic(Schema schema, Object value) {
     switch (schema.getType()) {
       case ARRAY:
-        return processArraySchema((GenericData.Array) value, schema);
+        return processArraySchema(value, schema);
       case MAP:
         return processMapSchema((Map<String, Object>) value, schema);
       case RECORD:
@@ -193,8 +194,26 @@ public class AvroSchemaUtil {
     }
   }
 
-  private static Object processArraySchema(GenericData.Array array, Schema schema) {
+  private static Object processArraySchema(Object object, Schema schema) {
     Schema elementSchema = schema.getElementType();
+    if (object == null) {
+      return null;
+    }
+    if (object instanceof List) {
+      List<Object> list = (List<Object>) object;
+      list.replaceAll(element -> processElement(element, elementSchema));
+      return list;
+    }
+    if (object.getClass().isArray()) {
+      int length = java.lang.reflect.Array.getLength(object);
+      for (int i = 0; i < length; i++) {
+        Object element = java.lang.reflect.Array.get(object, i);
+        java.lang.reflect.Array.set(object, i, processElement(element, elementSchema));
+      }
+      return object;
+    }
+
+    GenericData.Array array = (GenericData.Array) object;
     for (int i = 0; i < array.size(); i++) {
       array.set(i, processElement(array.get(i), elementSchema));
     }
@@ -203,6 +222,9 @@ public class AvroSchemaUtil {
 
   private static Object processMapSchema(Map<String, Object> map, Schema schema) {
     Schema valueSchema = schema.getValueType();
+    if (map == null) {
+      return null;
+    }
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       entry.setValue(processElement(entry.getValue(), valueSchema));
     }
