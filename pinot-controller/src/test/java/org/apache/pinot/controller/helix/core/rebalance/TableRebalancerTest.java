@@ -1299,6 +1299,18 @@ public class TableRebalancerTest {
       for (boolean bestEfforts : falseAndTrue) {
         assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
             idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 1);
+      }
+    }
+
+    instanceStateMap.put("instance3", CONSUMING);
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1309,6 +1321,8 @@ public class TableRebalancerTest {
       for (boolean bestEfforts : falseAndTrue) {
         assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
             idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1318,32 +1332,69 @@ public class TableRebalancerTest {
       for (boolean bestEfforts : falseAndTrue) {
         assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
             idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+      }
+    }
+
+    // Should fail when instance state does not match
+    instanceStateMap.put("instance2", OFFLINE);
+    instanceStateMap.put("instance3", OFFLINE);
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+      }
+    }
+
+    // Should fail when instance state does not match
+    instanceStateMap.put("instance2", CONSUMING);
+    instanceStateMap.put("instance3", OFFLINE);
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 1);
       }
     }
 
     // Should pass when instance state matches
     instanceStateMap.put("instance2", CONSUMING);
+    instanceStateMap.put("instance3", CONSUMING);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
         assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
             idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null), 0);
       }
     }
 
     // When there are extra instances in ExternalView, should pass in regular mode but fail in low disk mode
-    instanceStateMap.put("instance3", CONSUMING);
+    instanceStateMap.put("instance4", CONSUMING);
+    instanceStateMap.put("instance5", CONSUMING);
+    instanceStateMap.put("instance6", CONSUMING);
     for (boolean bestEfforts : falseAndTrue) {
       assertTrue(
           TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
               false, bestEfforts, null));
+      assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+          idealStateSegmentStates, false, bestEfforts, null), 0);
       assertFalse(
           TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
               true, bestEfforts, null));
+      assertEquals(TableRebalancer.getNumRemainingSegmentsToProcess(offlineTableName, externalViewSegmentStates,
+          idealStateSegmentStates, true, bestEfforts, null), 3);
     }
 
     // When instance state is ERROR in ExternalView, should fail in regular mode but pass in best-efforts mode
     instanceStateMap.put("instance2", ERROR);
-    instanceStateMap.remove("instance3");
+    instanceStateMap.remove("instance4");
+    instanceStateMap.remove("instance5");
+    instanceStateMap.remove("instance6");
     for (boolean lowDiskMode : falseAndTrue) {
       try {
         TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
@@ -1359,7 +1410,10 @@ public class TableRebalancerTest {
 
     // When the extra instance is in ERROR state, should throw exception in low disk mode when best-efforts is disabled
     instanceStateMap.put("instance2", CONSUMING);
-    instanceStateMap.put("instance3", ERROR);
+    instanceStateMap.put("instance3", CONSUMING);
+    instanceStateMap.put("instance4", ERROR);
+    instanceStateMap.put("instance5", ERROR);
+    instanceStateMap.put("instance6", ERROR);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
         if (lowDiskMode && !bestEfforts) {
