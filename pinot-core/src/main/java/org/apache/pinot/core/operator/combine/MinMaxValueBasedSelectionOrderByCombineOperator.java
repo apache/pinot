@@ -296,16 +296,10 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      String errorMessage =
-          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
-              mergedDataSchema, dataSchemaToMerge);
-      // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
-      LOGGER.debug(errorMessage);
-      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage);
-      mergedBlock.addErrorMessage(errMsg);
-      return;
+      SelectionOperatorUtils.handleSchemeMisMatchOnMerge(mergedBlock, blockToMerge, _numRowsToKeep, true, LOGGER);
+    } else {
+      SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
     }
-    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
   }
 
   private static class MinMaxValueContext {

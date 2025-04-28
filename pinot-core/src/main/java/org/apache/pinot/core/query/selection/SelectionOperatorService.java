@@ -76,11 +76,12 @@ public class SelectionOperatorService {
   /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    */
-  public void reduceWithOrdering(Collection<DataTable> dataTables, boolean isSelectStarQuery) {
+  public void reduceWithOrdering(Collection<DataTable> dataTables, boolean isSelectStarQuery,
+                                 boolean hasSchemaMismatch) {
     Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(
             _queryContext.getOrderByExpressions(), _queryContext.isNullHandlingEnabled()).reversed();
     List<String> reduceSelectColumns = null;
-    if (isSelectStarQuery) {
+    if (isSelectStarQuery && hasSchemaMismatch) {
       reduceSelectColumns = SelectionOperatorUtils.getReducedColumns(dataTables);
     }
     _rows = SelectionOperatorUtils.reduceResults(dataTables, _numRowsToKeep, _queryContext.isNullHandlingEnabled(),

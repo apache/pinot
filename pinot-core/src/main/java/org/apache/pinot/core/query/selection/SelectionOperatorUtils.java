@@ -563,9 +563,9 @@ public class SelectionOperatorUtils {
    * (Broker side)
    */
   public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit,
-      boolean nullHandlingEnabled, boolean isSelectStar) {
+      boolean nullHandlingEnabled, boolean isSelectStar, boolean hasSchemaMismatch) {
     List<String> reduceSelectedColumns = null;
-    if (isSelectStar) {
+    if (isSelectStar && hasSchemaMismatch) {
       reduceSelectedColumns = getReducedColumns(dataTables);
     }
     return reduceResults(dataTables, limit, nullHandlingEnabled, reduceSelectedColumns, null);

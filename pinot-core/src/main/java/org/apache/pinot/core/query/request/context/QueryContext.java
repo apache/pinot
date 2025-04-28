@@ -137,6 +137,8 @@ public class QueryContext {
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
+  // Indicates whether the query had schema mismatch when merging results
+  private boolean _hasSchemaMisMatch = false;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
@@ -493,6 +495,14 @@ public class QueryContext {
       return true;
     }
     return !_skipIndexes.getOrDefault(columnName, Collections.EMPTY_SET).contains(indexType);
+  }
+
+  public void setHasSchemaMisMatch(boolean hasSchemaMismatch) {
+    _hasSchemaMisMatch = hasSchemaMismatch;
+  }
+
+  public boolean hasSchemaMisMatch() {
+    return _hasSchemaMisMatch;
   }
 
   public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {

@@ -80,6 +80,7 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Process server response metadata.
     Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+    boolean hasSchemaMismatch = false;
     while (iterator.hasNext()) {
       Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
       DataTable dataTable = entry.getValue();
@@ -110,6 +111,7 @@ public class BrokerReduceService extends BaseReduceService {
                 // If the query is SELECT *, we can ignore the data schema mismatch.
                 dataSchemaFromNonEmptyDataTable = SelectionOperatorUtils.getCommonDataSchema(
                     dataSchemaFromNonEmptyDataTable, dataSchema);
+                hasSchemaMismatch = true;
               } else {
                 serversWithConflictingDataSchema.add(entry.getKey());
                 iterator.remove();
@@ -166,7 +168,7 @@ public class BrokerReduceService extends BaseReduceService {
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
+              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity, hasSchemaMismatch), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
           new QueryProcessingException(QueryErrorCode.QUERY_CANCELLATION, e.toString()));
