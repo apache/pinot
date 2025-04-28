@@ -138,7 +138,6 @@ public class CityHashFunctions {
      * Computes 64-bit CityHash of input byte array from index pos to pos + len - 1
      */
     public static long cityHash64(byte[] s, int pos, int len) {
-
         if (len <= 32) {
             if (len <= 16) {
                 return hashLen0to16(s, pos, len);
@@ -218,7 +217,6 @@ public class CityHashFunctions {
      * Computes 128-bit CityHash of input byte array from index pos to pos + len - 1  and using two seed values
      */
     public static long[] cityHash128WithSeed(byte[] s, int pos, int len, long seed0, long seed1) {
-
         if (len < 128) {
             return cityMurmur(s, pos, len, seed0, seed1);
         }
@@ -365,6 +363,10 @@ public class CityHashFunctions {
                 + ((b[i + 0] & 255) << 0));
     }
 
+    private static long shiftMix(long val) {
+        return val ^ (val >>> 47);
+    }
+
     private static long fetch64(byte[] s, int pos) {
         return toLongLE(s, pos);
     }
@@ -380,10 +382,6 @@ public class CityHashFunctions {
     private static int rotate32(int val, int shift) {
         // Avoid shifting by 32: doing so yields an undefined result.
         return shift == 0 ? val : ((val >>> shift) | (val << (32 - shift)));
-    }
-    
-    private static long shiftMix(long val) {
-        return val ^ (val >>> 47);
     }
 
     private static long hash128to64(long u, long v) {
@@ -466,7 +464,6 @@ public class CityHashFunctions {
     }
 
     private static long hashLen33to64(byte[] s, int pos, int len) {
-
         long mul = K2 + len * 2;
         long a = fetch64(s, pos) * K2;
         long b = fetch64(s, pos + 8);
