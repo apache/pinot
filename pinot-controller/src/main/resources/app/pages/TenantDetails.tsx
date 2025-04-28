@@ -732,7 +732,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   title={
                     pauseStatusData?.pauseFlag
                       ? 'Resume consumption of realtime table'
-                      : 'Pause consumption of realtime table'
+                      : 'Pause consumption of realtime table. This will force the table to commit all consuming segments.'
                   }
                   arrow
                   placement="top"
