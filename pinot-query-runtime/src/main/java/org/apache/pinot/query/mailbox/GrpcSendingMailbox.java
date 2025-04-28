@@ -255,14 +255,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
   }
 
-  @VisibleForTesting
-  public static List<ByteString> toByteStrings(DataBlock dataBlock, int maxByteStringSize)
+  static List<ByteString> toByteStrings(DataBlock dataBlock, int maxByteStringSize)
       throws IOException {
     return toByteStrings(dataBlock.serialize(), maxByteStringSize);
   }
 
-  @VisibleForTesting
-  public static List<ByteString> toByteStrings(List<ByteBuffer> bytes, int maxByteStringSize) {
+  static List<ByteString> toByteStrings(List<ByteBuffer> bytes, int maxByteStringSize) {
     if (bytes.isEmpty()) {
       return EMPTY_BYTEBUFFER_LIST;
     }
