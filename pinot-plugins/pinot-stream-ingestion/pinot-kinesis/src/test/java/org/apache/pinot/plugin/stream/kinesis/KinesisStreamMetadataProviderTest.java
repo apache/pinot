@@ -211,8 +211,6 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
     Assert.assertEquals(result.get(1).getPartitionGroupId(), 1);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
-
-
   }
 
   @Test

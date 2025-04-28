@@ -47,14 +47,13 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.getLatestStreamOffsetAtStartupTime();
 
     if (isOffsetCaughtUp(segmentName, latestIngestedOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}", segmentName,
-          latestIngestedOffset, latestStreamOffset);
+      _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}",
+          segmentName, latestIngestedOffset, latestStreamOffset);
       return true;
     }
 
     _logger.info("Latest ingested offset {} in segment {} is smaller than stream latest available offset {} ",
         latestIngestedOffset, segmentName, latestStreamOffset);
     return false;
-
   }
 }

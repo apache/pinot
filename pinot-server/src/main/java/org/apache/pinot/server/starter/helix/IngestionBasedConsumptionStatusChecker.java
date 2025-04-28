@@ -137,7 +137,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
 
   protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
 
-  protected boolean isOffsetCaughtUp(String segmentName, StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
+  protected boolean isOffsetCaughtUp(String segmentName,
+      StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
     if (currentOffset != null && latestOffset != null) {
       // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
       // current offset in the case we are caught up.
