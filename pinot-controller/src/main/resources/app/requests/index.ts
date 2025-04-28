@@ -50,7 +50,8 @@ import {
   SchemaInfo,
   SegmentStatusInfo,
   ServerToSegmentsCount,
-  ConsumingSegmentsInfo
+  ConsumingSegmentsInfo,
+  PauseStatusDetails
 } from 'Models';
 
 const headers = {
@@ -116,6 +117,20 @@ export const getSegmentsStatus = (name: string): Promise<AxiosResponse<SegmentSt
 // API: GET /tables/{tableName}/consumingSegmentsInfo
 export const getConsumingSegmentsInfo = (name: string): Promise<AxiosResponse<ConsumingSegmentsInfo>> =>
   baseApi.get(`/tables/${name}/consumingSegmentsInfo`);
+
+// Pause or resume consumption of a realtime table
+// API: POST /tables/{tableName}/pauseConsumption
+export const pauseConsumption = (name: string, comment?: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.post(`/tables/${name}/pauseConsumption`, null, { params: { comment } });
+
+// API: POST /tables/{tableName}/resumeConsumption
+export const resumeConsumption = (name: string, comment?: string, consumeFrom?: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.post(`/tables/${name}/resumeConsumption`, null, { params: { comment, consumeFrom } });
+
+// Fetch pause status for a realtime table
+// API: GET /tables/{tableName}/pauseStatus
+export const getPauseStatus = (name: string): Promise<AxiosResponse<PauseStatusDetails>> =>
+  baseApi.get(`/tables/${name}/pauseStatus`);
 
 export const getInstances = (): Promise<AxiosResponse<Instances>> =>
   baseApi.get('/instances');
