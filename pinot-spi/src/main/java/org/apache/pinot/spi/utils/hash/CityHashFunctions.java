@@ -381,11 +381,7 @@ public class CityHashFunctions {
         // Avoid shifting by 32: doing so yields an undefined result.
         return shift == 0 ? val : ((val >>> shift) | (val << (32 - shift)));
     }
-
-    private static long rotateByAtLeast1(long val, int shift) {
-        return (val >>> shift) | (val << (64 - shift));
-    }
-
+    
     private static long shiftMix(long val) {
         return val ^ (val >>> 47);
     }

@@ -163,6 +163,8 @@ public class HashFunctionsTest {
   @Test
   public void testCityHash64() {
     assertEquals(HashFunctions.cityHash64(INPUT_LEN_3.getBytes()), 2640714258260161385L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_7.getBytes()), 4341691227789030229L);
+    assertEquals(HashFunctions.cityHash64(INPUT_LEN_13.getBytes()), 2219442073233419101L);
     assertEquals(HashFunctions.cityHash64(INPUT_LEN_19.getBytes()), -7582989256905268791L);
     assertEquals(HashFunctions.cityHash64(INPUT_LEN_39.getBytes()), 2649092397580160289L);
     assertEquals(HashFunctions.cityHash64(INPUT_LEN_78.getBytes()), 4095282343956748170L);
