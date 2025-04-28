@@ -17,7 +17,7 @@
 # under the License.
 #
 
-# Copied from Calcite 1.37.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
+# Copied from Calcite 1.39.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
 
 # Default data declarations for parsers.
 # Each of these may be overridden in a parser's config.fmpp file.
@@ -456,6 +456,9 @@ parser: {
   # Custom identifier token.
   # Example: "< IDENTIFIER: (<LETTER>|<DIGIT>)+ >".
   customIdentifierToken: ""
+
+  # Method for parsing "SET [OR RESET]" calls.
+  setOptionParserMethod: "SqlSetOption"
 
   includePosixOperators: false
   includeCompoundIdentifier: true
