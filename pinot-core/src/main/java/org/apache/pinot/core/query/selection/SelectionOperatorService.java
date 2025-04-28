@@ -79,7 +79,7 @@ public class SelectionOperatorService {
   public void reduceWithOrdering(Collection<DataTable> dataTables, boolean isSelectStarQuery,
                                  boolean hasSchemaMismatch) {
     Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(
-            _queryContext.getOrderByExpressions(), _queryContext.isNullHandlingEnabled()).reversed();
+            _queryContext.getOrderByExpressions(), _queryContext.isNullHandlingEnabled());
     List<String> reduceSelectColumns = null;
     if (isSelectStarQuery && hasSchemaMismatch) {
       reduceSelectColumns = SelectionOperatorUtils.getReducedColumns(dataTables);

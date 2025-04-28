@@ -97,6 +97,9 @@ public class StreamingReduceService extends BaseReduceService {
     DataTableReducerContext dataTableReducerContext =
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
             groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity, false);
+    // TODO: The current StreamingReducer does not handle schema mismatches or perform validations
+    // that are present in BrokerReduceService. To properly support fixes for SELECT * queries (as done in PR #15350),
+    // it will be added in a separate follow-up PR.
     StreamingReducer streamingReducer = ResultReducerFactory.getStreamingReducer(queryContext);
 
     streamingReducer.init(dataTableReducerContext);

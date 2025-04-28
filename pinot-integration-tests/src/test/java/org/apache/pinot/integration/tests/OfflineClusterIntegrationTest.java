@@ -4336,27 +4336,61 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testSelectStarOnNewColumnAddition() throws Exception {
-    String tableNameWithType = DEFAULT_TABLE_NAME + "_" + TableType.OFFLINE;
-    // Add new column
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     String testColumn = "TestColumn";
-    Schema schema = getSchema(DEFAULT_SCHEMA_NAME);
-    schema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
-    updateSchema(schema);
+    try {
+      // Add a new column to a copy of the old schema
+      Schema newSchema = new Schema();
+      newSchema.setSchemaName(oldSchema.getSchemaName());
+      for (FieldSpec fieldSpec : oldSchema.getAllFieldSpecs()) {
+        newSchema.addField(fieldSpec);
+      }
+      newSchema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
+      updateSchema(newSchema);
 
-    // Run query and check that the new column is not present
-    runQueryAndAssert(testColumn, false);
+      // Run query and assert new column is not present yet
+      runQueryAndAssert(testColumn, false);
 
-    // Partially reload one segment
-    String segmentName = listSegments(tableNameWithType).get(0);
-    reloadOfflineSegment(tableNameWithType, segmentName, true);
+      // Partially reload one segment and assert column is still not present
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+      runQueryAndAssert(testColumn, false);
 
-    // Run query again and check that the new column should still not be present
-    runQueryAndAssert(testColumn, false);
+      // Fully reload table and assert new column is now present
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+      runQueryAndAssert(testColumn, true);
+    } finally {
+      forceUpdateSchema(oldSchema);
+    }
+  }
 
-    // Reload all segments on all servers
-    reloadOfflineTable(tableNameWithType, true);
-    // Run query again and check that the new column should be present
-    runQueryAndAssert(testColumn, true);
+  private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
+    String response = (segmentName != null)
+        ? reloadOfflineSegment(tableNameWithType, segmentName, true)
+        : reloadOfflineTable(tableNameWithType, true);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    String jobId = null;
+    if (segmentName != null) {
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      jobId = statusString.substring(startIdx, endIdx).trim();
+    } else {
+      // Full table reload response: structured JSON
+      JsonNode tableLevelDetails
+              = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
+      assertEquals(tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText(), "SUCCESS");
+      jobId = tableLevelDetails.get("reloadJobId").asText();
+    }
+    String finalJobId = jobId;
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return isReloadJobCompleted(finalJobId);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
   private void runQueryAndAssert(String newAddedColumn, boolean isPresent) throws Exception {
@@ -4367,9 +4401,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     DataSchema resultSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
 
     assert !rows.isEmpty();
+    boolean columnPresent = false;
     for (String columnName : resultSchema.getColumnNames()) {
-      assert !columnName.equals(newAddedColumn);
+      if (columnName.equals(newAddedColumn)) {
+          columnPresent = true;
+          break;
+      }
     }
+    assertEquals(columnPresent, isPresent);
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,

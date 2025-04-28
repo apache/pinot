@@ -108,7 +108,8 @@ public class BrokerReduceService extends BaseReduceService {
             //       can change across different versions.
             if (!Arrays.equals(dataSchema.getColumnDataTypes(), dataSchemaFromNonEmptyDataTable.getColumnDataTypes())) {
               if (queryOptions != null && QueryOptionsUtils.isSelectStarQuery(queryOptions)) {
-                // If the query is SELECT *, we can ignore the data schema mismatch.
+                // If the query is SELECT *, we can ignore the data schema mismatch
+                // Since we would prune the non-matching columns.
                 dataSchemaFromNonEmptyDataTable = SelectionOperatorUtils.getCommonDataSchema(
                     dataSchemaFromNonEmptyDataTable, dataSchema);
                 hasSchemaMismatch = true;
