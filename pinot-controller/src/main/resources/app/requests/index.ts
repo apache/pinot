@@ -45,10 +45,12 @@ import {
   SegmentDebugDetails,
   QuerySchemas,
   TableType,
-  InstanceState, SegmentMetadata,
+  InstanceState,
+  SegmentMetadata,
   SchemaInfo,
   SegmentStatusInfo,
-  ServerToSegmentsCount
+  ServerToSegmentsCount,
+  ConsumingSegmentsInfo
 } from 'Models';
 
 const headers = {
@@ -110,6 +112,11 @@ export const getServerToSegmentsCount = (name: string, tableType: TableType, ver
 export const getSegmentsStatus = (name: string): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
   baseApi.get(`/tables/${name}/segmentsStatus`);
 
+// Fetch consuming segments information for a table
+// API: GET /tables/{tableName}/consumingSegmentsInfo
+export const getConsumingSegmentsInfo = (name: string): Promise<AxiosResponse<ConsumingSegmentsInfo>> =>
+  baseApi.get(`/tables/${name}/consumingSegmentsInfo`);
+
 export const getInstances = (): Promise<AxiosResponse<Instances>> =>
   baseApi.get('/instances');
 
@@ -133,6 +140,16 @@ export const dropInstance = (name: string): Promise<AxiosResponse<OperationRespo
 
 export const getPeriodicTaskNames = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/periodictask/names`, { headers });
+
+// Runs a periodic task against a table. If tableName is omitted, runs against all tables.
+export const runPeriodicTask = (
+  taskName: string,
+  tableName?: string,
+  tableType?: string
+): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/periodictask/run`, {
+    params: { taskname: taskName, tableName, type: tableType },
+  });
 
 export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/tasktypes`, { headers: { ...headers, Accept: 'application/json' } });

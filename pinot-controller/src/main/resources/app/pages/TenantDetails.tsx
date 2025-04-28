@@ -19,10 +19,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -37,6 +37,7 @@ import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import ReloadStatusOp from '../components/Homepage/Operations/ReloadStatusOp';
 import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceServerTableOp';
 import Confirm from '../components/Confirm';
+import CustomDialog from '../components/CustomDialog';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
@@ -47,6 +48,7 @@ import NotFound from '../components/NotFound';
 import {
   RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
+import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -155,6 +157,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  // State for consuming segments info
+  const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
+  const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
+  const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -412,18 +418,18 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const customMessage = (
       <Box>
         <Typography variant='inherit'>{result.status}</Typography>
-        <Button 
-          className={classes.copyIdButton} 
-          variant="outlined" 
-          color="inherit" 
-          size="small" 
+        <Button
+          className={classes.copyIdButton}
+          variant="outlined"
+          color="inherit"
+          size="small"
           onClick={handleCopyReloadJobId}
         >
           Copy Id
         </Button>
       </Box>
     )
-    
+
     syncResponse(result, reloadJobId && customMessage);
   };
 
@@ -440,7 +446,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         setShowReloadStatusModal(false);
         return;
       }
-      
+
       setReloadStatusData(reloadStatusData);
       setTableJobsData(tableJobsData);
     } catch(error) {
@@ -452,6 +458,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleRebalanceTableStatus = () => {
     setShowRebalanceServerStatus(true);
   };
+  // Handler to view consuming segments info
+  const handleViewConsumingSegments = async () => {
+    setShowConsumingSegmentsModal(true);
+    setLoadingConsumingSegments(true);
+    try {
+      const data = await PinotMethodUtils.getConsumingSegmentsInfoData(tableName);
+      setConsumingSegmentsInfo(data);
+    } catch (error) {
+      dispatch({ type: 'error', message: `Error fetching consuming segments info: ${error}` });
+      setShowConsumingSegmentsModal(false);
+    } finally {
+      setLoadingConsumingSegments(false);
+    }
+  };
 
   const handleRebalanceBrokers = () => {
     setDialogDetails({
@@ -461,10 +481,29 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     });
     setConfirmDialog(true);
   };
-  
+
   const rebalanceBrokers = async () => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
+  };
+  
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
   };
 
   const closeDialog = () => {
@@ -558,6 +597,25 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Rebalance Brokers
               </CustomButton>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
+                  enableTooltip={true}
+                >
+                 Repair Table
+                </CustomButton>
+              )}
+             {/* Button to view consuming segments info */}
+             {tableType.toLowerCase() === TableType.REALTIME && (
+              <CustomButton
+                onClick={handleViewConsumingSegments}
+                tooltipTitle="View offset and lag information about consuming segments"
+                enableTooltip={true}
+              >
+                View Consuming Segments
+              </CustomButton>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
@@ -625,7 +683,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   autoCursor={false}
                 />
               </SimpleAccordion>
-            </div>
+              </div>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
               data={segmentList}
@@ -714,6 +772,36 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             tableType={tableType.toUpperCase()}
             tableName={tableName}
           />
+        )}
+        {/* Consuming Segments Info Dialog */}
+        {showConsumingSegmentsModal && (
+          <CustomDialog
+            open={showConsumingSegmentsModal}
+            handleClose={() => setShowConsumingSegmentsModal(false)}
+            title="Consuming Segments Info"
+            size="lg"
+            showOkBtn={false}
+            btnCancelText="Close"
+            disableBackdropClick
+          >
+            {loadingConsumingSegments && (
+              <Box display="flex" justifyContent="center">
+                <CircularProgress />
+              </Box>
+            )}
+            {!loadingConsumingSegments && consumingSegmentsInfo && (
+              <Box style={{ height: '100%', overflowY: 'auto' }}>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo?.serversFailingToRespond ?? 'N/A'}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo?.serversUnparsableRespond ?? 'N/A'}</Typography>
+                <Box mt={2}>
+                  <ConsumingSegmentsTable info={consumingSegmentsInfo} />
+                </Box>
+              </Box>
+            )}
+            {!loadingConsumingSegments && !consumingSegmentsInfo && (
+              <Typography>No consuming segments data available.</Typography>
+            )}
+          </CustomDialog>
         )}
         {confirmDialog && dialogDetails && (
           <Confirm

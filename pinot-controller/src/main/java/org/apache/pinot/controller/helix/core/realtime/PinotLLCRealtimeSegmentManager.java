@@ -1555,13 +1555,13 @@ public class PinotLLCRealtimeSegmentManager {
           // partition has reached end of life
           // 1. All replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption
           //    for some reason
-          // 2. All replicas ONLINE and metadata DONE/UPLOADED
+          // 2. All replicas ONLINE and metadata DONE/UPLOADED/COMMITTING
           // 3. We should never end up with some replicas ONLINE and some OFFLINE
           boolean allInstancesOffline = isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE);
-          boolean allInstancesOnlineAndMetadataCompleted =
-              isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE) && latestSegmentZKMetadata.getStatus()
-                  .isCompleted();
-          if (!allInstancesOffline && !allInstancesOnlineAndMetadataCompleted) {
+          boolean allInstancesOnlineAndMetadataNotInProgress =
+              isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE) && (latestSegmentZKMetadata.getStatus()
+                  != Status.IN_PROGRESS);
+          if (!allInstancesOffline && !allInstancesOnlineAndMetadataNotInProgress) {
             LOGGER.error("Got unexpected instance state map: {} for segment: {} with status: {}", instanceStateMap,
                 latestSegmentName, latestSegmentZKMetadata.getStatus());
             continue;

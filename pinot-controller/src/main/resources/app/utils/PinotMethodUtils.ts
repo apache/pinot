@@ -27,7 +27,8 @@ import {
   SchemaInfo,
   SegmentMetadata,
   SqlException,
-  SQLResult
+  SQLResult,
+  TaskType
 } from 'Models';
 import moment from 'moment';
 import {
@@ -39,6 +40,7 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -106,6 +108,7 @@ import {
   getTaskRuntimeConfig,
   getSchemaInfo,
   getSegmentsStatus,
+  getConsumingSegmentsInfo,
   getServerToSegmentsCount
 } from '../requests';
 import { baseApi } from './axios-config';
@@ -429,7 +432,14 @@ const getAllSchemaDetails = async (schemaList) => {
     columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
-}
+};
+
+// Fetch consuming segments info for a given table
+// API: /tables/{tableName}/consumingSegmentsInfo
+// Expected Output: ConsumingSegmentsInfo
+const getConsumingSegmentsInfoData = (tableName) => {
+  return getConsumingSegmentsInfo(tableName).then(({ data }) => data);
+};
 
 const allTableDetailsColumnHeader = [
   'Table Name',
@@ -1030,6 +1040,11 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;
@@ -1360,6 +1375,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,
@@ -1381,5 +1397,6 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
-  fetchServerToSegmentsCountData
+  fetchServerToSegmentsCountData,
+  getConsumingSegmentsInfoData
 };
