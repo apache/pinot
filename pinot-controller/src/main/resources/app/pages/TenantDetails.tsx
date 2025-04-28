@@ -551,7 +551,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     }
   };
   // Pause or resume consumption for realtime tables with polling status
-  const handlePauseResume = async () => {
+  const doPauseResume = async () => {
     const willPause = !pauseStatusData?.pauseFlag;
     setPauseActionType(willPause ? 'pause' : 'resume');
     setIsPauseActionInProgress(true);
@@ -559,8 +559,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       const result: PauseStatusDetails = willPause
         ? await PinotMethodUtils.pauseConsumptionOp(tableName, "Pause Triggered from Admin UI")
         : await PinotMethodUtils.resumeConsumptionOp(tableName, "Resume Triggered from Admin UI", "lastConsumed");
-      dispatch({ type: 'success', message: willPause ? "Pause Flag set in Ideal state, waiting for consuming segments to commit" : "Pause flag cleared, waiting for consumption to resume", show: true });
-      // Start polling for updated pause status
+      dispatch({
+        type: 'success',
+        message: willPause
+          ? "Pause Flag set in Ideal state, waiting for consuming segments to commit"
+          : "Pause flag cleared, waiting for consumption to resume",
+        show: true
+      });
       if (pausePollingRef.current) {
         clearInterval(pausePollingRef.current);
       }
@@ -583,10 +588,29 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         }
       }, 2000);
     } catch (error) {
-      dispatch({ type: 'error', message: `Error during ${pauseStatusData?.pauseFlag ? 'resume' : 'pause'}: ${error}`, show: true });
+      dispatch({
+        type: 'error',
+        message: `Error during ${pauseStatusData?.pauseFlag ? 'resume' : 'pause'}: ${error}`,
+        show: true
+      });
       setIsPauseActionInProgress(false);
       setPauseActionType(null);
     }
+  };
+
+  const handlePauseResume = () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setDialogDetails({
+      title: willPause ? 'Pause consumption' : 'Resume consumption',
+      content: willPause
+        ? 'Are you sure you want to pause consumption of this realtime table?'
+        : 'Are you sure you want to resume consumption of this realtime table?',
+      successCb: () => {
+        closeDialog();
+        doPauseResume();
+      }
+    });
+    setConfirmDialog(true);
   };
 
   const closeDialog = () => {
