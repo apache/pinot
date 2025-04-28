@@ -248,6 +248,7 @@ public class ControllerTest {
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
     overrideControllerConf(properties);
     return properties;
   }
@@ -1141,6 +1142,12 @@ public class ControllerTest {
    * test functionality.
    */
   public void cleanup() {
+    // Delete logical tables
+    List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();
+    for (String logicalTableName : logicalTables) {
+      _helixResourceManager.deleteLogicalTable(logicalTableName);
+    }
+
     // Delete all tables
     List<String> tables = _helixResourceManager.getAllTables();
     for (String tableNameWithType : tables) {

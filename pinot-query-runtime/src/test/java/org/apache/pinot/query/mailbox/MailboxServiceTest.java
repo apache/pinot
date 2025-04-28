@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -604,7 +605,11 @@ public class MailboxServiceTest {
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
     // receiving-side early terminates after pulling the first block
     TestUtils.waitForCondition(aVoid -> {
-      MseBlock block = readBlock(receivingMailbox);
+      ReceivingMailbox.MseBlockWithStats blockWithStats = receivingMailbox.poll();
+      if (blockWithStats == null) {
+        return false;
+      }
+      MseBlock block = blockWithStats.getBlock();
       return block != null && block.isData() && ((MseBlock.Data) block).getNumRows() == 1;
     }, 1000L, "Failed to deliver mails");
     receivingMailbox.earlyTerminate();
@@ -627,9 +632,12 @@ public class MailboxServiceTest {
     return rows;
   }
 
+  @Nullable
   public static MseBlock readBlock(ReceivingMailbox receivingMailbox) {
     ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
-    assertNotNull(block);
+    if (block == null) {
+      return null;
+    }
     return block.getBlock();
   }
 }

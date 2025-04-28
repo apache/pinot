@@ -2645,7 +2645,7 @@ public class PinotHelixResourceManager {
           InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
               InstancePartitionsType.OFFLINE));
     }
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+    if (tableConfig.isUpsertEnabled()) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       return Collections.singletonMap(InstancePartitionsType.CONSUMING,

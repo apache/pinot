@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -29,14 +28,23 @@ import org.apache.pinot.spi.data.FieldSpec;
 public interface CombinedInvertedIndexCreator
     extends DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
 
-  FieldSpec.DataType getDataType();
+  @Deprecated
+  default DataType getDataType() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the data type of the values in the index. The type returned should be the internal stored type.
+  default DataType getValueType() {
+    return getDataType().getStoredType();
+  }
 
   @Override
-  default void add(@Nonnull Object value, int dictId) {
+  default void add(Object value, int dictId) {
     if (dictId >= 0) {
       add(dictId);
     } else {
-      switch (getDataType()) {
+      DataType valueType = getValueType();
+      switch (valueType) {
         case INT:
           add((Integer) value);
           break;
@@ -50,17 +58,18 @@ public interface CombinedInvertedIndexCreator
           add((Double) value);
           break;
         default:
-          throw new RuntimeException("Unsupported data type " + getDataType() + " for range index");
+          throw new RuntimeException("Unsupported data type " + valueType + " for range index");
       }
     }
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(Object[] values, @Nullable int[] dictIds) {
     if (dictIds != null) {
       add(dictIds, dictIds.length);
     } else {
-      switch (getDataType()) {
+      DataType valueType = getValueType();
+      switch (valueType) {
         case INT:
           int[] intValues = new int[values.length];
           for (int i = 0; i < values.length; i++) {
@@ -90,7 +99,7 @@ public interface CombinedInvertedIndexCreator
           add(doubleValues, values.length);
           break;
         default:
-          throw new RuntimeException("Unsupported data type " + getDataType() + " for range index");
+          throw new RuntimeException("Unsupported data type " + valueType + " for range index");
       }
     }
   }

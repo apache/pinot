@@ -55,6 +55,7 @@ public class TableCacheTest {
   private static final String ANOTHER_TABLE_OFFLINE = TableNameBuilder.OFFLINE.tableNameWithType(ANOTHER_TABLE);
 
   private static final String MANGLED_RAW_TABLE_NAME = "cAcHeTeStTaBlE";
+  private static final String MANGLED_LOGICAL_TABLE_NAME = "cAcHeLoGiCaLTeStTaBlE";
   private static final String MANGLED_OFFLINE_TABLE_NAME = MANGLED_RAW_TABLE_NAME + "_oFfLiNe";
 
   @BeforeClass
@@ -122,8 +123,15 @@ public class TableCacheTest {
     TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTable(LOGICAL_TABLE_NAME) != null, 10_000L,
         "Failed to add the logical table to the cache");
     // Logical table can be accessed by the logical table name
+    if (isCaseInsensitive) {
+      assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
+      assertEquals(tableCache.getLogicalTable(MANGLED_LOGICAL_TABLE_NAME), logicalTable);
+      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
+    } else {
+      assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
+    }
     assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTable);
-    assertEquals(tableCache.getLogicalTableSchema(LOGICAL_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Register the change listeners
     TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
@@ -216,8 +224,14 @@ public class TableCacheTest {
     // update the logical table
     logicalTable = getLogicalTable(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTable(logicalTable);
+    if (isCaseInsensitive) {
+      assertEquals(tableCache.getLogicalTable(MANGLED_LOGICAL_TABLE_NAME), logicalTable);
+      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
+    } else {
+      assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
+    }
     assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTable);
-    assertEquals(tableCache.getLogicalTableSchema(LOGICAL_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);

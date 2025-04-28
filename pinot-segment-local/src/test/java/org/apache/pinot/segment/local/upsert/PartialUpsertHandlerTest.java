@@ -121,7 +121,7 @@ public class PartialUpsertHandlerTest {
           when(mockReader.isNull(1)).thenReturn(isPreviousNull);
           when(mockReader.getValue(1)).thenReturn(previousValue);
         })) {
-      UpsertConfig upsertConfig = new UpsertConfig();
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
       upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
       PartialUpsertHandler handler =
@@ -154,7 +154,7 @@ public class PartialUpsertHandlerTest {
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
-    UpsertConfig upsertConfig = new UpsertConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     upsertConfig.setPartialUpsertMergerClass("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
 

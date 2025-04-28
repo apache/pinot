@@ -128,6 +128,31 @@ declare module 'Models' {
 
   export type QuerySchemas = Array<string>;
 
+  /**
+   * Information about a consuming segment on a server
+   */
+  export interface ConsumingInfo {
+    serverName: string;
+    consumerState: string;
+    lastConsumedTimestamp: number;
+    partitionToOffsetMap: Record<string, string>;
+    partitionOffsetInfo: {
+      currentOffsetsMap: Record<string, string>;
+      latestUpstreamOffsetMap: Record<string, string>;
+      recordsLagMap: Record<string, string>;
+      availabilityLagMsMap: Record<string, string>;
+    };
+  }
+
+  /**
+   * Consuming segments information for a table
+   */
+  export interface ConsumingSegmentsInfo {
+    serversFailingToRespond: number;
+    serversUnparsableRespond: number;
+    _segmentToConsumingInfoMap: Record<string, ConsumingInfo[]>;
+  }
+
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
@@ -258,6 +283,20 @@ declare module 'Models' {
       tableName: string
     }
   }
+
+  type RebalanceTableSegmentJob = {
+    jobId: string;
+    messageCount: number;
+    submissionTimeMs: number;
+    jobType: string;
+    tableName: string;
+    REBALANCE_PROGRESS_STATS: string;
+    REBALANCE_CONTEXT: string;
+  }
+
+  export type RebalanceTableSegmentJobs = {
+    [key: string]: RebalanceTableSegmentJob;
+  }
   
   export interface TaskRuntimeConfig {
     ConcurrentTasksPerWorker: string,
@@ -316,5 +355,9 @@ declare module 'Models' {
   export interface SqlException {
     errorCode: number,
     message: string
+  }
+
+  export const enum TaskType {
+    RealtimeSegmentValidationManager = 'RealtimeSegmentValidationManager'
   }
 }

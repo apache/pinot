@@ -71,8 +71,8 @@ public class TableCache implements PinotConfigProvider {
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMA_PARENT_PATH = "/SCHEMAS";
   private static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
-  private static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL";
-  private static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/";
+  private static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
+  private static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
   private static final String OFFLINE_TABLE_SUFFIX = "_OFFLINE";
   private static final String REALTIME_TABLE_SUFFIX = "_REALTIME";
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = OFFLINE_TABLE_SUFFIX.toLowerCase();
@@ -98,8 +98,11 @@ public class TableCache implements PinotConfigProvider {
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
   private final ZkLogicalTableChangeListener _zkLogicalTableChangeListener = new ZkLogicalTableChangeListener();
-  // Key is table name, value is schema info
-  private final Map<String, LogicalTable> _logicalTableNameMap = new ConcurrentHashMap<>();
+  // Key is table name, value is logical table info
+  private final Map<String, LogicalTableInfo> _logicalTableInfoMap = new ConcurrentHashMap<>();
+  // Key is lower case logical table name, value is actual logical table name
+  // For case-insensitive mode only
+  private final Map<String, String> _logicalTableNameMap = new ConcurrentHashMap<>();
 
   public TableCache(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean ignoreCase) {
     _propertyStore = propertyStore;
@@ -170,11 +173,32 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
+   * Returns the actual logical table name for the given table name, or {@code null} if table does not exist.
+   * @param logicalTableName Logical table name
+   * @return Actual logical table name
+   */
+  @Nullable
+  public String getActualLogicalTableName(String logicalTableName) {
+    return _ignoreCase
+        ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
+        : _logicalTableNameMap.get(logicalTableName);
+  }
+
+  /**
    * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
    * case.
    */
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
+  }
+
+  /**
+   * Returns a map from logical table name to actual logical table name. For case-insensitive case, the keys of the map
+   * are in lower case.
+   * @return Map from logical table name to actual logical table name
+   */
+  public Map<String, String> getLogicalTableNameMap() {
+    return _logicalTableNameMap;
   }
 
   /**
@@ -229,6 +253,14 @@ public class TableCache implements PinotConfigProvider {
     return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
   }
 
+  @Nullable
+  @Override
+  public LogicalTable getLogicalTable(String logicalTableName) {
+    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
+    LogicalTableInfo logicalTableInfo = _logicalTableInfoMap.get(logicalTableName);
+    return logicalTableInfo != null ? logicalTableInfo._logicalTable : null;
+  }
+
   @Override
   public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     synchronized (_zkTableConfigChangeListener) {
@@ -256,6 +288,15 @@ public class TableCache implements PinotConfigProvider {
   private Schema getPhysicalTableSchema(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._schema : null;
+  }
+
+  private Schema getLogicalTableSchema(String logicalTableName) {
+    LogicalTable logicalTable = getLogicalTable(logicalTableName);
+    if (logicalTable == null) {
+      return null;
+    }
+    Optional<String> physicalTableName = logicalTable.getPhysicalTableConfigMap().keySet().stream().findFirst();
+    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(physicalTableName.orElse(null)));
   }
 
   @Override
@@ -286,6 +327,23 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
+  private void addLogicalTables(List<String> paths) {
+    // Subscribe data changes before reading the data to avoid missing changes
+    for (String path : paths) {
+      _propertyStore.subscribeDataChanges(path, _zkLogicalTableChangeListener);
+    }
+    List<ZNRecord> znRecords = _propertyStore.get(paths, null, AccessOption.PERSISTENT);
+    for (ZNRecord znRecord : znRecords) {
+      if (znRecord != null) {
+        try {
+          putLogicalTable(znRecord);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while adding logical table for ZNRecord: {}", znRecord.getId(), e);
+        }
+      }
+    }
+  }
+
   private void putTableConfig(ZNRecord znRecord)
       throws IOException {
     TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
@@ -298,6 +356,19 @@ public class TableCache implements PinotConfigProvider {
     } else {
       _tableNameMap.put(tableNameWithType, tableNameWithType);
       _tableNameMap.put(rawTableName, rawTableName);
+    }
+  }
+
+  private void putLogicalTable(ZNRecord znRecord)
+      throws IOException {
+    LogicalTable logicalTable = LogicalTableUtils.fromZNRecord(znRecord);
+    String logicalTableName = logicalTable.getTableName();
+    if (_ignoreCase) {
+      _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
+      _logicalTableInfoMap.put(logicalTableName.toLowerCase(), new LogicalTableInfo(logicalTable));
+    } else {
+      _logicalTableNameMap.put(logicalTableName, logicalTableName);
+      _logicalTableInfoMap.put(logicalTableName, new LogicalTableInfo(logicalTable));
     }
   }
 
@@ -330,6 +401,14 @@ public class TableCache implements PinotConfigProvider {
         }
       }
     }
+  }
+
+  private void removeLogicalTable(String path) {
+    _propertyStore.unsubscribeDataChanges(path, _zkLogicalTableChangeListener);
+    String logicalTableName = path.substring(LOGICAL_TABLE_PATH_PREFIX.length());
+    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
+    _logicalTableInfoMap.remove(logicalTableName);
+    _logicalTableNameMap.remove(logicalTableName);
   }
 
   private void addSchemas(List<String> paths) {
@@ -398,12 +477,25 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
+  private void notifyLogicalTableChangeListeners() {
+    if (!_logicalTableChangeListeners.isEmpty()) {
+      List<LogicalTable> logicalTables = getLogicalTables();
+      for (LogicalTableChangeListener listener : _logicalTableChangeListeners) {
+        listener.onChange(logicalTables);
+      }
+    }
+  }
+
   private List<TableConfig> getTableConfigs() {
     List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
     for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
       tableConfigs.add(tableConfigInfo._tableConfig);
     }
     return tableConfigs;
+  }
+
+  public List<LogicalTable> getLogicalTables() {
+    return _logicalTableInfoMap.values().stream().map(o -> o._logicalTable).collect(Collectors.toList());
   }
 
   private void notifySchemaChangeListeners() {
@@ -423,65 +515,9 @@ public class TableCache implements PinotConfigProvider {
     return schemas;
   }
 
-  private void addLogicalTables(List<String> paths) {
-    // Subscribe data changes before reading the data to avoid missing changes
-    for (String path : paths) {
-      _propertyStore.subscribeDataChanges(path, _zkLogicalTableChangeListener);
-    }
-    List<ZNRecord> znRecords = _propertyStore.get(paths, null, AccessOption.PERSISTENT);
-    for (ZNRecord znRecord : znRecords) {
-      if (znRecord != null) {
-        try {
-          putLogicalTable(znRecord);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while adding logical table for ZNRecord: {}", znRecord.getId(), e);
-        }
-      }
-    }
-  }
-
-  private void putLogicalTable(ZNRecord znRecord)
-      throws IOException {
-    LogicalTable logicalTable = LogicalTableUtils.fromZNRecord(znRecord);
-    String logicalTableName = logicalTable.getTableName();
-    _logicalTableNameMap.put(logicalTableName, logicalTable);
-  }
-
-  private void removeLogicalTable(String path) {
-    _propertyStore.unsubscribeDataChanges(path, _zkLogicalTableChangeListener);
-    String logicalTableName = path.substring(LOGICAL_TABLE_PATH_PREFIX.length());
-    _logicalTableNameMap.remove(logicalTableName);
-  }
-
-  private void notifyLogicalTableChangeListeners() {
-    if (!_logicalTableChangeListeners.isEmpty()) {
-      List<LogicalTable> logicalTables = new ArrayList<>(_logicalTableNameMap.values());
-      for (LogicalTableChangeListener listener : _logicalTableChangeListeners) {
-        listener.onChange(logicalTables);
-      }
-    }
-  }
-
-  @Nullable
-  public LogicalTable getLogicalTable(String logicalTableName) {
-    return _logicalTableNameMap.get(logicalTableName);
-  }
-
   public boolean isLogicalTable(String logicalTableName) {
-    return _logicalTableNameMap.containsKey(logicalTableName);
-  }
-
-  public List<LogicalTable> getLogicalTables() {
-    return new ArrayList<>(_logicalTableNameMap.values());
-  }
-
-  public Schema getLogicalTableSchema(String logicalTableName) {
-    LogicalTable logicalTable = getLogicalTable(logicalTableName);
-    if (logicalTable == null) {
-      return null;
-    }
-    Optional<String> physicalTableName = logicalTable.getPhysicalTableConfigMap().keySet().stream().findFirst();
-    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(physicalTableName.orElse(null)));
+    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
+    return _logicalTableInfoMap.containsKey(logicalTableName);
   }
 
   @Override
@@ -592,7 +628,7 @@ public class TableCache implements PinotConfigProvider {
       // Only process new added logical tables. Changed/removed logical tables are handled by other callbacks.
       List<String> pathsToAdd = new ArrayList<>();
       for (String logicalTableName : logicalTableNames) {
-        if (!_logicalTableNameMap.containsKey(logicalTableName)) {
+        if (!_logicalTableInfoMap.containsKey(logicalTableName)) {
           pathsToAdd.add(LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
         }
       }
@@ -668,6 +704,15 @@ public class TableCache implements PinotConfigProvider {
     private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
       _schema = schema;
       _columnNameMap = columnNameMap;
+    }
+  }
+
+  private static class LogicalTableInfo {
+    final LogicalTable _logicalTable;
+    // TODO : Add expression override map for logical table, issue #15607
+
+    private LogicalTableInfo(LogicalTable logicalTable) {
+      _logicalTable = logicalTable;
     }
   }
 }

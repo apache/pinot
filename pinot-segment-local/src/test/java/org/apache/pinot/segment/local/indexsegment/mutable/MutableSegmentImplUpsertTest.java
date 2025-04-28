@@ -21,10 +21,7 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import java.util.List;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -39,43 +36,29 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 
 public class MutableSegmentImplUpsertTest {
   private static final String SCHEMA_FILE_PATH = "data/test_upsert_schema.json";
   private static final String DATA_FILE_PATH = "data/test_upsert_data.json";
   private static final String RAW_TABLE_NAME = "testTable";
-  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+  private static final String TIME_COLUMN = "secondsSinceEpoch";
+  private static final String OTHER_COMPARISON_COLUMN = "otherComparisonColumn";
 
-  private TableDataManager _tableDataManager;
-  private TableConfig _tableConfig;
-  private Schema _schema;
-  private CompositeTransformer _recordTransformer;
   private MutableSegmentImpl _mutableSegmentImpl;
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
-  @BeforeClass
-  public void setUp() {
-    ServerMetrics.register(mock(ServerMetrics.class));
-    _tableDataManager = mock(TableDataManager.class);
-    when(_tableDataManager.getTableDataDir()).thenReturn(new File(REALTIME_TABLE_NAME));
-  }
-
   private UpsertConfig createPartialUpsertConfig(HashFunction hashFunction) {
     UpsertConfig upsertConfigWithHash = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    upsertConfigWithHash.setPartialUpsertStrategies(new HashMap<>());
-    upsertConfigWithHash.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
-    upsertConfigWithHash.setComparisonColumns(Arrays.asList("secondsSinceEpoch", "otherComparisonColumn"));
     upsertConfigWithHash.setHashFunction(hashFunction);
+    upsertConfigWithHash.setComparisonColumns(List.of(TIME_COLUMN, OTHER_COMPARISON_COLUMN));
     return upsertConfigWithHash;
   }
 
@@ -89,27 +72,28 @@ public class MutableSegmentImplUpsertTest {
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
-    _tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfigWithHash)
-            .setNullHandlingEnabled(true).build();
-    _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfigWithHash)
+        .setNullHandlingEnabled(true)
+        .build();
+    Schema schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
+    CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     TableUpsertMetadataManager tableUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
-    tableUpsertMetadataManager.init(_tableConfig, _schema, _tableDataManager);
+        TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema,
+            mock(TableDataManager.class));
     _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);
     _mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false, true, upsertConfigWithHash, "secondsSinceEpoch",
-            _partitionUpsertMetadataManager, null, null);
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COLUMN, _partitionUpsertMetadataManager,
+            null);
 
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
-        _schema.getColumnNames(), null)) {
+        schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
-        GenericRow transformedRow = _recordTransformer.transform(reuse);
+        GenericRow transformedRow = recordTransformer.transform(reuse);
         _mutableSegmentImpl.index(transformedRow, null);
         reuse.clear();
       }
@@ -167,20 +151,20 @@ public class MutableSegmentImplUpsertTest {
         Assert.assertTrue(bitmap.contains(2));
         Assert.assertFalse(bitmap.contains(3));
         // Confirm that both comparison column values have made it into the persisted upserted doc
-        Assert.assertEquals(1567205397L, _mutableSegmentImpl.getValue(2, "secondsSinceEpoch"));
-        Assert.assertEquals(1567205395L, _mutableSegmentImpl.getValue(2, "otherComparisonColumn"));
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(2));
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(2));
+        Assert.assertEquals(_mutableSegmentImpl.getValue(2, TIME_COLUMN), 1567205397L);
+        Assert.assertEquals(_mutableSegmentImpl.getValue(2, OTHER_COMPARISON_COLUMN), 1567205395L);
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(2));
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(2));
 
         // bb
         Assert.assertFalse(bitmap.contains(4));
         Assert.assertTrue(bitmap.contains(5));
         Assert.assertFalse(bitmap.contains(6));
         // Confirm that comparison column values have made it into the persisted upserted doc
-        Assert.assertEquals(1567205396L, _mutableSegmentImpl.getValue(5, "secondsSinceEpoch"));
-        Assert.assertEquals(Long.MIN_VALUE, _mutableSegmentImpl.getValue(5, "otherComparisonColumn"));
-        Assert.assertTrue(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(5));
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(5));
+        Assert.assertEquals(_mutableSegmentImpl.getValue(5, TIME_COLUMN), 1567205396L);
+        Assert.assertEquals(_mutableSegmentImpl.getValue(5, OTHER_COMPARISON_COLUMN), Long.MIN_VALUE);
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(5));
+        Assert.assertTrue(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(5));
       }
     } finally {
       tearDown();

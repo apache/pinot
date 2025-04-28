@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -76,10 +77,10 @@ public class SegmentPreloadUtilsTest {
 
     // Setup mocks for TableConfig and Schema.
     TableConfig tableConfig = mock(TableConfig.class);
-    UpsertConfig upsertConfig = new UpsertConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumn("ts");
-    upsertConfig.setEnablePreload(true);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    upsertConfig.setPreload(Enablement.ENABLE);
     when(tableConfig.getUpsertConfig()).thenReturn(upsertConfig);
     when(tableConfig.getTableName()).thenReturn(realtimeTableName);
     Schema schema = mock(Schema.class);

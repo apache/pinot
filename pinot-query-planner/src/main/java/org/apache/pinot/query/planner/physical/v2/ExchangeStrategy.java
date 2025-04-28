@@ -59,5 +59,9 @@ public enum ExchangeStrategy {
   /**
    * Each stream will send data to all receiving streams.
    */
-  BROADCAST_EXCHANGE
+  BROADCAST_EXCHANGE,
+  /**
+   * Records are sent randomly from a given worker in the sender to some worker in the receiver.
+   */
+  RANDOM_EXCHANGE
 }
