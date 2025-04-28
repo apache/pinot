@@ -277,7 +277,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private boolean _segmentBuildFailedWithDeterministicError = false;
   private final StreamConsumerFactory _streamConsumerFactory;
   private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
-  private final AtomicBoolean _shutdownRequested = new AtomicBoolean(false);
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
