@@ -571,7 +571,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       const result: PauseStatusDetails = willPause
         ? await PinotMethodUtils.pauseConsumptionOp(tableName, "Pause Triggered from Admin UI")
         : await PinotMethodUtils.resumeConsumptionOp(tableName, "Resume Triggered from Admin UI", "lastConsumed");
-      dispatch({ type: 'success', message: result.comment, show: true });
+      dispatch({ type: 'success', message: willPause ? "Pause Flag set in Ideal state, waiting for consuming segments to commit" : "Pause flag cleared, waiting for consumption to resume", show: true });
       // Start polling for updated pause status
       if (pausePollingRef.current) {
         clearInterval(pausePollingRef.current);
@@ -704,19 +704,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                  Repair Table
                 </CustomButton>
               )}
-              {/* Pause or resume realtime consumption */}
-              {tableType.toLowerCase() === TableType.REALTIME && (
-                <CustomButton
-                  onClick={handlePauseResume}
-                  tooltipTitle={pauseStatusData?.pauseFlag ? 'Resume consumption of realtime table' : 'Pause consumption of realtime table'}
-                  enableTooltip={true}
-                  isDisabled={isPauseActionInProgress}
-                >
-                  {isPauseActionInProgress
-                    ? (pauseActionType === 'pause' ? 'Pausing...' : 'Resuming...')
-                    : (pauseStatusData?.pauseFlag ? 'Resume Consumption' : 'Pause Consumption')}
-                </CustomButton>
-              )}
              {/* Button to view consuming segments info */}
              {tableType.toLowerCase() === TableType.REALTIME && (
               <CustomButton
@@ -726,6 +713,35 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 View Consuming Segments
               </CustomButton>
+              )}
+              {/* Toggle realtime consumption */}
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <Tooltip
+                  title={
+                    pauseStatusData?.pauseFlag
+                      ? 'Resume consumption of realtime table'
+                      : 'Pause consumption of realtime table'
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={!pauseStatusData?.pauseFlag}
+                        onChange={handlePauseResume}
+                        name="consumptionEnabled"
+                        color="primary"
+                        disabled={
+                          loadingPauseStatus ||
+                          isPauseActionInProgress ||
+                          (pauseStatusData?.pauseFlag && pauseStatusData?.consumingSegments?.length > 0)
+                        }
+                      />
+                    }
+                    label="Consume"
+                  />
+                </Tooltip>
               )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
