@@ -108,6 +108,7 @@ import {
   getTaskRuntimeConfig,
   getSchemaInfo,
   getSegmentsStatus,
+  getConsumingSegmentsInfo,
   getServerToSegmentsCount
 } from '../requests';
 import { baseApi } from './axios-config';
@@ -431,7 +432,14 @@ const getAllSchemaDetails = async (schemaList) => {
     columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
-}
+};
+
+// Fetch consuming segments info for a given table
+// API: /tables/{tableName}/consumingSegmentsInfo
+// Expected Output: ConsumingSegmentsInfo
+const getConsumingSegmentsInfoData = (tableName) => {
+  return getConsumingSegmentsInfo(tableName).then(({ data }) => data);
+};
 
 const allTableDetailsColumnHeader = [
   'Table Name',
@@ -1389,5 +1397,6 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
-  fetchServerToSegmentsCountData
+  fetchServerToSegmentsCountData,
+  getConsumingSegmentsInfoData
 };
