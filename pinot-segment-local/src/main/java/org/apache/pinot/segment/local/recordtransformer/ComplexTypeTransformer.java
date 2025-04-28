@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,6 +94,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   public static final String DEFAULT_DELIMITER = ".";
   public static final ComplexTypeConfig.CollectionNotUnnestedToJson DEFAULT_COLLECTION_TO_JSON_MODE =
       ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE;
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final List<String> _fieldsToUnnest;
   private final String _delimiter;
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
@@ -224,6 +228,18 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   private void unnestCollection(GenericRow record, String column, List<GenericRow> list) {
     Object value = record.getValue(column);
+    if (value instanceof String) {
+      String json = value.toString().trim();
+      try {
+        JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
+        if (jsonNode != null && jsonNode.isArray()) {
+          // JSON Array
+          value = JsonUtils.stringToObject(json, List.class);
+        }
+      } catch (Exception e) {
+        return; // Ignore exception
+      }
+    }
     if (value == null) {
       // use the record itself
       list.add(record);

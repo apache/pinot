@@ -313,6 +313,50 @@ public class ComplexTypeTransformerTest {
   }
 
   @Test
+  public void testUnnestJsonArrayFromStringType() {
+//    {
+//      "key": "value",
+//      "records": [
+//        {
+//          "name": "foo1",
+//          "active": true
+//        },
+//        {
+//          "name": "foo2",
+//          "active": false
+//        },
+//        {
+//          "name": "foo3",
+//          "active": true
+//        }
+//      ],
+//      "event_time": 123456789
+//    }
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("key", "value");
+    genericRow.putValue("event_time", "123456789");
+    genericRow.putValue("records", "["
+        + "{\"name\": \"foo1\", \"active\": true}, "
+        + "{\"name\": \"foo2\", \"active\": false}, "
+        + "{\"name\": \"foo3\", \"active\": true}]"
+    );
+
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("records");
+
+    ComplexTypeTransformer complexTypeTransformer = new ComplexTypeTransformer(fieldsToUnnest, ".");
+    GenericRow result = complexTypeTransformer.transform(genericRow);
+
+    Assert.assertNotNull(result.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
+    Collection<GenericRow> rows = (Collection<GenericRow>) result.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    Assert.assertEquals(rows.size(), 3);
+    List<String> recordNames = Arrays.asList("foo1", "foo2", "foo3");
+    for (GenericRow row : rows) {
+      Assert.assertTrue(recordNames.contains(row.getValue("records.name")));
+    }
+  }
+
+  @Test
   public void testConvertCollectionToString() {
     // json convert inner collections
     // {

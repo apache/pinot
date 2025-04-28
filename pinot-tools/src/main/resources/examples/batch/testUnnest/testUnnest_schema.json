@@ -1,0 +1,25 @@
+{
+  "schemaName": "testUnnest",
+  "enableColumnBasedNullHandling": true,
+  "dimensionFieldSpecs": [
+    {
+      "name": "key",
+      "dataType": "STRING",
+      "fieldType": "DIMENSION"
+    },
+    {
+      "name": "data_for_unnesting||name",
+      "dataType": "STRING",
+      "fieldType": "DIMENSION"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "event_time",
+      "dataType": "LONG",
+      "fieldType": "DATE_TIME",
+      "format": "EPOCH|MILLISECONDS|1",
+      "granularity": "MILLISECONDS|1"
+    }
+  ]
+}
