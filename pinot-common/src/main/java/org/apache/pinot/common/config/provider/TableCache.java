@@ -177,6 +177,7 @@ public class TableCache implements PinotConfigProvider {
    * @param logicalTableName Logical table name
    * @return Actual logical table name
    */
+  @Nullable
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
         ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
@@ -708,6 +709,7 @@ public class TableCache implements PinotConfigProvider {
 
   private static class LogicalTableInfo {
     final LogicalTable _logicalTable;
+    // TODO : Add expression override map for logical table, issue #15607
 
     private LogicalTableInfo(LogicalTable logicalTable) {
       _logicalTable = logicalTable;

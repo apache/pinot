@@ -1178,10 +1178,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @VisibleForTesting
   static String getActualTableName(String tableName, TableCache tableCache) {
     String actualTableName = tableCache.getActualTableName(tableName);
-    if (actualTableName != null) {
-      return actualTableName;
+    // If actual table name is not found for physical table, check in the logical tables
+    if (actualTableName == null) {
+      actualTableName = tableCache.getActualLogicalTableName(tableName);
     }
-    return tableName;
+    return actualTableName != null ? actualTableName : tableName;
   }
 
   /**
