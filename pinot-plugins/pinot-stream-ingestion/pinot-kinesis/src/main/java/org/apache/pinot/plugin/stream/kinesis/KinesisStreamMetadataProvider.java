@@ -230,8 +230,29 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       throws IOException, TimeoutException {
     try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
         _clientId, partitionGroupConsumptionStatus)) {
-      MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
-      return messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
+      int attempts = 0;
+      while (true) {
+        MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
+        if (messageBatch.getMessageCount() > 0) {
+          // There are messages left to be consumed so we haven't consumed the shard fully
+          return false;
+        }
+        if (messageBatch.isEndOfPartitionGroup()) {
+          // Shard can't be iterated further. We have consumed all the messages because message count = 0
+          return true;
+        }
+        // Even though message count = 0, shard can be iterated further.
+        // Based on kinesis documentation, there might be more records to be consumed.
+        // So we need to fetch messages again to check if we have reached end of shard.
+        // To prevent an infinite loop (known cases listed in fetchMessages()), we will limit the number of attempts
+        attempts++;
+        if (attempts >= 5) {
+          LOGGER.warn("Reached max attempts to check if end of shard reached from checkpoint {}. "
+                  + " Assuming we have not consumed till end of shard.", startCheckpoint);
+          return false;
+        }
+        // continue to fetch messages. reusing the partitionGroupConsumer ensures we use new shard iterator
+      }
     }
   }
 

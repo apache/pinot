@@ -61,6 +61,16 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     super(config, kinesisClient);
   }
 
+  /**
+   * Based on Kinesis documentation, we might get a response with empty records but a non-null nextShardIterator.
+   * Known cases are:
+   *  1. When the shard has ended (has been split or merged) and we need a couple of calls to getRecords() to reach
+   *  a null iterator
+   *  2. When there are no new messages in the shard but the shard is active. We will continue to get a non-null
+   *  nextShardIterator in this case
+   *  3. When there are some messages in the shard, but we need a few iterations to get them.
+   * This needs to be handled by the client based on appropriate retry strategy.
+   */
   @Override
   public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
     try {
@@ -93,30 +103,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       return new KinesisMessageBatch(List.of(), startOffset, true);
     }
 
-    // Read records from kinesis.
-    // Based on getRecords documentation, we might get a response with empty records but a non-null nextShardIterator.
-    // This method is also used to accurately determine if we reached end of shard. So, we need to use nextShardIterator
-    // and call getRecords again until we get non-empty records or null nextShardIterator.
-    // To prevent an infinite loop due to some bug, we will limit the number of attempts
-    GetRecordsResponse getRecordsResponse;
-    int attempts = 0;
-    while (true) {
-      rateLimitRequests();
-      GetRecordsRequest getRecordRequest =
-          GetRecordsRequest.builder().shardIterator(shardIterator).limit(_config.getNumMaxRecordsToFetch()).build();
-      getRecordsResponse = _kinesisClient.getRecords(getRecordRequest);
-      if (!getRecordsResponse.records().isEmpty() || getRecordsResponse.nextShardIterator() == null) {
-        break;
-      }
-      // If the response is empty but nextShardIterator exists, we need to call again with the nextShardIterator
-      shardIterator = getRecordsResponse.nextShardIterator();
-      attempts++;
-      if (attempts >= 5) {
-        LOGGER.warn("Reached max attempts to get records from Kinesis stream: {}. Returning empty batch.",
-            _config.getStreamTopicName());
-        break;
-      }
-    }
+    // Read records
+    rateLimitRequests();
+    GetRecordsRequest getRecordRequest =
+        GetRecordsRequest.builder().shardIterator(shardIterator).limit(_config.getNumMaxRecordsToFetch()).build();
+    GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordRequest);
 
     List<Record> records = getRecordsResponse.records();
     List<BytesStreamMessage> messages;
