@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
