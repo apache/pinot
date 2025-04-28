@@ -114,19 +114,8 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Run some queries that are known to not work as is with the multi-stage query engine
 
-    // Type differences
-    // STRING is VARCHAR in v2
-    JsonNode response = postQuery("SELECT CAST(ArrTime AS STRING) FROM mytable");
-    assertFalse(response.get("resultTable").get("rows").isEmpty());
-    // LONG is BIGINT in v2
-    response = postQuery("SELECT CAST(ArrTime AS LONG) FROM mytable");
-    assertFalse(response.get("resultTable").get("rows").isEmpty());
-    // FLOAT_ARRAY is FLOAT ARRAY in v2
-    response = postQuery("SELECT CAST(DivAirportIDs AS FLOAT_ARRAY) FROM mytable");
-    assertFalse(response.get("resultTable").get("rows").isEmpty());
-
     // MV column requires ARRAY_TO_MV wrapper to be used in filter predicates
-    response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports = 'JFK'");
+    JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE DivAirports = 'JFK'");
     assertFalse(response.get("resultTable").get("rows").isEmpty());
 
     // Unsupported function
@@ -138,20 +127,20 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     response = postQuery("SELECT AirTime, AirTime FROM mytable ORDER BY AirTime");
     assertFalse(response.get("resultTable").get("rows").isEmpty());
 
-    assertEquals((Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count"), initialQueryCount + 8L);
+    assertEquals((Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count"), initialQueryCount + 5L);
 
     AtomicLong multiStageMigrationMetricValue = new AtomicLong();
     TestUtils.waitForCondition((aVoid) -> {
       try {
         multiStageMigrationMetricValue.set((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"));
-        return multiStageMigrationMetricValue.get() == 6L;
+        return multiStageMigrationMetricValue.get() == 3L;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 5000, "Expected value of MBean 'pinot.broker.singleStageQueriesInvalidMultiStage' to be: "
-        + 6L + "; actual value: " + multiStageMigrationMetricValue.get());
+        + 3L + "; actual value: " + multiStageMigrationMetricValue.get());
 
-    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
+    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 3L);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
