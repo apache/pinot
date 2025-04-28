@@ -304,18 +304,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   useEffect(() => {
     fetchTableData();
   }, []);
-  // Fetch pause status once tableType is known
-  useEffect(() => {
-    if (tableType.toLowerCase() === TableType.REALTIME) {
-      setLoadingPauseStatus(true);
-      PinotMethodUtils.getPauseStatusData(tableName)
-        .then((data: PauseStatusDetails) => setPauseStatusData(data))
-        .catch((error: any) => dispatch({ type: 'error', message: `Error fetching pause status: ${error}`, show: true }))
-        .finally(() => setLoadingPauseStatus(false));
-    } else {
-      setPauseStatusData(null);
-    }
-  }, [tableType, tableName]);
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
