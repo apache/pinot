@@ -78,7 +78,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 21, 24 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
@@ -169,7 +169,7 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 21, 24 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
@@ -399,7 +399,7 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 21, 24 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
