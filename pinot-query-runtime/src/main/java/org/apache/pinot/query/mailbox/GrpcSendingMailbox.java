@@ -286,14 +286,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
           bb.position(bb.limit()); // just exhaust it
         } else {
           int oldLimit = bb.limit();
-          int chunkSize = oldLimit - bb.position();
-          bb.limit(bb.position() + chunkSize);
+          bb.limit(bb.position() + available);
           acc = acc.concat(UnsafeByteOperations.unsafeWrap(bb));
-          available -= chunkSize;
           bb.position(bb.limit()); // consume the copied chunk
           bb.limit(oldLimit);
-        }
-        if (available == 0) {
           result.add(acc);
           acc = ByteString.EMPTY;
           available = maxByteStringSize;
