@@ -39,6 +39,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 public class GrpcSendingMailboxTest {
 
@@ -49,6 +51,9 @@ public class GrpcSendingMailboxTest {
     ByteBuffer expected = concatenateBuffers(input);
 
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
+    for (ByteString chunk: output) {
+      assertTrue(chunk.size() <= maxByteStringSize);
+    }
     ByteBuffer actual = concatenateBuffers(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
@@ -59,6 +64,10 @@ public class GrpcSendingMailboxTest {
   public void testDataBlockToByteStrings(String name, int maxByteStringSize) throws IOException {
     DataBlock dataBlock = buildTestDataBlock();
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
+    for (ByteString chunk: output) {
+      assertTrue(chunk.size() <= maxByteStringSize);
+    }
+
     DataBlock actual = DataBlockUtils.deserialize(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
@@ -70,6 +79,9 @@ public class GrpcSendingMailboxTest {
     DataBlock dataBlock = buildTestDataBlock();
     List<ByteBuffer> byteBuffers = dataBlock.serialize();
     List<ByteString> byteStrings = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
+    for (ByteString chunk: byteStrings) {
+      assertTrue(chunk.size() <= maxByteStringSize);
+    }
 
     List<DataBuffer> asGrpc = byteStrings.stream()
         .map(ByteString::asReadOnlyByteBuffer)
