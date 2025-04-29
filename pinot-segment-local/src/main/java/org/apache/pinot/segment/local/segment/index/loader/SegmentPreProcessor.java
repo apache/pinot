@@ -152,7 +152,19 @@ public class SegmentPreProcessor implements AutoCloseable {
         if (type != StandardIndexes.forward()) {
           IndexHandler handler = createHandler(type);
           indexHandlers.add(handler);
-          handler.updateIndices(segmentWriter);
+          try {
+            handler.updateIndices(segmentWriter);
+          } catch (IllegalStateException | UnsupportedOperationException e) {
+            // Index creation can fail when an index is unsupported for the current column or segment representation.
+            // For example, a range index is unsupported for a raw TIMESTAMP column but supported after the column is
+            // changed to dictionary encoding. Log these expected failures and continue with the next index handler.
+            LOGGER.error("Failed to create index: {} for segment: {}", type, segmentName, e);
+            indexHandlers.remove(handler);
+          } catch (Exception e) {
+            // Handle unexpected exceptions separately to avoid masking critical issues.
+            LOGGER.error("Unexpected error while creating index: {} for segment: {}", type, segmentName, e);
+            throw e;
+          }
         }
       }
 

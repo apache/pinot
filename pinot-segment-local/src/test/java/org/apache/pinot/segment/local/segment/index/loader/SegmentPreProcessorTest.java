@@ -371,15 +371,16 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST,
             null, null, null, fstIndexes, null, null));
-    if (segmentVersion == SegmentVersion.v1) {
-      assertThrows(UnsupportedOperationException.class, this::runPreProcessor);
-      return;
-    }
     runPreProcessor();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
-    assertTrue(columnMetadata.hasDictionary());
-    assertTrue(columnMetadata.getIndexSizeFor(StandardIndexes.fst()) > 0);
+    if (segmentVersion == SegmentVersion.v1) {
+      assertFalse(columnMetadata.hasDictionary());
+      assertEquals(columnMetadata.getIndexSizeFor(StandardIndexes.fst()), ColumnMetadata.UNAVAILABLE);
+    } else {
+      assertTrue(columnMetadata.hasDictionary());
+      assertTrue(columnMetadata.getIndexSizeFor(StandardIndexes.fst()) > 0);
+    }
   }
 
   @Test(dataProvider = "bothV1AndV3")
