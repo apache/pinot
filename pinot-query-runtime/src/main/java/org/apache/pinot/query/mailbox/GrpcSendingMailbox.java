@@ -26,11 +26,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
@@ -59,8 +59,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
 
   private static final List<ByteString> EMPTY_BYTEBUFFER_LIST = Collections.emptyList();
-
-  private final PinotConfiguration _config;
   private final String _id;
   private final ChannelManager _channelManager;
   private final String _hostname;
@@ -75,7 +73,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
   public GrpcSendingMailbox(
       PinotConfiguration config, String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
-    _config = config;
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -83,7 +80,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _deadlineMs = deadlineMs;
     _statMap = statMap;
     // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-    _maxByteStringSize = Math.max(_config.getProperty(
+    _maxByteStringSize = Math.max(config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     ) / 2, 1);
@@ -119,7 +116,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    toMailboxContents(block, serializedStats).forEach(_contentObserver::onNext);
+    splitAndSend(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
@@ -150,7 +147,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
       MseBlock errorBlock = ErrorMseBlock.fromError(
           QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
-      toMailboxContents(errorBlock, List.of()).forEach(_contentObserver::onNext);
+      splitAndSend(errorBlock, List.of());
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -174,7 +171,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
         .open(_statusObserver);
   }
 
-  private Stream<MailboxContent> toMailboxContents(MseBlock block, List<DataBuffer> serializedStats)
+  private void splitAndSend(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
@@ -187,18 +184,25 @@ public class GrpcSendingMailbox implements SendingMailbox {
       }
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
 
-      final int[] i = {0};
-      return byteStrings.stream().map(byteString -> MailboxContent.newBuilder()
-          .setMailboxId(_id)
-          .setPayload(byteString)
-          .setWaitForMore(++i[0] < byteStrings.size())
-          .build());
+      Iterator<ByteString> byteStringIt = byteStrings.iterator();
+      while (byteStringIt.hasNext()) {
+        sendContent(byteStringIt.next(), byteStringIt.hasNext());
+      }
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
       throw t;
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
+  }
+
+  private void sendContent(ByteString byteString, boolean waitForMore) {
+    MailboxContent content = MailboxContent.newBuilder()
+        .setMailboxId(_id)
+        .setPayload(byteString)
+        .setWaitForMore(waitForMore)
+        .build();
+    _contentObserver.onNext(content);
   }
 
   @Override
