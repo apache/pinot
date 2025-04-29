@@ -125,6 +125,13 @@ public interface TableExecutionInfo {
     private long _minIngestionTimeMs;
     private long _maxEndTimeMs;
 
+    public ConsumingSegmentsInfo() {
+      _numConsumingSegmentsQueried = 0;
+      _minIndexTimeMs = Long.MAX_VALUE;
+      _minIngestionTimeMs = Long.MAX_VALUE;
+      _maxEndTimeMs = Long.MIN_VALUE;
+    }
+
     public ConsumingSegmentsInfo(int numConsumingSegmentsQueried, long minIndexTimeMs, long minIngestionTimeMs,
         long maxEndTimeMs) {
       _numConsumingSegmentsQueried = numConsumingSegmentsQueried;

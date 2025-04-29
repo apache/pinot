@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
@@ -43,7 +44,8 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableExecutionInfo.class);
 
   public static LogicalTableExecutionInfo create(InstanceDataManager instanceDataManager,
-      ServerQueryRequest queryRequest, QueryContext queryContext) {
+      ServerQueryRequest queryRequest, QueryContext queryContext)
+      throws TableNotFoundException {
     List<TableRouteInfo> tableRouteInfos = queryRequest.getTableRouteInfos();
     List<SingleTableExecutionInfo> tableExecutionInfos = new ArrayList<>(tableRouteInfos.size());
     for (TableRouteInfo tableRouteInfo : tableRouteInfos) {
@@ -87,15 +89,6 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
   public List<IndexSegment> getIndexSegments() {
     return _tableExecutionInfos.stream().flatMap(tableExecutionInfo -> tableExecutionInfo.getIndexSegments().stream())
         .collect(Collectors.toList());
-  }
-
-  @Override
-  public List<IndexSegment> getCopyOfIndexSegments() {
-    List<IndexSegment> indexSegments = new ArrayList<>();
-    for (SingleTableExecutionInfo tableExecutionInfo : _tableExecutionInfos) {
-      indexSegments.addAll(tableExecutionInfo.getCopyOfIndexSegments());
-    }
-    return indexSegments;
   }
 
   @Nullable

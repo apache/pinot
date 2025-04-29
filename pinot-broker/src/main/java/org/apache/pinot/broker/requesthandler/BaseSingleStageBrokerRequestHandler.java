@@ -389,8 +389,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
     if (logicalTable != null) {
-      AuthorizationResult authorizationResult =
-          hasTableAccess(requesterIdentity, new HashSet<>(logicalTable.getPhysicalTableNames()), requestContext, httpHeaders);
+      AuthorizationResult authorizationResult = hasTableAccess(requesterIdentity,
+          new HashSet<>(logicalTable.getPhysicalTableNames()), requestContext, httpHeaders);
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }

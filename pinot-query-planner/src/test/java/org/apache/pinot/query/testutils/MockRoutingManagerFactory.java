@@ -195,11 +195,6 @@ public class MockRoutingManagerFactory {
       return _serverInstances;
     }
 
-    @Override
-    public boolean isTableDisabled(String tableNameWithType) {
-      return false;
-    }
-
     @Nullable
     @Override
     public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
