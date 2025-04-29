@@ -1,0 +1,425 @@
+{
+  "physical_opt_join_planning_tests": {
+    "queries": [
+      {
+        "description": "Inner join with order by",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[ASC])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalProject(col1=[$0], ts=[$1], col3=[$3])",
+          "\n      PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col1=[$0], ts=[$6])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col2=[$1], col3=[$2])",
+          "\n            PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Inner join with order by and select column with alias",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT a.col1 AS value1, a.ts AS ts1, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[ASC])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalProject(value1=[$0], ts1=[$1], col3=[$3])",
+          "\n      PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col1=[$0], ts=[$6])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col2=[$1], col3=[$2])",
+          "\n            PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SELECT * inner join",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[=($0, $9)], joinType=[inner])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[1]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SELECT * inner join with filter on one table",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[=($0, $9)], joinType=[inner])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalFilter(condition=[>=($2, 0)])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[1]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SELECT * inner join with filter",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[AND(=($0, $9), >($2, $10))], joinType=[inner])",
+          "\n  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalFilter(condition=[>=($2, 0)])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[BROADCAST_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SELECT * inner join on 2 columns equality",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[AND(=($0, $8), =($1, $9))], joinType=[inner])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 1]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 1]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_semi_join_planning_tests": {
+    "queries": [
+      {
+        "description": "Single semi-join",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(col1=[$0], col2=[$1])",
+          "\n  PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[2]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col3=[$2])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "self semi-join on single server table",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM b WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(col1=[$0], col2=[$1])",
+          "\n  PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
+          "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col3=[$2])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Multiple semi-join",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b WHERE col2='foo') AND col3 IN (SELECT col3 FROM b WHERE col2='bar') AND col3 IN (SELECT col3 FROM b WHERE col2='lorem')",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(col1=[$0], col2=[$1])",
+          "\n  PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n      PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[2]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col3=[$2])",
+          "\n            PhysicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n              PhysicalTableScan(table=[[default, b]])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n        PhysicalProject(col3=[$2])",
+          "\n          PhysicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n            PhysicalTableScan(table=[[default, b]])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($1, _UTF-8'lorem')])",
+          "\n          PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "semi-join, followed by anti semi-join with single-server table, followed by another semi-join",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b WHERE col2='foo') AND col3 NOT IN (SELECT col3 FROM b WHERE col2='bar') AND col3 IN (SELECT col3 FROM b WHERE col2='lorem')",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(col1=[$0], col2=[$1])",
+          "\n  PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      PhysicalFilter(condition=[IS NOT TRUE($5)])",
+          "\n        PhysicalJoin(condition=[=($3, $4)], joinType=[left])",
+          "\n          PhysicalProject(col1=[$0], col2=[$1], col3=[$2], col31=[$2])",
+          "\n            PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n              PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[2]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                  PhysicalTableScan(table=[[default, a]])",
+          "\n              PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col3=[$2])",
+          "\n                  PhysicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n                    PhysicalTableScan(table=[[default, b]])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n            PhysicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n              PhysicalProject(col3=[$2], $f1=[true])",
+          "\n                PhysicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n                  PhysicalTableScan(table=[[default, b]])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($1, _UTF-8'lorem')])",
+          "\n          PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "semi-join, followed by anti semi-join on same fact table, followed by another semi-join",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b WHERE col2='foo') AND col3 NOT IN (SELECT col3 FROM a WHERE col2='bar') AND col3 IN (SELECT col3 FROM b WHERE col2='lorem')",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(col1=[$0], col2=[$1])",
+          "\n  PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      PhysicalFilter(condition=[IS NOT TRUE($5)])",
+          "\n        PhysicalJoin(condition=[=($3, $4)], joinType=[left])",
+          "\n          PhysicalProject(col1=[$0], col2=[$1], col3=[$2], col31=[$2])",
+          "\n            PhysicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n              PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[2]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                  PhysicalTableScan(table=[[default, a]])",
+          "\n              PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col3=[$2])",
+          "\n                  PhysicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n                    PhysicalTableScan(table=[[default, b]])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n            PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n              PhysicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n                PhysicalProject(col3=[$2], $f1=[true])",
+          "\n                  PhysicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n                    PhysicalTableScan(table=[[default, a]])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($1, _UTF-8'lorem')])",
+          "\n          PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_auto_identity_tests": {
+    "queries": [
+      {
+        "description": "Self semi-joins",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'bar')",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n  PhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col1=[$0], col2=[$1])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalProject(col2=[$1])",
+          "\n        PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalProject(col2=[$1])",
+          "\n      PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Self semi and anti semi-joins",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = 'bar') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'lorem')",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n  PhysicalProject(col1=[$0], col2=[$1])",
+          "\n    PhysicalFilter(condition=[IS NOT TRUE($4)])",
+          "\n      PhysicalJoin(condition=[=($2, $3)], joinType=[left])",
+          "\n        PhysicalProject(col1=[$0], col2=[$1], col21=[$1])",
+          "\n          PhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n            PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n              PhysicalProject(col1=[$0], col2=[$1])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n            PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n              PhysicalProject(col2=[$1])",
+          "\n                PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n                  PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n            PhysicalProject(col2=[$1], $f1=[true])",
+          "\n              PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalProject(col2=[$1])",
+          "\n      PhysicalFilter(condition=[=($2, CAST(_UTF-8'lorem'):INTEGER NOT NULL)])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Self semi and anti semi-joins with aggregation in the end",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col1, COUNT(*) FROM a WHERE col2 IN (SELECT col2 FROM a WHERE col3 = 'foo') AND col2 NOT IN (SELECT col2 FROM a WHERE col3 = 'bar') AND col2 IN (SELECT col2 FROM a WHERE col3 = 'lorem') GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{0}], agg#0=[COUNT($1)])",
+          "\n  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalAggregate(group=[{0}], agg#0=[COUNT()])",
+          "\n      PhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n        PhysicalProject(col1=[$0], col2=[$1])",
+          "\n          PhysicalFilter(condition=[IS NOT TRUE($4)])",
+          "\n            PhysicalJoin(condition=[=($2, $3)], joinType=[left])",
+          "\n              PhysicalProject(col1=[$0], col2=[$1], col21=[$1])",
+          "\n                PhysicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n                  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                    PhysicalProject(col1=[$0], col2=[$1])",
+          "\n                      PhysicalTableScan(table=[[default, a]])",
+          "\n                  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                    PhysicalProject(col2=[$1])",
+          "\n                      PhysicalFilter(condition=[=($2, CAST(_UTF-8'foo'):INTEGER NOT NULL)])",
+          "\n                        PhysicalTableScan(table=[[default, a]])",
+          "\n              PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalAggregate(group=[{0}], agg#0=[MIN($1)])",
+          "\n                  PhysicalProject(col2=[$1], $f1=[true])",
+          "\n                    PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                      PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalProject(col2=[$1])",
+          "\n            PhysicalFilter(condition=[=($2, CAST(_UTF-8'lorem'):INTEGER NOT NULL)])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_misc_auto_identity": {
+    "queries": [
+      {
+        "description": "Union, distinct, etc. but still maximally identity exchange",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col2 FROM a WHERE col1 = 'foo' UNION ALL SELECT col2 FROM a WHERE col3 = 'bar'), tmp2 AS (SELECT DISTINCT col2 FROM tmp) SELECT COUNT(*), col3 FROM a WHERE col2 IN (SELECT col2 FROM tmp2) GROUP BY col3",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(EXPR$0=[$1], col3=[$0])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[COUNT($1)])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalAggregate(group=[{1}], agg#0=[COUNT()])",
+          "\n        PhysicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n          PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n          PhysicalAggregate(group=[{0}])",
+          "\n            PhysicalUnion(all=[true])",
+          "\n              PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col2=[$1])",
+          "\n                  PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n                    PhysicalTableScan(table=[[default, a]])",
+          "\n              PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n                PhysicalProject(col2=[$1])",
+          "\n                  PhysicalFilter(condition=[=($2, CAST(_UTF-8'bar'):INTEGER NOT NULL)])",
+          "\n                    PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_simple_sort_queries": {
+    "queries": [
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' ORDER BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[ASC])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalProject(col2=[$1], col3=[$2])",
+          "\n      PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' ORDER BY col2 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(sort0=[$0], dir0=[ASC], fetch=[10])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' ORDER BY col2 LIMIT 10, 11",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[ASC], offset=[10], fetch=[11])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(sort0=[$0], dir0=[ASC], fetch=[21])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' LIMIT 10, 11",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(offset=[10], fetch=[11])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(fetch=[21])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, COUNT(*) as cnt FROM a GROUP BY col2 ORDER BY cnt LIMIT 100",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$1], dir0=[ASC], fetch=[100])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(sort0=[$1], dir0=[ASC], fetch=[100])",
+          "\n      PhysicalAggregate(group=[{1}], agg#0=[COUNT()])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT col2, COUNT(*) as cnt FROM b GROUP BY col2 ORDER BY cnt LIMIT 100",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$1], dir0=[ASC], fetch=[100])",
+          "\n  PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(sort0=[$1], dir0=[ASC], fetch=[100])",
+          "\n      PhysicalAggregate(group=[{1}], agg#0=[COUNT()])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}
