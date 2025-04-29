@@ -78,16 +78,6 @@ public class SingletonExchangeTest {
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void shouldThrowWhenSingletonWithNonLocalMailbox()
-      throws Exception {
-    // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox2);
-
-    // When:
-    new SingletonExchange(destinations, BlockSplitter.NO_OP).route(destinations, _block);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
   public void shouldThrowWhenSingletonWithMultipleMailboxes()
       throws Exception {
     // Given:

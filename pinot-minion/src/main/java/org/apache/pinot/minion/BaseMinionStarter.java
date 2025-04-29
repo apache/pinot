@@ -107,10 +107,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
+    applyCustomConfigs(_config);
 
-    PinotInsecureMode.setPinotInInsecureMode(
-        Boolean.valueOf(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     setupHelixSystemProperties();
     _hostname = _config.getHostName();
@@ -137,19 +136,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     ContinuousJfrStarter.init(_config);
   }
 
-  private void updateInstanceConfigIfNeeded() {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
-    if (_tlsPort > 0) {
-      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
-    }
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
-    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
-    if (updated) {
-      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
-    }
+  /// Can be overridden to apply custom configs to the minion conf.
+  protected void applyCustomConfigs(MinionConf minionConf) {
   }
 
   private void setupHelixSystemProperties() {
@@ -353,6 +341,21 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionMetrics.addTimedValue(MinionTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
     LOGGER.info("Pinot minion started");
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+    updated |= HelixHelper.addDefaultTags(instanceConfig,
+        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+    }
   }
 
   /**

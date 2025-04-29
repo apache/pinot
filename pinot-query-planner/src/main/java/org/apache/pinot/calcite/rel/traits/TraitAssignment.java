@@ -34,7 +34,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.Window;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
@@ -113,16 +112,23 @@ public class TraitAssignment {
     }
     // Case-2: Handle dynamic filter for semi joins.
     JoinInfo joinInfo = join.analyzeCondition();
-    if (join.isSemiJoin() && joinInfo.nonEquiConditions.isEmpty() && joinInfo.leftKeys.size() == 1) {
+    /* if (join.isSemiJoin() && joinInfo.nonEquiConditions.isEmpty() && joinInfo.leftKeys.size() == 1) {
       if (PinotRuleUtils.canPushDynamicBroadcastToLeaf(join.getLeft())) {
         return assignDynamicFilterSemiJoin(join);
       }
-    }
+    } */
+    Preconditions.checkState(joinInfo.leftKeys.size() == joinInfo.rightKeys.size(),
+        "Always expect left and right keys to be same size. Found: %s and %s",
+        joinInfo.leftKeys, joinInfo.rightKeys);
     // Case-3: Default case.
-    RelDistribution leftDistribution = joinInfo.leftKeys.isEmpty() ? RelDistributions.RANDOM_DISTRIBUTED
-        : RelDistributions.hash(joinInfo.leftKeys);
-    RelDistribution rightDistribution = joinInfo.rightKeys.isEmpty() ? RelDistributions.BROADCAST_DISTRIBUTED
-        : RelDistributions.hash(joinInfo.rightKeys);
+    RelDistribution rightDistribution = joinInfo.isEqui() && !joinInfo.rightKeys.isEmpty()
+        ? RelDistributions.hash(joinInfo.rightKeys) : RelDistributions.BROADCAST_DISTRIBUTED;
+    RelDistribution leftDistribution;
+    if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
+      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+    } else {
+      leftDistribution = RelDistributions.hash(joinInfo.leftKeys);
+    }
     // left-input
     RelNode leftInput = join.getInput(0);
     RelTraitSet leftTraitSet = leftInput.getTraitSet().plus(leftDistribution);
@@ -233,6 +239,7 @@ public class TraitAssignment {
     return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, newProject));
   }
 
+  @SuppressWarnings("unused")
   private RelNode assignDynamicFilterSemiJoin(PhysicalJoin join) {
     /*
      * When dynamic broadcast is enabled, push broadcast trait to right input along with the pipeline breaker

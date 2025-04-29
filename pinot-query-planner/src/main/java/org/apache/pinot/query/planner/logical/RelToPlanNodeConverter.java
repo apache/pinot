@@ -49,6 +49,7 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -185,7 +186,7 @@ public final class RelToPlanNodeConverter {
       }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
+        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null);
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {
@@ -206,11 +207,17 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), literalRows);
   }
 
+  /**
+   * TODO: Add support for exclude clauses ({@link org.apache.calcite.rex.RexWindowExclusion})
+   */
   private WindowNode convertLogicalWindow(LogicalWindow node) {
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(node.groups.size() == 1, "Only a single window group is allowed, got: %s",
         node.groups.size());
     Window.Group windowGroup = node.groups.get(0);
+
+    Preconditions.checkState(windowGroup.exclude == RexWindowExclusion.EXCLUDE_NO_OTHER,
+        "EXCLUDE clauses for window functions are not currently supported");
 
     int numAggregates = windowGroup.aggCalls.size();
     List<RexExpression.FunctionCall> aggCalls = new ArrayList<>(numAggregates);

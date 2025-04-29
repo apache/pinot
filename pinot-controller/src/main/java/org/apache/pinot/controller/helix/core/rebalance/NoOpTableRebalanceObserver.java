@@ -42,6 +42,10 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   @Override
+  public void onRollback() {
+  }
+
+  @Override
   public boolean isStopped() {
     return false;
   }

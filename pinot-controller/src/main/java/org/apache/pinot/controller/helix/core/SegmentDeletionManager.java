@@ -30,10 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -73,6 +76,9 @@ public class SegmentDeletionManager {
   private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
   private static final String DELIMITER = "/";
+
+  private static final int OBJECT_DELETION_TIMEOUT = 5;
+  private static final int NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT = 100;
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
@@ -270,8 +276,8 @@ public class SegmentDeletionManager {
     try {
       URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
       if (pinotFS.exists(segmentMetadataUri)) {
-        LOGGER.info("Deleting segment metadata {} from {}", segmentId, segmentMetadataUri);
-        if (!pinotFS.delete(segmentMetadataUri, true)) {
+        LOGGER.info("Deleting segment metadata: {} from: {}", segmentId, segmentMetadataUri);
+        if (!deleteWithTimeout(pinotFS, segmentMetadataUri, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
           LOGGER.warn("Could not delete segment metadata: {} from: {}", segmentId, segmentMetadataUri);
         }
       }
@@ -337,14 +343,10 @@ public class SegmentDeletionManager {
   }
 
   private static void segmentDeletion(String segmentId, PinotFS pinotFS, URI fileToDeleteURI) {
-    try {
-      if (pinotFS.delete(fileToDeleteURI, true)) {
-        LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
-      } else {
-        LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
-      }
-    } catch (IOException e) {
-      LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
+    if (deleteWithTimeout(pinotFS, fileToDeleteURI, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
+      LOGGER.info("Deleted segment: {} from: {}", segmentId, fileToDeleteURI.toString());
+    } else {
+      LOGGER.warn("Failed to delete segment: {} from: {}", segmentId, fileToDeleteURI.toString());
     }
   }
 
@@ -432,10 +434,15 @@ public class SegmentDeletionManager {
                     URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
                 long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
                 if (System.currentTimeMillis() >= deletionTimeMs) {
-                  if (!pinotFS.delete(targetURI, true)) {
-                    LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
+                  if (!deleteWithTimeout(pinotFS, targetURI, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOGGER.warn("Failed to remove resource: {}", targetURI);
                   } else {
                     numFilesDeleted++;
+                    if (numFilesDeleted >= NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
+                      LOGGER.info("Reached threshold of max aged segments to delete per attempt. Deleted: {} files "
+                          + "from directory: {}", numFilesDeleted, tableNameDir);
+                      break;
+                    }
                   }
                 }
               } catch (Exception e) {
@@ -445,8 +452,8 @@ public class SegmentDeletionManager {
 
             if (numFilesDeleted == targetFiles.length) {
               // Delete directory if it's empty
-              if (!pinotFS.delete(tableNameURI, false)) {
-                LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+              if (!deleteWithTimeout(pinotFS, tableNameURI, false, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
+                LOGGER.warn("Failed to remove the directory: {}", tableNameDir);
               }
             }
           }
@@ -456,6 +463,32 @@ public class SegmentDeletionManager {
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
+    }
+  }
+
+  private static boolean deleteWithTimeout(PinotFS pinotFS, URI targetURI, boolean forceDelete, long timeout,
+      TimeUnit timeUnit) {
+    CompletableFuture<Boolean> deleteFuture = CompletableFuture.supplyAsync(() -> {
+      try {
+        return pinotFS.delete(targetURI, forceDelete);
+      } catch (IOException e) {
+        LOGGER.warn("Error while deleting resource: {}", targetURI, e);
+        return false;
+      }
+    });
+
+    try {
+      return deleteFuture.get(timeout, timeUnit);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Thread was interrupted while deleting resource: {}", targetURI, e);
+      return false;
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timeout occurred while deleting resource: {}", targetURI, e);
+      return false;
+    } catch (ExecutionException e) {
+      LOGGER.warn("Exception occurred while deleting resource: {}", targetURI, e);
+      return false;
     }
   }
 

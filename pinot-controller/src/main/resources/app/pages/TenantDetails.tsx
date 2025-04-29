@@ -19,10 +19,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType, ConsumingSegmentsInfo, PauseStatusDetails } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -37,6 +38,7 @@ import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import ReloadStatusOp from '../components/Homepage/Operations/ReloadStatusOp';
 import RebalanceServerTableOp from '../components/Homepage/Operations/RebalanceServerTableOp';
 import Confirm from '../components/Confirm';
+import CustomDialog from '../components/CustomDialog';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import Utils from '../utils/Utils';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
@@ -45,8 +47,9 @@ import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
 import {
-  RebalanceServerStatusOp, RebalanceTableSegmentJobs
+  RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
+import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -83,6 +86,20 @@ const useStyles = makeStyles((theme) => ({
   copyIdButton: {
     paddingBlock: 0,
     marginLeft: 10
+  }
+  ,
+  // Status pill styles
+  statusActive: {
+    backgroundColor: '#4CAF50',
+    color: 'white'
+  },
+  statusPaused: {
+    backgroundColor: '#f44336',
+    color: 'white'
+  },
+  statusPausing: {
+    backgroundColor: '#ff9800',
+    color: 'white'
   }
 }));
 
@@ -155,6 +172,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  // State for consuming segments info
+  const [showConsumingSegmentsModal, setShowConsumingSegmentsModal] = useState(false);
+  const [loadingConsumingSegments, setLoadingConsumingSegments] = useState(false);
+  const [consumingSegmentsInfo, setConsumingSegmentsInfo] = useState<ConsumingSegmentsInfo | null>(null);
+  // State for pause status of realtime tables
+  const [loadingPauseStatus, setLoadingPauseStatus] = useState(false);
+  const [pauseStatusData, setPauseStatusData] = useState<PauseStatusDetails | null>(null);
+  // State for rebalance operations menu
+  const [rebalanceMenuAnchorEl, setRebalanceMenuAnchorEl] = useState<null | HTMLElement>(null);
+  // State for pause/resume action progress and polling
+  const [isPauseActionInProgress, setIsPauseActionInProgress] = useState(false);
+  const [pauseActionType, setPauseActionType] = useState<'pause' | 'resume' | null>(null);
+  const pausePollingRef = useRef<number | null>(null);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -197,7 +227,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     PinotMethodUtils.getTableSummaryData(tableName).then((result) => {
       setTableSummary(result);
     });
-    fetchSegmentData()
+    fetchSegmentData();
+    // (pause status fetched by effect after tableType is set)
   }
 
   const fetchSegmentData = async () => {
@@ -273,6 +304,26 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   useEffect(() => {
     fetchTableData();
   }, []);
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+    };
+  }, []);
+  // Fetch pause status once tableType is known
+  useEffect(() => {
+    if (tableType.toLowerCase() === TableType.REALTIME) {
+      setLoadingPauseStatus(true);
+      PinotMethodUtils.getPauseStatusData(tableName)
+        .then((data: PauseStatusDetails) => setPauseStatusData(data))
+        .catch((error: any) => dispatch({ type: 'error', message: `Error fetching pause status: ${error}`, show: true }))
+        .finally(() => setLoadingPauseStatus(false));
+    } else {
+      setPauseStatusData(null);
+    }
+  }, [tableType, tableName]);
 
   const handleSwitchChange = (event) => {
     setDialogDetails({
@@ -412,18 +463,18 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     const customMessage = (
       <Box>
         <Typography variant='inherit'>{result.status}</Typography>
-        <Button 
-          className={classes.copyIdButton} 
-          variant="outlined" 
-          color="inherit" 
-          size="small" 
+        <Button
+          className={classes.copyIdButton}
+          variant="outlined"
+          color="inherit"
+          size="small"
           onClick={handleCopyReloadJobId}
         >
           Copy Id
         </Button>
       </Box>
     )
-    
+
     syncResponse(result, reloadJobId && customMessage);
   };
 
@@ -440,7 +491,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         setShowReloadStatusModal(false);
         return;
       }
-      
+
       setReloadStatusData(reloadStatusData);
       setTableJobsData(tableJobsData);
     } catch(error) {
@@ -452,6 +503,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleRebalanceTableStatus = () => {
     setShowRebalanceServerStatus(true);
   };
+  // Handler to view consuming segments info
+  const handleViewConsumingSegments = async () => {
+    setShowConsumingSegmentsModal(true);
+    setLoadingConsumingSegments(true);
+    try {
+      const data = await PinotMethodUtils.getConsumingSegmentsInfoData(tableName);
+      setConsumingSegmentsInfo(data);
+    } catch (error) {
+      dispatch({ type: 'error', message: `Error fetching consuming segments info: ${error}` });
+      setShowConsumingSegmentsModal(false);
+    } finally {
+      setLoadingConsumingSegments(false);
+    }
+  };
 
   const handleRebalanceBrokers = () => {
     setDialogDetails({
@@ -461,10 +526,91 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     });
     setConfirmDialog(true);
   };
-  
+
   const rebalanceBrokers = async () => {
     const result = await PinotMethodUtils.rebalanceBrokersForTableOp(tableName);
     syncResponse(result);
+  };
+  
+  const handleRepairTable = () => {
+    setDialogDetails({
+      title: 'Repair Table',
+      content: 'This action will trigger RealtimeSegmentValidationManager periodic task on Controller which will try to fix stuck consumers and segments in ERROR state. Continue?',
+      successCb: () => repairTable()
+    });
+    setConfirmDialog(true);
+  };
+
+  const repairTable = async () => {
+    try {
+      const result = await PinotMethodUtils.repairTableOp(tableName, tableType);
+      dispatch({type: 'success', message: 'RealtimeSegmentValidationManager triggered successfully with id: ' + result.taskId, show: true});
+      closeDialog();
+    } catch (error) {
+      dispatch({type: 'error', message: 'Failed to trigger RealtimeSegmentValidationManager with error: ' + error, show: true});
+    }
+  };
+  // Pause or resume consumption for realtime tables with polling status
+  const doPauseResume = async () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setPauseActionType(willPause ? 'pause' : 'resume');
+    setIsPauseActionInProgress(true);
+    try {
+      const result: PauseStatusDetails = willPause
+        ? await PinotMethodUtils.pauseConsumptionOp(tableName, "Pause Triggered from Admin UI")
+        : await PinotMethodUtils.resumeConsumptionOp(tableName, "Resume Triggered from Admin UI", "lastConsumed");
+      dispatch({
+        type: 'success',
+        message: willPause
+          ? "Pause Flag set in Ideal state, waiting for consuming segments to commit"
+          : "Pause flag cleared, waiting for consumption to resume",
+        show: true
+      });
+      if (pausePollingRef.current) {
+        clearInterval(pausePollingRef.current);
+      }
+      pausePollingRef.current = window.setInterval(async () => {
+        try {
+          const status = await PinotMethodUtils.getPauseStatusData(tableName);
+          setPauseStatusData(status);
+          const settled = willPause
+            ? (status.pauseFlag && (!status.consumingSegments || status.consumingSegments.length === 0))
+            : !status.pauseFlag;
+          if (settled) {
+            if (pausePollingRef.current) {
+              clearInterval(pausePollingRef.current);
+            }
+            setIsPauseActionInProgress(false);
+            setPauseActionType(null);
+          }
+        } catch {
+          // ignore polling errors
+        }
+      }, 2000);
+    } catch (error) {
+      dispatch({
+        type: 'error',
+        message: `Error during ${pauseStatusData?.pauseFlag ? 'resume' : 'pause'}: ${error}`,
+        show: true
+      });
+      setIsPauseActionInProgress(false);
+      setPauseActionType(null);
+    }
+  };
+
+  const handlePauseResume = () => {
+    const willPause = !pauseStatusData?.pauseFlag;
+    setDialogDetails({
+      title: willPause ? 'Pause consumption' : 'Resume consumption',
+      content: willPause
+        ? 'Are you sure you want to pause consumption of this realtime table?'
+        : 'Are you sure you want to resume consumption of this realtime table?',
+      successCb: () => {
+        closeDialog();
+        doPauseResume();
+      }
+    });
+    setConfirmDialog(true);
   };
 
   const closeDialog = () => {
@@ -537,27 +683,78 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               >
                 Reload Status
               </CustomButton>
+              {/* Rebalance operations dropdown */}
               <CustomButton
-                onClick={()=>{setShowRebalanceServerModal(true);}}
-                tooltipTitle="Recalculates the segment to server mapping for this table"
-                enableTooltip={true}
+                onClick={(e) => setRebalanceMenuAnchorEl(e.currentTarget)}
+                tooltipTitle="Rebalance operations"
+                enableTooltip={false}
               >
-                Rebalance Servers
+                Rebalance <ArrowDropDownIcon />
               </CustomButton>
-              <CustomButton
-                  onClick={handleRebalanceTableStatus}
-                  tooltipTitle="The status of table rebalance job"
+              <Menu
+                anchorEl={rebalanceMenuAnchorEl}
+                keepMounted
+                open={Boolean(rebalanceMenuAnchorEl)}
+                onClose={() => setRebalanceMenuAnchorEl(null)}
+              >
+                <MenuItem onClick={() => { setShowRebalanceServerModal(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers
+                </MenuItem>
+                <MenuItem onClick={() => { setShowRebalanceServerStatus(true); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Servers Status
+                </MenuItem>
+                <MenuItem onClick={() => { handleRebalanceBrokers(); setRebalanceMenuAnchorEl(null); }}>
+                  Rebalance Brokers
+                </MenuItem>
+              </Menu>
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <CustomButton
+                  onClick={handleRepairTable}
+                  tooltipTitle="Triggers RealtimeSegmentValidationManager periodic task. Use this to fix missing CONSUMING segments or segments in ERROR state."
                   enableTooltip={true}
-              >
-                Rebalance Servers Status
-              </CustomButton>
+                >
+                 Repair Table
+                </CustomButton>
+              )}
+             {/* Button to view consuming segments info */}
+             {tableType.toLowerCase() === TableType.REALTIME && (
               <CustomButton
-                onClick={handleRebalanceBrokers}
-                tooltipTitle="Rebuilds brokerResource mapping for this table"
+                onClick={handleViewConsumingSegments}
+                tooltipTitle="View offset and lag information about consuming segments"
                 enableTooltip={true}
               >
-                Rebalance Brokers
+                View Consuming Segments
               </CustomButton>
+              )}
+              {/* Toggle realtime consumption */}
+              {tableType.toLowerCase() === TableType.REALTIME && (
+                <Tooltip
+                  title={
+                    pauseStatusData?.pauseFlag
+                      ? 'Resume consumption of realtime table'
+                      : 'Pause consumption of realtime table. This will force the table to commit all consuming segments.'
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={!pauseStatusData?.pauseFlag}
+                        onChange={handlePauseResume}
+                        name="consumptionEnabled"
+                        color="primary"
+                        disabled={
+                          loadingPauseStatus ||
+                          isPauseActionInProgress ||
+                          (pauseStatusData?.pauseFlag && pauseStatusData?.consumingSegments?.length > 0)
+                        }
+                      />
+                    }
+                    label="Consume"
+                  />
+                </Tooltip>
+              )}
               <Tooltip title="Disabling will disable the table for queries, consumption and data push" arrow placement="top">
               <FormControlLabel
                 control={
@@ -577,10 +774,43 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         <div className={classes.highlightBackground}>
           <TableToolbar name="Summary" showSearchBox={false} />
           <Grid container spacing={2} alignItems="center" className={classes.body}>
-            <Grid item xs={4}>
+            <Grid item xs={3}>
               <strong>Table Name:</strong> {tableSummary.tableName}
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            <Grid item xs={3}>
+              <Box display="flex" alignItems="center">
+                <strong>Consuming status:</strong>
+                {loadingPauseStatus ? (
+                  <CircularProgress size={16} style={{ marginLeft: 8 }} />
+                ) : pauseStatusData ? (
+                  <Chip
+                    label={
+                      isPauseActionInProgress
+                        ? (pauseActionType === 'pause' ? 'PAUSING...' : 'RESUMING...')
+                        : (pauseStatusData.pauseFlag
+                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                               ? 'PAUSING'
+                               : 'PAUSED')
+                            : 'ACTIVE')
+                    }
+                    className={
+                      isPauseActionInProgress
+                        ? classes.statusPausing
+                        : (pauseStatusData.pauseFlag
+                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                               ? classes.statusPausing
+                               : classes.statusPaused)
+                            : classes.statusActive)
+                    }
+                    size="small"
+                    style={{ marginLeft: 8 }}
+                  />
+                ) : (
+                  <Box ml={1}>N/A</Box>
+                )}
+              </Box>
+            </Grid>
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Uncompressed size of all data segments with replication" arrow placement="top">
                   <strong>Reported Size:</strong>
@@ -594,7 +824,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 }
               </Grid>
             </Grid>
-            <Grid item container xs={4} wrap="nowrap" spacing={1}>
+            <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Estimated size of all data segments with replication, in case any servers are not reachable for actual size" arrow placement="top-start">
                   <strong>Estimated Size: </strong>
@@ -625,7 +855,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                   autoCursor={false}
                 />
               </SimpleAccordion>
-            </div>
+              </div>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
               data={segmentList}
@@ -714,6 +944,36 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             tableType={tableType.toUpperCase()}
             tableName={tableName}
           />
+        )}
+        {/* Consuming Segments Info Dialog */}
+        {showConsumingSegmentsModal && (
+          <CustomDialog
+            open={showConsumingSegmentsModal}
+            handleClose={() => setShowConsumingSegmentsModal(false)}
+            title="Consuming Segments Info"
+            size="lg"
+            showOkBtn={false}
+            btnCancelText="Close"
+            disableBackdropClick
+          >
+            {loadingConsumingSegments && (
+              <Box display="flex" justifyContent="center">
+                <CircularProgress />
+              </Box>
+            )}
+            {!loadingConsumingSegments && consumingSegmentsInfo && (
+              <Box style={{ height: '100%', overflowY: 'auto' }}>
+                <Typography><strong>Servers Failing To Respond:</strong> {consumingSegmentsInfo?.serversFailingToRespond ?? 'N/A'}</Typography>
+                <Typography><strong>Servers Unparsable Respond:</strong> {consumingSegmentsInfo?.serversUnparsableRespond ?? 'N/A'}</Typography>
+                <Box mt={2}>
+                  <ConsumingSegmentsTable info={consumingSegmentsInfo} />
+                </Box>
+              </Box>
+            )}
+            {!loadingConsumingSegments && !consumingSegmentsInfo && (
+              <Typography>No consuming segments data available.</Typography>
+            )}
+          </CustomDialog>
         )}
         {confirmDialog && dialogDetails && (
           <Confirm

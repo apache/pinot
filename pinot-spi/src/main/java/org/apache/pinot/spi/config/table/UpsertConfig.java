@@ -19,15 +19,17 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.Collections;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.Enablement;
 
 
-/** Class representing upsert configuration of a table. */
+/// Class representing upsert configuration of a table.
 public class UpsertConfig extends BaseJsonConfig {
 
   public enum Mode {
@@ -44,12 +46,16 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @JsonPropertyDescription("Upsert mode.")
-  private Mode _mode;
+  private Mode _mode = Mode.FULL;
 
   @JsonPropertyDescription("Function to hash the primary key.")
   private HashFunction _hashFunction = HashFunction.NONE;
 
+  /// Maintains the mapping of merge strategies per column.
+  /// Each key in the map is a columnName, value is a partial upsert merging strategy.
+  /// Supported strategies are {OVERWRITE|INCREMENT|APPEND|UNION|IGNORE}.
   @JsonPropertyDescription("Partial update strategies.")
+  @Nullable
   private Map<String, Strategy> _partialUpsertStrategies;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
@@ -58,17 +64,34 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Class name for custom row merger implementation")
   private String _partialUpsertMergerClass;
 
+  /// When two records have the same primary key, the comparison column(s) si used to determine the latest record. If
+  /// not configured, the time column is used.
+  /// When multiple comparison columns are configured, the latest record is determined by the first non-null value for
+  /// the comparison columns. A typical use case is for partial upsert, where each record only contains non-null value
+  /// for one of the comparison columns, and that value is used to determine the latest record. If the record is the
+  /// latest, the non-null comparison column value is partially upserted to the previous record.
   @JsonPropertyDescription("Columns for upsert comparison, default to time column")
+  @Nullable
   private List<String> _comparisonColumns;
 
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
+  @Nullable
   private String _deleteRecordColumn;
 
+  @JsonPropertyDescription("Whether to drop out-of-order record")
+  private boolean _dropOutOfOrderRecord;
+
   @JsonPropertyDescription("Boolean column to indicate whether a records is out-of-order")
+  @Nullable
   private String _outOfOrderRecordColumn;
 
-  @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
-  private boolean _enableSnapshot;
+  @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery. Available values are ENABLE, "
+      + "DISABLE and DEFAULT (use instance level default behavior).")
+  private Enablement _snapshot = Enablement.DEFAULT;
+
+  @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery. Available values are "
+      + "ENABLE, DISABLE and DEFAULT (use instance level default behavior).")
+  private Enablement _preload = Enablement.DEFAULT;
 
   @JsonPropertyDescription("Whether to use TTL for upsert metadata cleanup, it uses the same unit as comparison col")
   private double _metadataTTL;
@@ -78,9 +101,6 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("If we are using deletionKeysTTL + compaction we need to enable this for data consistency")
   private boolean _enableDeletedKeysCompactionConsistency;
-
-  @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
-  private boolean _enablePreload;
 
   @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
   private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
@@ -96,10 +116,18 @@ public class UpsertConfig extends BaseJsonConfig {
   private String _metadataManagerClass;
 
   @JsonPropertyDescription("Custom configs for upsert metadata manager")
+  @Nullable
   private Map<String, String> _metadataManagerConfigs;
 
-  @JsonPropertyDescription("Whether to drop out-of-order record")
-  private boolean _dropOutOfOrderRecord;
+  /// @deprecated use {@link #_snapshot} instead. This is kept here for backward compatibility.
+  @Deprecated
+  @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
+  private boolean _enableSnapshot;
+
+  /// @deprecated use {@link #_preload} instead. This is kept here for backward compatibility.
+  @Deprecated
+  @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
+  private boolean _enablePreload;
 
   /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
   @Deprecated
@@ -119,6 +147,7 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public void setMode(Mode mode) {
+    Preconditions.checkArgument(mode != null, "Upsert mode cannot be null");
     _mode = mode;
   }
 
@@ -126,21 +155,57 @@ public class UpsertConfig extends BaseJsonConfig {
     return _hashFunction;
   }
 
+  public void setHashFunction(HashFunction hashFunction) {
+    Preconditions.checkArgument(hashFunction != null, "Hash function cannot be null");
+    _hashFunction = hashFunction;
+  }
+
   @Nullable
   public Map<String, Strategy> getPartialUpsertStrategies() {
     return _partialUpsertStrategies;
+  }
+
+  public void setPartialUpsertStrategies(@Nullable Map<String, Strategy> partialUpsertStrategies) {
+    _partialUpsertStrategies = partialUpsertStrategies;
   }
 
   public Strategy getDefaultPartialUpsertStrategy() {
     return _defaultPartialUpsertStrategy;
   }
 
+  public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
+    Preconditions.checkArgument(defaultPartialUpsertStrategy != null, "Default partial upsert strategy cannot be null");
+    _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
+  }
+
+  @Nullable
   public String getPartialUpsertMergerClass() {
     return _partialUpsertMergerClass;
   }
 
+  public void setPartialUpsertMergerClass(@Nullable String partialUpsertMergerClass) {
+    _partialUpsertMergerClass = partialUpsertMergerClass;
+  }
+
+  @Nullable
   public List<String> getComparisonColumns() {
     return _comparisonColumns;
+  }
+
+  public void setComparisonColumns(@Nullable List<String> comparisonColumns) {
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+      _comparisonColumns = comparisonColumns;
+    } else {
+      _comparisonColumns = null;
+    }
+  }
+
+  public void setComparisonColumn(@Nullable String comparisonColumn) {
+    if (StringUtils.isNotEmpty(comparisonColumn)) {
+      _comparisonColumns = List.of(comparisonColumn);
+    } else {
+      _comparisonColumns = null;
+    }
   }
 
   @Nullable
@@ -148,45 +213,92 @@ public class UpsertConfig extends BaseJsonConfig {
     return _deleteRecordColumn;
   }
 
+  public void setDeleteRecordColumn(@Nullable String deleteRecordColumn) {
+    _deleteRecordColumn = deleteRecordColumn;
+  }
+
+  public boolean isDropOutOfOrderRecord() {
+    return _dropOutOfOrderRecord;
+  }
+
+  public void setDropOutOfOrderRecord(@Nullable boolean dropOutOfOrderRecord) {
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
+  }
+
   @Nullable
   public String getOutOfOrderRecordColumn() {
     return _outOfOrderRecordColumn;
   }
 
-  public boolean isEnableSnapshot() {
-    return _enableSnapshot;
+  public void setOutOfOrderRecordColumn(@Nullable String outOfOrderRecordColumn) {
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
+  }
+
+  public Enablement getSnapshot() {
+    return _snapshot;
+  }
+
+  public void setSnapshot(Enablement snapshot) {
+    Preconditions.checkArgument(snapshot != null, "Snapshot cannot be null, must be one of ENABLE, DISABLE or DEFAULT");
+    _snapshot = snapshot;
+  }
+
+  public Enablement getPreload() {
+    return _preload;
+  }
+
+  public void setPreload(Enablement preload) {
+    Preconditions.checkArgument(preload != null, "Preload cannot be null, must be one of ENABLE, DISABLE or DEFAULT");
+    _preload = preload;
   }
 
   public double getMetadataTTL() {
     return _metadataTTL;
   }
 
+  public void setMetadataTTL(double metadataTTL) {
+    _metadataTTL = metadataTTL;
+  }
+
   public double getDeletedKeysTTL() {
     return _deletedKeysTTL;
   }
 
-  public boolean isEnablePreload() {
-    return _enablePreload;
+  public void setDeletedKeysTTL(double deletedKeysTTL) {
+    _deletedKeysTTL = deletedKeysTTL;
   }
 
   public boolean isEnableDeletedKeysCompactionConsistency() {
     return _enableDeletedKeysCompactionConsistency;
   }
 
+  public void setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
+    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
+  }
+
   public ConsistencyMode getConsistencyMode() {
     return _consistencyMode;
+  }
+
+  public void setConsistencyMode(ConsistencyMode consistencyMode) {
+    Preconditions.checkArgument(consistencyMode != null, "Consistency mode cannot be null");
+    _consistencyMode = consistencyMode;
   }
 
   public long getUpsertViewRefreshIntervalMs() {
     return _upsertViewRefreshIntervalMs;
   }
 
+  public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
+    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
+  }
+
   public long getNewSegmentTrackingTimeMs() {
     return _newSegmentTrackingTimeMs;
   }
 
-  public boolean isDropOutOfOrderRecord() {
-    return _dropOutOfOrderRecord;
+  public void setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
+    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
   }
 
   @Nullable
@@ -194,122 +306,52 @@ public class UpsertConfig extends BaseJsonConfig {
     return _metadataManagerClass;
   }
 
+  public void setMetadataManagerClass(@Nullable String metadataManagerClass) {
+    _metadataManagerClass = metadataManagerClass;
+  }
+
   @Nullable
   public Map<String, String> getMetadataManagerConfigs() {
     return _metadataManagerConfigs;
   }
 
-  public void setHashFunction(HashFunction hashFunction) {
-    _hashFunction = hashFunction;
-  }
-
-  /**
-   * PartialUpsertStrategies maintains the mapping of merge strategies per column.
-   * Each key in the map is a columnName, value is a partial upsert merging strategy.
-   * Supported strategies are {OVERWRITE|INCREMENT|APPEND|UNION|IGNORE}.
-   */
-  public void setPartialUpsertStrategies(Map<String, Strategy> partialUpsertStrategies) {
-    _partialUpsertStrategies = partialUpsertStrategies;
-  }
-
-  /**
-   * If strategy is not specified for a column, the merger on that column will be "defaultPartialUpsertStrategy".
-   * The default value of defaultPartialUpsertStrategy is OVERWRITE.
-   */
-  public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
-    _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
-  }
-
-  /**
-   * Specify to plug a custom implementation for merging rows in partial upsert realtime table.
-   * @param partialUpsertMergerClass
-   */
-  public void setPartialUpsertMergerClass(String partialUpsertMergerClass) {
-    _partialUpsertMergerClass = partialUpsertMergerClass;
-  }
-
-  /**
-   * By default, Pinot uses the value in the time column to determine the latest record. For two records with the
-   * same primary key, the record with the larger value of the time column is picked as the
-   * latest update.
-   * However, there are cases when users need to use another column to determine the order.
-   * In such case, you can use option comparisonColumn to override the column used for comparison. When using
-   * multiple comparison columns, typically in the case of partial upserts, it is expected that input documents will
-   * each only have a singular non-null comparisonColumn. Multiple non-null values in an input document _will_ result
-   * in undefined behaviour. Typically, one comparisonColumn is allocated per distinct producer application of data
-   * in the case where there are multiple producers sinking to the same table.
-   */
-  public void setComparisonColumns(List<String> comparisonColumns) {
-    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
-      _comparisonColumns = comparisonColumns;
-    }
-  }
-
-  public void setComparisonColumn(String comparisonColumn) {
-    if (comparisonColumn != null) {
-      _comparisonColumns = Collections.singletonList(comparisonColumn);
-    }
-  }
-
-  public void setDeleteRecordColumn(String deleteRecordColumn) {
-    _deleteRecordColumn = deleteRecordColumn;
-  }
-
-  public void setOutOfOrderRecordColumn(String outOfOrderRecordColumn) {
-    _outOfOrderRecordColumn = outOfOrderRecordColumn;
-  }
-
-  public void setEnableSnapshot(boolean enableSnapshot) {
-    _enableSnapshot = enableSnapshot;
-  }
-
-  public void setMetadataTTL(double metadataTTL) {
-    _metadataTTL = metadataTTL;
-  }
-
-  public void setDeletedKeysTTL(double deletedKeysTTL) {
-    _deletedKeysTTL = deletedKeysTTL;
-  }
-
-  public void setEnablePreload(boolean enablePreload) {
-    _enablePreload = enablePreload;
-  }
-
-  public void setConsistencyMode(ConsistencyMode consistencyMode) {
-    _consistencyMode = consistencyMode;
-  }
-
-  public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
-    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
-  }
-
-  public void setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
-    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
-  }
-
-  public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
-    _dropOutOfOrderRecord = dropOutOfOrderRecord;
-  }
-
-  public void setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
-    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
-  }
-
-  public void setMetadataManagerClass(String metadataManagerClass) {
-    _metadataManagerClass = metadataManagerClass;
-  }
-
-  public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
+  public void setMetadataManagerConfigs(@Nullable Map<String, String> metadataManagerConfigs) {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
   @Deprecated
-  public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
-    _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
+  public boolean isEnableSnapshot() {
+    return _enableSnapshot;
+  }
+
+  @Deprecated
+  public void setEnableSnapshot(boolean enableSnapshot) {
+    _enableSnapshot = enableSnapshot;
+    if (enableSnapshot) {
+      _snapshot = Enablement.ENABLE;
+    }
+  }
+
+  @Deprecated
+  public boolean isEnablePreload() {
+    return _enablePreload;
+  }
+
+  @Deprecated
+  public void setEnablePreload(boolean enablePreload) {
+    _enablePreload = enablePreload;
+    if (enablePreload) {
+      _preload = Enablement.ENABLE;
+    }
   }
 
   @Deprecated
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
+  }
+
+  @Deprecated
+  public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
+    _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
   }
 }
