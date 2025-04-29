@@ -55,50 +55,6 @@ public class GrpcSendingMailboxTest {
     assertEquals(actual, expected);
   }
 
-  private ByteBuffer concatenateBuffers(List<ByteBuffer> buffers) {
-    int totalSize = buffers.stream().mapToInt(ByteBuffer::remaining).sum();
-    ByteBuffer all = ByteBuffer.allocate(totalSize);
-    for (ByteBuffer bb : buffers) {
-      all.put(bb.slice());
-    }
-    return all.flip();
-  }
-
-  @DataProvider(name = "byteBuffersDataProvider")
-  public Object[][] byteBuffersDataProvider() {
-    // byteBufferSizes / maxByteStringSize
-    return new Object[][]{
-        {new int[]{1024}, 1024},
-        {new int[]{1024}, 200},
-        {new int[]{1024}, 1},
-        {new int[]{100, 200, 300, 400}, 220},
-        {new int[]{100, 200, 300, 400}, 1000}
-    };
-  }
-
-  private static DataBlock buildTestDataBlock() {
-    int numRows = 1;
-    DataSchema dataSchema = new DataSchema(
-        new String[]{
-            "valueInt"
-        },
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT
-        });
-
-    List<Object[]> rows = new ArrayList<>(numRows);
-    for (int i = 0; i < numRows; i++) {
-      rows.add(new Object[] {i});
-    }
-
-    try {
-      return DataBlockBuilder.buildFromRows(rows, dataSchema);
-    } catch (Exception e) {
-      e.printStackTrace();
-      return null;
-    }
-  }
-
   @Test(dataProvider = "testDataBlockToByteStringsProvider")
   public void testDataBlockToByteStrings(String name, int maxByteStringSize) throws IOException {
     DataBlock dataBlock = buildTestDataBlock();
@@ -130,6 +86,27 @@ public class GrpcSendingMailboxTest {
     }
   }
 
+  @Test(dataProvider = "testDataBlockToByteStringsProvider")
+  public void testDataBlockReusable(String name, int maxByteStringSize) throws IOException {
+    DataBlock dataBlock = buildTestDataBlock();
+    List<ByteString> split1 = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
+    List<ByteString> split2 = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
+
+    assertEquals(split1, split2);
+  }
+
+  @DataProvider(name = "byteBuffersDataProvider")
+  public Object[][] byteBuffersDataProvider() {
+    // byteBufferSizes / maxByteStringSize
+    return new Object[][]{
+        {new int[]{1024}, 1024},
+        {new int[]{1024}, 200},
+        {new int[]{1024}, 1},
+        {new int[]{100, 200, 300, 400}, 220},
+        {new int[]{100, 200, 300, 400}, 1000}
+    };
+  }
+
   @DataProvider(name = "testDataBlockToByteStringsProvider")
   public Object[][] testDataBlockToByteStringsProvider() throws IOException {
     DataBlock dataBlock = buildTestDataBlock();
@@ -142,6 +119,34 @@ public class GrpcSendingMailboxTest {
         {"maxInteger", Integer.MAX_VALUE},
         {"forceSplit", largestChunk / 3}
     };
+  }
+
+  private static DataBlock buildTestDataBlock()
+      throws IOException {
+    int numRows = 1;
+    DataSchema dataSchema = new DataSchema(
+        new String[]{
+            "valueInt"
+        },
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT
+        });
+
+    List<Object[]> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      rows.add(new Object[] {i});
+    }
+
+    return DataBlockBuilder.buildFromRows(rows, dataSchema);
+  }
+
+  private ByteBuffer concatenateBuffers(List<ByteBuffer> buffers) {
+    int totalSize = buffers.stream().mapToInt(ByteBuffer::remaining).sum();
+    ByteBuffer all = ByteBuffer.allocate(totalSize);
+    for (ByteBuffer bb : buffers) {
+      all.put(bb.slice());
+    }
+    return all.flip();
   }
 
   private ByteBuffer randomByteBuffer(int size) {
