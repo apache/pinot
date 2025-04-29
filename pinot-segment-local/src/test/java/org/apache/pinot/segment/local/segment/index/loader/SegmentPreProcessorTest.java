@@ -347,8 +347,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         1);
   }
 
-  @Test(dataProvider = "bothV1AndV3", expectedExceptions = UnsupportedOperationException.class,
-      expectedExceptionsMessageRegExp = "FST index is currently only supported on dictionary encoded columns: column4")
+  @Test(dataProvider = "bothV1AndV3")
   public void testEnableFSTIndexOnExistingColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
     buildSegment(segmentVersion);
