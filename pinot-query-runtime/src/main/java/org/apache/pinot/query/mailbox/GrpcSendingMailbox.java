@@ -272,7 +272,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     for (ByteBuffer bb : bytes) {
       totalBytes += bb.remaining();
     }
-    int initialCapacity = (totalBytes / maxByteStringSize) + bytes.size();
+    int initialCapacity = (totalBytes / maxByteStringSize) + 1;
     List<ByteString> result = new ArrayList<>(initialCapacity);
 
     ByteString acc = ByteString.EMPTY;
