@@ -186,7 +186,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
       Iterator<ByteString> byteStringIt = byteStrings.iterator();
       while (byteStringIt.hasNext()) {
-        sendContent(byteStringIt.next(), byteStringIt.hasNext());
+        ByteString byteString = byteStringIt.next();
+        boolean waitForMore = byteStringIt.hasNext();
+        sendContent(byteString, waitForMore);
       }
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
