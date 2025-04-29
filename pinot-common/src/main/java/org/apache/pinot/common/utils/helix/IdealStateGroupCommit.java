@@ -105,7 +105,7 @@ public class IdealStateGroupCommit {
    * @param helixManager helixManager with the ability to pull from the current data\
    * @param resourceName the resource name to be updated
    * @param updater the idealState updater to be applied
-   * @return IdealState if the update is successful, null if not
+   * @return IdealState if the update is successful, exception if not and null if interrupted while committing change
    */
   public IdealState commit(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater,
       RetryPolicy retryPolicy, boolean noChangeOk) {
