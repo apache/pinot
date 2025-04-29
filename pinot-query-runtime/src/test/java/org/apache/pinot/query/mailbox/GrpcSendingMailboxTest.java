@@ -39,8 +39,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-
 
 public class GrpcSendingMailboxTest {
 
@@ -48,11 +46,12 @@ public class GrpcSendingMailboxTest {
   public void testByteBuffersToByteStrings(int[] byteBufferSizes, int maxByteStringSize) {
     List<ByteBuffer> input = Arrays.stream(byteBufferSizes)
         .mapToObj(this::randomByteBuffer).collect(Collectors.toList());
-    List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
-
     ByteBuffer expected = concatenateBuffers(input);
+
+    List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
     ByteBuffer actual = concatenateBuffers(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
+
     assertEquals(actual, expected);
   }
 
@@ -76,8 +75,6 @@ public class GrpcSendingMailboxTest {
         {new int[]{100, 200, 300, 400}, 1000}
     };
   }
-
-  static DataBlock _dataBlock = buildTestDataBlock();
 
   private static DataBlock buildTestDataBlock() {
     int numRows = 1;
@@ -104,18 +101,19 @@ public class GrpcSendingMailboxTest {
 
   @Test(dataProvider = "testDataBlockToByteStringsProvider")
   public void testDataBlockToByteStrings(String name, int maxByteStringSize) throws IOException {
-    assertNotNull(_dataBlock);
-    List<ByteString> output = GrpcSendingMailbox.toByteStrings(_dataBlock, maxByteStringSize);
+    DataBlock dataBlock = buildTestDataBlock();
+    List<ByteString> output = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
     DataBlock actual = DataBlockUtils.deserialize(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
-    DataBlockEquals.checkSameContent(_dataBlock, actual, "Rebuilt data block (" + name + ") does not match.");
+    DataBlockEquals.checkSameContent(dataBlock, actual, "Rebuilt data block (" + name + ") does not match.");
   }
 
   @Test(dataProvider = "testDataBlockToByteStringsProvider")
   public void testToByteStringDataBuffers(String name, int maxByteStringSize) throws IOException {
-    List<ByteBuffer> byteBuffers = _dataBlock.serialize();
-    List<ByteString> byteStrings = GrpcSendingMailbox.toByteStrings(_dataBlock, maxByteStringSize);
+    DataBlock dataBlock = buildTestDataBlock();
+    List<ByteBuffer> byteBuffers = dataBlock.serialize();
+    List<ByteString> byteStrings = GrpcSendingMailbox.toByteStrings(dataBlock, maxByteStringSize);
 
     List<DataBuffer> asGrpc = byteStrings.stream()
         .map(ByteString::asReadOnlyByteBuffer)
@@ -134,7 +132,8 @@ public class GrpcSendingMailboxTest {
 
   @DataProvider(name = "testDataBlockToByteStringsProvider")
   public Object[][] testDataBlockToByteStringsProvider() throws IOException {
-    List<ByteBuffer> dataBlockSer = _dataBlock.serialize();
+    DataBlock dataBlock = buildTestDataBlock();
+    List<ByteBuffer> dataBlockSer = dataBlock.serialize();
     int totalSize = dataBlockSer.stream().mapToInt(ByteBuffer::remaining).sum();
     int largestChunk = dataBlockSer.stream().mapToInt(ByteBuffer::remaining).max().orElse(0);
     return new Object[][]{

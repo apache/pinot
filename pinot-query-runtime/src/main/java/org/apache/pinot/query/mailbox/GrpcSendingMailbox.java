@@ -254,11 +254,15 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
   }
 
+  /// Transforms a DataBlock into a list of ByteStrings of maxByteStringSize (except for the last one).
+  /// This method will consume the dataBlock.serialize() output.
   static List<ByteString> toByteStrings(DataBlock dataBlock, int maxByteStringSize)
       throws IOException {
     return toByteStrings(dataBlock.serialize(), maxByteStringSize);
   }
 
+  /// Transforms a list of ByteBuffers into a list of ByteStrings of maxByteStringSize (except for the last one).
+  /// This method will consume the original ByteBuffers.
   static List<ByteString> toByteStrings(List<ByteBuffer> bytes, int maxByteStringSize) {
     if (bytes.isEmpty()) {
       return EMPTY_BYTEBUFFER_LIST;
@@ -275,40 +279,32 @@ public class GrpcSendingMailbox implements SendingMailbox {
     int available = maxByteStringSize;
 
     for (ByteBuffer bb: bytes) {
-      int from = bb.position();
-      int remaining = bb.limit() - from;
-      while (remaining > 0) {
-        if (remaining <= available) {
-          acc = acc.concat(UnsafeByteOperations.unsafeWrap(sliceByteBuffer(bb, from, from + remaining)));
-          available -= remaining;
-          remaining = 0;
+      while (bb.hasRemaining()) {
+        if (bb.remaining() < available) {
+          available -= bb.remaining();
+          acc = acc.concat(UnsafeByteOperations.unsafeWrap(bb));
+          bb.position(bb.limit()); // just exhaust it
         } else {
-          acc = acc.concat(UnsafeByteOperations.unsafeWrap(sliceByteBuffer(bb, from, from + available)));
-          from += available;
-          remaining -= available;
+          int oldLimit = bb.limit();
+          int chunkSize = oldLimit - bb.position();
+          bb.limit(bb.position() + chunkSize);
+          acc = acc.concat(UnsafeByteOperations.unsafeWrap(bb));
+          available -= chunkSize;
+          bb.position(bb.limit()); // consume the copied chunk
+          bb.limit(oldLimit);
+        }
+        if (available == 0) {
           result.add(acc);
           acc = ByteString.EMPTY;
           available = maxByteStringSize;
         }
       }
     }
-    result.add(acc);
+
+    if (!acc.isEmpty()) {
+      result.add(acc);
+    }
 
     return result;
-  }
-
-  // polyfill because ByteBuffer.slice(pos, lim) is not available until Java 13
-  private static ByteBuffer sliceByteBuffer(ByteBuffer bb, int position, int limit) {
-    int oldPosition = bb.position();
-    int oldLimit = bb.limit();
-
-    try {
-      bb.position(position);
-      bb.limit(limit);
-      return bb.slice();
-    } finally {
-      bb.position(oldPosition);
-      bb.limit(oldLimit);
-    }
   }
 }
