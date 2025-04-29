@@ -109,7 +109,10 @@ import {
   getSchemaInfo,
   getSegmentsStatus,
   getConsumingSegmentsInfo,
-  getServerToSegmentsCount
+  getServerToSegmentsCount,
+  pauseConsumption,
+  resumeConsumption,
+  getPauseStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -821,6 +824,19 @@ const toggleTableState = (tableName, state, tableType) => {
     return response.data;
   });
 };
+// Pause or resume consumption of a realtime table
+// Returns PauseStatusDetails
+const pauseConsumptionOp = (tableName, comment) => {
+  return pauseConsumption(tableName, comment).then((response) => response.data);
+};
+
+const resumeConsumptionOp = (tableName, comment, consumeFrom) => {
+  return resumeConsumption(tableName, comment, consumeFrom).then((response) => response.data);
+};
+
+const getPauseStatusData = (tableName) => {
+  return getPauseStatus(tableName).then((response) => response.data);
+};
 
 const deleteInstance = (instanceName) => {
   return dropInstance(instanceName).then((response)=>{
@@ -1397,6 +1413,10 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
+  // Pause/resume consumption of realtime tables
+  pauseConsumptionOp,
+  resumeConsumptionOp,
+  getPauseStatusData,
   fetchServerToSegmentsCountData,
   getConsumingSegmentsInfoData
 };

@@ -152,6 +152,22 @@ declare module 'Models' {
     serversUnparsableRespond: number;
     _segmentToConsumingInfoMap: Record<string, ConsumingInfo[]>;
   }
+  
+  /**
+   * Pause status information for a realtime table
+   */
+  export interface PauseStatusDetails {
+    /** Whether the table is currently paused */
+    pauseFlag: boolean;
+    /** List of segments still in consuming state when paused */
+    consumingSegments: string[];
+    /** Reason code for pause state */
+    reasonCode: string;
+    /** Optional comment provided when pausing/resuming */
+    comment: string;
+    /** Timestamp of the pause/resume action */
+    timestamp: string;
+  }
 
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;

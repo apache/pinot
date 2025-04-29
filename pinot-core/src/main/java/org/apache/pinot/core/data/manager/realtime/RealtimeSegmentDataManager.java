@@ -437,8 +437,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _consecutiveErrorCount, e);
       throw e;
     } else {
-      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
-          _consecutiveErrorCount, e);
+      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
+        _segmentLogger.debug("Interrupted to stop consumption", e);
+      } else {
+        _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
+            _consecutiveErrorCount, e);
+      }
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       recreateStreamConsumer("Too many transient errors");
     }
