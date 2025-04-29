@@ -124,6 +124,68 @@
           <reuseForks>true</reuseForks>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>com.github.siom79.japicmp</groupId>
+        <artifactId>japicmp-maven-plugin</artifactId>
+        <version>0.23.1</version>
+        <configuration>
+          <oldVersion>
+            <file>
+              <path>${basedir}/resources/pinot-spi-japicmp-baseline.jar</path>
+            </file>
+          </oldVersion>
+          <newVersion>
+            <file>
+              <path>${project.build.directory}/${project.artifactId}-${project.version}.jar</path>
+            </file>
+          </newVersion>
+          <parameter>
+            <includes>org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder</includes>
+            <onlyModified>true</onlyModified>
+            <skipXmlReport>true</skipXmlReport>
+            <skipHtmlReport>true</skipHtmlReport>
+            <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
+            <overrideCompatibilityChangeParameters>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>ANNOTATION_MODIFIED</compatibilityChange>
+                <sourceCompatible>false</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>ANNOTATION_REMOVED</compatibilityChange>
+                <sourceCompatible>false</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_NOW_VARARGS</compatibilityChange>
+                <sourceCompatible>false</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_IN_IMPLEMENTED_INTERFACE</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_IN_SUPERCLASS</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_TO_CLASS</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ADDED_TO_INTERFACE</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+            </overrideCompatibilityChangeParameters>
+          </parameter>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>cmp</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
