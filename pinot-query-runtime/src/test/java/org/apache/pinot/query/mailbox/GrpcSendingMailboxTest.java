@@ -51,9 +51,10 @@ public class GrpcSendingMailboxTest {
     ByteBuffer expected = concatenateBuffers(input);
 
     List<ByteString> output = GrpcSendingMailbox.toByteStrings(input, maxByteStringSize);
-    for (ByteString chunk: output) {
-      assertTrue(chunk.size() <= maxByteStringSize);
+    for (ByteString chunk: output.subList(0, output.size() - 1)) {
+      assertEquals(chunk.size(), maxByteStringSize);
     }
+    assertTrue(output.get(output.size() - 1).size() <= maxByteStringSize);
     ByteBuffer actual = concatenateBuffers(
         output.stream().map(ByteString::asReadOnlyByteBuffer).collect(Collectors.toList()));
 
