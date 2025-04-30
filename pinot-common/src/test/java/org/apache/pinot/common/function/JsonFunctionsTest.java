@@ -432,4 +432,23 @@ public class JsonFunctionsTest {
     );
     assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonList), expected);
   }
+
+  @Test
+  public void testJsonStringToCollection() {
+    String jsonArrayString = "[{\"k1\":\"v1\"}, {\"k2\":\"v2\"}, {\"k3\":\"v3\"}, {\"k4\":\"v4\"}, {\"k5\":\"v5\"}]";
+    List<Map<String, String>> expectedArray =
+        List.of(Map.of("k1", "v1"), Map.of("k2", "v2"), Map.of("k3", "v3"), Map.of("k4", "v4"), Map.of("k5", "v5"));
+    assertEquals(JsonFunctions.jsonStringToArray(jsonArrayString), expectedArray);
+    assertEquals(JsonFunctions.jsonStringToListOrMap(jsonArrayString), expectedArray);
+
+    String jsonMapString = "{\"k1\":\"v1\", \"k2\":\"v2\", \"k3\":\"v3\", \"k4\":\"v4\",\"k5\":\"v5\"}";
+    Map<String, String> expectedMap =
+        Map.of("k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4", "k5", "v5");
+    assertEquals(JsonFunctions.jsonStringToMap(jsonMapString), expectedMap);
+    assertEquals(JsonFunctions.jsonStringToListOrMap(jsonMapString), expectedMap);
+
+    String invalidJson = "[\"k1\":\"v1\"}";
+    assertEquals(JsonFunctions.jsonStringToMap(invalidJson), null);
+    assertEquals(JsonFunctions.jsonStringToListOrMap(invalidJson), null);
+  }
 }
