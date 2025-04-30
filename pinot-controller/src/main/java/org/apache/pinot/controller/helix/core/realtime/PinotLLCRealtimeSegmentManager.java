@@ -1229,7 +1229,6 @@ public class PinotLLCRealtimeSegmentManager {
       }, DEFAULT_RETRY_POLICY, true);
     } catch (Exception e) {
       LOGGER.error("Failed to update ideal state during ensureAllPartitionsConsuming.", e);
-      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
       throw e;
     }
   }
