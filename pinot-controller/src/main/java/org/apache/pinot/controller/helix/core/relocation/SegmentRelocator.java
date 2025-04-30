@@ -203,15 +203,15 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setIncludeConsuming(_includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
 
-    try {
-      if (_tablesUndergoingRebalance != null) {
-        LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
-        if (!_tablesUndergoingRebalance.add(tableNameWithType)) {
-          LOGGER.warn("Skip rebalancing table: {}, table already exists in tablesUndergoingRebalance, a rebalance "
-              + "must have already been started", tableNameWithType);
-          return;
-        }
+    if (_tablesUndergoingRebalance != null) {
+      LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
+      if (!_tablesUndergoingRebalance.add(tableNameWithType)) {
+        LOGGER.warn("Skip rebalancing table: {}, table already exists in tablesUndergoingRebalance, a rebalance "
+            + "must have already been started", tableNameWithType);
+        return;
       }
+    }
+    try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
       // tier is updated. New servers can put segments onto the right tier when loading the segments. After that,
