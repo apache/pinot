@@ -155,6 +155,10 @@ public class QueryDispatcher {
     _mailboxService.start();
   }
 
+  /// Submits a query to the server and waits for the result.
+  ///
+  /// This method may throw almost any exception but QueryException or TimeoutException, which are caught and converted
+  /// into a QueryResult with the error code (and stats, if any can be collected).
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
@@ -176,10 +180,17 @@ public class QueryDispatcher {
     }
   }
 
+  /// Tries to recover from an exception thrown during query dispatching.
+  ///
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and stats,
+  /// while other exceptions are not known, so they are directly rethrown.
   private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
       throw ex;
+    }
+    if (ex instanceof ExecutionException && ex.getCause() instanceof Exception) {
+      ex = (Exception) ex.getCause();
     }
     QueryErrorCode errorCode;
     if (ex instanceof TimeoutException) {
@@ -443,7 +454,7 @@ public class QueryDispatcher {
   private Map<DispatchablePlanFragment, StageInfo> serializePlanFragments(
       Set<DispatchablePlanFragment> stagePlans,
       Set<QueryServerInstance> serverInstances, Deadline deadline)
-      throws InterruptedException, ExecutionException, TimeoutException {
+      throws InterruptedException, ExecutionException {
     List<CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>>> stageInfoFutures =
         new ArrayList<>(stagePlans.size());
     for (DispatchablePlanFragment stagePlan : stagePlans) {

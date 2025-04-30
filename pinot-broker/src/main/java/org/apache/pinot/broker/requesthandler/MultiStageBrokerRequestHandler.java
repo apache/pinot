@@ -426,13 +426,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
                 query.getOptions());
-      } catch (TimeoutException e) {
-        for (String table : tableNames) {
-          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
-        }
-        LOGGER.warn("Timed out executing request {}: {}", requestId, query);
-        requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
-        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
