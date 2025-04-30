@@ -46,6 +46,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -125,8 +126,16 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
         LOGGER.error(message);
         throw new IllegalStateException(message);
       }
-      return new CompactedPinotSegmentRecordReader(x.getIndexDir(), validDocIds);
+      return new CompactedPinotSegmentRecordReader(validDocIds);
     }).collect(Collectors.toList());
+    List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>(recordReaders.size());
+    for (int i = 0; i < recordReaders.size(); i++) {
+      RecordReader recordReader = recordReaders.get(i);
+      File segmentDir = segmentDirs.get(i);
+      RecordReaderFileConfig recordReaderFileConfig =
+          new RecordReaderFileConfig(null, segmentDir, null, null, recordReader);
+      recordReaderFileConfigs.add(recordReaderFileConfig);
+    }
 
     // create new UploadedRealtimeSegment
     segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments.get());
@@ -135,17 +144,10 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
     List<File> outputSegmentDirs;
-    try {
-      _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-      outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
-          SegmentProcessorFramework.convertRecordReadersToRecordReaderFileConfig(recordReaders),
-          Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
-          configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)))).process();
-    } finally {
-      for (RecordReader recordReader : recordReaders) {
-        recordReader.close();
-      }
-    }
+    _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
+    outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+        recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
+        configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)))).process();
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));

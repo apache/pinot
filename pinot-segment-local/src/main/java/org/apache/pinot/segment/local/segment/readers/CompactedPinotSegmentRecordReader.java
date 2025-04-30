@@ -45,14 +45,13 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   // Flag to mark whether we need to fetch another row
   private boolean _nextRowReturned = true;
 
-  public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds) {
-    this(indexDir, validDocIds, null);
+  public CompactedPinotSegmentRecordReader(RoaringBitmap validDocIds) {
+    this(validDocIds, null);
   }
 
-  public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds,
+  public CompactedPinotSegmentRecordReader(RoaringBitmap validDocIds,
       @Nullable String deleteRecordColumn) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-    _pinotSegmentRecordReader.init(indexDir, null, null);
     _validDocIdsBitmap = validDocIds;
     _validDocIdsIterator = validDocIds.getIntIterator();
     _deleteRecordColumn = deleteRecordColumn;
@@ -61,6 +60,8 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
+    // lazy init the record reader
+    _pinotSegmentRecordReader.init(dataFile, null, null);
   }
 
   @Override

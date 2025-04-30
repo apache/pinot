@@ -184,7 +184,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             return null;
           });
 
-      // A completable future that will finish when all submit task finish or on timoeut
+      // A completable future that will finish when all submit task finish or on timeout
       CompletableFuture<Void> allCompleted = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
           .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS);
       // When this future completes, notify the broker.
