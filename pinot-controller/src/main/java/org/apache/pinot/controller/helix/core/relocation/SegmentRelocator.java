@@ -133,7 +133,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   @Override
   protected void processTable(String tableNameWithType) {
     if (_waitingTables == null) {
-      if (_tablesUndergoingRebalance == null || !_tablesUndergoingRebalance.contains(tableNameWithType)) {
+      if (!_tablesUndergoingRebalance.contains(tableNameWithType)) {
         LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
         _executorService.submit(() -> rebalanceTable(tableNameWithType));
       } else {
@@ -206,7 +206,11 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     try {
       if (_tablesUndergoingRebalance != null) {
         LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
-        _tablesUndergoingRebalance.add(tableNameWithType);
+        if (!_tablesUndergoingRebalance.add(tableNameWithType)) {
+          LOGGER.warn("Skip rebalancing table: {}, table already exists in tablesUndergoingRebalance, a rebalance "
+              + "must have already been started", tableNameWithType);
+          return;
+        }
       }
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
