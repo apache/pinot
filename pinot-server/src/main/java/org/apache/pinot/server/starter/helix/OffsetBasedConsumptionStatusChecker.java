@@ -26,6 +26,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 
 
 /**
@@ -44,19 +45,22 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
 
   @Override
   protected boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager) {
-    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
-    assert partitionMetadataProvider != null;
-    if (!partitionMetadataProvider.canValidateOffsetCatchUp()) {
-      // Stream provider like Kinesis doesn't provide latest offset. Hence, there is nothing for comparison.
-      // Skip this table.
-      return true;
-    }
     StreamPartitionMsgOffset latestIngestedOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.getLatestStreamOffsetAtStartupTime();
-
-    if (isOffsetCaughtUp(segmentName, latestIngestedOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}",
-          segmentName, latestIngestedOffset, latestStreamOffset);
+    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
+    assert partitionMetadataProvider != null;
+    try {
+      if (partitionMetadataProvider.isOffsetCaughtUp(latestIngestedOffset, latestStreamOffset)) {
+        _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}",
+            segmentName, latestIngestedOffset, latestStreamOffset);
+        return true;
+      }
+    } catch (UnsupportedOffsetCatchUpCheckException e) {
+      // Cannot conclude if segment has caught up or not. Skip such segments.
+      _logger.warn(
+          "Received UnsupportedOffsetCatchUpCheckException for segment: {}. Latest stream offset: {}, current stream "
+              + "offset: {}",
+          segmentName, latestStreamOffset, latestIngestedOffset);
       return true;
     }
 

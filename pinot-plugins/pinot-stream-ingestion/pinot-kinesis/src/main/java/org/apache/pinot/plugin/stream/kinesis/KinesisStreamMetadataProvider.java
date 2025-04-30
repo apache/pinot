@@ -41,6 +41,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
@@ -288,7 +289,15 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public boolean canValidateOffsetCatchUp() {
+  public boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset)
+      throws UnsupportedOffsetCatchUpCheckException {
+    if (currentOffset != null && latestOffset != null) {
+      KinesisPartitionGroupOffset latestPartitionGroupOffset = ((KinesisPartitionGroupOffset) latestOffset);
+      if (latestPartitionGroupOffset.getSequenceNumber() == null) {
+        throw new UnsupportedOffsetCatchUpCheckException("Sequence number in latestPartitionGroupOffset is null.");
+      }
+      return currentOffset.compareTo(latestOffset) >= 0;
+    }
     return false;
   }
 

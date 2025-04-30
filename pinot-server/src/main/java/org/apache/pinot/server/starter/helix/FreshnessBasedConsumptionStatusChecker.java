@@ -26,6 +26,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 
 
 /**
@@ -73,19 +74,23 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // For stream partitions that see very low volume, it's possible we're already caught up but the oldest
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
-    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
-    assert partitionMetadataProvider != null;
-    if (!partitionMetadataProvider.canValidateOffsetCatchUp()) {
-      // Stream provider like Kinesis doesn't provide latest offset. Hence, there is nothing for comparison.
-      // Skip this table.
-      return true;
-    }
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
-    if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
-          _minFreshnessMs, currentOffset);
+    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
+    assert partitionMetadataProvider != null;
+    try {
+      if (partitionMetadataProvider.isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
+        _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
+                + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
+            _minFreshnessMs, currentOffset);
+        return true;
+      }
+    } catch (UnsupportedOffsetCatchUpCheckException e) {
+      // Cannot conclude if segment has caught up or not. Skip such segments.
+      _logger.warn(
+          "Received UnsupportedOffsetCatchUpCheckException for segment: {}. Latest stream offset: {}, current stream "
+              + "offset: {}",
+          segmentName, latestStreamOffset, currentOffset);
       return true;
     }
 

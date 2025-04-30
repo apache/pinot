@@ -48,6 +48,15 @@ public interface StreamPartitionMsgOffset extends Comparable<StreamPartitionMsgO
   String toString();
 
   /**
+   *  Few streams like Kinesis can return invalid offsets.
+   *  For example: In Kinesis shards that are in the OPEN state have an ending sequence number of null.
+   *  This method can be used to compare if offset is valid for comparison with other offset.
+   */
+  default boolean isValidOffset() {
+    return true;
+  }
+
+  /**
    * @deprecated Should be done via a static function
    */
   @Deprecated

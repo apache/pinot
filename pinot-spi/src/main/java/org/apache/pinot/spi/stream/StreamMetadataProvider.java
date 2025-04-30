@@ -136,8 +136,12 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
-  default boolean canValidateOffsetCatchUp() {
-    return true;
+  default boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset)
+      throws UnsupportedOffsetCatchUpCheckException {
+    if (currentOffset != null && latestOffset != null) {
+      return currentOffset.compareTo(latestOffset) >= 0;
+    }
+    return false;
   }
 
   /**
