@@ -237,6 +237,14 @@ public class DataSchema {
     return typeFactory.createStructType(columnTypes, Arrays.asList(_columnNames));
   }
 
+  /**
+   * Returns a map from column name to index.
+   * <p>This method lazily computes the map on the first call and caches it for subsequent calls.
+   * We are using this for merging data from different blocks, with the assumption that the column names are not always
+   * in the same order across blocks and doesn't have the same set of columns.
+   *
+   * @return Map from column name to index
+   */
   @JsonIgnore
   public Map<String, Integer> getColumnNameToIndexMap() {
     if (_columnNameToIndexMap == null) {

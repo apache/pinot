@@ -830,18 +830,17 @@ public class CalciteSqlCompilerTest {
   // TODO: to be removed once OPTIONS REGEX match is deprecated
   public void testQueryOptions() {
     PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-    Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
 
     pinotQuery =
         compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes)");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 2);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
 
     pinotQuery = compileToPinotQuery(
         "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes, foo=1234, bar='potato')");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
@@ -866,17 +865,16 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testQuerySetOptions() {
     PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-    Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
 
     pinotQuery = compileToPinotQuery("SET delicious='yes'; select * from vegetables where name <> 'Brussels sprouts'");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 2);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
 
     pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; SET bar='''potato''';"
         + "select * from vegetables where name <> 'Brussels sprouts' ");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
@@ -884,7 +882,7 @@ public class CalciteSqlCompilerTest {
 
     pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; "
         + "SET bar='''potato'''; select * from vegetables where name <> 'Brussels sprouts' ");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
@@ -892,7 +890,7 @@ public class CalciteSqlCompilerTest {
 
     pinotQuery = compileToPinotQuery("SET delicious='yes'; SET foo='1234'; "
         + "select * from vegetables where name <> 'Brussels sprouts'; SET bar='''potato'''; ");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
     Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");

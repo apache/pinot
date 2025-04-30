@@ -192,7 +192,7 @@ public class SelectionOperatorUtils {
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions == null || queryContext.getLimit() == 0) {
       // For 'SELECT *', use the server response data schema as the final results data schema.
-      if ((numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR) || isSelectStar)) {
+      if (isSelectStar) {
         int[] columnIndices = new int[numColumnsInDataSchema];
         for (int i = 0; i < numColumnsInDataSchema; i++) {
           columnIndices[i] = i;
@@ -236,7 +236,7 @@ public class SelectionOperatorUtils {
     }
 
     // For 'SELECT *' with order-by, exclude transform functions from the returned columns and sort.
-    if (numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR) || isSelectStar) {
+    if (isSelectStar) {
       String[] columnNamesInDataSchema = dataSchema.getColumnNames();
       List<Integer> columnIndexList = new ArrayList<>(columnNamesInDataSchema.length);
       for (int i = 0; i < columnNamesInDataSchema.length; i++) {

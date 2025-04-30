@@ -383,6 +383,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SELECT_STAR_QUERY));
   }
 
+  public static void setSelectStarOption(Map<String, String> queryOptions, boolean isSelectStarQuery) {
+    queryOptions.put(QueryOptionKey.IS_SELECT_STAR_QUERY, Boolean.toString(isSelectStarQuery));
+  }
+
   @Nullable
   private static Integer uncheckedParseInt(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {

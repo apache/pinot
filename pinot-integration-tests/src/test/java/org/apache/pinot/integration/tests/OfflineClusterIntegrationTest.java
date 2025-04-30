@@ -48,6 +48,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
@@ -4336,30 +4337,61 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testSelectStarOnNewColumnAddition() throws Exception {
-    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     String testColumn = "TestColumn";
-    try {
-      // Add a new column to a copy of the old schema
-      Schema newSchema = new Schema();
-      newSchema.setSchemaName(oldSchema.getSchemaName());
-      for (FieldSpec fieldSpec : oldSchema.getAllFieldSpecs()) {
-        newSchema.addField(fieldSpec);
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    // Pick any existing INT column name for the “valid” cases
+    String validColumnName = oldSchema.getAllFieldSpecs().stream()
+            .filter(fs -> fs.getDataType() == DataType.INT)
+            .findFirst()
+            .get()
+            .getName();
+
+    // Pair each query with whether it should succeed (true) or fail (false) before full reload
+    List<Pair<String, Boolean>> testCases = List.of(
+            Pair.of(SELECT_STAR_QUERY, false),
+            Pair.of(SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000", true),
+            Pair.of(SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000", true),
+            Pair.of(SELECT_STAR_QUERY + " WHERE " + testColumn + " > 0 LIMIT 10000", false),
+            Pair.of(SELECT_STAR_QUERY + " ORDER BY " + testColumn + " LIMIT 10000", false)
+    );
+
+    for (Pair<String, Boolean> tc : testCases) {
+      try {
+        String query = tc.getLeft();
+        boolean shouldSucceed = tc.getRight();
+
+        // Build new schema with the extra column
+        Schema newSchema = new Schema();
+        newSchema.setSchemaName(oldSchema.getSchemaName());
+        for (FieldSpec fs : oldSchema.getAllFieldSpecs()) {
+          newSchema.addField(fs);
+        }
+        newSchema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
+        updateSchema(newSchema);
+
+        // Partially reload one segment
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
+                listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+
+        if (shouldSucceed) {
+          // Column still not present until full reload
+          runQueryAndAssert(query, testColumn, false);
+          // Now do a full reload and assert the column shows up
+          reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+          runQueryAndAssert(query, testColumn, true);
+        } else {
+          try {
+            postQuery(query);
+            fail("Expected query to fail due to missing column: " + testColumn);
+          } catch (Exception | AssertionError e) {
+            // Expected exception due to missing column
+          }
+        }
+      } finally {
+        // Reset back to the original schema for the next iteration
+        forceUpdateSchema(oldSchema);
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
       }
-      newSchema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
-      updateSchema(newSchema);
-
-      // Run query and assert new column is not present yet
-      runQueryAndAssert(testColumn, false);
-
-      // Partially reload one segment and assert column is still not present
-      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
-      runQueryAndAssert(testColumn, false);
-
-      // Fully reload table and assert new column is now present
-      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
-      runQueryAndAssert(testColumn, true);
-    } finally {
-      forceUpdateSchema(oldSchema);
     }
   }
 
@@ -4368,7 +4400,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         ? reloadOfflineSegment(tableNameWithType, segmentName, true)
         : reloadOfflineTable(tableNameWithType, true);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
-    String jobId = null;
+    String jobId;
     if (segmentName != null) {
       // Single segment reload response: status is a string, parse manually
       String statusString = responseJson.get("status").asText();
@@ -4393,8 +4425,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String newAddedColumn, boolean isPresent) throws Exception {
-    JsonNode response = postQuery(SELECT_STAR_QUERY);
+  private void runQueryAndAssert(String query, String newAddedColumn, boolean isPresent) throws Exception {
+    JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");
     JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
@@ -4408,7 +4440,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           break;
       }
     }
-    assertEquals(columnPresent, isPresent);
+    assertEquals(columnPresent, isPresent,
+        "Column presence mismatch for query: " + query + ", expected: " + isPresent + ", actual: " + columnPresent);
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
