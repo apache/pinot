@@ -33,14 +33,14 @@ import org.apache.calcite.sql.validate.implicit.TypeCoercionImpl;
 /**
  * Custom implementation of Calcite's default type coercion implementation to add Pinot specific type coercion rules.
  * Currently, the only additional rule we add is to for TIMESTAMP / BIGINT types. For binary arithmetic and binary
- * comparison operators, we add implicit casts to convert TIMESTAMP to BIGINT. For standard operators, we add implicit
- * casts to convert TIMESTAMP to BIGINT and also vice versa.
+ * comparison operators, we add implicit casts to convert TIMESTAMP to BIGINT. For other standard operators, we add
+ * implicit casts in both directions as and when needed (TIMESTAMP -> BIGINT and BIGINT -> TIMESTAMP).
  * <p>
- * This always works since Pinot's execution type for the TIMESTAMP SQL type is LONG. We add these implicit casts for
- * convenience since the single-stage engine already treats the two types as interchangeable and many common user query
- * patterns include things like TIMESTAMP + LONG or TIMESTAMP - LONG or TIMESTAMP > LONG. For such operations, we're
- * always adding the cast on the TIMESTAMP side, but users can choose to add explicit casts instead, for performance
- * reasons (adding cast on literal side instead of column side) and index applicability.
+ * This always works since Pinot's execution type for the TIMESTAMP SQL type is LONG (i.e., BIGINT). We add these
+ * implicit casts for convenience since the single-stage engine already treats the two types as interchangeable and
+ * many common user query patterns include things like TIMESTAMP + LONG or TIMESTAMP - LONG or TIMESTAMP > LONG. For
+ * such operations, we're always adding the cast on the TIMESTAMP side, but users can choose to add explicit casts
+ * instead, for performance reasons (adding cast on literal side instead of column side) and index applicability.
  */
 public class PinotTypeCoercion extends TypeCoercionImpl {
   public PinotTypeCoercion(RelDataTypeFactory typeFactory,
