@@ -923,7 +923,7 @@ public class CommonConstants {
      * See QueryServer
      */
     public static final String MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX =
-        QUERY_EXECUTOR_CONFIG_PREFIX + "multistage.submission";
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + "multistage.submission";
     public static final String DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE = "cached";
     @Deprecated
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
