@@ -190,6 +190,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
+    <enforcer-api.version>3.5.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
@@ -296,6 +297,8 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
     <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
+    <jdom2.version>2.0.6</jdom2.version>
+    <maven.version>3.9.7</maven.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -2088,6 +2091,27 @@
         <version>${assertj.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.maven.enforcer</groupId>
+        <artifactId>enforcer-api</artifactId>
+        <version>${enforcer-api.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-plugin-api</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jdom</groupId>
+        <artifactId>jdom2</artifactId>
+        <version>${jdom2.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2282,10 +2306,23 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                     </excludes>
                   </bannedDependencies>
+                  <customDependencyVersionRule>
+                    <skipRoot>true</skipRoot>
+                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                      pinot-tools,contrib</skipModules>
+                  </customDependencyVersionRule>
                 </rules>
+                <fail>true</fail>
               </configuration>
             </execution>
           </executions>
+<!--          <dependencies>-->
+<!--            <dependency>-->
+<!--              <groupId>org.apache.pinot</groupId>-->
+<!--              <artifactId>pinot-dependency-verifier</artifactId>-->
+<!--              <version>${project.version}</version>-->
+<!--            </dependency>-->
+<!--          </dependencies>-->
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
@@ -2468,6 +2505,18 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.5.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.sisu</groupId>
+          <artifactId>sisu-maven-plugin</artifactId>
+          <version>0.9.0.M1</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>main-index</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>

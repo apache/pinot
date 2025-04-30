@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.verifier;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class DepVerifierTest {
   private static final String SUBMODULE_PATH = "../pinot-spi/pom.xml";
