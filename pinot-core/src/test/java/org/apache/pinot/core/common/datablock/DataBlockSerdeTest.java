@@ -32,7 +32,6 @@ import org.apache.pinot.common.datablock.ZeroCopyDataBlockSerde;
 import org.apache.pinot.common.utils.DataSchema;
 import org.testng.annotations.Test;
 
-
 public class DataBlockSerdeTest {
 
   @Test
