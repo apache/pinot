@@ -80,9 +80,10 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     assert partitionMetadataProvider != null;
     try {
       if (partitionMetadataProvider.isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
-        _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-                + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
-            _minFreshnessMs, currentOffset);
+        _logger.info(
+            "Segment {} with freshness {}ms has not caught up within min freshness {}. But the current ingested "
+                + "offset is equal to the latest available offset {}.",
+            segmentName, freshnessMs, _minFreshnessMs, currentOffset);
         return true;
       }
     } catch (UnsupportedOffsetCatchUpCheckException e) {
