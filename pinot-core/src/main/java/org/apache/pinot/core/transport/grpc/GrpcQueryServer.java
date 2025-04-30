@@ -64,6 +64,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.lang.Math.min;
 
 
 // TODO: Plug in QueryScheduler
@@ -73,6 +74,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
   // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+
+  private static final int DEFAULT_GRPC_QUERY_WORKER_THREAD = min(8, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
 
   private final QueryExecutor _queryExecutor;
   private final ServerMetrics _serverMetrics;
@@ -107,7 +110,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
             ? config.getQueryWorkerThreads()
-            : ResourceManager.DEFAULT_QUERY_WORKER_THREADS)
+            : DEFAULT_GRPC_QUERY_WORKER_THREAD)
     );
     _queryExecutor = queryExecutor;
     _serverMetrics = serverMetrics;
