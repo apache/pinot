@@ -115,6 +115,10 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
+  default boolean canCheckIfOffsetIsCaughtUp() {
+    return true;
+  }
+
   /**
    * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
    */

@@ -2055,6 +2055,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _forceCommitMessageReceived = true;
   }
 
+  public StreamMetadataProvider getPartitionMetadataProvider(String reason) {
+    if (_partitionMetadataProvider == null) {
+     createPartitionMetadataProvider(reason);
+    }
+    return _partitionMetadataProvider;
+  }
+
   @VisibleForTesting
   AtomicBoolean getConsumerSemaphoreAcquired() {
     return _consumerSemaphoreAcquired;
