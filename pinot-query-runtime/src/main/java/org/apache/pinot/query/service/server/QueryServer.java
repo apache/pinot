@@ -25,6 +25,7 @@ import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -171,7 +172,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       QueryThreadContext.setQueryEngine("mse");
 
       // Submit the stage for each worker
-      List<CompletableFuture<List<Object>>> futures = forEachStageAndWorker(request,
+      CompletableFuture<List<Object>>[] futures = forEachStageAndWorker(request,
           (stagePlan, workerMetadata) -> {
             Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
             ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -185,10 +186,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           });
 
       // A completable future that will finish when all submit task finish or on timeout
-      CompletableFuture<Void> allCompleted = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+      CompletableFuture<Void> allCompleted = CompletableFuture.allOf(futures)
           .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS);
       // When this future completes, notify the broker.
-      allCompleted.handle((result, error) -> {
+      allCompleted.whenComplete((result, error) -> {
         // this can be called either on the submission thread that finished the last or in the caller (GRPC) thread
         // in the improbable case all submission tasks finished before the caller thread reaches this line
         if (error != null) {
@@ -205,7 +206,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
                   .build());
           responseObserver.onCompleted();
         }
-        return null;
       });
     }
   }
@@ -228,9 +228,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // Explain the stage for each worker
-      List<CompletableFuture<List<StagePlan>>> futures = forEachStageAndWorker(request,
+      CompletableFuture<List<StagePlan>>[] futures = forEachStageAndWorker(request,
           (stagePlan, workerMetadata) -> _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata));
-      CompletableFuture<?>[] responseFutures = futures.stream()
+      CompletableFuture<?>[] responseFutures = Arrays.stream(futures)
           .map(plansFuture ->
               plansFuture.thenApply(plans -> {
                 Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
@@ -360,26 +360,32 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   /**
-   * Submits each stage in the request to the workers and waits for all workers to complete,
-   * applying the submitFunction to each worker and the consumer to the list of results.
+   * Submits each stage in the request to the workers and schedules the submitFunction to be called for each worker and
+   * the consumer to the list of results.
+   *
+   * This is an asynchronous call, and the submitFunction may be called concurrently for each worker. The caller
+   * can wait for the completion of each future if needed.
    *
    * @param request the query request
    * @param submitFunction the function to apply to each worker. This function may be called concurrently for each
    *                       worker plan by threads from {@link #_querySubmissionExecutorService}.
    * @param <W> the type of the result returned by the submitFunction.
    */
-  private <W> List<CompletableFuture<List<W>>> forEachStageAndWorker(Worker.QueryRequest request,
+  private <W> CompletableFuture<List<W>>[] forEachStageAndWorker(Worker.QueryRequest request,
       BiFunction<StagePlan, WorkerMetadata, W> submitFunction) {
     List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
     int numStages = protoStagePlans.size();
-    List<CompletableFuture<List<W>>> stageSubmissionStubs = new ArrayList<>(numStages);
-    for (Worker.StagePlan protoStagePlan : protoStagePlans) {
+
+    CompletableFuture<List<W>>[] stageSubmissionStubs = new CompletableFuture[numStages];
+    for (int i = 0; i < protoStagePlans.size(); i++) {
+      Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
+
       CompletableFuture<List<W>> future = CompletableFuture.supplyAsync(() -> {
         List<W> plans = new ArrayList<>();
         submitStage(protoStagePlan, submitFunction, plans::add);
         return plans;
       }, _querySubmissionExecutorService);
-      stageSubmissionStubs.add(future);
+      stageSubmissionStubs[i] = future;
     }
     return stageSubmissionStubs;
   }
