@@ -60,6 +60,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
+import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
@@ -133,7 +134,8 @@ public class QueryEnvironment {
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
-    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
+    _catalogReader = new PinotCatalogReader(
+        rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _optProgram = getOptProgram();
   }
 
@@ -514,6 +516,14 @@ public class QueryEnvironment {
      */
     @Nullable
     TableCache getTableCache();
+
+    /**
+     * Whether the schema should be considered case-insensitive.
+     */
+    @Value.Default
+    default boolean isCaseSensitive() {
+      return !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE;
+    }
 
     /**
      * Whether to apply partition hint by default or not.

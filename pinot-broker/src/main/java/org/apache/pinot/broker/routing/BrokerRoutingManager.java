@@ -102,7 +102,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
   private final BrokerMetrics _brokerMetrics;
-  private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
+  private final Map<String, RoutingEntry> _routingEntryMap;
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the synchronized block
   private final Set<String> _excludedServers = new HashSet<>();
@@ -122,6 +122,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
+
+    boolean caseSensitive = !_pinotConfig.getProperty(
+        Helix.ENABLE_CASE_INSENSITIVE_KEY,
+        Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
+    if (caseSensitive) {
+      _routingEntryMap = new ConcurrentHashMap<>();
+    } else {
+      _routingEntryMap = new CaseInsensitiveConcurrentHashMap<>();
+    }
   }
 
   @Override
@@ -867,6 +876,37 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         }
       }
       return new ArrayList<>(selectedSegments);
+    }
+  }
+
+  protected static class CaseInsensitiveConcurrentHashMap<V> extends ConcurrentHashMap<String, V> {
+    @Override
+    public V put(String key, V value) {
+      return super.put(key.toLowerCase(), value);
+    }
+
+    @Override
+    public V get(Object key) {
+      if (key instanceof String) {
+        return super.get(((String) key).toLowerCase());
+      }
+      return null;
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+      if (key instanceof String) {
+        return super.containsKey(((String) key).toLowerCase());
+      }
+      return false;
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+      if (key instanceof String) {
+        return super.remove(((String)key).toLowerCase(), value);
+      }
+      return false;
     }
   }
 }
