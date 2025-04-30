@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
@@ -66,6 +67,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
+  private final boolean _splitBlocks;
   private final int _maxByteStringSize;
 
   private StreamObserver<MailboxContent> _contentObserver;
@@ -79,6 +81,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
+    _splitBlocks = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
     // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
     _maxByteStringSize = Math.max(config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
@@ -177,7 +182,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
+      List<ByteString> byteStrings;
+      if (_splitBlocks) {
+        byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
+      } else {
+        byteStrings = List.of(DataBlockUtils.toByteString(dataBlock));
+      }
       int sizeInBytes = byteStrings.stream().mapToInt(ByteString::size).reduce(0, Integer::sum);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);

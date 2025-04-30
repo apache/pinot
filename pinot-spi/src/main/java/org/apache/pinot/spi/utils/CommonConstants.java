@@ -1509,6 +1509,13 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
     /**
+     * Enable splitting of data block payload during mailbox transfer.
+     */
+    public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
+          "pinot.query.runner.enable.data.block.payload.split";
+    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = true;
+
+    /**
      * Configuration for server port, port that opens and accepts
      * {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} and start executing query stages.
      */
