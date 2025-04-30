@@ -113,6 +113,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName);
   }
 
+  public String forPeriodTaskRun(String taskName, String tableName, TableType tableType) {
+    return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName + "&tableName=" + tableName
+        + "&type=" + tableType);
+  }
+
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
     StringBuilder params = new StringBuilder();
     if (StringUtils.isNotBlank(username)) {
@@ -172,6 +177,11 @@ public class ControllerRequestURLBuilder {
 
   public String forTenantInstancesToggle(String tenant, String tenantType, String state) {
     return StringUtil.join("/", _baseUrl, "tenants", tenant) + "?type=" + tenantType + "&state=" + state;
+  }
+
+  public String forToggleTableState(String tableName, TableType type, boolean enable) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "state") + "?type=" + type
+        + "&state=" + (enable ? "enable" : "disable");
   }
 
   public String forLiveBrokerTablesGet() {

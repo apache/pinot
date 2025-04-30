@@ -189,7 +189,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
-        switch (columnMetadata.getDataType()) {
+        switch (columnMetadata.getDataType().getStoredType()) {
           case INT:
             for (int i = 0; i < numDocs; i++) {
               rangeIndexCreator.add(forwardIndexReader.getInt(i, readerContext));
@@ -216,7 +216,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
       } else {
         // Multi-value column
         int maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
-        switch (columnMetadata.getDataType()) {
+        switch (columnMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = new int[maxNumValuesPerMVEntry];
             for (int i = 0; i < numDocs; i++) {

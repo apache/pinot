@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.integration.tests.models;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.BasePartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.BaseTableUpsertMetadataManager;
@@ -34,37 +32,15 @@ import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
 
-  private TableConfig _tableConfig;
-  private Schema _schema;
-
-  public DummyTableUpsertMetadataManager() {
-    super();
-  }
-
-  @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
-    super.init(tableConfig, schema, tableDataManager);
-    _tableConfig = tableConfig;
-    _schema = schema;
-  }
-
   @Override
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    UpsertContext context = new UpsertContext.Builder().setTableConfig(_tableConfig).setSchema(_schema)
-        .setPrimaryKeyColumns(_schema.getPrimaryKeyColumns())
-        .setComparisonColumns(Collections.singletonList(_tableConfig.getValidationConfig().getTimeColumnName()))
-        .setHashFunction(HashFunction.NONE).setTableIndexDir(new File("/tmp/tableIndexDirDummy")).build();
-
-    return new DummyPartitionUpsertMetadataManager("dummy", partitionId, context);
+    return new DummyPartitionUpsertMetadataManager("dummy", partitionId, _context);
   }
 
   @Override

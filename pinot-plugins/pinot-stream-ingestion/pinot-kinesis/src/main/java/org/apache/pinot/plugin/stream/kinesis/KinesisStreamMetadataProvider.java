@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
-
 /**
  * A {@link StreamMetadataProvider} implementation for the Kinesis stream
  */
@@ -101,7 +100,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     // fetch offset for _partitionId
     Shard foundShard = _kinesisConnectionHandler.getShards().stream()
-        .filter(shard -> shard.shardId().equals(SHARD_ID_PREFIX + _partitionId))
+        .filter(shard -> {
+          String shardId = shard.shardId();
+          int partitionGroupId = getPartitionGroupIdFromShardId(shardId);
+          return partitionGroupId == Integer.parseInt(_partitionId);
+        })
         .findFirst().orElseThrow(() -> new RuntimeException("Failed to find shard for partitionId: " + _partitionId));
     SequenceNumberRange sequenceNumberRange = foundShard.sequenceNumberRange();
     if (offsetCriteria.isSmallest()) {
@@ -195,6 +198,23 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   /**
+   * Refer documentation for {@link #computePartitionGroupMetadata(String, StreamConfig, List, int)}
+   * @param forceGetOffsetFromStream - the flag is not required for Kinesis stream. Kinesis implementation
+   *                                 takes care of returning non-null offsets for all old and new partitions.
+   *                                 The flag is primarily required for Kafka stream which requires refactoring
+   *                                 to avoid this flag. More details in {@link
+   *                                 StreamMetadataProvider#computePartitionGroupMetadata(
+   *                                 String, StreamConfig, List, int, boolean)}
+   */
+  @Override
+  public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
+      boolean forceGetOffsetFromStream)
+      throws IOException, TimeoutException {
+    return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
+  }
+
+  /**
    * Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId
    * e.g. "shardId-000000000001" becomes 1
    * FIXME: Although practically the shard values follow this format, the Kinesis docs don't guarantee it.
@@ -210,8 +230,29 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       throws IOException, TimeoutException {
     try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
         _clientId, partitionGroupConsumptionStatus)) {
-      MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
-      return messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
+      int attempts = 0;
+      while (true) {
+        MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
+        if (messageBatch.getMessageCount() > 0) {
+          // There are messages left to be consumed so we haven't consumed the shard fully
+          return false;
+        }
+        if (messageBatch.isEndOfPartitionGroup()) {
+          // Shard can't be iterated further. We have consumed all the messages because message count = 0
+          return true;
+        }
+        // Even though message count = 0, shard can be iterated further.
+        // Based on kinesis documentation, there might be more records to be consumed.
+        // So we need to fetch messages again to check if we have reached end of shard.
+        // To prevent an infinite loop (known cases listed in fetchMessages()), we will limit the number of attempts
+        attempts++;
+        if (attempts >= 5) {
+          LOGGER.warn("Reached max attempts to check if end of shard reached from checkpoint {}. "
+                  + " Assuming we have not consumed till end of shard.", startCheckpoint);
+          return false;
+        }
+        // continue to fetch messages. reusing the partitionGroupConsumer ensures we use new shard iterator
+      }
     }
   }
 

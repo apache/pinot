@@ -37,18 +37,20 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
+ * This {@code MailboxSendOperator} is created to send {@link MseBlock}s to the receiving end.
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
@@ -96,7 +98,7 @@ public class MailboxSendOperator extends MultiStageOperator {
    */
   private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
       StatMap<StatKey> statMap) {
-    BlockSplitter mainSplitter = TransferableBlockUtils::splitBlock;
+    BlockSplitter mainSplitter = BlockSplitter.DEFAULT;
     if (!node.isMultiSend()) {
       // it is guaranteed that there is exactly one receiver stage
       int receiverStageId = node.getReceiverStageIds().iterator().next();
@@ -198,24 +200,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     try {
-      TransferableBlock block = _input.nextBlock();
-      if (block.isSuccessfulEndOfStreamBlock()) {
+      MseBlock block = _input.nextBlock();
+      if (block.isEos()) {
         if (_context.isSendStats()) {
-          block = updateEosBlock(block, _statMap);
-          // no need to check early terminate signal b/c the current block is already EOS
-          sendTransferableBlock(block);
-          // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
-          // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
-          if (_context.getStageId() == 1) {
-            updateMetrics(block);
-          }
+          sendEos((MseBlock.Eos) block);
         } else {
-          sendTransferableBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+          sendEos(SuccessMseBlock.INSTANCE);
         }
       } else {
-        if (sendTransferableBlock(block)) {
+        if (sendMseBlock(((MseBlock.Data) block))) {
           earlyTerminate();
         }
       }
@@ -223,15 +218,15 @@ public class MailboxSendOperator extends MultiStageOperator {
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return createLeafBlock();
+      return SuccessMseBlock.INSTANCE;
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      return ErrorMseBlock.fromException(e);
     } catch (Exception e) {
-      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
-        sendTransferableBlock(errorBlock);
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId());
+        sendEos(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
@@ -239,14 +234,44 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  protected TransferableBlock createLeafBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
+  private void sendEos(MseBlock.Eos eosBlockWithoutStats)
+      throws Exception {
+    MultiStageQueryStats stats = calculateStats();
+
+    List<DataBuffer> serializedStats;
+    try {
+      serializedStats = stats.serialize();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize stats", e);
+      serializedStats = Collections.emptyList();
+    }
+
+    // no need to check early terminate signal b/c the current block is already EOS
+    sendMseBlock(eosBlockWithoutStats, serializedStats);
+    // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
+    // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
+    if (_context.getStageId() == 1) {
+      updateMetrics(stats);
+    }
   }
 
-  private boolean sendTransferableBlock(TransferableBlock block)
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  private boolean sendMseBlock(MseBlock.Data block)
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
+    }
+    return isEarlyTerminated;
+  }
+
+  private boolean sendMseBlock(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      throws Exception {
+    boolean isEarlyTerminated = _exchange.send(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
@@ -265,9 +290,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange.cancel(t);
   }
 
-  private void updateMetrics(TransferableBlock block) {
+  private void updateMetrics(MultiStageQueryStats queryStats) {
     ServerMetrics serverMetrics = ServerMetrics.get();
-    MultiStageQueryStats queryStats = block.getQueryStats();
     if (queryStats == null) {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {

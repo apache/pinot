@@ -58,7 +58,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored in V1.
+   * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
@@ -360,6 +360,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
+          case DISTINCTCOUNTOFFHEAP:
+            return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -383,17 +385,17 @@ public class AggregationFunctionFactory {
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
-            return new CountMVAggregationFunction(arguments);
+            return new CountMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMV:
-            return new MinMVAggregationFunction(arguments);
+            return new MinMVAggregationFunction(arguments, nullHandlingEnabled);
           case MAXMV:
-            return new MaxMVAggregationFunction(arguments);
+            return new MaxMVAggregationFunction(arguments, nullHandlingEnabled);
           case SUMMV:
-            return new SumMVAggregationFunction(arguments);
+            return new SumMVAggregationFunction(arguments, nullHandlingEnabled);
           case AVGMV:
-            return new AvgMVAggregationFunction(arguments);
+            return new AvgMVAggregationFunction(arguments, nullHandlingEnabled);
           case MINMAXRANGEMV:
-            return new MinMaxRangeMVAggregationFunction(arguments);
+            return new MinMaxRangeMVAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(arguments);
           case DISTINCTCOUNTBITMAPMV:

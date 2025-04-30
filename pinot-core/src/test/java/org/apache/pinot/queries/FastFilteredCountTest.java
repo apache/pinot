@@ -54,16 +54,16 @@ import static org.testng.Assert.assertTrue;
 public class FastFilteredCountTest extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FastFilteredCountTest");
-  private static final String RAW_TABLE_NAME = "testTable";
+  protected static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_RECORDS = 1000;
   private static final int BUCKET_SIZE = 8;
-  private static final String SORTED_COLUMN = "sorted";
-  private static final String CLASSIFICATION_COLUMN = "class";
-  private static final String TEXT_COLUMN = "textCol";
-  private static final String JSON_COLUMN = "jsonCol";
-  private static final String INT_RANGE_COLUMN = "intRangeCol";
+  protected static final String SORTED_COLUMN = "sorted";
+  protected static final String CLASSIFICATION_COLUMN = "class";
+  protected static final String TEXT_COLUMN = "textCol";
+  protected static final String JSON_COLUMN = "jsonCol";
+  protected static final String INT_RANGE_COLUMN = "intRangeCol";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(SORTED_COLUMN, FieldSpec.DataType.INT)
@@ -122,13 +122,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
-        .setJsonIndexColumns(List.of(JSON_COLUMN)).setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
-        .setFieldConfigList(fieldConfigs).build();
+    TableConfig tableConfig = getTableConfig();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
@@ -136,6 +130,21 @@ public class FastFilteredCountTest extends BaseQueriesTest {
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = List.of(immutableSegment, immutableSegment);
+  }
+
+  // overridden in composite index test
+  protected TableConfig getTableConfig() {
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
+        .setJsonIndexColumns(List.of(JSON_COLUMN))
+        .setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
+        .setFieldConfigList(fieldConfigs)
+        .build();
+    return tableConfig;
   }
 
   @AfterClass

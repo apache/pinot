@@ -118,6 +118,7 @@ import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -608,7 +609,7 @@ public class PinotTableRestletResource {
       @QueryParam("includeConsuming") boolean includeConsuming,
       @ApiParam(value = "Whether to enable minimize data movement on rebalance, DEFAULT will use "
           + "the minimizeDataMovement in table config") @DefaultValue("ENABLE")
-      @QueryParam("minimizeDataMovement") RebalanceConfig.MinimizeDataMovementOptions minimizeDataMovement,
+      @QueryParam("minimizeDataMovement") Enablement minimizeDataMovement,
       @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
           + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,

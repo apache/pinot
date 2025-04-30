@@ -82,11 +82,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this(port, queryRunner, tlsConfig, ServerMetrics.get(), new PinotConfiguration());
+    this(port, queryRunner, tlsConfig, new PinotConfiguration());
   }
 
-  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
-      ServerMetrics serverMetrics, PinotConfiguration config) {
+  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig, PinotConfiguration config) {
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
@@ -96,6 +95,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         "query_submission_executor_on_" + _port + "_port",
         CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
     MetricsExecutor withMetrics = new MetricsExecutor(
         baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),

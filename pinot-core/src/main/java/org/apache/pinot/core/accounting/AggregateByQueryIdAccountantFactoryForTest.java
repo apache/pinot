@@ -25,13 +25,14 @@ import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccountantFactory {
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
-    return new AggregateByQueryIdAccountant(config, instanceId);
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+    return new AggregateByQueryIdAccountant(config, instanceId, instanceType);
   }
 
   public static class QueryResourceTrackerImpl implements QueryResourceTracker {
@@ -75,8 +76,8 @@ public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccount
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
     Map<String, QueryResourceTrackerImpl> _queryMemUsage = new ConcurrentHashMap<>();
 
-    public AggregateByQueryIdAccountant(PinotConfiguration config, String instanceId) {
-      super(config, instanceId);
+    public AggregateByQueryIdAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+      super(config, instanceId, instanceType);
     }
 
     @Override

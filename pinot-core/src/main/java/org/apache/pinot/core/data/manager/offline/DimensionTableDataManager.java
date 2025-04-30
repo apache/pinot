@@ -35,9 +35,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -108,20 +109,20 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   @Override
   protected void doInit() {
     super.doInit();
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
 
+    IndexLoadingConfig indexLoadingConfig = _indexLoadingConfig;
+    Schema schema = indexLoadingConfig.getSchema();
+    assert schema != null;
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    if (tableConfig != null) {
-      DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
-      if (dimensionTableConfig != null) {
-        _disablePreload = dimensionTableConfig.isDisablePreload();
-        _errorOnDuplicatePrimaryKey = dimensionTableConfig.isErrorOnDuplicatePrimaryKey();
-      }
+    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    assert tableConfig != null;
+    DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
+    if (dimensionTableConfig != null) {
+      _disablePreload = dimensionTableConfig.isDisablePreload();
+      _errorOnDuplicatePrimaryKey = dimensionTableConfig.isErrorOnDuplicatePrimaryKey();
     }
 
     if (_disablePreload) {
@@ -142,8 +143,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @Override
-  public void addSegment(ImmutableSegment immutableSegment) {
-    super.addSegment(immutableSegment);
+  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    super.addSegment(immutableSegment, zkMetadata);
     String segmentName = immutableSegment.getSegmentName();
     if (loadLookupTable()) {
       _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
@@ -206,8 +207,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     // loading is in progress.
     int token = _loadToken.incrementAndGet();
 
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
+    Schema schema = _indexLoadingConfig.getSchema();
+    assert schema != null;
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
@@ -282,8 +283,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     // loading is in progress.
     int token = _loadToken.incrementAndGet();
 
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for dimension table: %s", _tableNameWithType);
+    Schema schema = _indexLoadingConfig.getSchema();
+    assert schema != null;
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);

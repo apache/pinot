@@ -53,8 +53,8 @@ public interface TableDataManager {
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      TableConfig tableConfig, SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor,
+      TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
@@ -94,10 +94,26 @@ public interface TableDataManager {
 
   /**
    * Adds a loaded immutable segment into the table.
+   * See {@link #addSegment(ImmutableSegment, SegmentZKMetadata)} for details.
+   */
+  @VisibleForTesting
+  default void addSegment(ImmutableSegment immutableSegment) {
+    addSegment(immutableSegment, null);
+  }
+
+  /**
+   * Adds a loaded immutable segment into the table.
+   * <p>If one segment already exists with the same name, replaces it with the new one.
+   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+   * segment (or the calling thread, if there are none) remove the segment.
+   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
+   * <p>Segment ZK metadata might not be available when replacing a CONSUMING segment with the locally sealed one or
+   * invoked from tests.
+   *
    * NOTE: This method is not designed to be directly used by the production code, but can be handy to set up tests.
    */
   @VisibleForTesting
-  void addSegment(ImmutableSegment immutableSegment);
+  void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata);
 
   /**
    * Adds an ONLINE segment into a table.
@@ -295,22 +311,15 @@ public interface TableDataManager {
   SegmentZKMetadata fetchZKMetadata(String segmentName);
 
   /**
-   * Fetches the table config and schema for the table from ZK.
-   */
-  Pair<TableConfig, Schema> fetchTableConfigAndSchema();
-
-  /**
    * Fetches the table config and schema for the table from ZK, then construct the index loading config with them.
    */
-  default IndexLoadingConfig fetchIndexLoadingConfig() {
-    Pair<TableConfig, Schema> tableConfigSchemaPair = fetchTableConfigAndSchema();
-    return getIndexLoadingConfig(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
-  }
+  IndexLoadingConfig fetchIndexLoadingConfig();
 
   /**
-   * Constructs the index loading config for the table with the given table config and schema.
+   * Returns the cached latest {@link IndexLoadingConfig} for the table. The cache is refreshed when invoking
+   * {@link #fetchIndexLoadingConfig()}.
    */
-  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, Schema schema);
+  IndexLoadingConfig getIndexLoadingConfig();
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
@@ -330,9 +339,8 @@ public interface TableDataManager {
 
   /**
    * Return list of segment names that are stale along with reason.
-   * @param tableConfig Table Config of the table
-   * @param schema Schema of the table
+   *
    * @return List of {@link StaleSegment} with segment names and reason why it is stale
    */
-  List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema);
+  List<StaleSegment> getStaleSegments();
 }
