@@ -44,6 +44,10 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
+      "BIG_DECIMAL"
+      "BYTES"
+      "LONG"
+      "STRING"
     ]
 
     # List of non-reserved keywords to add;
@@ -51,6 +55,10 @@ data: {
     nonReservedKeywordsToAdd: [
       "FILE"
       "ARCHIVE"
+      "BIG_DECIMAL"
+      "BYTES"
+      "LONG"
+      "STRING"
       # Pinot allows using DEFAULT as the catalog name
       "DEFAULT_"
       # Pinot allows using DATETIME as column name

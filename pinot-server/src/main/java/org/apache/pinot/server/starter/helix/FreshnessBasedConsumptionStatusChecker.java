@@ -48,16 +48,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     _idleTimeoutMs = idleTimeoutMs;
   }
 
-  private boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
-    if (currentOffset != null && latestOffset != null) {
-      // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
-      // current offset in the case we are caught up.
-      // TODO: implement a way to have this work correctly for kafka consumers
-      return currentOffset.compareTo(latestOffset) >= 0;
-    }
-    return false;
-  }
-
   private boolean segmentHasBeenIdleLongerThanThreshold(long segmentIdleTime) {
     return _idleTimeoutMs > 0 && segmentIdleTime > _idleTimeoutMs;
   }
@@ -83,13 +73,16 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // For stream partitions that see very low volume, it's possible we're already caught up but the oldest
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
-    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider("");
-    StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
-    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
-    if (!partitionMetadataProvider.isComparableForCatchUp()) {
+    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
+    assert partitionMetadataProvider != null;
+    if (!partitionMetadataProvider.canValidateOffsetCatchUp()) {
+      // Stream provider like Kinesis doesn't provide latest offset. Hence, there is nothing for comparison.
+      // Skip this table.
       return true;
     }
-    if (isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
+    StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
+    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
+    if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
       _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
               + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
           _minFreshnessMs, currentOffset);

@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
@@ -43,20 +44,24 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
 
   @Override
   protected boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager) {
+    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
+    assert partitionMetadataProvider != null;
+    if (!partitionMetadataProvider.canValidateOffsetCatchUp()) {
+      // Stream provider like Kinesis doesn't provide latest offset. Hence, there is nothing for comparison.
+      // Skip this table.
+      return true;
+    }
     StreamPartitionMsgOffset latestIngestedOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.getLatestStreamOffsetAtStartupTime();
-    if (latestStreamOffset == null || latestIngestedOffset == null) {
-      _logger.info("Null offset found for segment {} - latest stream offset: {}, latest ingested offset: {}. "
-          + "Will check consumption status later", segmentName, latestStreamOffset, latestIngestedOffset);
-      return false;
+
+    if (isOffsetCaughtUp(segmentName, latestIngestedOffset, latestStreamOffset)) {
+      _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}",
+          segmentName, latestIngestedOffset, latestStreamOffset);
+      return true;
     }
-    if (latestIngestedOffset.compareTo(latestStreamOffset) < 0) {
-      _logger.info("Latest ingested offset {} in segment {} is smaller than stream latest available offset {} ",
-          latestIngestedOffset, segmentName, latestStreamOffset);
-      return false;
-    }
-    _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}", segmentName,
-        latestIngestedOffset, latestStreamOffset);
-    return true;
+
+    _logger.info("Latest ingested offset {} in segment {} is smaller than stream latest available offset {} ",
+        latestIngestedOffset, segmentName, latestStreamOffset);
+    return false;
   }
 }
