@@ -133,6 +133,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   @Override
   protected void processTable(String tableNameWithType) {
     if (_waitingTables == null) {
+      assert _tablesUndergoingRebalance != null;
       if (!_tablesUndergoingRebalance.contains(tableNameWithType)) {
         LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
         _executorService.submit(() -> rebalanceTable(tableNameWithType));
