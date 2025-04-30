@@ -1209,8 +1209,15 @@ public class PinotLLCRealtimeSegmentManager {
           streamConfigs.stream()
               .forEach(streamConfig -> streamConfig.setOffsetCriteria(
                   offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
-          List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+          List<PartitionGroupMetadata> newPartitionGroupMetadataList;
+          try {
+            newPartitionGroupMetadataList =
+                getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+          } catch (Exception e) {
+            _controllerMetrics.addMeteredTableValue(realtimeTableName,
+                ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR, 1L);
+            throw e;
+          }
           streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, newPartitionGroupMetadataList,
               offsetCriteria);
