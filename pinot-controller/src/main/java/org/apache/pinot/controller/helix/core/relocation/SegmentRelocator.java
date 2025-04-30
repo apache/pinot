@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -80,7 +81,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
-  private final Set<String> _tablesUndergoingRebalance;
+  @Nullable private final Set<String> _tablesUndergoingRebalance;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
