@@ -70,11 +70,6 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public boolean isValidOffset() {
-    return _sequenceNumber != null;
-  }
-
-  @Override
   public String toString() {
     return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber).toString();
   }
