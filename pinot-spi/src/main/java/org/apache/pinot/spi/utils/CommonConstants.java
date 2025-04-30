@@ -1513,7 +1513,7 @@ public class CommonConstants {
      */
     public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
           "pinot.query.runner.enable.data.block.payload.split";
-    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = true;
+    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
     /**
      * Configuration for server port, port that opens and accepts
