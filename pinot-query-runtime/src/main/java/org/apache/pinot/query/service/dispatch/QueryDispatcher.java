@@ -187,9 +187,12 @@ public class QueryDispatcher {
     } else if (ex instanceof QueryException) {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
+      // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
       cancel(requestId, servers);
       throw ex;
     }
+    // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
+    // that include the stats.
     MultiStageQueryStats stats = cancelWithStats(requestId, servers);
     if (stats == null) {
       throw ex;

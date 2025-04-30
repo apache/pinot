@@ -198,7 +198,7 @@ public class QueryRunner {
       _executorService = new HardLimitExecutor(hardLimit, _executorService);
     }
 
-    _opChainScheduler = new OpChainSchedulerService(_executorService);
+    _opChainScheduler = new OpChainSchedulerService(_executorService, config);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
