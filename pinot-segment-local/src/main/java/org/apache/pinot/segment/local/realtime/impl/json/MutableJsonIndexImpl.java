@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.json;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -34,6 +35,8 @@ import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -44,6 +47,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
@@ -57,29 +61,39 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Json index for mutable segment.
  */
 public class MutableJsonIndexImpl implements MutableJsonIndex {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MutableJsonIndexImpl.class);
   private final JsonIndexConfig _jsonIndexConfig;
   private final TreeMap<String, RoaringBitmap> _postingListMap;
   private final IntList _docIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
+  private final String _segmentName;
+  private final String _columnName;
 
   private int _nextDocId;
   private int _nextFlattenedDocId;
+  private long _bytesSize;
+  private ServerMetrics _serverMetrics;
 
-  public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig) {
+  public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig, String segmentName, String columnName) {
     _jsonIndexConfig = jsonIndexConfig;
+    _segmentName = segmentName;
+    _columnName = columnName;
     _postingListMap = new TreeMap<>();
     _docIdMapping = new IntArrayList();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     _readLock = readWriteLock.readLock();
     _writeLock = readWriteLock.writeLock();
+    _serverMetrics = ServerMetrics.get();
   }
 
   /**
@@ -117,9 +131,15 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       for (Map.Entry<String, String> entry : record.entrySet()) {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
         String key = entry.getKey();
-        _postingListMap.computeIfAbsent(key, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
+        _postingListMap.computeIfAbsent(key, k -> {
+          _bytesSize += Utf8.encodedLength(key);
+          return new RoaringBitmap();
+        }).add(_nextFlattenedDocId);
         String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
-        _postingListMap.computeIfAbsent(keyValue, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
+        _postingListMap.computeIfAbsent(keyValue, k -> {
+          _bytesSize += Utf8.encodedLength(keyValue);
+          return new RoaringBitmap();
+        }).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
     }
@@ -722,6 +742,20 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   @Override
   public void close() {
+    try {
+      String tableName = SegmentUtils.getTableNameFromSegmentName(_segmentName);
+      _serverMetrics.addMeteredTableValue(tableName, _columnName, ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE,
+          _bytesSize);
+    } catch (Exception e) {
+      LOGGER.warn(
+          "Caught exception while updating mutable json index memory usage for segment: {}, column: {}, value: {}",
+          _segmentName, _columnName, _bytesSize, e);
+    }
+  }
+
+  @Override
+  public boolean canAddMore() {
+    return _bytesSize < _jsonIndexConfig.getMaxBytesSize();
   }
 
   // AND given bitmaps, optionally converting first one to mutable (if it's not already)

@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
@@ -48,6 +50,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
 
@@ -78,11 +82,15 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       + "  \"programming\""
       + "]"
       + "}";
+  private ServerMetrics _serverMetrics;
 
   @BeforeMethod
   public void setUp()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+    _serverMetrics = mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    ServerMetrics.register(_serverMetrics);
   }
 
   @AfterMethod
@@ -155,7 +163,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -293,7 +301,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -345,7 +353,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(indexConfig)) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(indexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableIndex.add(record);
       }
@@ -446,7 +454,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, getIndexConfig());
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig())) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
         mutableIndex.add(record);
@@ -515,7 +523,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, getIndexConfig());
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig())) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
         mutableIndex.add(record);
@@ -694,7 +702,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndex = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapIndex = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableIndex.add(record);
       }
@@ -782,7 +790,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndex = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapIndex = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableIndex.add(record);
       }
@@ -827,7 +835,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -901,7 +909,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         ImmutableJsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         ImmutableJsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
       for (String record : records) {
         mutableIndex.add(record);
       }
@@ -919,6 +927,35 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         assertEquals(expected.get(i), (Object) mutableRes, keys[i]);
       }
     }
+  }
+
+  @Test
+  public void testMutableJsonIndexSizeLimit() {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    try (MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table1__0__1", "col")) {
+      assertTrue(mutableIndex.canAddMore());
+      mutableIndex.add("{\"key\":\"value\"}");
+      mutableIndex.add("{\"key\":\"value2\"}");
+      assertTrue(mutableIndex.canAddMore());
+    } catch (IOException e) {
+      fail();
+    }
+
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table1"), eq("col"),
+        eq(ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE),
+        eq(25L)); // bytes(.key) + bytes(.key\u0000value) +  bytes(.key\u0000value2)
+
+    jsonIndexConfig.setMaxBytesSize(5);
+    try (MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table2__0__1", "col")) {
+      assertTrue(mutableIndex.canAddMore());
+      mutableIndex.add("{\"anotherKey\":\"anotherValue\"}");
+      assertFalse(mutableIndex.canAddMore());
+    } catch (IOException e) {
+      fail();
+    }
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table2"), eq("col"),
+        eq(ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE),
+        eq(35L)); // bytes(.anotherKey) + bytes(.anotherKey\u0000anotherValue)
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {

@@ -62,6 +62,7 @@ public class JsonIndexConfig extends IndexConfig {
   private Set<String> _indexPaths;
   private int _maxValueLength = 0;
   private boolean _skipInvalidJson = false;
+  private long _maxBytesSize = Long.MAX_VALUE;
 
   public JsonIndexConfig() {
     super(false);
@@ -80,7 +81,8 @@ public class JsonIndexConfig extends IndexConfig {
       @JsonProperty("excludeFields") @Nullable Set<String> excludeFields,
       @JsonProperty("indexPaths") @Nullable Set<String> indexPaths,
       @JsonProperty("maxValueLength") int maxValueLength,
-      @JsonProperty("skipInvalidJson") boolean skipInvalidJson) {
+      @JsonProperty("skipInvalidJson") boolean skipInvalidJson,
+      @JsonProperty("maxBytesSize") @Nullable Long maxBytesSize) {
     super(disabled);
     _maxLevels = maxLevels;
     _excludeArray = excludeArray;
@@ -91,6 +93,7 @@ public class JsonIndexConfig extends IndexConfig {
     _indexPaths = indexPaths;
     _maxValueLength = maxValueLength;
     _skipInvalidJson = skipInvalidJson;
+    _maxBytesSize = maxBytesSize == null ? _maxBytesSize : maxBytesSize;
   }
 
   public int getMaxLevels() {
@@ -172,6 +175,15 @@ public class JsonIndexConfig extends IndexConfig {
 
   public void setSkipInvalidJson(boolean skipInvalidJson) {
     _skipInvalidJson = skipInvalidJson;
+  }
+
+  public long getMaxBytesSize() {
+    return _maxBytesSize;
+  }
+
+  public void setMaxBytesSize(int maxBytesSize) {
+    Preconditions.checkArgument(maxBytesSize > 0, "Max bytes size must be greater than 0");
+    _maxBytesSize = maxBytesSize;
   }
 
   @Override

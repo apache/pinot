@@ -104,4 +104,11 @@ public class SegmentUtilsTest {
       fail("Exception should not be thrown");
     }
   }
+
+  @Test
+  void testGetTableNameFromSegmentName() {
+    String segmentName = "some_table_name__0__1240__20250419T0723Z";
+    String tableName = SegmentUtils.getTableNameFromSegmentName(segmentName);
+    assertEquals(tableName, "some_table_name");
+  }
 }
