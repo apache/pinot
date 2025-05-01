@@ -310,7 +310,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _queryLogger.log(requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
+    String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), workloadName);
 
     try {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,

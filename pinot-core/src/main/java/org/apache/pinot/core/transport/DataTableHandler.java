@@ -25,6 +25,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +72,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID));
+      String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      Tracing.ThreadAccountantOps.updateResourceUsageConcurrently(String.valueOf(requestID), TrackingScope.QUERY);
+      Tracing.ThreadAccountantOps.updateResourceUsageConcurrently(workloadName, TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);

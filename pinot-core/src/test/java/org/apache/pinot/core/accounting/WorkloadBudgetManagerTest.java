@@ -1,0 +1,128 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.core.accounting;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
+
+
+public class WorkloadBudgetManagerTest {
+  PinotConfiguration _config;
+  long _enforcementWindowMs = 10_000L; // 10 seconds
+
+  @BeforeClass
+  void setup() {
+    _config = new PinotConfiguration();
+    _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, _enforcementWindowMs);
+    // Initialize once for all tests
+    WorkloadBudgetManager.init(_config); // 10 seconds for reset window
+  }
+
+  @Test
+  void testSingletonInitialization() {
+    WorkloadBudgetManager first = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager.init(_config); // Should not override
+    WorkloadBudgetManager second = WorkloadBudgetManager.getInstance();
+    assertSame(first, second, "WorkloadBudgetManager should be a singleton");
+  }
+
+  @Test
+  void testAddOrUpdateAndRetrieveBudget() {
+    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    manager.addOrUpdateWorkload("test-workload", 1_000_000L, 1_000_000L);
+
+    WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload("test-workload");
+    assertEquals(1_000_000L, stats._cpuRemaining);
+    assertEquals(1_000_000L, stats._memoryRemaining);
+  }
+
+  @Test
+  void testTryChargeWithoutBudget() {
+    WorkloadBudgetManager mgr = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager.BudgetStats stats = mgr.tryCharge("unknown-workload", 100L, 100L);
+    assertEquals(Long.MAX_VALUE, stats._cpuRemaining);
+    assertEquals(Long.MAX_VALUE, stats._memoryRemaining);
+  }
+
+  @Test
+  void testBudgetResetAfterInterval() throws InterruptedException {
+    WorkloadBudgetManager mgr = WorkloadBudgetManager.getInstance();
+    mgr.addOrUpdateWorkload("reset-test", 1_000_000L, 1_000_000L);
+    mgr.tryCharge("reset-test", 500_000L, 500_000L);
+
+    // Ensure budget is charged
+    WorkloadBudgetManager.BudgetStats usedStats = mgr.getRemainingBudgetForWorkload("reset-test");
+    assertEquals(500_000L, usedStats._cpuRemaining);
+    assertEquals(500_000L, usedStats._memoryRemaining);
+
+    // Wait for reset window (configured as 10 seconds)
+    Thread.sleep(_enforcementWindowMs + 1000L);
+
+    // Check if reset occurred
+    WorkloadBudgetManager.BudgetStats resetStats = mgr.getRemainingBudgetForWorkload("reset-test");
+    assertEquals(1_000_000L, resetStats._cpuRemaining);
+    assertEquals(1_000_000L, resetStats._memoryRemaining);
+  }
+
+  @Test
+  void testConcurrentTryChargeSingleWorkload() throws InterruptedException {
+    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    String workload = "concurrent-test";
+    long initialCpuBudget = 2_000_000L;
+    long initialMemBudget = 2_000_000L;
+    manager.addOrUpdateWorkload(workload, initialCpuBudget, initialMemBudget);
+
+    int numThreads = 20;
+    int chargesPerThread = 1000;
+    long cpuChargePerCall = 10L;
+    long memChargePerCall = 10L;
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    CountDownLatch latch = new CountDownLatch(numThreads);
+
+    for (int i = 0; i < numThreads; i++) {
+      executor.submit(() -> {
+        for (int j = 0; j < chargesPerThread; j++) {
+          manager.tryCharge(workload, cpuChargePerCall, memChargePerCall);
+        }
+        latch.countDown();
+      });
+    }
+
+    latch.await();
+    executor.shutdown();
+
+    long totalCpuCharged = numThreads * chargesPerThread * cpuChargePerCall;
+    long totalMemCharged = numThreads * chargesPerThread * memChargePerCall;
+
+    WorkloadBudgetManager.BudgetStats remaining = manager.getRemainingBudgetForWorkload(workload);
+    assertEquals(initialCpuBudget - totalCpuCharged, remaining._cpuRemaining,
+        "CPU budget mismatch after concurrent updates");
+    assertEquals(initialMemBudget - totalMemCharged, remaining._memoryRemaining,
+        "Memory budget mismatch after concurrent updates");
+  }
+}

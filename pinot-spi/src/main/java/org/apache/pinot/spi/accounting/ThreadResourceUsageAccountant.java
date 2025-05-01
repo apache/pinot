@@ -41,9 +41,10 @@ public interface ThreadResourceUsageAccountant {
    * @param queryId query id string
    * @param taskId a unique task id
    * @param parentContext the parent execution context, null for root(runner) thread
+   * @param workloadName Name of the workload corresponding to the query.
    */
   void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
+      @Nullable ThreadExecutionContext parentContext, @Nullable String workloadName);
 
   /**
    * get the executon context of current thread
@@ -68,9 +69,9 @@ public interface ThreadResourceUsageAccountant {
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
-   * queryId/taskId is unknown and the execution process is hard to instrument
+   * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
    */
-  void updateQueryUsageConcurrently(String queryId);
+  void updateResourceUsageConcurrently(String resourceName, TrackingScope resourceType);
 
   /**
    * start the periodical task
