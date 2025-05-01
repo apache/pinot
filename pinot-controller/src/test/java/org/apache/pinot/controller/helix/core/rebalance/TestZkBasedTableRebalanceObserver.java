@@ -57,10 +57,19 @@ public class TestZkBasedTableRebalanceObserver {
         new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Map<String, String>> targetIntermediate = new TreeMap<>();
     target.put("segment1",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    target.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    targetIntermediate.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    targetIntermediate.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6"), ONLINE));
     source.put("segment2",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
+    source.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6"), ONLINE));
 
     Set<String> segmentSet = new HashSet<>(source.keySet());
     segmentSet.addAll(target.keySet());
@@ -80,14 +89,29 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(observer.getNumUpdatesToZk(), 2);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
     checkProgressPercentMetrics(controllerMetrics, observer);
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, source, targetIntermediate,
+        rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source,
+        targetIntermediate,
+        rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+    source.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ONLINE));
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source,
+        targetIntermediate,
+        rebalanceContext);
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, targetIntermediate, target,
+        rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target,
         rebalanceContext);
     checkProgressPercentMetrics(controllerMetrics, observer);
     // Both of the changes above will update ZK for progress stats
-    assertEquals(observer.getNumUpdatesToZk(), 4);
+    assertEquals(observer.getNumUpdatesToZk(), 8);
     // Try a rollback and this should trigger a ZK update as well
     observer.onRollback();
-    assertEquals(observer.getNumUpdatesToZk(), 5);
+    assertEquals(observer.getNumUpdatesToZk(), 9);
   }
 
   private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
@@ -100,7 +124,8 @@ public class TestZkBasedTableRebalanceObserver {
     long progressRemained = (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
         overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
         overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
-            + overallProgress._totalRemainingSegmentsToConverge));
+            + overallProgress._totalRemainingSegmentsToConverge + overallProgress._totalCarryOverSegmentsToBeAdded
+            + overallProgress._totalCarryOverSegmentsToBeDeleted));
     assertEquals(progressGaugeValue, progressRemained > 100 ? 0 : 100 - progressRemained);
   }
 

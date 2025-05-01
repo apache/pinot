@@ -348,7 +348,6 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String PERIODIC_TASK = "periodicTask";
     public static final String STATUS = "status";
     public static final String DATABASE = "database";
-    public static final String JOBID = "jobId";
   }
 
   public static class ExportedLabelValues {

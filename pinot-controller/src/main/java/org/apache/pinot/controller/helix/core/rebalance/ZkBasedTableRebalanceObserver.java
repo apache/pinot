@@ -239,8 +239,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   /**
-   * Emits the rebalance progress in percent to the metrics. Uses the percentage of remaining segments to be added as
-   * the indicator of the overall progress.
+   * Emits the rebalance progress in percent to the metrics, which is calculated as:
+   *          (totalRemainingSegmentsToBeAdded + totalRemainingSegmentsToBeDeleted + totalRemainingSegmentsToConverge
+   *                       + totalCarryOverSegmentsToBeAdded + totalCarryOverSegmentsToBeDeleted)
+   * 100%  -   ------------------------------------------------------------------------------------------------- * 100%
+   *                                (totalSegmentsToBeAdded + totalSegmentsToBeDeleted)
    * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
    * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
    * 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
@@ -255,7 +258,6 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
             + overallProgress._totalRemainingSegmentsToConverge + overallProgress._totalCarryOverSegmentsToBeAdded
             + overallProgress._totalCarryOverSegmentsToBeDeleted));
-    // Using the original job ID to group rebalance retries together with the same label
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
         progressPercent < 0 ? 0 : progressPercent);
   }
