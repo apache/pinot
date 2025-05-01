@@ -144,20 +144,12 @@ TODO: At the time of the next Pinot release (1.4.0), update the baseline version
             </file>
           </newVersion>
           <parameter>
-            <includes>org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder</includes>
+            <includes>org.apache.pinot.spi</includes>
             <onlyModified>true</onlyModified>
             <skipXmlReport>true</skipXmlReport>
             <skipHtmlReport>true</skipHtmlReport>
             <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
             <overrideCompatibilityChangeParameters>
-              <overrideCompatibilityChangeParameter>
-                <compatibilityChange>ANNOTATION_MODIFIED</compatibilityChange>
-                <sourceCompatible>false</sourceCompatible>
-              </overrideCompatibilityChangeParameter>
-              <overrideCompatibilityChangeParameter>
-                <compatibilityChange>ANNOTATION_REMOVED</compatibilityChange>
-                <sourceCompatible>false</sourceCompatible>
-              </overrideCompatibilityChangeParameter>
               <overrideCompatibilityChangeParameter>
                 <compatibilityChange>METHOD_NOW_VARARGS</compatibilityChange>
                 <sourceCompatible>false</sourceCompatible>
