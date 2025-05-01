@@ -49,16 +49,16 @@ public class PinotNameMatcher implements SqlNameMatcher {
 
   @Override
   public boolean matches(String string, String name) {
-    return this._caseSensitive ? string.equals(name) : string.equalsIgnoreCase(name);
+    return _caseSensitive ? string.equals(name) : string.equalsIgnoreCase(name);
   }
 
   @Override
   public <K extends List<String>, V> @Nullable V get(Map<K, V> map, List<String> prefixNames, List<String> names) {
     List<String> key = concat(prefixNames, names);
-    if (this._caseSensitive) {
+    if (_caseSensitive) {
       return map.get(key);
     } else {
-      for(Map.Entry<K, V> entry : map.entrySet()) {
+      for (Map.Entry<K, V> entry : map.entrySet()) {
         if (this.listMatches(key, entry.getKey())) {
           return entry.getValue();
         }
@@ -75,14 +75,14 @@ public class PinotNameMatcher implements SqlNameMatcher {
 
   @Override
   public @Nullable RelDataTypeField field(RelDataType rowType, String fieldName) {
-    return rowType.getField(fieldName, this._caseSensitive, false);
+    return rowType.getField(fieldName, _caseSensitive, false);
   }
 
   @Override
   public int frequency(Iterable<String> names, String name) {
     int n = 0;
 
-    for(String s : names) {
+    for (String s : names) {
       if (this.matches(s, name)) {
         ++n;
       }
@@ -97,7 +97,7 @@ public class PinotNameMatcher implements SqlNameMatcher {
   }
 
   private static List<String> concat(List<String> prefixNames, List<String> names) {
-    return (List<String>)(prefixNames.isEmpty() ? names : ImmutableList.builder()
+    return (List<String>) (prefixNames.isEmpty() ? names : ImmutableList.builder()
         .addAll(prefixNames).addAll(names).build());
   }
 
@@ -105,7 +105,7 @@ public class PinotNameMatcher implements SqlNameMatcher {
     if (list0.size() != list1.size()) {
       return false;
     } else {
-      for(int i = 0; i < list0.size(); ++i) {
+      for (int i = 0; i < list0.size(); i++) {
         String s0 = list0.get(i);
         String s1 = list1.get(i);
         if (!this.matches(s0, s1)) {

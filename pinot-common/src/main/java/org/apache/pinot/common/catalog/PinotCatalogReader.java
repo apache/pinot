@@ -29,6 +29,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 public class PinotCatalogReader extends CalciteCatalogReader {
   public PinotCatalogReader(CalciteSchema rootSchema, List<String> defaultSchema,
       RelDataTypeFactory typeFactory, CalciteConnectionConfig config, boolean caseSensitive) {
-    super(rootSchema, new PinotNameMatcher(caseSensitive), ImmutableList.of(ImmutableList.copyOf(defaultSchema), ImmutableList.of()), typeFactory, config);
+    super(rootSchema, new PinotNameMatcher(caseSensitive),
+        ImmutableList.of(ImmutableList.copyOf(defaultSchema), ImmutableList.of()), typeFactory, config);
   }
 }

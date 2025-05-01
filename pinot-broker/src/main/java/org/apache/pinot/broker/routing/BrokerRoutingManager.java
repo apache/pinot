@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -129,7 +130,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     if (caseSensitive) {
       _routingEntryMap = new ConcurrentHashMap<>();
     } else {
-      _routingEntryMap = new CaseInsensitiveConcurrentHashMap<>();
+      _routingEntryMap = Collections.synchronizedMap(new CaseInsensitiveMap<>());
     }
   }
 
@@ -876,37 +877,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         }
       }
       return new ArrayList<>(selectedSegments);
-    }
-  }
-
-  protected static class CaseInsensitiveConcurrentHashMap<V> extends ConcurrentHashMap<String, V> {
-    @Override
-    public V put(String key, V value) {
-      return super.put(key.toLowerCase(), value);
-    }
-
-    @Override
-    public V get(Object key) {
-      if (key instanceof String) {
-        return super.get(((String) key).toLowerCase());
-      }
-      return null;
-    }
-
-    @Override
-    public boolean containsKey(Object key) {
-      if (key instanceof String) {
-        return super.containsKey(((String) key).toLowerCase());
-      }
-      return false;
-    }
-
-    @Override
-    public boolean remove(Object key, Object value) {
-      if (key instanceof String) {
-        return super.remove(((String)key).toLowerCase(), value);
-      }
-      return false;
     }
   }
 }

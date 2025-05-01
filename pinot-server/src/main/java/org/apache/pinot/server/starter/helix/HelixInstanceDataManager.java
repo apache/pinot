@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +38,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections4.map.CaseInsensitiveMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -66,6 +68,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -79,7 +82,7 @@ import org.slf4j.LoggerFactory;
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+  private Map<String, TableDataManager> _tableDataManagerMap;
   // TODO: Consider making segment locks per table instead of per instance
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
@@ -115,6 +118,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
+    boolean caseSensitive = !config.getProperty(
+        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
+        CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
+    if (caseSensitive) {
+      _tableDataManagerMap = new ConcurrentHashMap<>();
+    } else {
+      _tableDataManagerMap = Collections.synchronizedMap(new CaseInsensitiveMap<>());
+    }
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
