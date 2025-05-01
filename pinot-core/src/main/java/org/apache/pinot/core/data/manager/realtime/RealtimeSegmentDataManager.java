@@ -437,8 +437,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _consecutiveErrorCount, e);
       throw e;
     } else {
-      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
-          _consecutiveErrorCount, e);
+      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
+        _segmentLogger.debug("Interrupted to stop consumption", e);
+      } else {
+        _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
+            _consecutiveErrorCount, e);
+      }
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       recreateStreamConsumer("Too many transient errors");
     }
@@ -475,7 +479,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
               messageBatch.isEndOfPartitionGroup());
         }
-        _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
+        // We need to check for both endOfPartitionGroup and messageCount == 0, because
+        // endOfPartitionGroup can be true even if this is the last batch of messages (has been observed for kinesis)
+        // To process the last batch of messages, we need to set _endOfPartitionGroup to false in such a case
+        _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);

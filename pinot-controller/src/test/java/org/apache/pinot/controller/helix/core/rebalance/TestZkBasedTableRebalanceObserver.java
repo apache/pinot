@@ -1293,4 +1293,129 @@ public class TestZkBasedTableRebalanceObserver {
 
     assertEquals(current, target);
   }
+
+  @Test
+  void testElapsedTimeWithCarryOverProgressStats() {
+    long estimatedAverageSegmentSize = 1024;
+
+    Map<String, Map<String, String>> currentIS = new TreeMap<>();
+    currentIS.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ONLINE));
+    currentIS.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2"), ONLINE));
+    currentIS.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4"), ONLINE));
+
+    // Assume that the current EV doesn't yet have the segments added as seen in currentIS
+    Map<String, Map<String, String>> currentEV = new TreeMap<>();
+
+    Map<String, Map<String, String>> targetIS = new TreeMap<>();
+    targetIS.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
+    targetIS.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host4", "host5"), ONLINE));
+    targetIS.put("segment3",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host4", "host5"), ONLINE));
+
+    TableRebalanceProgressStats tableRebalanceProgressStats = new TableRebalanceProgressStats();
+
+    // Initialize the start trigger with some change
+    Set<String> segmentSet = new HashSet<>(targetIS.keySet());
+    TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+        estimatedAverageSegmentSize, segmentSet, segmentSet);
+    TableRebalanceProgressStats.RebalanceProgressStats stats =
+        ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(targetIS, currentIS, rebalanceContext,
+            TableRebalanceObserver.Trigger.START_TRIGGER, tableRebalanceProgressStats);
+    assertEquals(stats._totalSegmentsToBeAdded, 11);
+    assertEquals(stats._totalSegmentsToBeDeleted, 2);
+    assertEquals(stats._totalRemainingSegmentsToBeAdded, 11);
+    assertEquals(stats._totalRemainingSegmentsToBeDeleted, 2);
+    assertEquals(stats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(stats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalRemainingSegmentsToConverge, 0);
+    assertEquals(stats._totalUniqueNewUntrackedSegmentsDuringRebalance, 0);
+    assertEquals(stats._percentageRemainingSegmentsToBeAdded, 100.0);
+    assertEquals(stats._percentageRemainingSegmentsToBeDeleted, 100.0);
+    assertEquals(stats._estimatedTimeToCompleteAddsInSeconds, -1.0);
+    assertEquals(stats._estimatedTimeToCompleteDeletesInSeconds, -1.0);
+    assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
+    assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 11);
+    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(stats);
+
+    // Next call EV-IS convergence (assume here that the IS is not yet updated like happens in actual rebalance)
+    // Since currentEV does not match currentIS, IS-EV convergence will detect some segments are carry over segments
+    // and wait for these to converge before moving on to the first IS update
+    // Also validate that the overall progress stats shows elapsed time as -1.0 instead of some random -ve time
+    segmentSet = new HashSet<>(targetIS.keySet());
+    rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(currentIS, currentEV, rebalanceContext,
+        TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+        tableRebalanceProgressStats);
+    tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(stats);
+    stats = tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
+    assertEquals(stats._totalSegmentsToBeAdded, 0);
+    assertEquals(stats._totalSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalRemainingSegmentsToBeAdded, 0);
+    assertEquals(stats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalCarryOverSegmentsToBeAdded, 3);
+    assertEquals(stats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalRemainingSegmentsToConverge, 0);
+    assertEquals(stats._totalUniqueNewUntrackedSegmentsDuringRebalance, 0);
+    assertEquals(stats._percentageRemainingSegmentsToBeAdded, 0.0);
+    assertEquals(stats._percentageRemainingSegmentsToBeDeleted, 0.0);
+    assertEquals(stats._estimatedTimeToCompleteAddsInSeconds, 0.0);
+    assertEquals(stats._estimatedTimeToCompleteDeletesInSeconds, 0.0);
+    assertEquals(stats._averageSegmentSizeInBytes, 0);
+    assertEquals(stats._totalEstimatedDataToBeMovedInBytes, 0);
+    TableRebalanceProgressStats.RebalanceProgressStats overallStats =
+        tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 11);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 11);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 2);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 3);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToConverge, 0);
+    assertEquals(overallStats._totalUniqueNewUntrackedSegmentsDuringRebalance, 0);
+    assertEquals(overallStats._percentageRemainingSegmentsToBeAdded, 127.27272727272727);
+    assertEquals(overallStats._percentageRemainingSegmentsToBeDeleted, 100.0);
+    assertEquals(overallStats._estimatedTimeToCompleteAddsInSeconds, -1.0);
+    assertEquals(overallStats._estimatedTimeToCompleteDeletesInSeconds, -1.0);
+    assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
+    assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 11);
+
+    // currentEV has converged to match currentIS, no more carry over segments should be seen
+    currentEV = new TreeMap<>(currentIS);
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(currentIS, currentEV, rebalanceContext,
+        TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+        tableRebalanceProgressStats);
+    tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(stats);
+    stats = tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
+    assertEquals(stats._totalSegmentsToBeAdded, 0);
+    assertEquals(stats._totalSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalRemainingSegmentsToBeAdded, 0);
+    assertEquals(stats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(stats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(stats._totalRemainingSegmentsToConverge, 0);
+    assertEquals(stats._totalUniqueNewUntrackedSegmentsDuringRebalance, 0);
+    assertEquals(stats._percentageRemainingSegmentsToBeAdded, 0.0);
+    assertEquals(stats._percentageRemainingSegmentsToBeDeleted, 0.0);
+    assertEquals(stats._estimatedTimeToCompleteAddsInSeconds, 0.0);
+    assertEquals(stats._estimatedTimeToCompleteDeletesInSeconds, 0.0);
+    assertEquals(stats._averageSegmentSizeInBytes, 0);
+    assertEquals(stats._totalEstimatedDataToBeMovedInBytes, 0);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 11);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 11);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 2);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToConverge, 0);
+    assertEquals(overallStats._totalUniqueNewUntrackedSegmentsDuringRebalance, 0);
+    assertEquals(overallStats._percentageRemainingSegmentsToBeAdded, 100.0);
+    assertEquals(overallStats._percentageRemainingSegmentsToBeDeleted, 100.0);
+    assertEquals(overallStats._estimatedTimeToCompleteAddsInSeconds, -1.0);
+    assertEquals(overallStats._estimatedTimeToCompleteDeletesInSeconds, -1.0);
+    assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
+    assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 11);
+  }
 }
