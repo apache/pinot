@@ -912,6 +912,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
             + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
             + "intended");
 
+    // test updateTargetTier warning
+    rebalanceConfig.setUpdateTargetTier(false);
+    rebalanceConfig.setBootstrap(false);
+    rebalanceConfig.setBestEfforts(false);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setTierConfigList(Collections.singletonList(
+                new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
+                    TierFactory.PINOT_SERVER_STORAGE_TYPE,
+                    TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), null, null)))
+            .build();
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(), "updateTargetTier should be enabled when tier configs are present");
+
     // trigger downtime warning
     TableConfig newTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
@@ -919,6 +937,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
     rebalanceConfig.setDowntime(true);
+    // udpateTargetTier is false, but there is no tier config so we should not see a warning
+    rebalanceConfig.setUpdateTargetTier(false);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
