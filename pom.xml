@@ -56,6 +56,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-dependency-verifier</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
@@ -189,6 +190,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
+    <enforcer-api.version>3.5.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
@@ -246,6 +248,7 @@
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.20</scala.version>
+    <scala-2.13.version>2.13.16</scala-2.13.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
@@ -294,6 +297,9 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
     <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
+    <jdom2.version>2.0.6</jdom2.version>
+    <maven.version>3.9.7</maven.version>
+    <plexus-utils.version>3.5.1</plexus-utils.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -2086,6 +2092,33 @@
         <version>${assertj.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.maven.enforcer</groupId>
+        <artifactId>enforcer-api</artifactId>
+        <version>${enforcer-api.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-plugin-api</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jdom</groupId>
+        <artifactId>jdom2</artifactId>
+        <version>${jdom2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-utils</artifactId>
+        <version>${plexus-utils.version}</version>
+        <scope>compile</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2249,38 +2282,26 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
+          <extensions>true</extensions>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-dependency-verifier</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
           <executions>
             <execution>
-              <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
+              <id>pinot-dependency-verifier</id> <!-- magic id, used when calling enforcer:enforce -->
               <goals>
                 <goal>enforce</goal>
               </goals>
               <phase>validate</phase>
               <configuration>
                 <rules>
-                  <dependencyConvergence />
-                  <bannedDependencies>
-                    <excludes>
-                      <!-- Use org.slf4j:jcl-over-slf4j -->
-                      <exclude>commons-logging:commons-logging</exclude>
-                      <!-- Use org.apache.logging.log4j:log4j-core -->
-                      <exclude>log4j:log4j</exclude>
-                      <!-- Use org.apache.logging.log4j:log4j-slf4j2-impl -->
-                      <exclude>org.slf4j:slf4j-log4j12</exclude>
-                      <exclude>org.slf4j:slf4j-reload4j</exclude>
-                      <exclude>ch.qos.reload4j:reload4j</exclude>
-                      <exclude>ch.qos.logback</exclude>
-                      <!-- Use com.fasterxml.jackson -->
-                      <exclude>org.codehaus.jackson</exclude>
-                      <!-- Use org.glassfish.jersey -->
-                      <exclude>com.sun.jersey</exclude>
-                      <!-- Use hadoop-shaded-protobuf_3_21 -->
-                      <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_7</exclude>
-                      <!-- Use org.bouncycastle:bcprov-jdk18on -->
-                      <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
-                    </excludes>
-                  </bannedDependencies>
+                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule"/>
                 </rules>
+                <fail>true</fail>
               </configuration>
             </execution>
           </executions>

@@ -58,6 +58,34 @@
           <repositoryName>lib</repositoryName>
         </configuration>
       </plugin>
+<!--      <plugin>-->
+<!--        <groupId>org.apache.maven.plugins</groupId>-->
+<!--        <artifactId>maven-enforcer-plugin</artifactId>-->
+<!--        <extensions>true</extensions>-->
+<!--        <dependencies>-->
+<!--          <dependency>-->
+<!--            <groupId>org.apache.pinot</groupId>-->
+<!--            <artifactId>pinot-dependency-verifier</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--          </dependency>-->
+<!--        </dependencies>-->
+<!--        <executions>-->
+<!--          <execution>-->
+<!--            <id>pinot-dependency-verifier</id> &lt;!&ndash; magic id, used when calling enforcer:enforce &ndash;&gt;-->
+<!--            <goals>-->
+<!--              <goal>enforce</goal>-->
+<!--            </goals>-->
+<!--            <phase>validate</phase>-->
+<!--            <configuration>-->
+<!--              <rules>-->
+<!--                &lt;!&ndash;                  <dependencyConvergence />&ndash;&gt;-->
+<!--                <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule"/>-->
+<!--              </rules>-->
+<!--              <fail>true</fail>-->
+<!--            </configuration>-->
+<!--          </execution>-->
+<!--        </executions>-->
+<!--      </plugin>-->
     </plugins>
   </build>
 
