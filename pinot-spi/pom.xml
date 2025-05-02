@@ -134,10 +134,10 @@
               <path>${basedir}/resources/pinot-spi-japicmp-baseline.jar</path>
             </file>
           </oldVersion>
-          <!-- If oldVersion were left blank, 1.3.0 would be the baseline version for japicmp's comparing. However, we already
-          introduced back-incompatible changes since the release of 1.4.0-SNAPSHOT, so we are using a baseline .jar of the repo here
-          (with version as of PR #15684).
-          TODO: At the time of the next Pinot release (1.4.0), update the baseline version here to 1.4.0 and remove pinot-spi/resources/pinot-spi-japicmp-baseline.jar from repo.-->
+<!-- If oldVersion were left blank, 1.3.0 would be the baseline version for japicmp's comparing. However, we already
+introduced back-incompatible changes since the release of 1.4.0-SNAPSHOT, so we are using a baseline .jar of the repo here
+(with version as of PR #15684).
+TODO: At the time of the next Pinot release (1.4.0), update the baseline version here to 1.4.0 and remove pinot-spi/resources/pinot-spi-japicmp-baseline.jar from repo.-->
           <newVersion>
             <file>
               <path>${project.build.directory}/${project.artifactId}-${project.version}.jar</path>
