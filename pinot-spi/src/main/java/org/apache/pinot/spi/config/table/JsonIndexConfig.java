@@ -62,7 +62,11 @@ public class JsonIndexConfig extends IndexConfig {
   private Set<String> _indexPaths;
   private int _maxValueLength = 0;
   private boolean _skipInvalidJson = false;
-  private long _maxBytesSize = Long.MAX_VALUE;
+
+  /**
+   * Max on-heap bytes size of the mutable JSON index. An underestimate, as this excludes the posting lists.
+   */
+  private Long _maxBytesSize;
 
   public JsonIndexConfig() {
     super(false);
@@ -93,7 +97,7 @@ public class JsonIndexConfig extends IndexConfig {
     _indexPaths = indexPaths;
     _maxValueLength = maxValueLength;
     _skipInvalidJson = skipInvalidJson;
-    _maxBytesSize = maxBytesSize == null ? _maxBytesSize : maxBytesSize;
+    _maxBytesSize = maxBytesSize;
   }
 
   public int getMaxLevels() {
@@ -178,10 +182,10 @@ public class JsonIndexConfig extends IndexConfig {
   }
 
   public long getMaxBytesSize() {
-    return _maxBytesSize;
+    return _maxBytesSize == null ? Long.MAX_VALUE : _maxBytesSize;
   }
 
-  public void setMaxBytesSize(int maxBytesSize) {
+  public void setMaxBytesSize(Long maxBytesSize) {
     Preconditions.checkArgument(maxBytesSize > 0, "Max bytes size must be greater than 0");
     _maxBytesSize = maxBytesSize;
   }

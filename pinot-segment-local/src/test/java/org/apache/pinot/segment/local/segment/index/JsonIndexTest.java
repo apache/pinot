@@ -945,7 +945,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         eq(ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE),
         eq(25L)); // bytes(.key) + bytes(.key\u0000value) +  bytes(.key\u0000value2)
 
-    jsonIndexConfig.setMaxBytesSize(5);
+    jsonIndexConfig.setMaxBytesSize(5L);
     try (MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table2__0__1", "col")) {
       assertTrue(mutableIndex.canAddMore());
       mutableIndex.add("{\"anotherKey\":\"anotherValue\"}");
