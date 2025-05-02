@@ -312,14 +312,17 @@ public interface TableDataManager {
 
   /**
    * Fetches the table config and schema for the table from ZK, then construct the index loading config with them.
+   * The fetched table config and schema are then cached in the table data manager, and should not be modified. The
+   * cache is used mainly for query time access of table config and schema without accessing ZK.
    */
   IndexLoadingConfig fetchIndexLoadingConfig();
 
   /**
-   * Returns the cached latest {@link IndexLoadingConfig} for the table. The cache is refreshed when invoking
-   * {@link #fetchIndexLoadingConfig()}.
+   * Returns the cached latest {@link TableConfig} and {@link Schema} pair for the table. The cache is refreshed when
+   * invoking {@link #fetchIndexLoadingConfig()}, and should not be modified. We cache them as a pair to ensure they are
+   * updated at once to avoid race conditions.
    */
-  IndexLoadingConfig getIndexLoadingConfig();
+  Pair<TableConfig, Schema> getCachedTableConfigAndSchema();
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
