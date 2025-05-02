@@ -1539,7 +1539,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(result > 0);
   }
 
-  @Test(enabled = false) // disabled until we figure out how to make MSE case-insensitive without breaking compatibility
+  @Test
   public void testCaseInsensitiveNamesAgainstController() throws Exception {
     String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
     JsonNode jsonNode = postQueryToController(query);
