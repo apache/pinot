@@ -128,6 +128,47 @@ declare module 'Models' {
 
   export type QuerySchemas = Array<string>;
 
+  /**
+   * Information about a consuming segment on a server
+   */
+  export interface ConsumingInfo {
+    serverName: string;
+    consumerState: string;
+    lastConsumedTimestamp: number;
+    partitionToOffsetMap: Record<string, string>;
+    partitionOffsetInfo: {
+      currentOffsetsMap: Record<string, string>;
+      latestUpstreamOffsetMap: Record<string, string>;
+      recordsLagMap: Record<string, string>;
+      availabilityLagMsMap: Record<string, string>;
+    };
+  }
+
+  /**
+   * Consuming segments information for a table
+   */
+  export interface ConsumingSegmentsInfo {
+    serversFailingToRespond: number;
+    serversUnparsableRespond: number;
+    _segmentToConsumingInfoMap: Record<string, ConsumingInfo[]>;
+  }
+  
+  /**
+   * Pause status information for a realtime table
+   */
+  export interface PauseStatusDetails {
+    /** Whether the table is currently paused */
+    pauseFlag: boolean;
+    /** List of segments still in consuming state when paused */
+    consumingSegments: string[];
+    /** Reason code for pause state */
+    reasonCode: string;
+    /** Optional comment provided when pausing/resuming */
+    comment: string;
+    /** Timestamp of the pause/resume action */
+    timestamp: string;
+  }
+
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;

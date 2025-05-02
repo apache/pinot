@@ -1001,6 +1001,9 @@ public class PinotLLCRealtimeSegmentManager {
         partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream()
             .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
             .collect(Collectors.toSet()));
+      } catch (UnsupportedOperationException ignored) {
+        allPartitionIdsFetched = false;
+        // Stream does not support fetching partition ids. There is a log in the fallback code which is sufficient
       } catch (Exception e) {
         allPartitionIdsFetched = false;
         LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfigs.get(i).getTopicName(), e);
@@ -1035,7 +1038,20 @@ public class PinotLLCRealtimeSegmentManager {
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
-        currentPartitionGroupConsumptionStatusList);
+        currentPartitionGroupConsumptionStatusList, false);
+  }
+
+  /**
+   * Fetches the latest state of the PartitionGroups for the stream
+   * If any partition has reached end of life, and all messages of that partition have been consumed by the segment,
+   * it will be skipped from the result
+   */
+  @VisibleForTesting
+  List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+      boolean forceGetOffsetFromStream) {
+    return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
+        currentPartitionGroupConsumptionStatusList, forceGetOffsetFromStream);
   }
 
   /**
@@ -1472,7 +1488,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     // Create a map from partition id to the smallest stream offset
     Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
-    if (offsetCriteria == OffsetCriteria.SMALLEST_OFFSET_CRITERIA) {
+    if (offsetCriteria != null && offsetCriteria.equals(OffsetCriteria.SMALLEST_OFFSET_CRITERIA)) {
       partitionIdToSmallestOffset = partitionIdToStartOffset;
     }
 
@@ -1565,11 +1581,13 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
           if (partitionIdToSmallestOffset == null) {
-            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs);
+            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfigs, idealState);
           }
 
           // Do not create new CONSUMING segment when the stream partition has reached end of life.
           if (!partitionIdToSmallestOffset.containsKey(partitionId)) {
+            LOGGER.info("PartitionGroup: {} has reached end of life. Skipping creation of new segment {}",
+                partitionId, latestSegmentName);
             continue;
           }
 
@@ -1663,13 +1681,24 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private Map<Integer, StreamPartitionMsgOffset> fetchPartitionGroupIdToSmallestOffset(
-      List<StreamConfig> streamConfigs) {
+      List<StreamConfig> streamConfigs, IdealState idealState) {
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestOffset = new HashMap<>();
     for (StreamConfig streamConfig : streamConfigs) {
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+          getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+
+      // Kinesis shard-split flow requires us to pass currentPartitionGroupConsumptionStatusList so that
+      // we can check if its completely consumed
+      // However the kafka implementation of computePartitionGroupMetadata() breaks if we pass the current status
+      // This leads to streamSmallestOffset set to null in selectStartOffset() method
+      // The overall dependency isn't clean and is causing the issue and requires refactor
+      // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
+      // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
+      // while the kinesis implementation will use it.
       List<PartitionGroupMetadata> partitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList());
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
       for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
         partitionGroupIdToSmallestOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());

@@ -49,7 +49,9 @@ public class Validator extends SqlValidatorImpl {
 
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
     super(opTab, catalogReader, typeFactory,
-        Config.DEFAULT.withConformance(SqlConformanceEnum.BABEL).withIdentifierExpansion(true));
+        Config.DEFAULT.withConformance(SqlConformanceEnum.BABEL)
+            .withIdentifierExpansion(true)
+            .withTypeCoercionFactory(PinotTypeCoercion::new));
   }
 
   /**

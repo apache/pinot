@@ -108,7 +108,11 @@ import {
   getTaskRuntimeConfig,
   getSchemaInfo,
   getSegmentsStatus,
-  getServerToSegmentsCount
+  getConsumingSegmentsInfo,
+  getServerToSegmentsCount,
+  pauseConsumption,
+  resumeConsumption,
+  getPauseStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -431,7 +435,14 @@ const getAllSchemaDetails = async (schemaList) => {
     columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
-}
+};
+
+// Fetch consuming segments info for a given table
+// API: /tables/{tableName}/consumingSegmentsInfo
+// Expected Output: ConsumingSegmentsInfo
+const getConsumingSegmentsInfoData = (tableName) => {
+  return getConsumingSegmentsInfo(tableName).then(({ data }) => data);
+};
 
 const allTableDetailsColumnHeader = [
   'Table Name',
@@ -812,6 +823,19 @@ const toggleTableState = (tableName, state, tableType) => {
   return setTableState(tableName, state, tableType).then((response)=>{
     return response.data;
   });
+};
+// Pause or resume consumption of a realtime table
+// Returns PauseStatusDetails
+const pauseConsumptionOp = (tableName, comment) => {
+  return pauseConsumption(tableName, comment).then((response) => response.data);
+};
+
+const resumeConsumptionOp = (tableName, comment, consumeFrom) => {
+  return resumeConsumption(tableName, comment, consumeFrom).then((response) => response.data);
+};
+
+const getPauseStatusData = (tableName) => {
+  return getPauseStatus(tableName).then((response) => response.data);
 };
 
 const deleteInstance = (instanceName) => {
@@ -1389,5 +1413,10 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
-  fetchServerToSegmentsCountData
+  // Pause/resume consumption of realtime tables
+  pauseConsumptionOp,
+  resumeConsumptionOp,
+  getPauseStatusData,
+  fetchServerToSegmentsCountData,
+  getConsumingSegmentsInfoData
 };
