@@ -93,7 +93,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
     Preconditions.checkState(newInput instanceof PRelNode, "Expected input of PhysicalExchange to be a PRelNode");
-    Preconditions.checkState(traitSet.isEmpty(), "Expected empty trait set for PhysicalExchange");
+    // TODO(mse-physical): this always uses streaming exec strategy at the moment.
     return new PhysicalExchange(_nodeId, (PRelNode) newInput, _pinotDataDistribution, _distributionKeys,
         _exchangeStrategy, _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
   }
