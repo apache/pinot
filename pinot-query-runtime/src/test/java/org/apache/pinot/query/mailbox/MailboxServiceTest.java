@@ -22,14 +22,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -46,8 +48,8 @@ public class MailboxServiceTest {
   private static final int SENDER_STAGE_ID = 1;
   private static final int RECEIVER_STAGE_ID = 0;
   private static final DataSchema DATA_SCHEMA =
-      new DataSchema(new String[]{"testColumn"}, new ColumnDataType[]{ColumnDataType.INT});
-
+      new DataSchema(new String[]{"testColumn"}, new ColumnDataType[]{ColumnDataType.STRING});
+  private static final int MAX_DATA_BLOCK_SIZE = 4_000_000;
   private MailboxService _mailboxService1;
   private MailboxService _mailboxService2;
 
@@ -58,7 +60,7 @@ public class MailboxServiceTest {
   public void setUp() {
     PinotConfiguration config = new PinotConfiguration(
         Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            4_000_000));
+            MAX_DATA_BLOCK_SIZE));
     _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
     _mailboxService1.start();
     _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
@@ -85,9 +87,9 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     sendingMailbox.complete();
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -95,16 +97,14 @@ public class MailboxServiceTest {
     });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
-      TransferableBlock block = receivingMailbox.poll();
-      assertNotNull(block);
-      List<Object[]> rows = block.getContainer();
+      List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
-      assertEquals(rows.get(0), new Object[]{i});
+      assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
     assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
-    TransferableBlock block = receivingMailbox.poll();
+    ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
     assertNotNull(block);
-    assertTrue(block.isSuccessfulEndOfStreamBlock());
+    assertTrue(block.getBlock().isSuccess());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
   }
@@ -124,25 +124,23 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     sendingMailbox.complete();
 
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
-      TransferableBlock block = receivingMailbox.poll();
-      assertNotNull(block);
-      List<Object[]> rows = block.getContainer();
+      List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
-      assertEquals(rows.get(0), new Object[]{i});
+      assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
     assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isSuccessfulEndOfStreamBlock());
+    assertTrue(block.isEos());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
   }
@@ -158,15 +156,15 @@ public class MailboxServiceTest {
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block and then cancel
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     sendingMailbox.cancel(new Exception("TEST ERROR"));
     assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -191,9 +189,9 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -213,15 +211,15 @@ public class MailboxServiceTest {
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block and then cancel
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 1);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -242,10 +240,10 @@ public class MailboxServiceTest {
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block, sleep until timed out, then send one more block
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
     try {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{1}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"1"}));
       fail("Expect exception when sending data after timing out");
     } catch (Exception e) {
       // Expected
@@ -254,9 +252,9 @@ public class MailboxServiceTest {
     // Data blocks will be cleaned up
     assertEquals(numCallbacks.get(), 2);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -278,12 +276,12 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
 
     // Next send will throw exception because buffer is full
     try {
-      sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+      sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
       fail("Except exception when sending data after buffer is full");
     } catch (Exception e) {
       // Expected
@@ -292,9 +290,9 @@ public class MailboxServiceTest {
     // Data blocks will be cleaned up
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -314,16 +312,17 @@ public class MailboxServiceTest {
     });
 
     // send a block
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     // receiving-side early terminates after pulling the first block
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     receivingMailbox.earlyTerminate();
     assertNotNull(block);
-    assertEquals(block.getNumRows(), 1);
+    assertTrue(block.isData());
+    assertEquals(((MseBlock.Data) block).getNumRows(), 1);
     // send another block b/c it doesn't guarantee the next block must be EOS
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     // send a metadata block
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
 
     // sending side should early terminate
     assertTrue(sendingMailbox.isEarlyTerminated());
@@ -338,9 +337,9 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     sendingMailbox.complete();
 
     // Wait until all the mails are delivered
@@ -353,16 +352,14 @@ public class MailboxServiceTest {
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
-      TransferableBlock block = receivingMailbox.poll();
-      assertNotNull(block);
-      List<Object[]> rows = block.getContainer();
+      List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
-      assertEquals(rows.get(0), new Object[]{i});
+      assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
     assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isSuccessfulEndOfStreamBlock());
+    assertTrue(block.isSuccess());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
   }
@@ -386,9 +383,9 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{Integer.toString(i)}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     sendingMailbox.complete();
 
     // Wait until all the mails are delivered
@@ -397,16 +394,14 @@ public class MailboxServiceTest {
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
-      TransferableBlock block = receivingMailbox.poll();
-      assertNotNull(block);
-      List<Object[]> rows = block.getContainer();
+      List<Object[]> rows = getRows(receivingMailbox);
       assertEquals(rows.size(), 1);
-      assertEquals(rows.get(0), new Object[]{i});
+      assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
     assertEquals(receivingMailbox.getNumPendingBlocks(), 1);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isSuccessfulEndOfStreamBlock());
+    assertTrue(block.isSuccess());
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
   }
@@ -426,7 +421,7 @@ public class MailboxServiceTest {
     });
 
     // Send one data block and then cancel
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     sendingMailbox.cancel(new Exception("TEST ERROR"));
 
     // Wait until all the mails are delivered
@@ -435,9 +430,9 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -469,9 +464,9 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -495,16 +490,16 @@ public class MailboxServiceTest {
     });
 
     // Send one data block and then cancel
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     receiveMailLatch.await();
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 1);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -529,7 +524,7 @@ public class MailboxServiceTest {
     });
 
     // Send one data block, RPC will timeout after deadline
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     Thread.sleep(deadlineMs - System.currentTimeMillis() + 10);
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), 2);
@@ -545,9 +540,9 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -571,21 +566,25 @@ public class MailboxServiceTest {
       receiveMailLatch.countDown();
     });
 
+    // send blocks big enough to avoid block combining in the sending side
+    // although fragile, this works because we know that outboundMax = inboundMax/2
+    String payload = new String(new char[MAX_DATA_BLOCK_SIZE / 3]).replace('\0', 'a');
+
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
-      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{payload}));
     }
 
     // Next send will be blocked on the receiver side and cause exception after timeout
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
     // Data blocks will be cleaned up
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    TransferableBlock block = receivingMailbox.poll();
+    MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
-    assertTrue(block.isErrorBlock());
+    assertTrue(block.isError());
 
     // Cancel is idempotent for both sending and receiving mailbox, so safe to call multiple times
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -607,21 +606,42 @@ public class MailboxServiceTest {
     });
 
     // send a block
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     // receiving-side early terminates after pulling the first block
     TestUtils.waitForCondition(aVoid -> {
-      TransferableBlock block = receivingMailbox.poll();
-      return block != null && block.getNumRows() == 1;
+      ReceivingMailbox.MseBlockWithStats blockWithStats = receivingMailbox.poll();
+      if (blockWithStats == null) {
+        return false;
+      }
+      MseBlock block = blockWithStats.getBlock();
+      return block != null && block.isData() && ((MseBlock.Data) block).getNumRows() == 1;
     }, 1000L, "Failed to deliver mails");
     receivingMailbox.earlyTerminate();
 
     // send another block b/c it doesn't guarantee the next block must be EOS
-    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"0"}));
     // send a metadata block
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
+    sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
     sendingMailbox.complete();
 
     // sending side should early terminate
     TestUtils.waitForCondition(aVoid -> sendingMailbox.isEarlyTerminated(), 1000L, "Failed to early-terminate sender");
+  }
+
+  private static List<Object[]> getRows(ReceivingMailbox receivingMailbox) {
+    ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
+    assertNotNull(block);
+    assertTrue(block.getBlock().isData());
+    List<Object[]> rows = ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
+    return rows;
+  }
+
+  @Nullable
+  public static MseBlock readBlock(ReceivingMailbox receivingMailbox) {
+    ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
+    if (block == null) {
+      return null;
+    }
+    return block.getBlock();
   }
 }

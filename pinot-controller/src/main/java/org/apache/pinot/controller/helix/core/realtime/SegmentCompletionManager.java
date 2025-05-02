@@ -139,17 +139,12 @@ public class SegmentCompletionManager {
     }
 
     if (factoryName == null) {
-      // Create a metric identifier at partition level granularity, similar to server metrics
-      // in RealtimeSegmentValidationManager
-      String tableNameAndPartitionGroupId = realtimeTableName + "-" + llcSegmentName.getPartitionGroupId();
       if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
         factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
-        _controllerMetrics.setValueOfTableGauge(tableNameAndPartitionGroupId,
-            ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
       } else {
         factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
-        _controllerMetrics.setValueOfTableGauge(tableNameAndPartitionGroupId,
-            ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
       }
     }
 
@@ -269,6 +264,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_DISCARD;
     }
     _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    _fsmMap.remove(segmentName);
     return SegmentCompletionProtocol.RESP_PROCESSED;
   }
 

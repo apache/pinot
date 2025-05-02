@@ -24,9 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -48,7 +50,7 @@ public class OpChainSchedulerService {
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
-        TransferableBlock returnedErrorBlock = null;
+        ErrorMseBlock errorBlock = null;
         Throwable thrown = null;
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
@@ -56,25 +58,25 @@ public class OpChainSchedulerService {
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
-          TransferableBlock result = operatorChain.getRoot().nextBlock();
-          while (!result.isEndOfStreamBlock()) {
+          MseBlock result = operatorChain.getRoot().nextBlock();
+          while (result.isData()) {
             result = operatorChain.getRoot().nextBlock();
           }
-          if (result.isErrorBlock()) {
-            returnedErrorBlock = result;
-            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, result.getQueryStats(),
-                result.getExceptions());
+          MultiStageQueryStats stats = operatorChain.getRoot().calculateStats();
+          if (result.isError()) {
+            errorBlock = (ErrorMseBlock) result;
+            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
           } else {
-            LOGGER.debug("({}): Completed {}", operatorChain, result.getQueryStats());
+            LOGGER.debug("({}): Completed {}", operatorChain, stats);
           }
         } catch (Exception e) {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
           _submittedOpChainMap.remove(operatorChain.getId());
-          if (returnedErrorBlock != null || thrown != null) {
+          if (errorBlock != null || thrown != null) {
             if (thrown == null) {
-              thrown = new RuntimeException("Error block " + returnedErrorBlock.getExceptions());
+              thrown = new RuntimeException("Error block " + errorBlock.getErrorMessages());
             }
             operatorChain.cancel(thrown);
           }

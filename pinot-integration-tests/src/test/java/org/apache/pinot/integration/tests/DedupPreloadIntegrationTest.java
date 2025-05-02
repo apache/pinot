@@ -25,19 +25,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -77,11 +78,10 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
-        "1");
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.DEDUP_CONFIG_PREFIX,
-        TableDedupMetadataManagerFactory.DEDUP_DEFAULT_ENABLE_PRELOAD), "true");
+    serverConf.setProperty(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads", "1");
+    serverConf.setProperty(Joiner.on(".")
+        .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Dedup.CONFIG_PREFIX,
+            Server.Dedup.DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
@@ -148,21 +148,40 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
+  protected IngestionConfig getIngestionConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig()
+        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
+    return ingestionConfig;
+  }
+
+  @Override
   protected TableConfig createDedupTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, 0, null, true);
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setPreload(Enablement.ENABLE);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).setRoutingConfig(
+        .setTimeColumnName(getTimeColumnName())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1)).setDedupConfig(dedupConfig)
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setDedupConfig(dedupConfig)
         .build();
   }
 }

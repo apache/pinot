@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
@@ -39,11 +40,28 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
  * The {@code CompositeTransformer} class performs multiple transforms based on the inner {@link RecordTransformer}s.
  */
 public class CompositeTransformer implements RecordTransformer {
+  // TODO: Integrate ComplexTypeTransformer into the CompositeTransformer.
   private final List<RecordTransformer> _transformers;
 
   /**
+   * Returns a list of record transformers that perform enrichment of the record before the record is passed onto the
+   * ComplexType transformer. The transform pipeline order is as follows:
+   * <ol>
+   *  <li> pre-complex type transformers</li>
+   *  <li> complex type transformers</li>
+   *  <li> plain record transformers</li>
+   * </ol>
+   */
+  public static List<RecordTransformer> getPreComplexTypeTransformers(TableConfig tableConfig) {
+    List<RecordTransformer> preComplexTypeTransformers = new ArrayList<>();
+    addRecordEnricherTransformers(tableConfig, preComplexTypeTransformers, true);
+    return preComplexTypeTransformers;
+  }
+
+  /**
    * Returns a record transformer that performs null value handling, time/expression/data-type transformation and record
-   * sanitization.
+   * sanitization. Note that the list of transformers returned from this method does not include the pre-complex type
+   * and complex type transformers.
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
@@ -87,20 +105,7 @@ public class CompositeTransformer implements RecordTransformer {
    */
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     List<RecordTransformer> transformers = new ArrayList<>();
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    if (ingestionConfig != null) {
-      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
-      if (enrichmentConfigs != null) {
-        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          try {
-            addIfNotNoOp(transformers, RecordEnricherRegistry.createRecordEnricher(enrichmentConfig));
-          } catch (IOException e) {
-            throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(),
-                e);
-          }
-        }
-      }
-    }
+    addRecordEnricherTransformers(tableConfig, transformers, false);
     addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new FilterTransformer(tableConfig));
     addIfNotNoOp(transformers, new SchemaConformingTransformer(tableConfig, schema));
@@ -116,6 +121,34 @@ public class CompositeTransformer implements RecordTransformer {
     if (!transformer.isNoOp()) {
       transformers.add(transformer);
     }
+  }
+
+  private static void addRecordEnricherTransformers(TableConfig tableConfig,
+      List<RecordTransformer> transformers, boolean preComplexTypeTransformers) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+      if (enrichmentConfigs != null) {
+        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+          // if pre-ComplexType transformers are requested, add only pre-ComplexType transformers. Similarly, if
+          // non pre-ComplexType transformers are requested, add only non pre-ComplexType transformers.
+          if (preComplexTypeTransformers != enrichmentConfig.isPreComplexTypeTransform()) {
+            continue;
+          }
+          try {
+            addIfNotNoOp(transformers, RecordEnricherRegistry.createRecordEnricher(enrichmentConfig));
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(),
+                e);
+          }
+        }
+      }
+    }
+  }
+
+  public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema, @Nullable
+      SegmentZKMetadata segmentZKMetadata) {
+    return new CompositeTransformer(getDefaultTransformers(tableConfig, schema));
   }
 
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {

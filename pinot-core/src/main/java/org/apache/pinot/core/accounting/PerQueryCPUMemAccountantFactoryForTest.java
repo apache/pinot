@@ -22,6 +22,7 @@ import java.util.Map;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -30,14 +31,15 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class PerQueryCPUMemAccountantFactoryForTest implements ThreadAccountantFactory {
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
-    return new PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(config, instanceId);
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+    return new PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(config, instanceId, instanceType);
   }
 
   public static class PerQueryCPUMemResourceUsageAccountantBrokerKillingTest
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-    public PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(PinotConfiguration config, String instanceId) {
-      super(config, instanceId);
+    public PerQueryCPUMemResourceUsageAccountantBrokerKillingTest(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
+      super(config, instanceId, instanceType);
     }
 
     public void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {

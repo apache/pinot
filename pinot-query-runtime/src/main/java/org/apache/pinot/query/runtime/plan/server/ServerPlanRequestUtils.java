@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,10 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
-import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -40,6 +39,7 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -51,11 +51,13 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -80,12 +82,10 @@ public class ServerPlanRequestUtils {
   public static OpChain compileLeafStage(
       OpChainExecutionContext executionContext,
       StagePlan stagePlan,
-      HelixManager helixManager,
-      ServerMetrics serverMetrics,
       QueryExecutor leafQueryExecutor,
       ExecutorService executorService) {
-    return compileLeafStage(executionContext, stagePlan, helixManager, serverMetrics, leafQueryExecutor,
-        executorService, (planNode, multiStageOperator) -> {
+    return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
+        (planNode, multiStageOperator) -> {
         }, false);
   }
 
@@ -96,29 +96,28 @@ public class ServerPlanRequestUtils {
    * @param stagePlan the distribute stage plan on the leaf.
    * @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
    */
-  public static OpChain compileLeafStage(OpChainExecutionContext executionContext,
+  public static OpChain compileLeafStage(
+      OpChainExecutionContext executionContext,
       StagePlan stagePlan,
-      HelixManager helixManager,
-      ServerMetrics serverMetrics,
       QueryExecutor leafQueryExecutor,
       ExecutorService executorService,
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
       boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
-    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor,
-        executorService, executionContext.getPipelineBreakerResult());
+    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
+        executionContext.getPipelineBreakerResult());
     // 1. Compile the PinotQuery
     constructPinotQueryPlan(serverContext, executionContext.getOpChainMetadata());
     // 2. Convert PinotQuery into InstanceRequest list (one for each physical table)
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     pinotQuery.setExplain(explain);
     List<InstanceRequest> instanceRequests =
-        constructServerQueryRequests(executionContext, pinotQuery, helixManager.getHelixPropertyStore());
+        constructServerQueryRequests(executionContext, pinotQuery, leafQueryExecutor.getInstanceDataManager());
     int numRequests = instanceRequests.size();
     List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(numRequests);
     for (InstanceRequest instanceRequest : instanceRequests) {
-      serverQueryRequests.add(new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs, true));
+      serverQueryRequests.add(new ServerQueryRequest(instanceRequest, ServerMetrics.get(), queryArrivalTimeMs, true));
     }
     serverContext.setServerQueryRequests(serverQueryRequests);
     // 3. Compile the OpChain
@@ -148,13 +147,9 @@ public class ServerPlanRequestUtils {
    * Entry point to construct a list of {@link InstanceRequest}s for executing leaf-stage v1 runner.
    */
   public static List<InstanceRequest> constructServerQueryRequests(OpChainExecutionContext executionContext,
-      PinotQuery pinotQuery, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
+      PinotQuery pinotQuery, InstanceDataManager instanceDataManager) {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
     String rawTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
-    // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
-    // network traffic. but there's chance to improve this:
-    // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
-    Schema schema = ZKMetadataProvider.getSchema(helixPropertyStore, rawTableName);
     Map<String, List<String>> tableSegmentsMap = executionContext.getWorkerMetadata().getTableSegmentsMap();
     assert tableSegmentsMap != null;
     TimeBoundaryInfo timeBoundary = stageMetadata.getTimeBoundary();
@@ -165,17 +160,19 @@ public class ServerPlanRequestUtils {
       List<String> segments = entry.getValue();
       if (tableType.equals(TableType.OFFLINE.name())) {
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore, offlineTableName);
-        return List.of(
-            compileInstanceRequest(executionContext, pinotQuery, offlineTableName, tableConfig, schema, timeBoundary,
-                TableType.OFFLINE, segments));
+        TableDataManager tableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
+        Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: %s",
+            offlineTableName);
+        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.OFFLINE, segments,
+            tableDataManager));
       } else {
         assert tableType.equals(TableType.REALTIME.name());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore, realtimeTableName);
-        return List.of(
-            compileInstanceRequest(executionContext, pinotQuery, realtimeTableName, tableConfig, schema, timeBoundary,
-                TableType.REALTIME, segments));
+        TableDataManager tableDataManager = instanceDataManager.getTableDataManager(realtimeTableName);
+        Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: %s",
+            realtimeTableName);
+        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME, segments,
+            tableDataManager));
       }
     } else {
       assert numRequests == 2;
@@ -183,15 +180,19 @@ public class ServerPlanRequestUtils {
       List<String> realtimeSegments = tableSegmentsMap.get(TableType.REALTIME.name());
       assert offlineSegments != null && realtimeSegments != null;
       String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+      TableDataManager offlineTableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
+      Preconditions.checkState(offlineTableDataManager != null, "Failed to find data manager for table: %s",
+          offlineTableName);
       String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-      TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore, offlineTableName);
-      TableConfig realtimeTableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore, realtimeTableName);
+      TableDataManager realtimeTableDataManager = instanceDataManager.getTableDataManager(realtimeTableName);
+      Preconditions.checkState(realtimeTableDataManager != null, "Failed to find data manager for table: %s",
+          realtimeTableName);
       // NOTE: Make a deep copy of PinotQuery for OFFLINE request.
       return List.of(
-          compileInstanceRequest(executionContext, new PinotQuery(pinotQuery), offlineTableName, offlineTableConfig,
-              schema, timeBoundary, TableType.OFFLINE, offlineSegments),
-          compileInstanceRequest(executionContext, pinotQuery, realtimeTableName, realtimeTableConfig, schema,
-              timeBoundary, TableType.REALTIME, realtimeSegments));
+          compileInstanceRequest(executionContext, new PinotQuery(pinotQuery), timeBoundary, TableType.OFFLINE,
+              offlineSegments, offlineTableDataManager),
+          compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME, realtimeSegments,
+              realtimeTableDataManager));
     }
   }
 
@@ -199,12 +200,13 @@ public class ServerPlanRequestUtils {
    * Convert {@link PinotQuery} into an {@link InstanceRequest}.
    */
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
-      String tableNameWithType, @Nullable TableConfig tableConfig, @Nullable Schema schema,
-      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
+      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList,
+      TableDataManager tableDataManager) {
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
     long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
     // 1. Modify the PinotQuery
+    String tableNameWithType = tableDataManager.getTableName();
     pinotQuery.getDataSource().setTableName(tableNameWithType);
     if (timeBoundaryInfo != null) {
       attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
@@ -212,7 +214,8 @@ public class ServerPlanRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
+    Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight());
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
@@ -358,8 +361,28 @@ public class ServerPlanRequestUtils {
           expressions.add(RequestUtils.getLiteralExpression(arrString[rowIdx]));
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] arrBigDecimal = new BigDecimal[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBigDecimal[rowIdx] = (BigDecimal) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBigDecimal);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBigDecimal[rowIdx]));
+        }
+        break;
+      case BYTES:
+        ByteArray[] arrBytes = new ByteArray[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBytes[rowIdx] = (ByteArray) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBytes);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBytes[rowIdx].getBytes()));
+        }
+        break;
       default:
-        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+        throw new IllegalStateException("Illegal SV data type for IN filter: " + storedType);
     }
     return expressions;
   }

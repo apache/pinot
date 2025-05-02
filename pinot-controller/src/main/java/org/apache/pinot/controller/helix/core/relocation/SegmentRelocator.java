@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -48,6 +49,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +76,12 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final boolean _bestEfforts;
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
+  private final boolean _includeConsuming;
+  private final Enablement _minimizeDataMovement;
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
+  @Nullable private final Set<String> _tablesUndergoingRebalance;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -94,6 +99,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _downtime = config.getSegmentRelocatorDowntime();
     _minAvailableReplicas = config.getSegmentRelocatorMinAvailableReplicas();
     _bestEfforts = config.getSegmentRelocatorBestEfforts();
+    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
+    _minimizeDataMovement = config.getSegmentRelocatorRebalanceMinimizeDataMovement();
     // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
     long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
     _externalViewCheckIntervalInMs =
@@ -115,17 +122,24 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
           LOGGER.warn("Got interrupted while rebalancing tables sequentially", e);
         }
       });
+      _tablesUndergoingRebalance = null;
     } else {
       _waitingTables = null;
       _waitingQueue = null;
+      _tablesUndergoingRebalance = ConcurrentHashMap.newKeySet();
     }
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
     if (_waitingTables == null) {
-      LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
-      _executorService.submit(() -> rebalanceTable(tableNameWithType));
+      assert _tablesUndergoingRebalance != null;
+      if (!_tablesUndergoingRebalance.contains(tableNameWithType)) {
+        LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
+        _executorService.submit(() -> rebalanceTable(tableNameWithType));
+      } else {
+        LOGGER.info("The previous rebalance has not yet completed, skip rebalancing table {}", tableNameWithType);
+      }
       return;
     }
     putTableToWait(tableNameWithType);
@@ -187,7 +201,17 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+    rebalanceConfig.setIncludeConsuming(_includeConsuming);
+    rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
 
+    if (_tablesUndergoingRebalance != null) {
+      LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
+      if (!_tablesUndergoingRebalance.add(tableNameWithType)) {
+        LOGGER.warn("Skip rebalancing table: {}, table already exists in tablesUndergoingRebalance, a rebalance "
+            + "must have already been started", tableNameWithType);
+        return;
+      }
+    }
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
@@ -212,6 +236,11 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       }
     } catch (Throwable t) {
       LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+    } finally {
+      if (_tablesUndergoingRebalance != null) {
+        LOGGER.debug("Done rebalancing table: {}, removing from tablesUndergoingRebalance", tableNameWithType);
+        _tablesUndergoingRebalance.remove(tableNameWithType);
+      }
     }
   }
 

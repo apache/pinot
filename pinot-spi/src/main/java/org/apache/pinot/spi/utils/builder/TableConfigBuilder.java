@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -133,6 +134,7 @@ public class TableConfigBuilder {
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
   private JsonNode _tierOverwrites;
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -452,6 +454,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setJsonIndexConfigs(Map<String, JsonIndexConfig> jsonIndexConfigs) {
+    _jsonIndexConfigs = jsonIndexConfigs;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -499,6 +506,7 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

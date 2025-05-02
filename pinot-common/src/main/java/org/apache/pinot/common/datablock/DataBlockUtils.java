@@ -115,7 +115,7 @@ public final class DataBlockUtils {
     }
   }
 
-  private static String extractErrorMsg(Throwable t) {
+  public static String extractErrorMsg(Throwable t) {
     while (t.getCause() != null && t.getMessage() == null) {
       t = t.getCause();
     }
@@ -252,7 +252,7 @@ public final class DataBlockUtils {
   public static DataBlock deserialize(List<ByteBuffer> buffers)
       throws IOException {
     List<DataBuffer> dataBuffers = buffers.stream()
-        .map(PinotByteBuffer::wrap)
+        .map(PinotByteBuffer::slice)
         .collect(Collectors.toList());
     try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(dataBuffers, ByteOrder.BIG_ENDIAN, false)) {
       return deserialize(compoundBuffer);

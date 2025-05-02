@@ -19,23 +19,28 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.io.Closeable;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface TableDedupMetadataManager extends Closeable {
   /**
    * Initialize TableDedupMetadataManager.
    */
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
+  void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
+      TableDataManager tableDataManager);
 
   /**
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
    */
   PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
 
+  DedupContext getContext();
+
+  /// @deprecated Use {@link #getContext()} instead.
+  @Deprecated
   boolean isEnablePreload();
 
   /**

@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -71,6 +72,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
+
+  //boolean Check if dataDir is avaiable on boot?
+  public static final String CONTINUE_WITHOUT_DEEP_STORE = "controller.startup.continueWithoutDeepStore";
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
@@ -198,6 +202,11 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.enableLocalTierMigration";
     public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
         "controller.segmentRelocator.rebalanceTablesSequentially";
+    public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
+        "controller.segmentRelocator.includeConsuming";
+    // Available options are: "ENABLE", "DISABLE", "DEFAULT"
+    public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
+        "controller.segmentRelocator.minimizeDataMovement";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
@@ -249,50 +258,50 @@ public class ControllerConf extends PinotConfiguration {
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
 
-    private static final Random RANDOM = new Random();
+    public static final Random RANDOM = new Random();
 
-    private static long getRandomInitialDelayInSeconds() {
+    public static long getRandomInitialDelayInSeconds() {
       return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
     }
 
     // Default values
-    private static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
-    private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
-    private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
-    private static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
-    private static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
-    private static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
-    private static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
-    private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
-    private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
+    public static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
+    public static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
+    public static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    public static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    public static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    public static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
+    public static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
     @Deprecated
-    private static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     @Deprecated
-    private static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS =
+    public static final int DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS =
         60 * 60; // 1 Hour.
 
-    private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
-    private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
+    public static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
+    public static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
 
     // Realtime Consumer Monitor
-    private static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
+    public static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
         "controller.realtimeConsumerMonitor.frequencyPeriod";
-    private static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
+    public static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeConsumerMonitor.initialDelayInSeconds";
 
-    private static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = -1; // Disabled by default
+    public static final int DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS = -1; // Disabled by default
   }
 
-  private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
-  private static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
-  private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
-  private static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
+  public static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
+  public static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
+  public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
+  public static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
   public static final String CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS = "controller.executor.rebalance.numThreads";
 
-  private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
+  public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
-  private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
-  private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
+  public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
@@ -300,61 +309,61 @@ public class ControllerConf extends PinotConfiguration {
   public static final String REBALANCE_PRE_CHECKER_CLASS = "controller.rebalance.pre.checker.class";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
-  private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
-  private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
+  public static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
+  public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
-  private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
-  private static final String REBALANCE_DISK_UTILIZATION_THRESHOLD = "controller.rebalance.disk.utilization.threshold";
-  private static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
-  private static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
-  private static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
-  private static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
+  public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  public static final String REBALANCE_DISK_UTILIZATION_THRESHOLD = "controller.rebalance.disk.utilization.threshold";
+  public static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
+  public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
+  public static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
+  public static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
-  private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
+  public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
-  private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  public static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
       "controller.enable.hybrid.table.retention.strategy";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
-  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
+  public static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
-  private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
-  private static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
-  private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
-  private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
-  private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
-  private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
+  public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  public static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
+  public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
+  public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
+  public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
-  private static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
-  private static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
-  private static final String DEFAULT_LINEAGE_MANAGER =
+  public static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
+  public static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
+  public static final String DEFAULT_LINEAGE_MANAGER =
       "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
-  private static final String DEFAULT_REBALANCE_PRE_CHECKER =
+  public static final String DEFAULT_REBALANCE_PRE_CHECKER =
       "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
-  private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
-  private static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
-  private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
-  private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
-  private static final double DEFAULT_REBALANCE_DISK_UTILIZATION_THRESHOLD = 0.9;
-  private static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
-  private static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
-  private static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
-  private static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
-  private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
-  private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
-  private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
-  private static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
-  private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
-  private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
+  public static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
+  public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
+  public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  public static final double DEFAULT_REBALANCE_DISK_UTILIZATION_THRESHOLD = 0.9;
+  public static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
+  public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
+  public static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
+  public static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
+  public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
+  public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
+  public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
+  public static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
+  public static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
+  public static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
-  private static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
-  private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
-  private static final int UNSPECIFIED_THREAD_POOL = -1;
+  public static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
+  public static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
+  public static final int UNSPECIFIED_THREAD_POOL = -1;
 
-  private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
+  public static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
@@ -531,6 +540,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isUpdateSegmentStateModel() {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
+  }
+
+  public boolean isContinueWithoutDeepStore() {
+    return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false);
   }
 
   public String generateVipUrl() {
@@ -798,6 +811,20 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isSegmentRelocatorRebalanceTablesSequentially() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
+  }
+
+  public boolean isSegmentRelocatorIncludingConsuming() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING, false);
+  }
+
+  public Enablement getSegmentRelocatorRebalanceMinimizeDataMovement() {
+    String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT,
+        Enablement.ENABLE.name());
+    try {
+      return Enablement.valueOf(value.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      return Enablement.ENABLE;
+    }
   }
 
   public boolean tieredSegmentAssignmentEnabled() {
@@ -1108,7 +1135,6 @@ public class ControllerConf extends PinotConfiguration {
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
     setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
   }
-
 
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();

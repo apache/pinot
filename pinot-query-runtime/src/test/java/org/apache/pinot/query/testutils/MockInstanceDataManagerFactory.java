@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -124,7 +125,7 @@ public class MockInstanceDataManagerFactory {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     Map<String, TableDataManager> tableDataManagers = new HashMap<>();
     for (Map.Entry<String, List<ImmutableSegment>> e : _tableSegmentMap.entrySet()) {
-      TableDataManager tableDataManager = mockTableDataManager(e.getValue());
+      TableDataManager tableDataManager = mockTableDataManager(e.getKey(), e.getValue());
       tableDataManagers.put(e.getKey(), tableDataManager);
     }
     for (Map.Entry<String, TableDataManager> e : tableDataManagers.entrySet()) {
@@ -149,10 +150,15 @@ public class MockInstanceDataManagerFactory {
     return _tableSegmentNameMap;
   }
 
-  private TableDataManager mockTableDataManager(List<ImmutableSegment> segmentList) {
+  private TableDataManager mockTableDataManager(String tableNameWithType, List<ImmutableSegment> segmentList) {
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableName()).thenReturn(tableNameWithType);
+    TableConfig tableConfig = createTableConfig(tableNameWithType);
+    Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
+    when(tableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, schema));
+
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
-    TableDataManager tableDataManager = mock(TableDataManager.class);
     // TODO: support optional segments for multi-stage engine, but for now, it's always null.
     when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
@@ -167,12 +173,8 @@ public class MockInstanceDataManagerFactory {
 
   private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, List<GenericRow> rows) {
     String segmentName = String.format("%s_%s", tableNameWithType, UUID.randomUUID());
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    // TODO: plugin table config constructor
-    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
-        .setNullHandlingEnabled(true).build();
-    Schema schema = _schemaMap.get(rawTableName);
+    TableConfig tableConfig = createTableConfig(tableNameWithType);
+    Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());
     config.setTableName(tableNameWithType);
@@ -186,5 +188,13 @@ public class MockInstanceDataManagerFactory {
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }
+  }
+
+  // TODO: plugin table config
+  private TableConfig createTableConfig(String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    return new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
+        .setNullHandlingEnabled(true).build();
   }
 }
