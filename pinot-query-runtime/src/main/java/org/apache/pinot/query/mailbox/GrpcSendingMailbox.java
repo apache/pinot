@@ -181,7 +181,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
       } else {
         byteStrings = List.of(DataBlockUtils.toByteString(dataBlock));
       }
-      int sizeInBytes = byteStrings.stream().mapToInt(ByteString::size).reduce(0, Integer::sum);
+      int sizeInBytes = 0;
+      for (ByteString byteString : byteStrings) {
+        sizeInBytes += byteString.size();
+      }
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
