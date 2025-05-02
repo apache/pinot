@@ -481,13 +481,12 @@ public class TableRebalancer {
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
       try {
-        tableRebalanceLogger.info("Waiting for ExternalView to converge, {} segments to monitor in current step",
-            segmentsToMonitor.size());
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
             externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
             allSegmentsFromIdealState, tableRebalanceLogger);
       } catch (Exception e) {
-        String errorMsg = "Caught exception while waiting for ExternalView to converge, aborting the rebalance";
+        String errorMsg =
+            "Caught exception while waiting for ExternalView to converge, aborting the rebalance: " + e.getMessage();
         tableRebalanceLogger.warn(errorMsg, e);
         if (_tableRebalanceObserver.isStopped()) {
           return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
@@ -1302,12 +1301,15 @@ public class TableRebalancer {
       long estimateAverageSegmentSizeInBytes, Set<String> allSegmentsFromIdealState,
       Logger tableRebalanceLogger)
       throws InterruptedException, TimeoutException {
-    long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
+    long startTimeMs = System.currentTimeMillis();
+    long endTimeMs = startTimeMs + externalViewStabilizationTimeoutInMs;
     int extensionCount = 0;
 
     IdealState idealState;
     ExternalView externalView;
     int previousRemainingSegments = -1;
+    tableRebalanceLogger.info("Waiting for ExternalView to converge, {} segments to monitor in current step",
+        segmentsToMonitor.size());
     while (true) {
       do {
         tableRebalanceLogger.debug("Start to check if ExternalView converges to IdealStates");
@@ -1334,7 +1336,8 @@ public class TableRebalancer {
           if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
               idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor,
               tableRebalanceLogger)) {
-            tableRebalanceLogger.info("ExternalView converged");
+            tableRebalanceLogger.info("ExternalView converged in {}ms, with {} extensions",
+                System.currentTimeMillis() - startTimeMs, extensionCount);
             return idealState;
           }
           if (previousRemainingSegments < 0) {
@@ -1367,11 +1370,15 @@ public class TableRebalancer {
           externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts,
           segmentsToMonitor, tableRebalanceLogger, false);
 
+      // It is possible that remainingSegments increases so that currentRemainingSegments > previousRemainingSegments,
+      // likely due to CONSUMING segments committing, where the state of the segment change to ONLINE. Therefore, if
+      // the segment had converged, it then becomes un-converged and thus increases the count.
       if (currentRemainingSegments >= previousRemainingSegments) {
         throw new TimeoutException(
             String.format(
-                "ExternalView has not made progress for the last %dms, throwing timeout exception after extended "
-                    + "timeout for %d times", externalViewStabilizationTimeoutInMs, extensionCount));
+                "ExternalView has not made progress for the last %dms, timeout after spending %dms waiting (%d "
+                    + "extensions)", externalViewStabilizationTimeoutInMs, System.currentTimeMillis() - startTimeMs,
+                extensionCount));
       }
       tableRebalanceLogger.info(
           "Extending EV stabilization timeout for another {}ms, remaining {} segments to be processed.",
