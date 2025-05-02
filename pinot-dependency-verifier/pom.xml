@@ -35,33 +35,24 @@
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>appassembler-maven-plugin</artifactId>
-        <configuration>
-          <programs>
-            <program>
-              <mainClass>org.apache.pinot.verifier.DepVerifier</mainClass>
-              <name>pinot-dependency-verifier</name>
-              <jvmSettings>
-                <initialMemorySize>2G</initialMemorySize>
-                <maxMemorySize>2G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=pinot-dependency-verifier-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-          </programs>
-          <repositoryLayout>flat</repositoryLayout>
-          <repositoryName>lib</repositoryName>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
-
   <dependencies>
+    <dependency>
+      <groupId>org.apache.maven.enforcer</groupId>
+      <artifactId>enforcer-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-plugin-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jdom</groupId>
+      <artifactId>jdom2</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>

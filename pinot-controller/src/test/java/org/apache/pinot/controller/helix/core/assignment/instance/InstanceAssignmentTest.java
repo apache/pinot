@@ -48,14 +48,11 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class InstanceAssignmentTest {
@@ -552,13 +549,13 @@ public class InstanceAssignmentTest {
 
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 2 instances
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, Enablement.DEFAULT);
 
     InstancePartitions instancePartitionsForcedMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, true);
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, Enablement.ENABLE);
 
     InstancePartitions instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
+        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, Enablement.DISABLE);
 
     // Initial assignment should be the same for all scenarios
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
@@ -578,16 +575,15 @@ public class InstanceAssignmentTest {
     // Leverage the latest instancePartitions from last computation as the parameter.
     // Data movement is minimized so that: i2 -> i10, i6 -> i11
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, Enablement.DEFAULT);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsForcedMinimize, true);
+            instancePartitionsForcedMinimize, Enablement.ENABLE);
 
     // Data movement here is not minimized
-    instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsNotMinimize, false);
+    instancePartitionsNotMinimize = driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+        instancePartitionsNotMinimize, Enablement.DISABLE);
 
     // Forced minimized data movement should be the same as minimized data movement
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
@@ -614,15 +610,14 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, Enablement.DEFAULT);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsForcedMinimize, true);
+            instancePartitionsForcedMinimize, Enablement.ENABLE);
 
-    instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsNotMinimize, false);
+    instancePartitionsNotMinimize = driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+        instancePartitionsNotMinimize, Enablement.DISABLE);
 
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
     assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
@@ -642,15 +637,14 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, Enablement.DEFAULT);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsForcedMinimize, true);
+            instancePartitionsForcedMinimize, Enablement.ENABLE);
 
-    instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsNotMinimize, false);
+    instancePartitionsNotMinimize = driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+        instancePartitionsNotMinimize, Enablement.DISABLE);
 
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
     assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
@@ -673,15 +667,14 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, Enablement.DEFAULT);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsForcedMinimize, true);
+            instancePartitionsForcedMinimize, Enablement.ENABLE);
 
-    instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsNotMinimize, false);
+    instancePartitionsNotMinimize = driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+        instancePartitionsNotMinimize, Enablement.DISABLE);
 
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
     assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
@@ -704,15 +697,14 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, Enablement.DEFAULT);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsForcedMinimize, true);
+            instancePartitionsForcedMinimize, Enablement.ENABLE);
 
-    instancePartitionsNotMinimize =
-        driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            instancePartitionsNotMinimize, false);
+    instancePartitionsNotMinimize = driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
+        instancePartitionsNotMinimize, Enablement.DISABLE);
 
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
     assertNotEquals(instancePartitionsNotMinimize, instancePartitions);

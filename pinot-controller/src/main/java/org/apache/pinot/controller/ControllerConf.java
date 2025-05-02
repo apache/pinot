@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -816,13 +817,13 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING, false);
   }
 
-  public RebalanceConfig.MinimizeDataMovementOptions getSegmentRelocatorRebalanceMinimizeDataMovement() {
+  public Enablement getSegmentRelocatorRebalanceMinimizeDataMovement() {
     String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT,
-        RebalanceConfig.MinimizeDataMovementOptions.ENABLE.name());
+        Enablement.ENABLE.name());
     try {
-      return RebalanceConfig.MinimizeDataMovementOptions.valueOf(value.toUpperCase());
+      return Enablement.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
-      return RebalanceConfig.MinimizeDataMovementOptions.ENABLE;
+      return Enablement.ENABLE;
     }
   }
 

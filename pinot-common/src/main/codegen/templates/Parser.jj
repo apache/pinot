@@ -5899,7 +5899,10 @@ SqlTypeNameSpec SqlTypeName1(Span s) :
     |
         <SMALLINT> { s.add(this); sqlTypeName = SqlTypeName.SMALLINT; }
     |
-        <BIGINT> { s.add(this); sqlTypeName = SqlTypeName.BIGINT; }
+        // <BIGINT> { s.add(this); sqlTypeName = SqlTypeName.BIGINT; }
+        // PINOT CUSTOMIZATION START
+        ( <BIGINT> | <LONG> ) { s.add(this); sqlTypeName = SqlTypeName.BIGINT; }
+        // PINOT CUSTOMIZATION END
     |
         <REAL> { s.add(this); sqlTypeName = SqlTypeName.REAL; }
     |
@@ -5932,7 +5935,10 @@ SqlTypeNameSpec SqlTypeName2(Span s) :
             { sqlTypeName = SqlTypeName.BINARY; }
         )
     |
-        <VARBINARY> { s.add(this); sqlTypeName = SqlTypeName.VARBINARY; }
+        // <VARBINARY> { s.add(this); sqlTypeName = SqlTypeName.VARBINARY; }
+        // PINOT CUSTOMIZATION START
+        (<VARBINARY> | <BYTES>) { s.add(this); sqlTypeName = SqlTypeName.VARBINARY; }
+        // PINOT CUSTOMIZATION END
     )
     precision = PrecisionOpt()
     {
@@ -5949,7 +5955,10 @@ SqlTypeNameSpec SqlTypeName3(Span s) :
 }
 {
     (
-        (<DECIMAL> | <DEC> | <NUMERIC>) { s.add(this); sqlTypeName = SqlTypeName.DECIMAL; }
+        // (<DECIMAL> | <DEC> | <NUMERIC>) { s.add(this); sqlTypeName = SqlTypeName.DECIMAL; }
+        // PINOT CUSTOMIZATION START
+        (<DECIMAL> | <DEC> | <NUMERIC> | <BIG_DECIMAL>) { s.add(this); sqlTypeName = SqlTypeName.DECIMAL; }
+        // PINOT CUSTOMIZATION END
     |
         <ANY> { s.add(this); sqlTypeName = SqlTypeName.ANY; }
     )
@@ -6155,7 +6164,10 @@ SqlTypeNameSpec CharacterTypeName(Span s) :
             { sqlTypeName = SqlTypeName.CHAR; }
         )
     |
-        <VARCHAR> { s.add(this); sqlTypeName = SqlTypeName.VARCHAR; }
+        // <VARCHAR> { s.add(this); sqlTypeName = SqlTypeName.VARCHAR; }
+        // PINOT CUSTOMIZATION START
+        (<VARCHAR> | <STRING>) { s.add(this); sqlTypeName = SqlTypeName.VARCHAR; }
+        // PINOT CUSTOMIZATION END
     )
     precision = PrecisionOpt()
     [
