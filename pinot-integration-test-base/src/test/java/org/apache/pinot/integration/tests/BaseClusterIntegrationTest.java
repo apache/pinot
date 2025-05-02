@@ -366,7 +366,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME)
+    return getTableConfigBuilder(TableType.REALTIME).build();
+  }
+
+  // TODO - Use this method to create table config for all table types to avoid redundant code
+  protected TableConfigBuilder getTableConfigBuilder(TableType tableType) {
+    return new TableConfigBuilder(tableType)
         .setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName())
         .setSortedColumn(getSortedColumn())
@@ -384,8 +389,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig())
         .setStreamConfigs(getStreamConfigs())
-        .setNullHandlingEnabled(getNullHandlingEnabled())
-        .build();
+        .setNullHandlingEnabled(getNullHandlingEnabled());
   }
 
   /**

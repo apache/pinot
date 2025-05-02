@@ -242,7 +242,9 @@ public class TableRebalanceProgressStats {
       int remainingSegmentsToChange) {
     double elapsedTimeInSeconds = (double) (System.currentTimeMillis() - startTime) / 1000.0;
     int segmentsAlreadyChanged = totalSegmentsToChange - remainingSegmentsToChange;
-    return segmentsAlreadyChanged == 0 ? totalSegmentsToChange == 0 ? 0.0 : -1.0
+    // If carry over + remaining segments to change are > total segments to change then number of segments already
+    // changed may be -ve, in which case we should just set the default value as we cannot measure elapsed time
+    return segmentsAlreadyChanged <= 0 ? totalSegmentsToChange == 0 ? 0.0 : -1.0
         : (double) remainingSegmentsToChange / (double) segmentsAlreadyChanged * elapsedTimeInSeconds;
   }
 

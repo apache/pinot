@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -65,6 +66,8 @@ import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -79,6 +82,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
@@ -96,6 +100,9 @@ import static org.testng.Assert.*;
 
 
 public class ControllerTest {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
+
   public static final String LOCAL_HOST = "localhost";
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
@@ -868,6 +875,87 @@ public class ControllerTest {
       resourceConfig.putSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.toString(enable));
       configAccessor.setResourceConfig(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
     }
+  }
+
+  public void runRealtimeSegmentValidationTask(String tableName)
+      throws IOException {
+    runPeriodicTask("RealtimeSegmentValidationManager", tableName, TableType.REALTIME);
+  }
+
+  public void runPeriodicTask(String taskName, String tableName, TableType tableType)
+      throws IOException {
+    sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+  }
+
+  public void pauseTable(String tableName)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        if (pauseStatusDetails.getConsumingSegments().isEmpty()) {
+          return true;
+        }
+        LOGGER.warn("Table not yet paused. Response " + pauseStatusDetails);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 2000, 60_000L, "Failed to pause table: " + tableName);
+  }
+
+  public void resumeTable(String tableName)
+      throws IOException {
+    resumeTable(tableName, "lastConsumed");
+  }
+
+  public void resumeTable(String tableName, String offsetCriteria)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName)
+        + "?consumeFrom=" + offsetCriteria);
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        // Its possible no segment is in consuming state, so check pause flag
+        if (!pauseStatusDetails.getPauseFlag()) {
+          return true;
+        }
+        LOGGER.warn("Pause flag is not yet set to false. Response " + pauseStatusDetails);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 2000, 60_000L, "Failed to resume table: " + tableName);
+  }
+
+  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState,
+      int desiredNumConsumingSegments, TableType type) {
+    TestUtils.waitForCondition((aVoid) -> {
+          try {
+            AtomicInteger numConsumingSegments = new AtomicInteger(0);
+            TableViews.TableView tableView = getExternalView(tableName, type);
+            Map<String, Map<String, String>> viewForType =
+                type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
+            viewForType.values().forEach((v) -> {
+              numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals(desiredState)).count());
+            });
+            return numConsumingSegments.get() == desiredNumConsumingSegments;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 5000, 60_000L,
+        "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName
+    );
+  }
+
+  public TableViews.TableView getExternalView(String tableName, TableType type)
+      throws IOException {
+    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
+    return JsonUtils.stringToObject(state, TableViews.TableView.class);
   }
 
   public static String sendGetRequest(String urlString)
