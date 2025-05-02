@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -128,7 +129,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       tableRebalanceLogger.info("Received {} needs reload responses and {} failed responses from servers assigned "
-              + "to table", needsReloadMetadata.size(), failedResponses);
+          + "to table", needsReloadMetadata.size(), failedResponses);
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
         tableRebalanceLogger.warn(
@@ -361,6 +362,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       pass = false;
       warnings.add(
           "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended");
+    }
+    if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && !rebalanceConfig.isUpdateTargetTier()) {
+      pass = false;
+      warnings.add("updateTargetTier should be enabled when tier configs are present");
     }
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
