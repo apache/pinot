@@ -268,10 +268,6 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "indexingConfigs");
   }
 
-  public String forTableGetServerInstances(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "instances?type=server");
-  }
-
   public String forTableGetBrokerInstances(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "instances?type=broker");
   }
