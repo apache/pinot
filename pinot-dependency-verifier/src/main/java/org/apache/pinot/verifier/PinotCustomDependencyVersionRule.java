@@ -17,8 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.verifier;
-
 import java.util.List;
+import javax.inject.Named;
 import org.apache.maven.enforcer.rule.api.EnforcerRule;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleException;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleHelper;
@@ -29,8 +29,8 @@ import org.apache.maven.project.MavenProject;
  * Enforces that no submodule declares a hardcoded <version> on its <dependency> entries.
  * Versions must be managed centrally in the root POM's <dependencyManagement>.
  */
-@Named("customDependencyVersionRule")
-public class CustomDependencyVersionRule implements EnforcerRule {
+@Named("pinotCustomDependencyVersionRule")
+public class PinotCustomDependencyVersionRule implements EnforcerRule {
 
   /**
    * If true, skip this rule in the root project (where versions belong).

@@ -299,6 +299,7 @@
     <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
     <jdom2.version>2.0.6</jdom2.version>
     <maven.version>3.9.7</maven.version>
+    <plexus-utils.version>3.5.1</plexus-utils.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -2112,6 +2113,12 @@
         <artifactId>jdom2</artifactId>
         <version>${jdom2.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-utils</artifactId>
+        <version>${plexus-utils.version}</version>
+        <scope>compile</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2275,6 +2282,14 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
+          <extensions>true</extensions>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-dependency-verifier</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
           <executions>
             <execution>
               <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
@@ -2306,23 +2321,16 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                     </excludes>
                   </bannedDependencies>
-                  <customDependencyVersionRule>
+                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                     <skipRoot>true</skipRoot>
                     <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
                       pinot-tools,contrib</skipModules>
-                  </customDependencyVersionRule>
+                  </pinotCustomDependencyVersionRule>
                 </rules>
                 <fail>true</fail>
               </configuration>
             </execution>
           </executions>
-<!--          <dependencies>-->
-<!--            <dependency>-->
-<!--              <groupId>org.apache.pinot</groupId>-->
-<!--              <artifactId>pinot-dependency-verifier</artifactId>-->
-<!--              <version>${project.version}</version>-->
-<!--            </dependency>-->
-<!--          </dependencies>-->
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
