@@ -88,6 +88,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -225,21 +226,7 @@ public class TableRebalancer {
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
     long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
     long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
-    Boolean minimizeDataMovement;
-    switch (rebalanceConfig.getMinimizeDataMovement()) {
-      case DEFAULT:
-        minimizeDataMovement = null;
-        break;
-      case ENABLE:
-        minimizeDataMovement = true;
-        break;
-      case DISABLE:
-        minimizeDataMovement = false;
-        break;
-      default:
-        throw new IllegalStateException(
-            "Invalid minimizeDataMovement option: " + rebalanceConfig.getMinimizeDataMovement());
-    }
+    Enablement minimizeDataMovement = rebalanceConfig.getMinimizeDataMovement();
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
@@ -1070,8 +1057,7 @@ public class TableRebalancer {
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
-    return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, false,
-        LOGGER);
+    return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, Enablement.DISABLE, LOGGER);
   }
 
   /**
@@ -1079,7 +1065,7 @@ public class TableRebalancer {
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
+      Enablement minimizeDataMovement, Logger tableRebalanceLogger) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -1125,7 +1111,7 @@ public class TableRebalancer {
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
+      Enablement minimizeDataMovement, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
@@ -1230,7 +1216,7 @@ public class TableRebalancer {
    */
   private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
+      Enablement minimizeDataMovement, Logger tableRebalanceLogger) {
     if (sortedTiers == null) {
       return Pair.of(null, true);
     }
@@ -1240,8 +1226,8 @@ public class TableRebalancer {
       tableRebalanceLogger.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
           tableConfig.getTableName());
       Pair<InstancePartitions, Boolean> partitionsAndUnchanged =
-          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun,
-              minimizeDataMovement, tableRebalanceLogger);
+          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun, minimizeDataMovement,
+              tableRebalanceLogger);
       tierToInstancePartitionsMap.put(tier.getName(), partitionsAndUnchanged.getLeft());
       instancePartitionsUnchanged = instancePartitionsUnchanged && partitionsAndUnchanged.getRight();
     }
@@ -1254,7 +1240,7 @@ public class TableRebalancer {
    * a boolean for whether the instance partition is unchanged.
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitionsForTier(TableConfig tableConfig, Tier tier,
-      boolean reassignInstances, boolean bootstrap, boolean dryRun, @Nullable Boolean minimizeDataMovement,
+      boolean reassignInstances, boolean bootstrap, boolean dryRun, Enablement minimizeDataMovement,
       Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String tierName = tier.getName();

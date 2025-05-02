@@ -581,10 +581,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         startTimeMs = existingProgressStats._startTimeMs;
         progressStats._estimatedTimeToCompleteAddsInSeconds =
             TableRebalanceProgressStats.calculateEstimatedTimeToCompleteChange(startTimeMs,
-                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+                progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
         progressStats._estimatedTimeToCompleteDeletesInSeconds =
             TableRebalanceProgressStats.calculateEstimatedTimeToCompleteChange(startTimeMs,
-                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
+                progressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         progressStats._averageSegmentSizeInBytes = existingProgressStats._averageSegmentSizeInBytes;
         progressStats._totalEstimatedDataToBeMovedInBytes =
             TableRebalanceProgressStats.calculateNewEstimatedDataToBeMovedInBytes(
