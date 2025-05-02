@@ -202,6 +202,7 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
     checkProgressPercentMetrics(controllerMetrics, observer);
   }
+
   // This is a test to verify if Zk stats are pushed out correctly
   @Test
   void testZkObserverTracking() {
