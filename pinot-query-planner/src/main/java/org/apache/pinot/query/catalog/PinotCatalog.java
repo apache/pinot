@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.catalog;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -68,10 +67,15 @@ public class PinotCatalog implements Schema {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
+    if (tableName == null) {
+      return null;
+    }
 
-    Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
-    Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
+    if (schema == null) {
+      return null;
+    }
+
     return new PinotTable(schema);
   }
 
