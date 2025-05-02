@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -113,7 +115,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setMetadataTTL(30);
     dedupConfig.setPreload(Enablement.ENABLE);
-    return new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
         .setTimeColumnName(getTimeColumnName())
         .setFieldConfigList(getFieldConfigs())
         .setNumReplicas(2)
@@ -130,6 +132,10 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 2))
         .setDedupConfig(dedupConfig)
         .build();
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
+    }
+    return tableConfig;
   }
 
   @AfterClass
