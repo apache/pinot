@@ -124,8 +124,8 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
   @Test
   public void testTableDoesNotExist()
       throws Exception {
-    QueryErrorCode expected = useMultiStageQueryEngine() ?
-        QueryErrorCode.QUERY_VALIDATION : QueryErrorCode.TABLE_DOES_NOT_EXIST;
+    QueryErrorCode expected = useMultiStageQueryEngine()
+        ? QueryErrorCode.QUERY_VALIDATION : QueryErrorCode.TABLE_DOES_NOT_EXIST;
     testQueryException("SELECT COUNT(*) FROM potato", expected);
   }
 
