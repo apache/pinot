@@ -1323,9 +1323,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _partitionMetadataProvider.close();
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
-      } finally {
-        // Clear reference so future offset fetches recreate a fresh provider
-        _partitionMetadataProvider = null;
       }
     }
   }
