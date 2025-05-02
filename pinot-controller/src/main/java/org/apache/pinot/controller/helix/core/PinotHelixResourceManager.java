@@ -176,7 +176,7 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -2206,14 +2206,14 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void addLogicalTable(LogicalTable logicalTable)
+  public void addLogicalTable(LogicalTableConfig logicalTableConfig)
       throws TableAlreadyExistsException {
-    String tableName = logicalTable.getTableName();
+    String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table: {}", tableName);
 
     // Check if the logical table name is already used
-    LogicalTable existingLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
-    if (existingLogicalTable != null) {
+    LogicalTableConfig existingLogicalTableConfig = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (existingLogicalTableConfig != null) {
       throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
     }
 
@@ -2223,21 +2223,21 @@ public class PinotHelixResourceManager {
           throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
         });
 
-    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
+    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTableConfig);
     LOGGER.info("Added logical table: {}", tableName);
   }
 
-  public void updateLogicalTable(LogicalTable logicalTable)
+  public void updateLogicalTable(LogicalTableConfig logicalTableConfig)
       throws TableNotFoundException {
-    String tableName = logicalTable.getTableName();
+    String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table: {}", tableName);
 
-    LogicalTable oldLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
-    if (oldLogicalTable == null) {
+    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (oldLogicalTableConfig == null) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
 
-    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
+    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTableConfig);
     LOGGER.info("Updated logical table: {}", tableName);
   }
 
@@ -2255,12 +2255,12 @@ public class PinotHelixResourceManager {
     return result;
   }
 
-  public LogicalTable getLogicalTable(String tableName) {
+  public LogicalTableConfig getLogicalTable(String tableName) {
     return ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
   }
 
   public List<String> getAllLogicalTableNames() {
-    return ZKMetadataProvider.getAllLogicalTables(_propertyStore).stream().map(LogicalTable::getTableName)
+    return ZKMetadataProvider.getAllLogicalTables(_propertyStore).stream().map(LogicalTableConfig::getTableName)
         .collect(Collectors.toList());
   }
 

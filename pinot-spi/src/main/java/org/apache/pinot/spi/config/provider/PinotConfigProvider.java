@@ -20,7 +20,7 @@ package org.apache.pinot.spi.config.provider;
 
 import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -64,7 +64,7 @@ public interface PinotConfigProvider {
    * @param logicalTableName the name of the logical table
    * @return the logical table
    */
-  LogicalTable getLogicalTable(String logicalTableName);
+  LogicalTableConfig getLogicalTable(String logicalTableName);
 
   /**
    * Registers the {@link LogicalTableChangeListener} and notifies it whenever any changes (addition, update,

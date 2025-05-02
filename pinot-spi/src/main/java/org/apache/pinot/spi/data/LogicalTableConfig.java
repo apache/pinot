@@ -30,7 +30,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LogicalTable extends BaseJsonConfig {
+public class LogicalTableConfig extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
 
@@ -42,9 +42,9 @@ public class LogicalTable extends BaseJsonConfig {
   private String _brokerTenant;
   private Map<String, PhysicalTableConfig> _physicalTableConfigMap;
 
-  public static LogicalTable fromString(String logicalTableString)
+  public static LogicalTableConfig fromString(String logicalTableString)
       throws IOException {
-    return JsonUtils.stringToObject(logicalTableString, LogicalTable.class);
+    return JsonUtils.stringToObject(logicalTableString, LogicalTableConfig.class);
   }
 
   public String getTableName() {
@@ -102,7 +102,7 @@ public class LogicalTable extends BaseJsonConfig {
     if (object == null || getClass() != object.getClass()) {
       return false;
     }
-    LogicalTable that = (LogicalTable) object;
+    LogicalTableConfig that = (LogicalTableConfig) object;
     return Objects.equals(getTableName(), that.getTableName());
   }
 

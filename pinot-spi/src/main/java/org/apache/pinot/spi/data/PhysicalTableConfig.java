@@ -22,7 +22,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
- * This class represents the configuration for a physical table in {@link LogicalTable}.
+ * This class represents the configuration for a physical table in {@link LogicalTableConfig}.
  * This is empty by design and more docs would be added as features are added.
  */
 public class PhysicalTableConfig extends BaseJsonConfig {

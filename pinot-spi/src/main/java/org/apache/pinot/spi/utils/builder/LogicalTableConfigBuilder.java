@@ -19,35 +19,35 @@
 package org.apache.pinot.spi.utils.builder;
 
 import java.util.Map;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 
 
-public class LogicalTableBuilder {
+public class LogicalTableConfigBuilder {
   private String _tableName;
   private Map<String, PhysicalTableConfig> _physicalTableConfigMap;
   private String _brokerTenant;
 
-  public LogicalTableBuilder setTableName(String tableName) {
+  public LogicalTableConfigBuilder setTableName(String tableName) {
     _tableName = tableName;
     return this;
   }
 
-  public LogicalTableBuilder setPhysicalTableConfigMap(Map<String, PhysicalTableConfig> physicalTableConfigMap) {
+  public LogicalTableConfigBuilder setPhysicalTableConfigMap(Map<String, PhysicalTableConfig> physicalTableConfigMap) {
     _physicalTableConfigMap = physicalTableConfigMap;
     return this;
   }
 
-  public LogicalTableBuilder setBrokerTenant(String brokerTenant) {
+  public LogicalTableConfigBuilder setBrokerTenant(String brokerTenant) {
     _brokerTenant = brokerTenant;
     return this;
   }
 
-  public LogicalTable build() {
-    LogicalTable logicalTable = new LogicalTable();
-    logicalTable.setTableName(_tableName);
-    logicalTable.setPhysicalTableConfigMap(_physicalTableConfigMap);
-    logicalTable.setBrokerTenant(_brokerTenant);
-    return logicalTable;
+  public LogicalTableConfig build() {
+    LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
+    logicalTableConfig.setTableName(_tableName);
+    logicalTableConfig.setPhysicalTableConfigMap(_physicalTableConfigMap);
+    logicalTableConfig.setBrokerTenant(_brokerTenant);
+    return logicalTableConfig;
   }
 }

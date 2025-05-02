@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -113,18 +113,18 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
 
     List<String> physicalTableNames = List.of("test_table_1");
     List<String> physicalTablesWithType = createHybridTables(physicalTableNames);
-    LogicalTable logicalTable;
+    LogicalTableConfig logicalTableConfig;
 
     // create logical table
     try {
-      logicalTable = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
+      logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
       String resp =
-          ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
+          ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       if (permissions.contains("create")) {
         assertEquals(resp,
             "{\"unrecognizedProperties\":{},\"status\":\"" + LOGICAL_TABLE_NAME
                 + " logical table successfully added.\"}");
-        verifyLogicalTableExists(getLogicalTableUrl, logicalTable);
+        verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
       } else {
         fail("Logical Table POST request should have failed");
       }
@@ -135,14 +135,15 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     // update logical table
     try {
       physicalTablesWithType.addAll(createHybridTables(List.of("test_table_2")));
-      logicalTable = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
-      String respUpdate = ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTable.toSingleLineJsonString(),
-          getHeaders());
+      logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
+      String respUpdate = ControllerTest.sendPutRequest(
+          updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders()
+      );
       if (permissions.contains("update")) {
         assertEquals(respUpdate,
             "{\"unrecognizedProperties\":{},\"status\":\"" + LOGICAL_TABLE_NAME
                 + " logical table successfully updated.\"}");
-        verifyLogicalTableExists(getLogicalTableUrl, logicalTable);
+        verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
       } else {
         fail("Logical Table POST request should have failed");
       }
@@ -163,10 +164,10 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     }
   }
 
-  private void verifyLogicalTableExists(String logicalTableNamesGet, LogicalTable logicalTable)
+  private void verifyLogicalTableExists(String logicalTableNamesGet, LogicalTableConfig logicalTableConfig)
       throws IOException {
     String respGet = ControllerTest.sendGetRequest(logicalTableNamesGet, getHeaders());
-    LogicalTable remoteTable = LogicalTable.fromString(respGet);
-    assertEquals(remoteTable, logicalTable);
+    LogicalTableConfig remoteTable = LogicalTableConfig.fromString(respGet);
+    assertEquals(remoteTable, logicalTableConfig);
   }
 }

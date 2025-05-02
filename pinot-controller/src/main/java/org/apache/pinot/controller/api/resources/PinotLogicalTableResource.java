@@ -58,7 +58,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
@@ -113,11 +113,11 @@ public class PinotLogicalTableResource {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Looking for logical table {}", tableName);
-    LogicalTable logicalTable = _pinotHelixResourceManager.getLogicalTable(tableName);
-    if (logicalTable == null) {
+    LogicalTableConfig logicalTableConfig = _pinotHelixResourceManager.getLogicalTable(tableName);
+    if (logicalTableConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Logical table not found", Response.Status.NOT_FOUND);
     }
-    return logicalTable.toPrettyJsonString();
+    return logicalTableConfig.toPrettyJsonString();
   }
 
   @POST
@@ -133,17 +133,17 @@ public class PinotLogicalTableResource {
   public SuccessResponse addLogicalTable(
       String logicalTableJsonString, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<LogicalTable, Map<String, Object>> logicalTableAndUnrecognizedProps =
+    Pair<LogicalTableConfig, Map<String, Object>> logicalTableAndUnrecognizedProps =
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
-    LogicalTable logicalTable = logicalTableAndUnrecognizedProps.getLeft();
-    String tableName = DatabaseUtils.translateTableName(logicalTable.getTableName(), httpHeaders);
-    logicalTable.setTableName(tableName);
+    LogicalTableConfig logicalTableConfig = logicalTableAndUnrecognizedProps.getLeft();
+    String tableName = DatabaseUtils.translateTableName(logicalTableConfig.getTableName(), httpHeaders);
+    logicalTableConfig.setTableName(tableName);
 
     // validate permission
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-    SuccessResponse successResponse = addLogicalTable(logicalTable);
+    SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
   }
 
@@ -162,17 +162,17 @@ public class PinotLogicalTableResource {
   public SuccessResponse updateLogicalTable(
       @ApiParam(value = "Name of the logical table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers, String logicalTableJsonString) {
-    Pair<LogicalTable, Map<String, Object>> logicalTableAndUnrecognizedProps =
+    Pair<LogicalTableConfig, Map<String, Object>> logicalTableAndUnrecognizedProps =
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
-    LogicalTable logicalTable = logicalTableAndUnrecognizedProps.getLeft();
+    LogicalTableConfig logicalTableConfig = logicalTableAndUnrecognizedProps.getLeft();
 
-    Preconditions.checkArgument(logicalTable.getTableName().equals(tableName),
+    Preconditions.checkArgument(logicalTableConfig.getTableName().equals(tableName),
         "Logical table name in the request body should match the table name in the URL");
 
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    logicalTable.setTableName(tableName);
+    logicalTableConfig.setTableName(tableName);
 
-    SuccessResponse successResponse = updateLogicalTable(tableName, logicalTable);
+    SuccessResponse successResponse = updateLogicalTable(tableName, logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
   }
 
@@ -198,11 +198,11 @@ public class PinotLogicalTableResource {
     }
   }
 
-  private Pair<LogicalTable, Map<String, Object>> getLogicalAndUnrecognizedPropertiesFromJson(
+  private Pair<LogicalTableConfig, Map<String, Object>> getLogicalAndUnrecognizedPropertiesFromJson(
       String logicalTableJsonString)
       throws ControllerApplicationException {
     try {
-      return JsonUtils.stringToObjectAndUnrecognizedProperties(logicalTableJsonString, LogicalTable.class);
+      return JsonUtils.stringToObjectAndUnrecognizedProperties(logicalTableJsonString, LogicalTableConfig.class);
     } catch (Exception e) {
       String msg =
           String.format("Invalid logical table json config: %s. Reason: %s", logicalTableJsonString, e.getMessage());
@@ -210,19 +210,19 @@ public class PinotLogicalTableResource {
     }
   }
 
-  private SuccessResponse addLogicalTable(LogicalTable logicalTable) {
-    String tableName = logicalTable.getTableName();
+  private SuccessResponse addLogicalTable(LogicalTableConfig logicalTableConfig) {
+    String tableName = logicalTableConfig.getTableName();
     try {
-      if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
-        logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
+      if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+        logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
       LogicalTableUtils.validateLogicalTableName(
-          logicalTable,
+          logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
       );
-      _pinotHelixResourceManager.addLogicalTable(logicalTable);
+      _pinotHelixResourceManager.addLogicalTable(logicalTableConfig);
       return new SuccessResponse(tableName + " logical table successfully added.");
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -235,19 +235,19 @@ public class PinotLogicalTableResource {
     }
   }
 
-  private SuccessResponse updateLogicalTable(String tableName, LogicalTable logicalTable) {
+  private SuccessResponse updateLogicalTable(String tableName, LogicalTableConfig logicalTableConfig) {
     try {
-      if (StringUtils.isEmpty(logicalTable.getBrokerTenant())) {
-        logicalTable.setBrokerTenant(DEFAULT_BROKER_TENANT);
+      if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+        logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
       LogicalTableUtils.validateLogicalTableName(
-          logicalTable,
+          logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
       );
-      _pinotHelixResourceManager.updateLogicalTable(logicalTable);
-      return new SuccessResponse(logicalTable.getTableName() + " logical table successfully updated.");
+      _pinotHelixResourceManager.updateLogicalTable(logicalTableConfig);
+      return new SuccessResponse(logicalTableConfig.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find logical table " + tableName,
           Response.Status.NOT_FOUND, e);

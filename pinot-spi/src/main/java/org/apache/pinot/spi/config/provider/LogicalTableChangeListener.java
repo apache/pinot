@@ -19,13 +19,13 @@
 package org.apache.pinot.spi.config.provider;
 
 import java.util.List;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 
 
 public interface LogicalTableChangeListener {
   /**
    * The callback to be invoked on logical table changes
-   * @param logicalTableList the entire list of logical tables in the cluster
+   * @param logicalTableConfigList the entire list of logical tables in the cluster
    */
-  void onChange(List<LogicalTable> logicalTableList);
+  void onChange(List<LogicalTableConfig> logicalTableConfigList);
 }

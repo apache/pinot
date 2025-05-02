@@ -75,7 +75,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -85,7 +85,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
-import org.apache.pinot.spi.utils.builder.LogicalTableBuilder;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -389,13 +389,13 @@ public class ControllerTest {
     }
   }
 
-  public static LogicalTable getDummyLogicalTable(String tableName, List<String> physicalTableNames,
+  public static LogicalTableConfig getDummyLogicalTable(String tableName, List<String> physicalTableNames,
       String brokerTenant) {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     for (String physicalTableName : physicalTableNames) {
       physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
     }
-    LogicalTableBuilder builder = new LogicalTableBuilder()
+    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
         .setTableName(tableName)
         .setBrokerTenant(brokerTenant)
         .setPhysicalTableConfigMap(physicalTableConfigMap);

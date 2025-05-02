@@ -50,7 +50,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
@@ -255,10 +255,10 @@ public class TableCache implements PinotConfigProvider {
 
   @Nullable
   @Override
-  public LogicalTable getLogicalTable(String logicalTableName) {
+  public LogicalTableConfig getLogicalTable(String logicalTableName) {
     logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     LogicalTableInfo logicalTableInfo = _logicalTableInfoMap.get(logicalTableName);
-    return logicalTableInfo != null ? logicalTableInfo._logicalTable : null;
+    return logicalTableInfo != null ? logicalTableInfo._logicalTableConfig : null;
   }
 
   @Override
@@ -291,11 +291,11 @@ public class TableCache implements PinotConfigProvider {
   }
 
   private Schema getLogicalTableSchema(String logicalTableName) {
-    LogicalTable logicalTable = getLogicalTable(logicalTableName);
-    if (logicalTable == null) {
+    LogicalTableConfig logicalTableConfig = getLogicalTable(logicalTableName);
+    if (logicalTableConfig == null) {
       return null;
     }
-    Optional<String> physicalTableName = logicalTable.getPhysicalTableConfigMap().keySet().stream().findFirst();
+    Optional<String> physicalTableName = logicalTableConfig.getPhysicalTableConfigMap().keySet().stream().findFirst();
     return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(physicalTableName.orElse(null)));
   }
 
@@ -361,14 +361,14 @@ public class TableCache implements PinotConfigProvider {
 
   private void putLogicalTable(ZNRecord znRecord)
       throws IOException {
-    LogicalTable logicalTable = LogicalTableUtils.fromZNRecord(znRecord);
-    String logicalTableName = logicalTable.getTableName();
+    LogicalTableConfig logicalTableConfig = LogicalTableUtils.fromZNRecord(znRecord);
+    String logicalTableName = logicalTableConfig.getTableName();
     if (_ignoreCase) {
       _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
-      _logicalTableInfoMap.put(logicalTableName.toLowerCase(), new LogicalTableInfo(logicalTable));
+      _logicalTableInfoMap.put(logicalTableName.toLowerCase(), new LogicalTableInfo(logicalTableConfig));
     } else {
       _logicalTableNameMap.put(logicalTableName, logicalTableName);
-      _logicalTableInfoMap.put(logicalTableName, new LogicalTableInfo(logicalTable));
+      _logicalTableInfoMap.put(logicalTableName, new LogicalTableInfo(logicalTableConfig));
     }
   }
 
@@ -479,9 +479,9 @@ public class TableCache implements PinotConfigProvider {
 
   private void notifyLogicalTableChangeListeners() {
     if (!_logicalTableChangeListeners.isEmpty()) {
-      List<LogicalTable> logicalTables = getLogicalTables();
+      List<LogicalTableConfig> logicalTableConfigs = getLogicalTables();
       for (LogicalTableChangeListener listener : _logicalTableChangeListeners) {
-        listener.onChange(logicalTables);
+        listener.onChange(logicalTableConfigs);
       }
     }
   }
@@ -494,8 +494,8 @@ public class TableCache implements PinotConfigProvider {
     return tableConfigs;
   }
 
-  public List<LogicalTable> getLogicalTables() {
-    return _logicalTableInfoMap.values().stream().map(o -> o._logicalTable).collect(Collectors.toList());
+  public List<LogicalTableConfig> getLogicalTables() {
+    return _logicalTableInfoMap.values().stream().map(o -> o._logicalTableConfig).collect(Collectors.toList());
   }
 
   private void notifySchemaChangeListeners() {
@@ -708,11 +708,11 @@ public class TableCache implements PinotConfigProvider {
   }
 
   private static class LogicalTableInfo {
-    final LogicalTable _logicalTable;
+    final LogicalTableConfig _logicalTableConfig;
     // TODO : Add expression override map for logical table, issue #15607
 
-    private LogicalTableInfo(LogicalTable logicalTable) {
-      _logicalTable = logicalTable;
+    private LogicalTableInfo(LogicalTableConfig logicalTableConfig) {
+      _logicalTableConfig = logicalTableConfig;
     }
   }
 }

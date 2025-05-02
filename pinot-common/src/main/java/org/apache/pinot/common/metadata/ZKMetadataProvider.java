@@ -49,7 +49,7 @@ import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.user.UserConfig;
-import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -820,17 +820,18 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void setLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, LogicalTable logicalTable) {
+  public static void setLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      LogicalTableConfig logicalTableConfig) {
     try {
-      ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTable);
-      String path = constructPropertyStorePathForLogical(logicalTable.getTableName());
+      ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTableConfig);
+      String path = constructPropertyStorePathForLogical(logicalTableConfig.getTableName());
       propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to convert logical table to ZNRecord", e);
     }
   }
 
-  public static List<LogicalTable> getAllLogicalTables(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static List<LogicalTableConfig> getAllLogicalTables(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(PROPERTYSTORE_LOGICAL_PREFIX, null, AccessOption.PERSISTENT, 0, 0);
     if (znRecords != null) {
@@ -847,7 +848,7 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static LogicalTable getLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+  public static LogicalTableConfig getLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     try {
       ZNRecord logicalTableZNRecord =
           propertyStore.get(constructPropertyStorePathForLogical(tableName), null, AccessOption.PERSISTENT);
