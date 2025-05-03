@@ -92,7 +92,7 @@
     "react-dom": "16.13.1",
     "react-flow-renderer": "^10.3.17",
     "react-hook-form": "6.15.8",
-    "react-router-dom": "5.3.3",
+    "react-router-dom": "7.5.2",
     "react-spring": "8.0.27"
   }
 }
