@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
+import java.util.LinkedList;
+import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
+import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -60,7 +61,7 @@ public class SelectionOperatorService {
   private final int[] _columnIndices;
   private final int _offset;
   private final int _numRowsToKeep;
-  private List<Object[]> _rows;
+  private final PriorityQueue<Object[]> _rows;
 
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema, int[] columnIndices) {
     _queryContext = queryContext;
@@ -70,34 +71,54 @@ public class SelectionOperatorService {
     _offset = queryContext.getOffset();
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
-    _rows = new ArrayList<>();
+    _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+        OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
+            _queryContext.isNullHandlingEnabled()).reversed());
   }
 
   /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
+   * TODO: Do merge sort after releasing 0.13.0 when server side results are sorted
+   *       Can also consider adding a data table metadata to indicate whether the server side results are sorted
    */
-  public void reduceWithOrdering(Collection<DataTable> dataTables, boolean isSelectStarQuery,
-                                 boolean hasSchemaMismatch) {
-    Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(
-            _queryContext.getOrderByExpressions(), _queryContext.isNullHandlingEnabled());
-    List<String> reduceSelectColumns = null;
-    if (isSelectStarQuery && hasSchemaMismatch) {
-      reduceSelectColumns = SelectionOperatorUtils.getReducedColumns(dataTables);
+  public void reduceWithOrdering(Collection<DataTable> dataTables) {
+    for (DataTable dataTable : dataTables) {
+      int numRows = dataTable.getNumberOfRows();
+      if (_queryContext.isNullHandlingEnabled()) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
+        for (int colId = 0; colId < nullBitmaps.length; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < nullBitmaps.length; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        }
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        }
+      }
     }
-    _rows = SelectionOperatorUtils.reduceResults(dataTables, _numRowsToKeep, _queryContext.isNullHandlingEnabled(),
-            reduceSelectColumns, comparator);
   }
 
   /**
    * Renders the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
    */
   public ResultTable renderResultTableWithOrdering() {
-    List<Object[]> resultRows = new ArrayList<>();
+    LinkedList<Object[]> resultRows = new LinkedList<>();
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
-    int numRows = _rows.size();
-    for (int index = _offset; index < numRows; index++) {
-      Object[] row = _rows.get(index);
+    while (_rows.size() > _offset) {
+      Object[] row = _rows.poll();
+      assert row != null;
       Object[] resultRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
         Object value = row[_columnIndices[i]];
@@ -105,7 +126,7 @@ public class SelectionOperatorService {
           resultRow[i] = columnDataTypes[i].convertAndFormat(value);
         }
       }
-      resultRows.add(resultRow);
+      resultRows.addFirst(resultRow);
     }
     return new ResultTable(_dataSchema, resultRows);
   }

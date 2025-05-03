@@ -167,7 +167,7 @@ public class MemoryEstimator {
             .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
 
     // read all rows and index them
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment)) {
@@ -331,7 +331,7 @@ public class MemoryEstimator {
             .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
     long memoryForConsumingSegmentPerPartition = memoryManager.getTotalAllocatedBytes();
     mutableSegmentImpl.destroy();
     FileUtils.deleteQuietly(statsFileCopy);

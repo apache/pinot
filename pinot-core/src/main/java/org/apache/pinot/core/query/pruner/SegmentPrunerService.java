@@ -137,31 +137,17 @@ public class SegmentPrunerService {
    *                 undefined way. Therefore, this list should not be used after calling this method.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
-  private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments, QueryContext query,
-      SegmentPrunerStatistics stats) {
+  private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments) {
     int selected = 0;
-    int invalid = 0;
     for (IndexSegment segment : segments) {
       if (!isEmptySegment(segment)) {
-        if (isInvalidSegment(segment, query)) {
-          invalid++;
-        } else {
-          segments.set(selected++, segment);
-        }
+        segments.set(selected++, segment);
       }
     }
-    stats.setInvalidSegments(invalid);
     return segments.subList(0, selected);
   }
 
   private static boolean isEmptySegment(IndexSegment segment) {
     return segment.getSegmentMetadata().getTotalDocs() == 0;
-  }
-
-  private static boolean isInvalidSegment(IndexSegment segment, QueryContext query) {
-    if (query.getQueryOptions() != null && QueryOptionsUtils.isSelectStarQuery(query.getQueryOptions())) {
-      return false;
-    }
-    return !segment.getColumnNames().containsAll(query.getColumns());
   }
 }

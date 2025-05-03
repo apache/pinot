@@ -140,6 +140,6 @@ public class MutableSegmentImplTestUtils {
     }
 
     RealtimeSegmentConfig realtimeSegmentConfig = segmentConfBuilder.build();
-    return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
+    return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics, null);
   }
 }

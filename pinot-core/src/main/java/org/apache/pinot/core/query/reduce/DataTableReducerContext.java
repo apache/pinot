@@ -33,7 +33,6 @@ public class DataTableReducerContext {
   private final int _groupByTrimThreshold;
   private final int _minGroupTrimSize;
   private final int _minInitialIndexedTableCapacity;
-  private final boolean _hasSchemaMismatch;
 
   /**
    * Constructor for the class.
@@ -44,14 +43,13 @@ public class DataTableReducerContext {
    * @param groupByTrimThreshold trim threshold for SQL group by
    */
   public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
-      int groupByTrimThreshold, int minGroupTrimSize, int minInitialIndexedTableCapacity, boolean hasSchemaMismatch) {
+      int groupByTrimThreshold, int minGroupTrimSize, int minInitialIndexedTableCapacity) {
     _executorService = executorService;
     _maxReduceThreadsPerQuery = maxReduceThreadsPerQuery;
     _reduceTimeOutMs = reduceTimeOutMs;
     _groupByTrimThreshold = groupByTrimThreshold;
     _minGroupTrimSize = minGroupTrimSize;
     _minInitialIndexedTableCapacity = minInitialIndexedTableCapacity;
-    _hasSchemaMismatch = hasSchemaMismatch;
   }
 
   public ExecutorService getExecutorService() {
@@ -76,9 +74,5 @@ public class DataTableReducerContext {
 
   public int getMinInitialIndexedTableCapacity() {
     return _minInitialIndexedTableCapacity;
-  }
-
-  public boolean hasSchemaMismatch() {
-      return _hasSchemaMismatch;
   }
 }

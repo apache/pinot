@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -55,7 +57,7 @@ public class IndexLoadingConfig {
 
   private final InstanceDataManagerConfig _instanceDataManagerConfig;
   private final TableConfig _tableConfig;
-  private final Schema _schema;
+  private Schema _schema;
 
   // These fields can be modified after initialization
   // TODO: Revisit them
@@ -84,6 +86,7 @@ public class IndexLoadingConfig {
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private boolean _dirty = true;
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   /**
    * NOTE: This step might modify the passed in table config and schema.
@@ -128,6 +131,10 @@ public class IndexLoadingConfig {
   @Nullable
   public Schema getSchema() {
     return _schema;
+  }
+
+  public void setSchema(Schema schema) {
+    _schema = schema;
   }
 
   private void init() {
@@ -401,5 +408,13 @@ public class IndexLoadingConfig {
       _knownColumns.addAll(columns);
     }
     _dirty = true;
+  }
+
+  public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return _propertyStore;
+  }
+
+  public void setPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      _propertyStore = propertyStore;
   }
 }

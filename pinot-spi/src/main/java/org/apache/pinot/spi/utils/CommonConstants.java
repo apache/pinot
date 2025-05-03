@@ -613,10 +613,6 @@ public class CommonConstants {
         // Use MSE compiler when trying to fill a response with no schema metadata
         // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
         public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
-        // Indicates that the query was originally a SELECT *.
-        // Since SELECT * queries are expanded at the broker, the server cannot infer this directly.
-        // This hint would server to ensure correctness during reloads until atomic reload across hosts is supported.
-        public static final String IS_SELECT_STAR_QUERY = "isSelectStarQuery";
       }
 
       public static class QueryOptionValue {

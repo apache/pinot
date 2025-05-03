@@ -1720,8 +1720,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @VisibleForTesting
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
       Map<String, String> columnNameMap) {
-    boolean hasStar = false;
     if (pinotQuery != null) {
+      boolean hasStar = false;
       for (Expression expression : pinotQuery.getSelectList()) {
         fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
         //check if the select expression is '*'

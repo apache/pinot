@@ -284,7 +284,8 @@ public class ImmutableSegmentLoader {
     }
 
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer,
+                indexLoadingConfig);
     LOGGER.info("Successfully loaded segment: {} with SegmentDirectory", segmentName);
     return segment;
   }

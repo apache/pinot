@@ -22,6 +22,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,11 +46,15 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
-
     if (!mergedDataSchema.equals(dataSchemaToMerge)) {
-      SelectionOperatorUtils.handleSchemeMisMatchOnMerge(mergedBlock, blockToMerge, _numRowsToKeep, false, LOGGER);
-    } else {
-      SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
+      String errorMessage =
+          String.format("Data schema mismatch between merged block: %s and block to merge: %s, drop block to merge",
+              mergedDataSchema, dataSchemaToMerge);
+      // NOTE: This is segment level log, so log at debug level to prevent flooding the log.
+      LOGGER.debug(errorMessage);
+      mergedBlock.addErrorMessage(QueryErrorMessage.safeMsg(QueryErrorCode.MERGE_RESPONSE, errorMessage));
+      return;
     }
+    SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, _numRowsToKeep);
   }
 }

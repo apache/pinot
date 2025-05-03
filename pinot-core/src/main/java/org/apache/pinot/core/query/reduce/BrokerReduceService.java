@@ -34,7 +34,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -80,7 +79,6 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Process server response metadata.
     Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
-    boolean hasSchemaMismatch = false;
     while (iterator.hasNext()) {
       Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
       DataTable dataTable = entry.getValue();
@@ -107,16 +105,8 @@ public class BrokerReduceService extends BaseReduceService {
             // NOTE: Only compare the column data types, since the column names (string representation of expression)
             //       can change across different versions.
             if (!Arrays.equals(dataSchema.getColumnDataTypes(), dataSchemaFromNonEmptyDataTable.getColumnDataTypes())) {
-              if (queryOptions != null && QueryOptionsUtils.isSelectStarQuery(queryOptions)) {
-                // If the query is SELECT *, we can ignore the data schema mismatch
-                // Since we would prune the non-matching columns.
-                dataSchemaFromNonEmptyDataTable = SelectionOperatorUtils.getCommonDataSchema(
-                    dataSchemaFromNonEmptyDataTable, dataSchema);
-                hasSchemaMismatch = true;
-              } else {
-                serversWithConflictingDataSchema.add(entry.getKey());
-                iterator.remove();
-              }
+              serversWithConflictingDataSchema.add(entry.getKey());
+              iterator.remove();
             }
           }
         }
@@ -169,7 +159,7 @@ public class BrokerReduceService extends BaseReduceService {
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity, hasSchemaMismatch), brokerMetrics);
+              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
           new QueryProcessingException(QueryErrorCode.QUERY_CANCELLATION, e.toString()));

@@ -75,12 +75,7 @@ public class ProjectPlanNode implements PlanNode {
       }
     }
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
-    projectionColumns.forEach(column -> {
-      DataSource dataSource = _indexSegment.getDataSource(column);
-      if (dataSource != null) {
-        dataSourceMap.put(column, _indexSegment.getDataSource(column));
-      }
-    });
+    projectionColumns.forEach(column -> dataSourceMap.put(column, _indexSegment.getDataSource(column)));
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
     DocIdSetOperator docIdSetOperator =
         _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall,

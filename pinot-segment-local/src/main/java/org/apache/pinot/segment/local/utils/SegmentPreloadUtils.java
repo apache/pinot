@@ -37,10 +37,18 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,5 +198,26 @@ public class SegmentPreloadUtils {
     ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType)
         .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
     return segmentMetadataMap;
+  }
+
+  public static DataSource getVirtualDataSource(IndexLoadingConfig indexLoadingConfig, String column,
+                                                int totalDocCount) {
+    // First check is the schema is already updated with the virtual column
+    Schema schema = indexLoadingConfig.getSchema();
+    assert schema != null : "Schema should not be null";
+    if (!schema.hasColumn(column)) {
+      // Get the latest schema from the table data manager
+      assert indexLoadingConfig.getTableConfig() != null;
+      schema = ZKMetadataProvider.getTableSchema(indexLoadingConfig.getPropertyStore(),
+              indexLoadingConfig.getTableConfig().getTableName());
+      indexLoadingConfig.setSchema(schema);
+    }
+    assert schema != null;
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    fieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, totalDocCount);
+    VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+    return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
+            virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
   }
 }

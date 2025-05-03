@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.type.RelDataType;
@@ -63,7 +62,6 @@ public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
-  private Map<String, Integer> _columnNameToIndexMap;
 
   /**
    * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
@@ -235,26 +233,6 @@ public class DataSchema {
       columnTypes.add(columnDataType.toType(typeFactory));
     }
     return typeFactory.createStructType(columnTypes, Arrays.asList(_columnNames));
-  }
-
-  /**
-   * Returns a map from column name to index.
-   * <p>This method lazily computes the map on the first call and caches it for subsequent calls.
-   * We are using this for merging data from different blocks, with the assumption that the column names are not always
-   * in the same order across blocks and doesn't have the same set of columns.
-   *
-   * @return Map from column name to index
-   */
-  @JsonIgnore
-  public Map<String, Integer> getColumnNameToIndexMap() {
-    if (_columnNameToIndexMap == null) {
-      Map<String, Integer> map = new LinkedHashMap<>();
-      for (int i = 0; i < _columnNames.length; i++) {
-        map.put(_columnNames[i], i);
-      }
-      _columnNameToIndexMap = map;
-    }
-    return _columnNameToIndexMap;
   }
 
   public enum ColumnDataType {

@@ -195,7 +195,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, indexLoadingConfig);
 
     _transformPipeline = new TransformPipeline(_tableConfig, _schema);
 

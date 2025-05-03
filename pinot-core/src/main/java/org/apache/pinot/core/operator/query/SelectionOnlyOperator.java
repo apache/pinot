@@ -63,34 +63,24 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _projectOperator = projectOperator;
+    _expressions = expressions;
 
-    // Use temp lists to gather valid expressions, names, and data types
-    List<String> columnNamesList = new ArrayList<>();
-    List<DataSchema.ColumnDataType> columnDataTypesList = new ArrayList<>();
-    List<ExpressionContext> filteredExpressions = new ArrayList<>();
     int numExpressions = expressions.size();
+    _blockValSets = new BlockValSet[numExpressions];
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = expressions.get(i);
+      columnNames[i] = expression.toString();
       ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
-      if (columnContext != null) {
-        columnNamesList.add(expression.toString());
-        columnDataTypesList.add(
-            DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue()));
-        filteredExpressions.add(expression);
-      }
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
-    // Update _expressions to only valid expressions (retainAll to preserve ordering)
-    _expressions = filteredExpressions;
-
-    int filteredNumExpressions = filteredExpressions.size();
-    _blockValSets = new BlockValSet[filteredNumExpressions];
-    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[filteredNumExpressions] : null;
-    _dataSchema = new DataSchema(
-        columnNamesList.toArray(new String[0]),
-        columnDataTypesList.toArray(new DataSchema.ColumnDataType[0]));
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
 
   @Override

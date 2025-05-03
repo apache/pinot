@@ -84,7 +84,6 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
   public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
-  private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -177,9 +176,6 @@ public class CalciteSqlParser {
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
     // Set query options into PinotQuery
     pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
-    if (pinotQuery.getSelectList().size() == 1 && pinotQuery.getSelectList().get(0).equals(STAR)) {
-      QueryOptionsUtils.setSelectStarOption(pinotQuery.getQueryOptions(), true);
-    }
     return pinotQuery;
   }
 

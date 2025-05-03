@@ -393,6 +393,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   private IndexLoadingConfig createAndCacheIndexLoadingConfig(TableConfig tableConfig, Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setPropertyStore(_propertyStore);
     _indexLoadingConfig = indexLoadingConfig;
     return indexLoadingConfig;
   }
