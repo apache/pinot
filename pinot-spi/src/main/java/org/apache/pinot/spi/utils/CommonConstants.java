@@ -71,6 +71,7 @@ public class CommonConstants {
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
+  public static final String QUERY_WORKLOAD = "queryWorkload";
 
   public static final String JFR = "pinot.jfr";
 
@@ -1123,6 +1124,10 @@ public class CommonConstants {
       public static final String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
           "default.allow.dedup.consumption.during.commit";
     }
+
+    public static final String QUERY_WORKLOAD_ENABLED = "pinot.server.queryWorkloadEnabled";
+    public static final boolean DEFAULT_QUERY_WORKLOAD_ENABLED = false;
+    public static final String CONTROLLER_URL = "pinot.server.controllerUrl";
   }
 
   public static class Controller {

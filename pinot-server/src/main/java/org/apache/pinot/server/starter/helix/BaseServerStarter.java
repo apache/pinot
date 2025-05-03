@@ -66,6 +66,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -96,6 +97,7 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
@@ -811,6 +813,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } else {
       serverMetrics.addTimedValue(
           ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+    }
+    boolean isQueryWorkloadEnabled =
+        _serverConf.getProperty(Server.QUERY_WORKLOAD_ENABLED, Server.DEFAULT_QUERY_WORKLOAD_ENABLED);
+    if (isQueryWorkloadEnabled) {
+      String controllerUrl = _serverConf.getProperty(Server.CONTROLLER_URL);
+      // TODO: This info would be used by the QueryWorkloadBudgetManager to fetch the query workload configs
+      QueryWorkloadConfigUtils.getQueryWorkloadConfigsFromController(controllerUrl, _instanceId,
+              NodeConfig.Type.LEAF_NODE);
     }
   }
 
