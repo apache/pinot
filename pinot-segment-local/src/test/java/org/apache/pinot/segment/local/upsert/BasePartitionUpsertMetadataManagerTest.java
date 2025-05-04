@@ -698,7 +698,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
-    return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
+    return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null, null) {
       public void persistValidDocIdsSnapshot() {
         segmentsTakenSnapshot.add(segName);
         super.persistValidDocIdsSnapshot();

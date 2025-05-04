@@ -31,6 +31,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -73,7 +74,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final Map<String, DataSource> _dataSources;
-  private final IndexLoadingConfig _indexLoadingConfig;
+  private final TableDataManager _tableDataManager;
 
   // Dedupe
   private PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -85,7 +86,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap,
-      @Nullable StarTreeIndexContainer starTreeIndexContainer, IndexLoadingConfig indexLoadingConfig) {
+      @Nullable StarTreeIndexContainer starTreeIndexContainer, TableDataManager tableDataManager) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
@@ -101,7 +102,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
       }
     }
-    _indexLoadingConfig = indexLoadingConfig;
+    _tableDataManager = tableDataManager;
   }
 
   public void enableDedup(PartitionDedupMetadataManager partitionDedupMetadataManager) {
@@ -242,7 +243,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     DataSource dataSource = _dataSources.get(column);
     if (dataSource == null) {
       // Populate a virtual data source
-      dataSource = SegmentPreloadUtils.getVirtualDataSource(_indexLoadingConfig, column,
+      dataSource = SegmentPreloadUtils.getVirtualDataSource(_tableDataManager, column,
               _segmentMetadata.getTotalDocs());
       _dataSources.put(column, dataSource);
     }

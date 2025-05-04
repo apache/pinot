@@ -24,8 +24,6 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -35,20 +33,16 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
@@ -66,22 +60,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -90,10 +73,6 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -105,7 +84,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -185,10 +163,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // Store the table size. Table size is platform dependent because of the native library used by the ChunkCompressor.
   // Once this value is set, assert that table size always gets back to this value after removing the added indices.
   private long _tableSize;
-
-  private PinotHelixResourceManager _resourceManager;
-  private TableRebalancer _tableRebalancer;
-  private ExecutorService _executorService;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -297,15 +271,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     waitForAllDocsLoaded(600_000L);
 
     _tableSize = getTableSize(getTableName());
-
-    _resourceManager = _controllerStarter.getHelixResourceManager();
-    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
-    _executorService = Executors.newFixedThreadPool(10);
-    preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
-    ConsumingSegmentInfoReader consumingSegmentInfoReader =
-        new ConsumingSegmentInfoReader(_executorService, null, _helixResourceManager);
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
-        _resourceManager.getTableSizeReader());
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -811,263 +776,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
-  }
-
-  @Test
-  public void testRebalancePreChecks()
-      throws Exception {
-    // setup the rebalance config
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(true);
-
-    TableConfig tableConfig = getOfflineTableConfig();
-
-    // Ensure pre-check status is null if not enabled
-    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getPreChecksResult());
-
-    // Enable pre-checks, nothing is set
-    rebalanceConfig.setPreChecks(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Enable minimizeDataMovement
-    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Override minimizeDataMovement
-    rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled in table config but it's overridden with disabled",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Use default minimizeDataMovement and disable it in table config
-    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(false);
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is not enabled but instance assignment is allowed",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Undo minimizeDataMovement, update the table config to add a column to bloom filter
-    rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
-    tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    updateTableConfig(tableConfig);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Undo tableConfig change
-    tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
-    updateTableConfig(tableConfig);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    // Validate that the status for reload is still PASS (i.e. even though an extra server is tagged which has no
-    // segments assigned for this table, we don't try to get needReload status from that extra server, otherwise
-    // ERROR status would be returned)
-    BaseServerStarter serverStarter0 = startOneServer(NUM_SERVERS);
-    rebalanceConfig.setReassignInstances(true);
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    rebalanceConfig.setReassignInstances(false);
-
-    // Stop the added server
-    serverStarter0.stop();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter0.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-
-    // Add a schema change
-    Schema schema = createSchema();
-    schema.addField(new MetricFieldSpec("NewAddedIntMetric", DataType.INT, 1));
-    updateSchema(schema);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Keep schema change and update table config to add minimizeDataMovement
-    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(true);
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
-    instanceAssignmentConfigMap = createInstanceAssignmentConfigMap(false);
-    replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
-    tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is enabled",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good",
-        RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments - numReplicaGroups: "
-            + replicaGroupPartitionConfig.getNumReplicaGroups() + ", numInstancesPerReplicaGroup: "
-            + (replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup() == 0
-            ? "0 (using as many instances as possible)" : replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup()),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    // Trigger rebalance config warning
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setBestEfforts(true);
-    rebalanceConfig.setBootstrap(true);
-    rebalanceConfig.setMinAvailableReplicas(-1);
-    tableConfig.setInstanceAssignmentConfigMap(null);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
-        "Instance assignment not allowed, no need for minimizeDataMovement",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "bestEfforts is enabled, only enable it if you know what you are doing\n"
-            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
-            + "intended", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "OFFLINE segments - Replica Groups are not enabled, replication: " + tableConfig.getReplication(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-
-    // Disable dry-run
-    rebalanceConfig.setBootstrap(false);
-    rebalanceConfig.setBestEfforts(false);
-    rebalanceConfig.setDryRun(false);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getPreChecksResult());
-    // Expect FAILED: Pre-checks can only be enabled in dry-run mode, not triggering rebalance
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-
-    // Stop the added server
-    serverStarter1.stop();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-  }
-
-  private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
-      String expectedMinimizeDataMovement, RebalancePreCheckerResult.PreCheckStatus expectedMinimizeDataMovementStatus,
-      String expectedNeedsReloadMessage, RebalancePreCheckerResult.PreCheckStatus expectedNeedsReloadStatus,
-      String expectedRebalanceConfig, RebalancePreCheckerResult.PreCheckStatus expectedRebalanceConfigStatus,
-      String expectedReplicaGroupMessage, RebalancePreCheckerResult.PreCheckStatus expectedReplicaGroupStatus) {
-    assertEquals(rebalanceResult.getStatus(), expectedStatus);
-    Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
-    assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 6);
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
-        expectedMinimizeDataMovementStatus);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
-        expectedMinimizeDataMovement);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-        expectedNeedsReloadStatus);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-        expectedNeedsReloadMessage);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
-        expectedRebalanceConfigStatus);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
-        expectedRebalanceConfig);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
-        expectedReplicaGroupStatus);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
-        expectedReplicaGroupMessage);
-    // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
-    // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
-    // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
-    // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
-  }
-
-  private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap(boolean minimizeDataMovement) {
-    InstanceTagPoolConfig instanceTagPoolConfig =
-        new InstanceTagPoolConfig("tag", false, 1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1, 1,
-            1, 1, 1, minimizeDataMovement,
-            null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,
-        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
-    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-    instanceAssignmentConfigMap.put("OFFLINE", instanceAssignmentConfig);
-    return instanceAssignmentConfigMap;
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3238,7 +2946,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     stopController();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
-    _executorService.shutdown();
   }
 
   private void testInstanceDecommission()
@@ -4251,92 +3958,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testRebalanceDryRunSummary()
-      throws Exception {
-    // setup the rebalance config
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(true);
-
-    TableConfig tableConfig = getOfflineTableConfig();
-
-    // Ensure summary status is non-null always
-    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
-        tableConfig.getReplication());
-
-    // Add a new server (to force change in instance assignment) and enable reassignInstances
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
-        getNumServers() + 1, tableConfig.getReplication());
-
-    // Disable dry-run to do a real rebalance
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setDowntime(true);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
-        getNumServers() + 1, tableConfig.getReplication());
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-
-    // Untag the added server
-    _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
-
-    // Re-enable dry-run
-    rebalanceConfig.setDryRun(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers() + 1,
-        getNumServers(), tableConfig.getReplication());
-
-    // Disable dry-run to do a real rebalance
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setDowntime(true);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-
-    waitForRebalanceToComplete(rebalanceResult, 600_000L);
-
-    // Stop the server
-    serverStarter1.stop();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
-        60_000L, "Failed to drop added server");
-
-    // Try dry-run again
-    rebalanceConfig.setDryRun(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
-        tableConfig.getReplication());
-
-    // Try dry-run with pre-checks
-    rebalanceConfig.setPreChecks(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
-        tableConfig.getReplication());
-    assertNotNull(rebalanceResult.getPreChecksResult());
-    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
-    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-        "No need to reload");
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
-        "Instance assignment not allowed, no need for minimizeDataMovement");
-    assertEquals(rebalanceResult.getPreChecksResult().get(
-            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-  }
-
-  @Test
-  public void testSelectStarOnNewColumnAddition() throws Exception {
+  public void testQueryOnNewColumnAdditionWithPartialReload() throws Exception {
     String testColumn = "TestColumn";
     Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     // Pick any existing INT column name for the “valid” cases
@@ -4347,19 +3969,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             .getName();
 
     // Pair each query with whether it should succeed (true) or fail (false) before full reload
-    List<Pair<String, Boolean>> testCases = List.of(
-            Pair.of(SELECT_STAR_QUERY, false),
-            Pair.of(SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000", true),
-            Pair.of(SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000", true),
-            Pair.of(SELECT_STAR_QUERY + " WHERE " + testColumn + " > 0 LIMIT 10000", false),
-            Pair.of(SELECT_STAR_QUERY + " ORDER BY " + testColumn + " LIMIT 10000", false)
+    List<String> queries = List.of(
+      SELECT_STAR_QUERY,
+      SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
+      SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
+      SELECT_STAR_QUERY + " WHERE " + testColumn + " > 0 LIMIT 10000",
+      SELECT_STAR_QUERY + " ORDER BY " + testColumn + " LIMIT 10000",
+      "SELECT " + testColumn + " FROM " + DEFAULT_TABLE_NAME + "_OFFLINE"
     );
 
-    for (Pair<String, Boolean> tc : testCases) {
+    for (String query: queries) {
       try {
-        String query = tc.getLeft();
-        boolean shouldSucceed = tc.getRight();
-
         // Build new schema with the extra column
         Schema newSchema = new Schema();
         newSchema.setSchemaName(oldSchema.getSchemaName());
@@ -4372,21 +3992,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         // Partially reload one segment
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
                 listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
-
-        if (shouldSucceed) {
-          // Column still not present until full reload
-          runQueryAndAssert(query, testColumn, false);
-          // Now do a full reload and assert the column shows up
-          reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
-          runQueryAndAssert(query, testColumn, true);
-        } else {
-          try {
-            postQuery(query);
-            fail("Expected query to fail due to missing column: " + testColumn);
-          } catch (Exception | AssertionError e) {
-            // Expected exception due to missing column
-          }
-        }
+        // Column still not present until full reload
+        runQueryAndAssert(query, testColumn);
+        // Now do a full reload and assert the column shows up
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+        runQueryAndAssert(query, testColumn);
       } finally {
         // Reset back to the original schema for the next iteration
         forceUpdateSchema(oldSchema);
@@ -4425,7 +4035,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String query, String newAddedColumn, boolean isPresent) throws Exception {
+  private void runQueryAndAssert(String query, String newAddedColumn) throws Exception {
     JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");
@@ -4440,129 +4050,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           break;
       }
     }
-    assertEquals(columnPresent, isPresent,
-        "Column presence mismatch for query: " + query + ", expected: " + isPresent + ", actual: " + columnPresent);
-  }
-
-  private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
-      boolean isSegmentsToBeMoved, int existingNumServers, int newNumServers, int replicationFactor) {
-    assertEquals(rebalanceResult.getStatus(), expectedStatus);
-    RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
-    assertNotNull(summaryResult);
-    assertNotNull(summaryResult.getServerInfo());
-    assertNotNull(summaryResult.getSegmentInfo());
-    assertEquals(summaryResult.getSegmentInfo().getReplicationFactor().getValueBeforeRebalance(), replicationFactor,
-        "Existing replication factor doesn't match expected");
-    assertEquals(summaryResult.getSegmentInfo().getReplicationFactor().getValueBeforeRebalance(),
-        summaryResult.getSegmentInfo().getReplicationFactor().getExpectedValueAfterRebalance(),
-        "Existing and new replication factor doesn't match");
-    assertEquals(summaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), existingNumServers,
-        "Existing number of servers don't match");
-    assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), newNumServers,
-        "New number of servers don't match");
-    // In this cluster integration test, servers are tagged with DefaultTenant only
-    assertEquals(summaryResult.getTagsInfo().size(), 1);
-    assertEquals(summaryResult.getTagsInfo().get(0).getTagName(),
-        TagNameUtils.getOfflineTagForTenant(getServerTenant()));
-    assertEquals(summaryResult.getTagsInfo().get(0).getNumServerParticipants(), newNumServers);
-    assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(),
-        summaryResult.getTagsInfo().get(0).getNumSegmentsToDownload());
-    // For this single tenant, the number of unchanged segments and the number of received segments should add up to
-    // the total present segment
-    assertEquals(summaryResult.getSegmentInfo().getNumSegmentsAcrossAllReplicas().getExpectedValueAfterRebalance(),
-        summaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged() + summaryResult.getTagsInfo()
-            .get(0)
-            .getNumSegmentsToDownload());
-    if (_tableSize > 0) {
-      assertTrue(summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes() > 0L,
-          "Avg segment size expected to be > 0 but found to be 0");
-    }
-    assertEquals(summaryResult.getServerInfo().getNumServersGettingNewSegments(),
-        summaryResult.getServerInfo().getServersGettingNewSegments().size());
-    if (existingNumServers != newNumServers) {
-      assertTrue(summaryResult.getServerInfo().getNumServersGettingNewSegments() > 0,
-          "Expected number of servers should be > 0");
-    } else {
-      assertEquals(summaryResult.getServerInfo().getNumServersGettingNewSegments(), 0,
-          "Expected number of servers getting new segments should be 0");
-    }
-
-    if (isSegmentsToBeMoved) {
-      assertTrue(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved() > 0,
-          "Segments to be moved should be > 0");
-      assertTrue(summaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted() > 0,
-          "Segments to be moved should be > 0");
-      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(),
-          summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved()
-              * summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes(),
-          "Estimated data to be moved in bytes doesn't match");
-      assertTrue(summaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer() > 0,
-          "Estimated max number of segments to move in a single server should be > 0");
-    } else {
-      assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
-      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(), 0L,
-          "Estimated data to be moved in bytes should be 0");
-      assertEquals(summaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer(), 0,
-          "Estimated max number of segments to move in a single server should be 0");
-    }
-
-    // Validate server status stats with numServers information
-    Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap =
-        summaryResult.getServerInfo().getServerSegmentChangeInfo();
-    int numServersAdded = 0;
-    int numServersRemoved = 0;
-    int numServersUnchanged = 0;
-    for (RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChangeInfo : serverSegmentChangeInfoMap.values()) {
-      switch (serverSegmentChangeInfo.getServerStatus()) {
-        case UNCHANGED:
-          numServersUnchanged++;
-          break;
-        case ADDED:
-          numServersAdded++;
-          break;
-        case REMOVED:
-          numServersRemoved++;
-          break;
-        default:
-          Assert.fail(String.format("Unknown server status encountered: %s",
-              serverSegmentChangeInfo.getServerStatus()));
-          break;
-      }
-    }
-
-    Assert.assertEquals(summaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(),
-        numServersRemoved + numServersUnchanged);
-    Assert.assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        numServersAdded + numServersUnchanged);
-
-    assertEquals(numServersAdded, summaryResult.getServerInfo().getServersAdded().size());
-    assertEquals(numServersRemoved, summaryResult.getServerInfo().getServersRemoved().size());
-    assertEquals(numServersUnchanged, summaryResult.getServerInfo().getServersUnchanged().size());
-  }
-
-  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs) {
-    String jobId = rebalanceResult.getJobId();
-    if (rebalanceResult.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-      return;
-    }
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-
-          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
-              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
-          return status != RebalanceResult.Status.IN_PROGRESS;
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
-      } catch (Exception e) {
-        return null;
-      }
-    }, 1000L, timeoutMs, "Failed to load all segments after rebalance");
+    assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
 }

@@ -586,7 +586,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         } catch {
           // ignore polling errors
         }
-      }, 2000);
+      }, 5000);
     } catch (error) {
       dispatch({
         type: 'error',
@@ -775,41 +775,52 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <TableToolbar name="Summary" showSearchBox={false} />
           <Grid container spacing={2} alignItems="center" className={classes.body}>
             <Grid item xs={3}>
-              <strong>Table Name:</strong> {tableSummary.tableName}
+              <div
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+                title={tableSummary.tableName}
+              >
+                <strong>Table Name:</strong> {tableSummary.tableName}
+              </div>
             </Grid>
-            <Grid item xs={3}>
-              <Box display="flex" alignItems="center">
-                <strong>Consuming status:</strong>
-                {loadingPauseStatus ? (
-                  <CircularProgress size={16} style={{ marginLeft: 8 }} />
-                ) : pauseStatusData ? (
-                  <Chip
-                    label={
-                      isPauseActionInProgress
-                        ? (pauseActionType === 'pause' ? 'PAUSING...' : 'RESUMING...')
-                        : (pauseStatusData.pauseFlag
-                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
-                               ? 'PAUSING'
-                               : 'PAUSED')
-                            : 'ACTIVE')
-                    }
-                    className={
-                      isPauseActionInProgress
-                        ? classes.statusPausing
-                        : (pauseStatusData.pauseFlag
-                            ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
-                               ? classes.statusPausing
-                               : classes.statusPaused)
-                            : classes.statusActive)
-                    }
-                    size="small"
-                    style={{ marginLeft: 8 }}
-                  />
-                ) : (
-                  <Box ml={1}>N/A</Box>
-                )}
-              </Box>
-            </Grid>
+            {tableType.toLowerCase() === TableType.REALTIME && (
+              <Grid item xs={3}>
+                <Box display="flex" alignItems="center">
+                  <strong>Consuming status:</strong>
+                  {loadingPauseStatus ? (
+                    <CircularProgress size={16} style={{ marginLeft: 8 }} />
+                  ) : pauseStatusData ? (
+                    <Chip
+                      label={
+                        isPauseActionInProgress
+                          ? (pauseActionType === 'pause' ? 'PAUSING...' : 'RESUMING...')
+                          : (pauseStatusData.pauseFlag
+                              ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                                  ? 'PAUSING'
+                                  : 'PAUSED')
+                              : 'ACTIVE')
+                      }
+                      className={
+                        isPauseActionInProgress
+                          ? classes.statusPausing
+                          : (pauseStatusData.pauseFlag
+                              ? (pauseStatusData.consumingSegments && pauseStatusData.consumingSegments.length > 0
+                                  ? classes.statusPausing
+                                  : classes.statusPaused)
+                              : classes.statusActive)
+                      }
+                      size="small"
+                      style={{ marginLeft: 8 }}
+                    />
+                  ) : (
+                    <Box ml={1}>N/A</Box>
+                  )}
+                </Box>
+              </Grid>
+            )}
             <Grid item container xs={3} wrap="nowrap" spacing={1}>
               <Grid item>
                 <Tooltip title="Uncompressed size of all data segments with replication" arrow placement="top">

@@ -669,7 +669,8 @@ public class TableIndexingTest {
     File indexDir = createSegment(tableConfig, schema, segmentName, rows);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
+            null);
 
     Map<String, Map<String, Integer>> map = new HashMap<>();
     addColumnIndexStats(segment, COLUMN_NAME, map);

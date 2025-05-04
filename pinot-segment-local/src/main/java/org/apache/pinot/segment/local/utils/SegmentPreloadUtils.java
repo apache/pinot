@@ -200,17 +200,14 @@ public class SegmentPreloadUtils {
     return segmentMetadataMap;
   }
 
-  public static DataSource getVirtualDataSource(IndexLoadingConfig indexLoadingConfig, String column,
+  public static DataSource getVirtualDataSource(TableDataManager tableDataManager, String column,
                                                 int totalDocCount) {
     // First check is the schema is already updated with the virtual column
-    Schema schema = indexLoadingConfig.getSchema();
+    Schema schema = tableDataManager.getCachedTableConfigAndSchema().getRight();
     assert schema != null : "Schema should not be null";
     if (!schema.hasColumn(column)) {
       // Get the latest schema from the table data manager
-      assert indexLoadingConfig.getTableConfig() != null;
-      schema = ZKMetadataProvider.getTableSchema(indexLoadingConfig.getPropertyStore(),
-              indexLoadingConfig.getTableConfig().getTableName());
-      indexLoadingConfig.setSchema(schema);
+      schema = tableDataManager.fetchIndexLoadingConfig().getSchema();
     }
     assert schema != null;
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);

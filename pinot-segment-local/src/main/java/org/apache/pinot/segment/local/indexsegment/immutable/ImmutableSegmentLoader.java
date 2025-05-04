@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -91,9 +92,9 @@ public class ImmutableSegmentLoader {
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable TableDataManager tableDataManager)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler);
+    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler, tableDataManager);
   }
 
   /**
@@ -103,7 +104,7 @@ public class ImmutableSegmentLoader {
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, null);
+    return load(indexDir, indexLoadingConfig, true, null, null);
   }
 
   /**
@@ -111,10 +112,10 @@ public class ImmutableSegmentLoader {
    * This method modifies the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable TableDataManager tableDataManager)
       throws Exception {
     return load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), needPreprocess,
-        segmentOperationsThrottler);
+        segmentOperationsThrottler, tableDataManager);
   }
 
   /**
@@ -133,9 +134,9 @@ public class ImmutableSegmentLoader {
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, @Nullable TableDataManager tableDataManager)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, schema, true, segmentOperationsThrottler);
+    return load(indexDir, indexLoadingConfig, schema, true, segmentOperationsThrottler, null);
   }
 
   /**
@@ -143,9 +144,9 @@ public class ImmutableSegmentLoader {
    * modify the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      boolean needPreprocess)
+      boolean needPreprocess, @Nullable TableDataManager tableDataManager)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, schema, needPreprocess, null);
+    return load(indexDir, indexLoadingConfig, schema, needPreprocess, null, tableDataManager);
   }
 
   /**
@@ -153,7 +154,8 @@ public class ImmutableSegmentLoader {
    * modify the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      boolean needPreprocess, @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      boolean needPreprocess, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      @Nullable TableDataManager tableDataManager)
       throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
@@ -182,7 +184,7 @@ public class ImmutableSegmentLoader {
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     SegmentDirectory segmentDirectory = segmentLoader.load(indexDir.toURI(), segmentLoaderContext);
     try {
-      return load(segmentDirectory, indexLoadingConfig, schema);
+      return load(segmentDirectory, indexLoadingConfig, schema, tableDataManager);
     } catch (Exception e) {
       LOGGER.error("Failed to load segment: {} with SegmentDirectory", segmentName, e);
       segmentDirectory.close();
@@ -226,14 +228,15 @@ public class ImmutableSegmentLoader {
   /**
    * Load the segment represented by the SegmentDirectory object to serve queries.
    */
-  public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
+  public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+                                      TableDataManager tableDataManager)
       throws Exception {
-    return load(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
+    return load(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema(), tableDataManager);
   }
 
   @Deprecated
   public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
+      @Nullable Schema schema, TableDataManager tableDataManager)
       throws Exception {
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
     if (segmentMetadata.getTotalDocs() == 0) {
@@ -285,7 +288,7 @@ public class ImmutableSegmentLoader {
 
     ImmutableSegmentImpl segment =
         new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer,
-                indexLoadingConfig);
+                tableDataManager);
     LOGGER.info("Successfully loaded segment: {} with SegmentDirectory", segmentName);
     return segment;
   }

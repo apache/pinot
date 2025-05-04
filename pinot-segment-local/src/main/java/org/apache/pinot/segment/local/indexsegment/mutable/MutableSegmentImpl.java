@@ -59,7 +59,6 @@ import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForw
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -111,7 +110,6 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.checkerframework.checker.units.qual.N;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -189,10 +187,10 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
-  private final IndexLoadingConfig _indexLoadingConfig;
+  private final TableDataManager _tableDataManager;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics,
-                            @Nullable IndexLoadingConfig indexLoadingConfig) {
+                            @Nullable TableDataManager tableDataManager) {
     _serverMetrics = serverMetrics;
     _realtimeTableName = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
@@ -427,7 +425,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _validDocIds = null;
       _queryableDocIds = null;
     }
-    _indexLoadingConfig = indexLoadingConfig;
+    _tableDataManager = tableDataManager;
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -995,7 +993,7 @@ public class MutableSegmentImpl implements MutableSegment {
       return indexContainer.toDataSource();
     } else {
       // Virtual column
-      return SegmentPreloadUtils.getVirtualDataSource(_indexLoadingConfig, column, _numDocsIndexed);
+      return SegmentPreloadUtils.getVirtualDataSource(_tableDataManager, column, _numDocsIndexed);
     }
   }
 

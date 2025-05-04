@@ -194,7 +194,7 @@ public class DimensionTableDataManagerTest {
 
     // assert that segments are released after loading data
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
     for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
       assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
           1, // Default ref count
@@ -224,7 +224,7 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"}));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -272,7 +272,7 @@ public class DimensionTableDataManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema, propertyStore);
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
 
     // Confirm table is loaded and available for lookup
     PrimaryKey key = new PrimaryKey(new String[]{"SF"});
@@ -326,7 +326,7 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupRow(key));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -371,7 +371,7 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager = makeTableDataManager(tableConfig, schema);
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_OPERATIONS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
 
     tableDataManager.shutDown();
 
@@ -390,7 +390,7 @@ public class DimensionTableDataManagerTest {
 
     try {
       tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-          SEGMENT_OPERATIONS_THROTTLER));
+          SEGMENT_OPERATIONS_THROTTLER, tableDataManager));
       fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;

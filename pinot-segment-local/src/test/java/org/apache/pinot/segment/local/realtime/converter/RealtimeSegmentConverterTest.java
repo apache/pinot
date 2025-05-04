@@ -446,7 +446,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       indexContainerMap.put(entry.getKey(),
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
-    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null, null);
+    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null,
+            null);
 
     GenericRow readRow = new GenericRow();
     int docId = 0;

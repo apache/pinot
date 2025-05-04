@@ -781,8 +781,11 @@ zookeeper:
 
   persistence:
     enabled: true
+    storageClass: ""
+    #storageClass: "ssd"
+
     ## The amount of PV storage allocated to each Zookeeper pod in the statefulset
-    # size: "2Gi"
+    size: "8Gi"
 
   ## Specify a Zookeeper imagePullPolicy
   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images

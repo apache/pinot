@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -106,7 +106,8 @@ public class SegmentPrunerService {
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats,
       @Nullable ExecutorService executorService) {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
-      segments = removeInvalidSegments(segments, query, stats);
+      segments = segments.stream()
+              .filter(segment -> !SegmentPrunerService.isEmptySegment(segment)).collect(Collectors.toList());
       int invokedPrunersCount = 0;
       for (SegmentPruner segmentPruner : _segmentPruners) {
         if (segmentPruner.isApplicableTo(query)) {
@@ -122,29 +123,6 @@ public class SegmentPrunerService {
       scope.setNumChildren(invokedPrunersCount);
     }
     return segments;
-  }
-
-  /**
-   * Filters the given list, returning a list that only contains the valid segments, modifying the list received as
-   * argument.
-   *
-   * <p>
-   * This is a destructive operation. The list received as arguments may be modified, so only the returned list should
-   * be used.
-   * </p>
-   *
-   * @param segments the list of segments to be pruned. This is a destructive operation that may modify this list in an
-   *                 undefined way. Therefore, this list should not be used after calling this method.
-   * @return the new list with filtered elements. This is the list that have to be used.
-   */
-  private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments) {
-    int selected = 0;
-    for (IndexSegment segment : segments) {
-      if (!isEmptySegment(segment)) {
-        segments.set(selected++, segment);
-      }
-    }
-    return segments.subList(0, selected);
   }
 
   private static boolean isEmptySegment(IndexSegment segment) {

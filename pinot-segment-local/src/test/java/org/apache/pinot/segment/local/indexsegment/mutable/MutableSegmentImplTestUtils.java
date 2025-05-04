@@ -25,8 +25,10 @@ import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -36,6 +38,7 @@ import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -140,6 +143,8 @@ public class MutableSegmentImplTestUtils {
     }
 
     RealtimeSegmentConfig realtimeSegmentConfig = segmentConfBuilder.build();
-    return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics, null);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(mock(TableConfig.class), schema));
+    return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics, tableDataManager);
   }
 }

@@ -216,7 +216,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Bytes to be written to deep store
   DEEP_STORE_WRITE_BYTES_IN_PROGRESS("deepStoreWriteBytesInProgress", true),
   // Count of deep store segment writes that are currently in progress
-  DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true);
+  DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true),
+
+  // The progress of a certain table rebalance job of a table
+  TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false);
+
 
   private final String _gaugeName;
   private final String _unit;
