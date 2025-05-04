@@ -146,8 +146,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
-  // Caches the latest IndexLoadingConfig. The cached IndexLoadingConfig should not be modified.
-  protected volatile IndexLoadingConfig _indexLoadingConfig;
+  // Caches the latest TableConfig and Schema pair. The cache should not be modified.
+  protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
 
   protected volatile boolean _shutDown;
 
@@ -190,6 +190,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -226,7 +227,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
-    createAndCacheIndexLoadingConfig(tableConfig, schema);
 
     doInit();
 
@@ -387,19 +387,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    return createAndCacheIndexLoadingConfig(tableConfig, schema);
-  }
-
-  private IndexLoadingConfig createAndCacheIndexLoadingConfig(TableConfig tableConfig, Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    _indexLoadingConfig = indexLoadingConfig;
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
     return indexLoadingConfig;
   }
 
   @Override
-  public IndexLoadingConfig getIndexLoadingConfig() {
-    return _indexLoadingConfig;
+  public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
+    return _cachedTableConfigAndSchema;
   }
 
   @Override
