@@ -48,7 +48,6 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
     StreamPartitionMsgOffset latestIngestedOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.getLatestStreamOffsetAtStartupTime();
     StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
-    assert partitionMetadataProvider != null;
     try {
       if (partitionMetadataProvider.isOffsetCaughtUp(latestIngestedOffset, latestStreamOffset)) {
         _logger.info("Segment {} with latest ingested offset {} has caught up to the latest stream offset {}",
