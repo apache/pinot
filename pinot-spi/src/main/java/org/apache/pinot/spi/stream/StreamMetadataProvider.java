@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -136,7 +137,17 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
-  default boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset)
+  /**
+   *  @param currentOffset - The next stream offset of a partition to be consumed by the segment consumer.
+   *  @param latestOffset - The latest stream offset of a given partition.
+   *
+   * @return true if currentOffset.compareTo(latestOffset) >= 0, else false.
+   *
+   * @throws UnsupportedOffsetCatchUpCheckException if stream cannot determine whether currentOffset >= latestOffset
+   * or not. This can happen for streams like Kinesis where latestStreamOffset for an open shard is null.
+   */
+  default boolean isOffsetCaughtUp(@Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset)
       throws UnsupportedOffsetCatchUpCheckException {
     if (currentOffset != null && latestOffset != null) {
       return currentOffset.compareTo(latestOffset) >= 0;

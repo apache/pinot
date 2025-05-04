@@ -28,10 +28,14 @@ import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMetadataProvider;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -497,5 +501,34 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(0));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void testIsSegmentCaughtUp() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
+    RealtimeSegmentDataManager mockRealtimeSegmentDataManager = mock(RealtimeSegmentDataManager.class);
+    MutableSegment mockMutableSegment = mock(MutableSegmentImpl.class);
+    when(mockRealtimeSegmentDataManager.getSegment()).thenReturn(mockMutableSegment);
+    SegmentMetadata mockSegmentMetadata = mock(SegmentMetadata.class);
+    when(mockMutableSegment.getSegmentMetadata()).thenReturn(mockSegmentMetadata);
+    when(mockSegmentMetadata.getLatestIngestionTimestamp()).thenReturn(System.currentTimeMillis() - 10000);
+    when(mockRealtimeSegmentDataManager.getCurrentOffset()).thenReturn(new LongMsgOffset(100));
+    when(mockRealtimeSegmentDataManager.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(500));
+    StreamMetadataProvider mockStreamMetadataProvider = new FakeStreamMetadataProvider();
+    when(mockRealtimeSegmentDataManager.getPartitionMetadataProvider()).thenReturn(mockStreamMetadataProvider);
+    Assert.assertFalse(statusChecker.isSegmentCaughtUp(segA0, mockRealtimeSegmentDataManager));
+
+    when(mockRealtimeSegmentDataManager.getCurrentOffset()).thenReturn(new LongMsgOffset(500));
+    when(mockRealtimeSegmentDataManager.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(500));
+    Assert.assertTrue(statusChecker.isSegmentCaughtUp(segA0, mockRealtimeSegmentDataManager));
   }
 }

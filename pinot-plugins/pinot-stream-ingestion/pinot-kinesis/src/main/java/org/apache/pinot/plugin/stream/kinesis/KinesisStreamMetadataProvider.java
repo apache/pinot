@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -289,11 +290,13 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset)
+  public boolean isOffsetCaughtUp(@Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset)
       throws UnsupportedOffsetCatchUpCheckException {
     if (currentOffset != null && latestOffset != null) {
       KinesisPartitionGroupOffset latestPartitionGroupOffset = ((KinesisPartitionGroupOffset) latestOffset);
       if (latestPartitionGroupOffset.getSequenceNumber() == null) {
+        // Cannot conclude if offset has caught up or not. Throw custom exception so that caller can handle accordingly.
         throw new UnsupportedOffsetCatchUpCheckException("Sequence number in latestPartitionGroupOffset is null.");
       }
       return currentOffset.compareTo(latestOffset) >= 0;

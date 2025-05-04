@@ -30,6 +30,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -250,5 +251,30 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+  }
+
+  @Test
+  public void testIsOffsetCaughtUp()
+      throws UnsupportedOffsetCatchUpCheckException {
+    StreamPartitionMsgOffset currentOffset = new KinesisPartitionGroupOffset("1", "1");
+    StreamPartitionMsgOffset latestOffset = new KinesisPartitionGroupOffset("1", "2");
+    Assert.assertFalse(_kinesisStreamMetadataProvider.isOffsetCaughtUp(currentOffset, latestOffset));
+
+    currentOffset = new KinesisPartitionGroupOffset("1", "4");
+    latestOffset = new KinesisPartitionGroupOffset("1", "4");
+    Assert.assertTrue(_kinesisStreamMetadataProvider.isOffsetCaughtUp(currentOffset, latestOffset));
+
+    currentOffset = new KinesisPartitionGroupOffset("1", "4");
+    latestOffset = new KinesisPartitionGroupOffset("1", "3");
+    Assert.assertTrue(_kinesisStreamMetadataProvider.isOffsetCaughtUp(currentOffset, latestOffset));
+
+    Assert.assertFalse(_kinesisStreamMetadataProvider.isOffsetCaughtUp(currentOffset, null));
+
+    currentOffset = new KinesisPartitionGroupOffset("1", "4");
+    latestOffset = new KinesisPartitionGroupOffset("1", null);
+    StreamPartitionMsgOffset finalCurrentOffset = currentOffset;
+    StreamPartitionMsgOffset finalLatestOffset = latestOffset;
+    Assert.expectThrows(UnsupportedOffsetCatchUpCheckException.class,
+        () -> _kinesisStreamMetadataProvider.isOffsetCaughtUp(finalCurrentOffset, finalLatestOffset));
   }
 }
