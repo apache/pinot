@@ -104,7 +104,8 @@ public class PinotTableIdealStateBuilder {
           tableNameWithType, fetcherException);
       ControllerMetrics controllerMetrics = ControllerMetrics.get();
       if (controllerMetrics != null) {
-        controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR, 1L);
+        controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR,
+            1L);
       }
       throw new RuntimeException(fetcherException);
     }
