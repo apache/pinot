@@ -1225,15 +1225,8 @@ public class PinotLLCRealtimeSegmentManager {
           streamConfigs.stream()
               .forEach(streamConfig -> streamConfig.setOffsetCriteria(
                   offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
-          List<PartitionGroupMetadata> newPartitionGroupMetadataList;
-          try {
-            newPartitionGroupMetadataList =
-                getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
-          } catch (Exception e) {
-            _controllerMetrics.addMeteredTableValue(realtimeTableName,
-                ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR, 1L);
-            throw e;
-          }
+          List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
           streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, newPartitionGroupMetadataList,
               offsetCriteria);
@@ -1244,8 +1237,7 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }, DEFAULT_RETRY_POLICY, true);
     } catch (Exception e) {
-      LOGGER.error("Failed to update ideal state during ensureAllPartitionsConsuming.", e);
-      throw e;
+      throw new RuntimeException("Failed to update ideal state during ensureAllPartitionsConsuming.", e);
     }
   }
 
