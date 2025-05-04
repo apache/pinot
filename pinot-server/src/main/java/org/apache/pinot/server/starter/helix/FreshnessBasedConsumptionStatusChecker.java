@@ -38,6 +38,8 @@ import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
  *   - the last ingested message is within {@link #_minFreshnessMs} of the current system time
  */
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
+  public static final int DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS = 5000;
+
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;
 
@@ -77,7 +79,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
     StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
-    assert partitionMetadataProvider != null;
     try {
       if (partitionMetadataProvider.isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
         _logger.info(
@@ -95,7 +96,8 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
       return true;
     }
 
-    StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
+    StreamPartitionMsgOffset earliestStreamOffset =
+        rtSegmentDataManager.fetchEarliestStreamOffset(DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS);
 
     long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
