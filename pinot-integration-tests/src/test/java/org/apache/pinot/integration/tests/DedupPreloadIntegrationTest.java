@@ -147,15 +147,15 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
     }
   }
 
-  @Override
-  protected IngestionConfig getIngestionConfig() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
-    ingestionConfig.getStreamIngestionConfig()
-        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
-    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
-    return ingestionConfig;
-  }
+//  @Override
+//  protected IngestionConfig getIngestionConfig() {
+//    IngestionConfig ingestionConfig = new IngestionConfig();
+//    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
+//    ingestionConfig.getStreamIngestionConfig()
+//        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+//    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
+//    return ingestionConfig;
+//  }
 
   @Override
   protected TableConfig createDedupTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {

@@ -92,16 +92,16 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     waitForDocsLoaded(600_000L, true, DEDUP_TABLE_WITH_REPLICAS);
   }
 
-  @Override
-  protected IngestionConfig getIngestionConfig() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
-    assert ingestionConfig.getStreamIngestionConfig() != null;
-    ingestionConfig.getStreamIngestionConfig()
-        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
-    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
-    return ingestionConfig;
-  }
+//  @Override
+//  protected IngestionConfig getIngestionConfig() {
+//    IngestionConfig ingestionConfig = new IngestionConfig();
+//    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(getStreamConfigs())));
+//    assert ingestionConfig.getStreamIngestionConfig() != null;
+//    ingestionConfig.getStreamIngestionConfig()
+//        .setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+//    ingestionConfig.getStreamIngestionConfig().setEnforceConsumptionInOrder(true);
+//    return ingestionConfig;
+//  }
 
   /**
    * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
