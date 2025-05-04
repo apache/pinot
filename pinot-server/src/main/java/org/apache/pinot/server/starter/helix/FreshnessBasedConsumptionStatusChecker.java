@@ -77,7 +77,8 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
-    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
+    StreamPartitionMsgOffset latestStreamOffset =
+        rtSegmentDataManager.fetchLatestStreamOffset(DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS);
     StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
     try {
       if (partitionMetadataProvider.isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
