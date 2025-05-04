@@ -66,6 +66,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
@@ -116,6 +119,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // setup some SegmentDataManagers
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
 
@@ -141,6 +146,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
     //           latest ingested offset     latest stream offset
@@ -177,6 +183,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -232,6 +241,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
