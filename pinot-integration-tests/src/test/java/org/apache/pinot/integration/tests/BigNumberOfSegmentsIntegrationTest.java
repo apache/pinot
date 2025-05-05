@@ -38,7 +38,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -151,7 +150,7 @@ public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Override
-  protected @Nullable List<String> getInvertedIndexColumns() {
+  protected List<String> getInvertedIndexColumns() {
     return Arrays.asList(FLOAT_COL, INT_COL);
   }
 
@@ -185,7 +184,7 @@ public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTe
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    List<Field> fields = new ArrayList();
+    List<Field> fields = new ArrayList<>();
     fields.add(new Field(INT_COL, create(Type.INT), null, null));
     fields.add(new Field(LONG_COL, create(Type.LONG), null, null));
     fields.add(new Field(FLOAT_COL, create(Type.FLOAT), null, null));
@@ -218,7 +217,7 @@ public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTe
           record.put(1, docId);
           record.put(2, docId);
           record.put(3, docId);
-          record.put(4, TimeUtils.VALID_MIN_TIME_MILLIS + r++ * 3600);
+          record.put(4, TimeUtils.VALID_MIN_TIME_MILLIS + r++ * 3600L);
 
           for (int si = 0; si < STR_COL_NUM; si++) {
             record.put(5 + si, strs[docId]);
@@ -233,7 +232,7 @@ public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTe
     return files;
   }
 
-  private static org.apache.avro.@NotNull Schema create(Type type) {
+  private static org.apache.avro.Schema create(Type type) {
     return org.apache.avro.Schema.create(type);
   }
 
