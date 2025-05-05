@@ -20,10 +20,10 @@ name: Pinot Dependency Check
 
 on:
   pull_request:
-    branches:
-      - master
     paths:
-      - "**/pom.xml"
+      - '**/pom.xml'
+      - 'pinot-dependency-verifier/**'
+      - '.github/workflows/enforce-dependencies.yml'
 
 jobs:
   check-dependency:
@@ -34,10 +34,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Fetch base branch
-        run: git fetch origin master
 
       - name: Set up JDK 11
         uses: actions/setup-java@v4
@@ -46,5 +42,11 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Run Shell Script
-        run: ./.github/workflows/scripts/.pinot_dependency_check.sh
+      - name: Build verifier module
+        run: |
+          cd pinot-dependency-verifier
+          mvn clean install -DskipTests -Pbin-dist
+          cd ..
+
+      - name: Run Maven Enforcer
+        run: mvn enforcer:enforce

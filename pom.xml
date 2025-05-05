@@ -2322,7 +2322,6 @@
                     </excludes>
                   </bannedDependencies>
                   <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
-                    <skipRoot>true</skipRoot>
                     <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
                       pinot-tools,contrib</skipModules>
                   </pinotCustomDependencyVersionRule>

@@ -17,12 +17,19 @@
  * under the License.
  */
 package org.apache.pinot.verifier;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.inject.Named;
 import org.apache.maven.enforcer.rule.api.EnforcerRule;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleException;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleHelper;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
+import org.apache.maven.model.Model;
 import org.apache.maven.project.MavenProject;
 
 /**
@@ -41,39 +48,65 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
    * Comma-separated list of artifactIds to skip (e.g. "pinot-plugins,pinot-connectors").
    */
   private String _skipModules;
+  private List<String> _skipModuleList;
 
-  public void setSkipRoot(boolean skipRoot) {
-    _skipRoot = skipRoot;
-  }
+//  public void setSkipRoot(boolean skipRoot) {
+//    _skipRoot = skipRoot;
+//  }
 
   public void setSkipModules(String skipModules) {
     _skipModules = skipModules;
+    _skipModuleList = parseSkipModules(skipModules);
   }
 
   @Override
   public void execute(final EnforcerRuleHelper helper) throws EnforcerRuleException {
     final MavenProject project;
+    final MavenSession session;
     try {
       project = (MavenProject) helper.evaluate("${project}");
+      session = (MavenSession) helper.evaluate("${session}");
     } catch (Exception e) {
       throw new EnforcerRuleException("Unable to retrieve MavenProject", e);
     }
 
-    // Skip root if configured
-    if (_skipRoot && project.isExecutionRoot()) {
+    Model originalModel = project.getOriginalModel();
+
+    // Check if Root POM has hardcoded in <dependencyManagement>
+    if (project.isExecutionRoot()) {
+      DependencyManagement depMgmt = originalModel.getDependencyManagement();
+      if (depMgmt == null || depMgmt.getDependencies() == null) {
+        return;
+      }
+
+      for (Dependency dep : depMgmt.getDependencies()) {
+        String version = dep.getVersion();
+        if (version != null && !version.trim().startsWith("${")) {
+          throw new EnforcerRuleException(String.format(
+              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s. Use a property instead.",
+              dep.getVersion(), dep.getGroupId(), dep.getArtifactId()
+          ));
+        }
+      }
       return;
     }
 
     // Skip configured modules
-    if (_skipModules != null) {
-      for (String skip : _skipModules.split(",")) {
-        if (project.getArtifactId().equals(skip.trim())) {
+    if (_skipModules != null && !_skipModules.trim().isEmpty()) {
+      Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
+      Path modulePath = project.getBasedir().toPath().toAbsolutePath().normalize();
+      Path relPath = rootPath.relativize(modulePath);
+
+      String rel = relPath.toString();
+      for (String skip : _skipModuleList) {
+        if (rel.contains(skip)) {
           return;
         }
       }
     }
 
-    List<Dependency> deps = project.getDependencies();
+    // Any dependencies listed under <dependencies> in any submodule POM should not include <version> tags
+    List<Dependency> deps = originalModel.getDependencies();
     for (Dependency d : deps) {
       if (d.getVersion() != null) {
         throw new EnforcerRuleException(
@@ -98,5 +131,15 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
   @Override
   public boolean isResultValid(EnforcerRule arg0) {
     return false;
+  }
+
+  private List<String> parseSkipModules(String skips) {
+    if (skips == null || skips.isBlank()) {
+      return new ArrayList<>();
+    }
+    return Arrays.stream(_skipModules.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .collect(Collectors.toList());
   }
 }
