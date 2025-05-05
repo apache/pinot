@@ -46,8 +46,7 @@ jobs:
         run: mvn -B \
           -f pinot-dependency-verifier/pom.xml \
           clean install \
-          -DskipTests \
-          -Pbin-dist
+          -DskipTests
 
       - name: Full build + enforcer
         run: mvn -B clean install \
