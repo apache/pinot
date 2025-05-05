@@ -66,22 +66,20 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
-  private final int _maxByteStringSize;
   private final Sender _sender;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(
       PinotConfiguration config, String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap, boolean splitBlocks, int maxByteStringSize) {
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxByteStringSize) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
-    _maxByteStringSize = maxByteStringSize;
-    _sender = splitBlocks ? new SplitSender(this) : new NonSplitSender(this);
+    _sender = maxByteStringSize > 0 ? new SplitSender(this, maxByteStringSize) : new NonSplitSender(this);
   }
 
   @Override
@@ -281,76 +279,73 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   private static abstract class Sender {
-    protected abstract void send(MseBlock block, List<DataBuffer> serializedStats)
+    protected final GrpcSendingMailbox _mailbox;
+
+    protected Sender(GrpcSendingMailbox mailbox) {
+      _mailbox = mailbox;
+    }
+
+    void send(MseBlock block, List<DataBuffer> serializedStats)
+        throws IOException {
+      _mailbox._statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
+      long start = System.currentTimeMillis();
+      try {
+        DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
+        int sizeInBytes = processAndSend(dataBlock);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
+        }
+        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
+      } catch (Throwable t) {
+        LOGGER.warn("Caught exception while serializing block: {}", block, t);
+        throw t;
+      } finally {
+        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
+      }
+    }
+
+    protected abstract int processAndSend(DataBlock dataBlock)
         throws IOException;
   }
 
   private static class SplitSender extends Sender {
-    private final GrpcSendingMailbox _mailbox;
+    private final int _maxByteStringSize;
 
-    public SplitSender(GrpcSendingMailbox mailbox) {
-      _mailbox = mailbox;
+    public SplitSender(GrpcSendingMailbox mailbox, int maxByteStringSize) {
+      super(mailbox);
+      _maxByteStringSize = maxByteStringSize;
     }
 
     @Override
-    protected void send(MseBlock block, List<DataBuffer> serializedStats)
+    protected int processAndSend(DataBlock dataBlock)
         throws IOException {
-      _mailbox._statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
-      long start = System.currentTimeMillis();
-      try {
-        DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-        List<ByteString> byteStrings = toByteStrings(dataBlock, _mailbox._maxByteStringSize);
-        int sizeInBytes = 0;
-        for (ByteString byteString : byteStrings) {
-          sizeInBytes += byteString.size();
-        }
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
-        }
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-
-        Iterator<ByteString> byteStringIt = byteStrings.iterator();
-        while (byteStringIt.hasNext()) {
-          ByteString byteString = byteStringIt.next();
-          boolean waitForMore = byteStringIt.hasNext();
-          _mailbox.sendContent(byteString, waitForMore);
-        }
-      } catch (Throwable t) {
-        LOGGER.warn("Caught exception while serializing block: {}", block, t);
-        throw t;
-      } finally {
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
+      List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
+      int sizeInBytes = 0;
+      for (ByteString byteString : byteStrings) {
+        sizeInBytes += byteString.size();
       }
+      Iterator<ByteString> byteStringIt = byteStrings.iterator();
+      while (byteStringIt.hasNext()) {
+        ByteString byteString = byteStringIt.next();
+        boolean waitForMore = byteStringIt.hasNext();
+        _mailbox.sendContent(byteString, waitForMore);
+      }
+      return sizeInBytes;
     }
   }
 
   private static class NonSplitSender extends Sender {
-    private final GrpcSendingMailbox _mailbox;
-
     public NonSplitSender(GrpcSendingMailbox mailbox) {
-      _mailbox = mailbox;
+      super(mailbox);
     }
 
     @Override
-    protected void send(MseBlock block, List<DataBuffer> serializedStats)
+    protected int processAndSend(DataBlock dataBlock)
         throws IOException {
-      _mailbox._statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
-      long start = System.currentTimeMillis();
-      try {
-        DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-        ByteString byteString = DataBlockUtils.toByteString(dataBlock);
-        int sizeInBytes = byteString.size();
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
-        }
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-        _mailbox.sendContent(byteString, false);
-      } catch (Throwable t) {
-        LOGGER.warn("Caught exception while serializing block: {}", block, t);
-        throw t;
-      } finally {
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
-      }
+      ByteString byteString = DataBlockUtils.toByteString(dataBlock);
+      int sizeInBytes = byteString.size();
+      _mailbox.sendContent(byteString, false);
+      return sizeInBytes;
     }
   }
 }

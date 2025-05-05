@@ -65,7 +65,6 @@ public class MailboxService {
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
-  private final boolean _splitBlocks;
   private final int _maxByteStringSize;
 
   private GrpcMailboxServer _grpcMailboxServer;
@@ -80,14 +79,18 @@ public class MailboxService {
     _config = config;
     _tlsConfig = tlsConfig;
     _channelManager = new ChannelManager(tlsConfig);
-    _splitBlocks = config.getProperty(
+    boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
-    // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-    _maxByteStringSize = Math.max(config.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
-    ) / 2, 1);
+    if (splitBlocks) {
+      // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
+      _maxByteStringSize = Math.max(config.getProperty(
+          CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+          CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
+      ) / 2, 1);
+    } else {
+      _maxByteStringSize = 0;
+    }
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -127,7 +130,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(
-          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _splitBlocks, _maxByteStringSize);
+          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _maxByteStringSize);
     }
   }
 
