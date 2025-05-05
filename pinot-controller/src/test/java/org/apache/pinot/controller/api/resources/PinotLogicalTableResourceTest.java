@@ -94,7 +94,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     // setup physical and logical tables
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
     LogicalTableConfig
-        logicalTableConfig = getDummyLogicalTable(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
+        logicalTableConfig = getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
 
     // create logical table
     String resp =
@@ -108,7 +108,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     // update logical table and setup new physical tables
     List<String> tableNameToUpdateWithType = createHybridTables(physicalTablesToUpdate);
     tableNameToUpdateWithType.addAll(physicalTableNamesWithType);
-    logicalTableConfig = getDummyLogicalTable(logicalTableName, tableNameToUpdateWithType, BROKER_TENANT);
+    logicalTableConfig = getDummyLogicalTableConfig(logicalTableName, tableNameToUpdateWithType, BROKER_TENANT);
 
     String response =
         ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
@@ -137,7 +137,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // Test logical table name with _OFFLINE and _REALTIME is not allowed
     LogicalTableConfig logicalTableConfig =
-        getDummyLogicalTable("testLogicalTable_OFFLINE", physicalTableNamesWithType, BROKER_TENANT);
+        getDummyLogicalTableConfig("testLogicalTable_OFFLINE", physicalTableNamesWithType, BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -146,7 +146,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
           e.getMessage());
     }
 
-    logicalTableConfig = getDummyLogicalTable("testLogicalTable_REALTIME", physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig =
+        getDummyLogicalTableConfig("testLogicalTable_REALTIME", physicalTableNamesWithType, BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -157,7 +158,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // Test logical table name can not be same as existing physical table name
     logicalTableConfig =
-        getDummyLogicalTable("test_table_1", physicalTableNamesWithType, BROKER_TENANT);
+        getDummyLogicalTableConfig("test_table_1", physicalTableNamesWithType, BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -167,7 +168,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // Test empty physical table names is not allowed
     logicalTableConfig =
-        getDummyLogicalTable(LOGICAL_TABLE_NAME, List.of(), BROKER_TENANT);
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(), BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -176,7 +177,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     }
 
     // Test all table names are physical table names and none is hybrid table name
-    logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTableNames, BROKER_TENANT);
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNames, BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -186,7 +187,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     }
 
     // Test valid broker tenant is provided
-    logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -204,7 +205,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1", "test_table_2"));
 
     LogicalTableConfig
-        logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+        logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
     ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
     try {
@@ -243,7 +244,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // Test physical table should exist
     LogicalTableConfig
-        logicalTableConfig = getDummyLogicalTable(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
+        logicalTableConfig = getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
     try {
       ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
@@ -267,7 +268,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
 
     for (int i = 0; i < logicalTableNames.size(); i++) {
-      LogicalTableConfig logicalTableConfig = getDummyLogicalTable(logicalTableNames.get(i), List.of(
+      LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableNames.get(i), List.of(
           physicalTableNamesWithType.get(2 * i), physicalTableNamesWithType.get(2 * i + 1)), BROKER_TENANT);
 
       ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forLogicalTableCreate(),

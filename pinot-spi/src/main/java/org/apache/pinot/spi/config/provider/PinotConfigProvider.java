@@ -60,17 +60,17 @@ public interface PinotConfigProvider {
   boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
 
   /**
-   * Returns the logical table for the given logical table name.
+   * Returns the logical table config for the given logical table name.
    * @param logicalTableName the name of the logical table
    * @return the logical table
    */
-  LogicalTableConfig getLogicalTable(String logicalTableName);
+  LogicalTableConfig getLogicalTableConfig(String logicalTableName);
 
   /**
-   * Registers the {@link LogicalTableChangeListener} and notifies it whenever any changes (addition, update,
-   * @param logicalTableChangeListener the listener to be registered
+   * Registers the {@link LogicalTableConfigChangeListener} and notifies it whenever any changes (addition, update,
+   * @param logicalTableConfigChangeListener the listener to be registered
    * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
    *         registered.
    */
-  boolean registerLogicalTableChangeListener(LogicalTableChangeListener logicalTableChangeListener);
+  boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
 }

@@ -22,7 +22,7 @@ import java.util.List;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 
 
-public interface LogicalTableChangeListener {
+public interface LogicalTableConfigChangeListener {
   /**
    * The callback to be invoked on logical table changes
    * @param logicalTableConfigList the entire list of logical tables in the cluster

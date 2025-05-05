@@ -113,7 +113,7 @@ public class PinotLogicalTableResource {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Looking for logical table {}", tableName);
-    LogicalTableConfig logicalTableConfig = _pinotHelixResourceManager.getLogicalTable(tableName);
+    LogicalTableConfig logicalTableConfig = _pinotHelixResourceManager.getLogicalTableConfig(tableName);
     if (logicalTableConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Logical table not found", Response.Status.NOT_FOUND);
     }

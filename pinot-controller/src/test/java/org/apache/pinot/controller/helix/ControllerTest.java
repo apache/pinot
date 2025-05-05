@@ -389,7 +389,7 @@ public class ControllerTest {
     }
   }
 
-  public static LogicalTableConfig getDummyLogicalTable(String tableName, List<String> physicalTableNames,
+  public static LogicalTableConfig getDummyLogicalTableConfig(String tableName, List<String> physicalTableNames,
       String brokerTenant) {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     for (String physicalTableName : physicalTableNames) {

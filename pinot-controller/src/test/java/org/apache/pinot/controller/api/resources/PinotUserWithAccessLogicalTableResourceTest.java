@@ -117,7 +117,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
 
     // create logical table
     try {
-      logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
+      logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
       String resp =
           ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       if (permissions.contains("create")) {
@@ -135,7 +135,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     // update logical table
     try {
       physicalTablesWithType.addAll(createHybridTables(List.of("test_table_2")));
-      logicalTableConfig = getDummyLogicalTable(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
+      logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTablesWithType, "DefaultTenant");
       String respUpdate = ControllerTest.sendPutRequest(
           updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders()
       );

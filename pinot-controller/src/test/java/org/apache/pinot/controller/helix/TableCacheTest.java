@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.spi.config.provider.LogicalTableChangeListener;
+import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -73,7 +73,7 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
-    assertNull(tableCache.getLogicalTable(LOGICAL_TABLE_NAME));
+    assertNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME));
 
     // Add a schema
     Schema schema =
@@ -117,20 +117,20 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
     // Add logical table
-    LogicalTableConfig logicalTableConfig = getLogicalTable(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME));
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME));
     TEST_INSTANCE.getHelixResourceManager().addLogicalTable(logicalTableConfig);
     // Wait for at most 10 seconds for the callback to add the logical table to the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTable(LOGICAL_TABLE_NAME) != null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME) != null, 10_000L,
         "Failed to add the logical table to the cache");
     // Logical table can be accessed by the logical table name
     if (isCaseInsensitive) {
       assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
-      assertEquals(tableCache.getLogicalTable(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
+      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
       assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
-    assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTableConfig);
+    assertEquals(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME), logicalTableConfig);
     assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Register the change listeners
@@ -144,15 +144,15 @@ public class TableCacheTest {
     assertEquals(schemaChangeListener._schemaList.size(), 1);
     assertEquals(schemaChangeListener._schemaList.get(0), expectedSchema);
 
-    TestLogicalTableChangeListener logicalTableChangeListener = new TestLogicalTableChangeListener();
-    assertTrue(tableCache.registerLogicalTableChangeListener(logicalTableChangeListener));
+    TestLogicalTableConfigChangeListener logicalTableChangeListener = new TestLogicalTableConfigChangeListener();
+    assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableChangeListener));
     assertEquals(logicalTableChangeListener._logicalTableConfigList.size(), 1);
     assertEquals(logicalTableChangeListener._logicalTableConfigList.get(0), logicalTableConfig);
 
     // Re-register the change listener should fail
     assertFalse(tableCache.registerTableConfigChangeListener(tableConfigChangeListener));
     assertFalse(tableCache.registerSchemaChangeListener(schemaChangeListener));
-    assertFalse(tableCache.registerLogicalTableChangeListener(logicalTableChangeListener));
+    assertFalse(tableCache.registerLogicalTableConfigChangeListener(logicalTableChangeListener));
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
@@ -222,15 +222,15 @@ public class TableCacheTest {
         aVoid -> anotherTableConfig.equals(tableCache.getTableConfig(ANOTHER_TABLE_OFFLINE)), 10_000L,
         "Failed to add the table config to the cache");
     // update the logical table
-    logicalTableConfig = getLogicalTable(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
+    logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTable(logicalTableConfig);
     if (isCaseInsensitive) {
-      assertEquals(tableCache.getLogicalTable(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
+      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
       assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
-    assertEquals(tableCache.getLogicalTable(LOGICAL_TABLE_NAME), logicalTableConfig);
+    assertEquals(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME), logicalTableConfig);
     assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
 
     // Remove the table config
@@ -272,7 +272,7 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
-    assertNull(tableCache.getLogicalTable(LOGICAL_TABLE_NAME));
+    assertNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME));
     assertEquals(schemaChangeListener._schemaList.size(), 0);
     assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
     assertEquals(logicalTableChangeListener._logicalTableConfigList.size(), 0);
@@ -282,7 +282,7 @@ public class TableCacheTest {
     TEST_INSTANCE.waitForEVToDisappear(ANOTHER_TABLE_OFFLINE);
   }
 
-  private static LogicalTableConfig getLogicalTable(String tableName, List<String> physicalTableNames) {
+  private static LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames) {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     for (String physicalTableName : physicalTableNames) {
       physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
@@ -317,7 +317,7 @@ public class TableCacheTest {
     }
   }
 
-  private static class TestLogicalTableChangeListener implements LogicalTableChangeListener {
+  private static class TestLogicalTableConfigChangeListener implements LogicalTableConfigChangeListener {
     private volatile List<LogicalTableConfig> _logicalTableConfigList;
 
     @Override

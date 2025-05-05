@@ -820,7 +820,7 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void setLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static void setLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       LogicalTableConfig logicalTableConfig) {
     try {
       ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTableConfig);
@@ -848,7 +848,8 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static LogicalTableConfig getLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+  public static LogicalTableConfig getLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableName) {
     try {
       ZNRecord logicalTableZNRecord =
           propertyStore.get(constructPropertyStorePathForLogical(tableName), null, AccessOption.PERSISTENT);

@@ -2212,7 +2212,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding logical table: {}", tableName);
 
     // Check if the logical table name is already used
-    LogicalTableConfig existingLogicalTableConfig = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    LogicalTableConfig existingLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
     if (existingLogicalTableConfig != null) {
       throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
     }
@@ -2223,7 +2223,7 @@ public class PinotHelixResourceManager {
           throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
         });
 
-    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTableConfig);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
     LOGGER.info("Added logical table: {}", tableName);
   }
 
@@ -2232,12 +2232,12 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table: {}", tableName);
 
-    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
     if (oldLogicalTableConfig == null) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
 
-    ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTableConfig);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
     LOGGER.info("Updated logical table: {}", tableName);
   }
 
@@ -2255,8 +2255,8 @@ public class PinotHelixResourceManager {
     return result;
   }
 
-  public LogicalTableConfig getLogicalTable(String tableName) {
-    return ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+  public LogicalTableConfig getLogicalTableConfig(String tableName) {
+    return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
   }
 
   public List<String> getAllLogicalTableNames() {
