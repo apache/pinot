@@ -42,11 +42,10 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build verifier module
-        run: |
-          cd pinot-dependency-verifier
-          mvn clean install -DskipTests -Pbin-dist
-          cd ..
+      - name: Build and install pinot-dependency-verifier
+        working-directory: pinot/pinot-dependency-verifier
+        run: mvn clean install -DskipTests -Pbin-dist
 
-      - name: Run Maven Enforcer
+      - name: Run Maven Enforcer in root
+        working-directory: pinot
         run: mvn enforcer:enforce

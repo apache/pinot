@@ -2321,10 +2321,10 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                     </excludes>
                   </bannedDependencies>
-<!--                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">-->
-<!--                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,-->
-<!--                      pinot-tools,contrib</skipModules>-->
-<!--                  </pinotCustomDependencyVersionRule>-->
+                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
+                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                      pinot-tools,contrib</skipModules>
+                  </pinotCustomDependencyVersionRule>
                 </rules>
                 <fail>true</fail>
               </configuration>
