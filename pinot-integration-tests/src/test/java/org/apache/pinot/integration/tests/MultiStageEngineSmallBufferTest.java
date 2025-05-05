@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -138,6 +140,7 @@ public class MultiStageEngineSmallBufferTest extends BaseClusterIntegrationTestS
   public void testConcurrentSplittedMailboxes()
       throws Exception {
     int numClients = 32;
+    int numIterations = 50;
 
     String query =
         "SELECT ActualElapsedTime FROM mytable ORDER BY ActualElapsedTime DESC LIMIT 100";
@@ -149,33 +152,44 @@ public class MultiStageEngineSmallBufferTest extends BaseClusterIntegrationTestS
         + ",[460],[459],[459],[458],[457],[456],[453],[453],[451],[451],[450],[450]]";
 
     List<String> results = Collections.synchronizedList(new ArrayList<>());
+    ExecutorService executorService = null;
 
-    CountDownLatch startLatch = new CountDownLatch(1);
-    CountDownLatch doneLatch = new CountDownLatch(numClients);
-
-    for (int i = 0; i < numClients; i++) {
-      new Thread(() -> {
-        try {
-          startLatch.await();
-          JsonNode jsonNode = postQuery(query);
-          assertNotNull(jsonNode);
-          String actual = jsonNode.get("resultTable").get("rows").toString();
-          results.add(actual);
-        } catch (Exception e) {
-          results.add("Error: " + e.getMessage());
-          e.printStackTrace();
-        } finally {
-          doneLatch.countDown();
+    for (int itest = 0; itest < numIterations; itest++) {
+      CountDownLatch startLatch = new CountDownLatch(1);
+      CountDownLatch doneLatch = new CountDownLatch(numClients);
+      try {
+        executorService = Executors.newFixedThreadPool(numClients);
+        for (int i = 0; i < numClients; i++) {
+          executorService.submit(() -> {
+            try {
+              startLatch.await();
+              JsonNode jsonNode = postQuery(query);
+              assertNotNull(jsonNode);
+              String actual = jsonNode.get("resultTable").get("rows").toString();
+              results.add(actual);
+            } catch (Exception e) {
+              results.add("Error: " + e.getMessage());
+              e.printStackTrace();
+            } finally {
+              doneLatch.countDown();
+            }
+          });
         }
-      }).start();
-    }
 
-    startLatch.countDown();
-    doneLatch.await();
+        startLatch.countDown();
+        doneLatch.await();
 
-    assertEquals(numClients, results.size());
-    for (String result : results) {
-      assertEquals(expected, result);
+        assertEquals(numClients, results.size());
+        for (String result : results) {
+          assertEquals(expected, result);
+        }
+      } finally {
+        if (executorService != null) {
+          executorService.shutdown();
+          executorService = null;
+        }
+        results.clear();
+      }
     }
   }
 }
