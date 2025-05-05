@@ -1584,7 +1584,7 @@ public class CommonConstants {
 
     /// Max time to keep the op stats in the cache.
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
-    public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 10 * 60 * 1000;
+    public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 60 * 1000;
     /// Timeout of the cancel request, in milliseconds.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
