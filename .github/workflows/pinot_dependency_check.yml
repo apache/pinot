@@ -43,7 +43,7 @@ jobs:
           cache: 'maven'
 
       - name: Build and install pinot-dependency-verifier
-        working-directory: pinot/pinot-dependency-verifier
+        working-directory: pinot-dependency-verifier
         run: mvn clean install -DskipTests -Pbin-dist
 
       - name: Run Maven Enforcer in root
