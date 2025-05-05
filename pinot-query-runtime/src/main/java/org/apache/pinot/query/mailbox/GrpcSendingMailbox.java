@@ -112,9 +112,28 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    _sender.send(block, serializedStats);
+    processAndSend(block, serializedStats);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
+    }
+  }
+
+  private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
+      throws IOException {
+    _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
+    long start = System.currentTimeMillis();
+    try {
+      DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
+      int sizeInBytes = _sender.processAndSend(dataBlock);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
+      }
+      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
+    } catch (Throwable t) {
+      LOGGER.warn("Caught exception while serializing block: {}", block, t);
+      throw t;
+    } finally {
+      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
   }
 
@@ -143,7 +162,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
       MseBlock errorBlock = ErrorMseBlock.fromError(
           QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
-      _sender.send(errorBlock, List.of());
+      processAndSend(errorBlock, List.of());
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -283,25 +302,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
     protected Sender(GrpcSendingMailbox mailbox) {
       _mailbox = mailbox;
-    }
-
-    void send(MseBlock block, List<DataBuffer> serializedStats)
-        throws IOException {
-      _mailbox._statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
-      long start = System.currentTimeMillis();
-      try {
-        DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-        int sizeInBytes = processAndSend(dataBlock);
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
-        }
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
-      } catch (Throwable t) {
-        LOGGER.warn("Caught exception while serializing block: {}", block, t);
-        throw t;
-      } finally {
-        _mailbox._statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
-      }
     }
 
     protected abstract int processAndSend(DataBlock dataBlock)
