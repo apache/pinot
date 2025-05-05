@@ -1579,11 +1579,11 @@ public class CommonConstants {
 
     /// Max number of rows operators stored in the op stats cache.
     /// Although the cache stores stages, each entry has a weight equal to the number of operators in the stage.
-    public static final String KEY_OF_OP_STATS_CACHE_MAX = "pinot.server.query.op.stats.cache.max";
-    public static final int DEFAULT_OF_OP_STATS_CACHE_MAX = 1000;
+    public static final String KEY_OF_OP_STATS_CACHE_SIZE = "pinot.server.query.op.stats.cache.size";
+    public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 1000;
 
     /// Max time to keep the op stats in the cache.
-    public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.secs";
+    public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
     public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 10 * 60 * 1000;
     /// Timeout of the cancel request, in milliseconds.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";

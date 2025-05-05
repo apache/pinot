@@ -53,15 +53,15 @@ public class OpChainSchedulerService {
   public OpChainSchedulerService(ExecutorService executorService, PinotConfiguration config) {
     this(
         executorService,
-        config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_MAX,
-            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_MAX),
+        config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
+            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_SIZE),
         config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_EXPIRE_MS,
             MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS)
     );
   }
 
   public OpChainSchedulerService(ExecutorService executorService) {
-    this(executorService, MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_MAX,
+    this(executorService, MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_SIZE,
         MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS);
   }
 
