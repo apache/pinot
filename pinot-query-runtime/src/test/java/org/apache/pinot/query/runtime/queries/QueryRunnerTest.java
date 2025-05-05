@@ -26,12 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -197,11 +198,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
     try {
       // query pinot
-      QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
-      if (queryResult.getProcessingException() != null) {
-        throw new RuntimeException(queryResult.getProcessingException().getMessage());
+      BrokerResponseNativeV2 response = queryRunner(sql, false);
+      if (response.getExceptions() != null && !response.getExceptions().isEmpty()) {
+        throw new RuntimeException(response.getExceptions().get(0).getMessage());
       }
-      ResultTable resultTable = queryResult.getResultTable();
+      ResultTable resultTable = response.getResultTable();
       Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
