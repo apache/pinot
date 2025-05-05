@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  private Map<String, TableDataManager> _tableDataManagerMap;
+  private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   // TODO: Consider making segment locks per table instead of per instance
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
@@ -119,14 +119,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
-    boolean caseSensitive = !config.getProperty(
-        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
-        CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-    if (caseSensitive) {
-      _tableDataManagerMap = new ConcurrentHashMap<>();
-    } else {
-      _tableDataManagerMap = Collections.synchronizedMap(new CaseInsensitiveMap<>());
-    }
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();

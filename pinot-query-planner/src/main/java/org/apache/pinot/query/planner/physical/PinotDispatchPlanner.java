@@ -55,7 +55,8 @@ public class PinotDispatchPlanner {
   public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
     // perform physical plan conversion and assign workers to each stage.
     DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
-        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+        subPlan.getSubPlanMetadata().getFields(),
+        resolveActualTableNames(subPlan.getSubPlanMetadata().getTableNames()));
     PlanFragment rootFragment = subPlan.getSubPlanRoot();
     PlanNode rootNode = rootFragment.getFragmentRoot();
     // 1. start by visiting the sub plan fragment root.
@@ -72,6 +73,19 @@ public class PinotDispatchPlanner {
     runValidations(rootFragment, context);
     // 7. convert it into query plan.
     return finalizeDispatchableSubPlan(rootFragment, context);
+  }
+
+  private Set<String> resolveActualTableNames(Set<String> tableNames) {
+    Set<String> actualTableNames = new HashSet<>();
+    for (String tableName : tableNames) {
+      String actualTableName = _tableCache.getActualTableName(tableName);
+      if (actualTableName != null) {
+        actualTableNames.add(actualTableName);
+      } else {
+        actualTableNames.add(tableName);
+      }
+    }
+    return actualTableNames;
   }
 
   /**

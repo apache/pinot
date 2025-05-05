@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -123,15 +122,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
-
-    boolean caseSensitive = !_pinotConfig.getProperty(
-        Helix.ENABLE_CASE_INSENSITIVE_KEY,
-        Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-    if (caseSensitive) {
-      _routingEntryMap = new ConcurrentHashMap<>();
-    } else {
-      _routingEntryMap = Collections.synchronizedMap(new CaseInsensitiveMap<>());
-    }
+    _routingEntryMap = new ConcurrentHashMap<>();
   }
 
   @Override
