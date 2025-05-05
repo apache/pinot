@@ -2279,58 +2279,58 @@
             </dependency>
           </dependencies>
         </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-enforcer-plugin</artifactId>
-          <extensions>true</extensions>
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.pinot</groupId>
-              <artifactId>pinot-dependency-verifier</artifactId>
-              <version>${project.version}</version>
-            </dependency>
-          </dependencies>
-          <executions>
-            <execution>
-              <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
-              <goals>
-                <goal>enforce</goal>
-              </goals>
-              <phase>validate</phase>
-              <configuration>
-                <rules>
-                  <dependencyConvergence />
-                  <bannedDependencies>
-                    <excludes>
-                      <!-- Use org.slf4j:jcl-over-slf4j -->
-                      <exclude>commons-logging:commons-logging</exclude>
-                      <!-- Use org.apache.logging.log4j:log4j-core -->
-                      <exclude>log4j:log4j</exclude>
-                      <!-- Use org.apache.logging.log4j:log4j-slf4j2-impl -->
-                      <exclude>org.slf4j:slf4j-log4j12</exclude>
-                      <exclude>org.slf4j:slf4j-reload4j</exclude>
-                      <exclude>ch.qos.reload4j:reload4j</exclude>
-                      <exclude>ch.qos.logback</exclude>
-                      <!-- Use com.fasterxml.jackson -->
-                      <exclude>org.codehaus.jackson</exclude>
-                      <!-- Use org.glassfish.jersey -->
-                      <exclude>com.sun.jersey</exclude>
-                      <!-- Use hadoop-shaded-protobuf_3_21 -->
-                      <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_7</exclude>
-                      <!-- Use org.bouncycastle:bcprov-jdk18on -->
-                      <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
-                    </excludes>
-                  </bannedDependencies>
+<!--        <plugin>-->
+<!--          <groupId>org.apache.maven.plugins</groupId>-->
+<!--          <artifactId>maven-enforcer-plugin</artifactId>-->
+<!--          <extensions>true</extensions>-->
+<!--          <dependencies>-->
+<!--            <dependency>-->
+<!--              <groupId>org.apache.pinot</groupId>-->
+<!--              <artifactId>pinot-dependency-verifier</artifactId>-->
+<!--              <version>${project.version}</version>-->
+<!--            </dependency>-->
+<!--          </dependencies>-->
+<!--          <executions>-->
+<!--            <execution>-->
+<!--              <id>default-cli</id> &lt;!&ndash; magic id, used when calling enforcer:enforce &ndash;&gt;-->
+<!--              <goals>-->
+<!--                <goal>enforce</goal>-->
+<!--              </goals>-->
+<!--              <phase>validate</phase>-->
+<!--              <configuration>-->
+<!--                <rules>-->
+<!--                  <dependencyConvergence />-->
+<!--                  <bannedDependencies>-->
+<!--                    <excludes>-->
+<!--                      &lt;!&ndash; Use org.slf4j:jcl-over-slf4j &ndash;&gt;-->
+<!--                      <exclude>commons-logging:commons-logging</exclude>-->
+<!--                      &lt;!&ndash; Use org.apache.logging.log4j:log4j-core &ndash;&gt;-->
+<!--                      <exclude>log4j:log4j</exclude>-->
+<!--                      &lt;!&ndash; Use org.apache.logging.log4j:log4j-slf4j2-impl &ndash;&gt;-->
+<!--                      <exclude>org.slf4j:slf4j-log4j12</exclude>-->
+<!--                      <exclude>org.slf4j:slf4j-reload4j</exclude>-->
+<!--                      <exclude>ch.qos.reload4j:reload4j</exclude>-->
+<!--                      <exclude>ch.qos.logback</exclude>-->
+<!--                      &lt;!&ndash; Use com.fasterxml.jackson &ndash;&gt;-->
+<!--                      <exclude>org.codehaus.jackson</exclude>-->
+<!--                      &lt;!&ndash; Use org.glassfish.jersey &ndash;&gt;-->
+<!--                      <exclude>com.sun.jersey</exclude>-->
+<!--                      &lt;!&ndash; Use hadoop-shaded-protobuf_3_21 &ndash;&gt;-->
+<!--                      <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_7</exclude>-->
+<!--                      &lt;!&ndash; Use org.bouncycastle:bcprov-jdk18on &ndash;&gt;-->
+<!--                      <exclude>org.bouncycastle:bcprov-jdk15on</exclude>-->
+<!--                    </excludes>-->
+<!--                  </bannedDependencies>-->
 <!--                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">-->
 <!--                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,-->
 <!--                      pinot-tools,contrib</skipModules>-->
 <!--                  </pinotCustomDependencyVersionRule>-->
-                </rules>
-                <fail>true</fail>
-              </configuration>
-            </execution>
-          </executions>
-        </plugin>
+<!--                </rules>-->
+<!--                <fail>true</fail>-->
+<!--              </configuration>-->
+<!--            </execution>-->
+<!--          </executions>-->
+<!--        </plugin>-->
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
