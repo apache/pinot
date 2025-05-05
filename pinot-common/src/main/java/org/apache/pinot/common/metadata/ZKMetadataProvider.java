@@ -49,6 +49,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.TableConfigDecoratorRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -602,7 +603,9 @@ public class ZKMetadataProvider {
     }
     try {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
-      return replaceVariables ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      TableConfig processedTableConfig = replaceVariables
+        ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      return TableConfigDecoratorRegistry.applyDecorator(processedTableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
