@@ -192,6 +192,8 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     // Test min/max values.
     Assert.assertEquals(dictionary.getMinVal(), expectedMin);
     Assert.assertEquals(dictionary.getMaxVal(), expectedMax);
+    // Test canTakeMore
+    Assert.assertTrue(dictionary.canAddMore());
 
     // Test sorted values.
     Collections.sort(expectedSortedValues);
