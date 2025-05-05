@@ -49,7 +49,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   }
 
   @Override
-  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata tableMetadata) {
+  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata metadata) {
     if (!request.getLanguage().equals(Constants.LANGUAGE)) {
       throw new IllegalArgumentException(
           String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(), Constants.LANGUAGE));

@@ -46,13 +46,13 @@ public class TimeSeriesQueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesQueryEnvironment.class);
   private final RoutingManager _routingManager;
   private final TableCache _tableCache;
-  private final TimeSeriesMetadata _tableMetadataProvider;
+  private final TimeSeriesMetadata _metadataProvider;
   private final Map<String, TimeSeriesLogicalPlanner> _plannerMap = new HashMap<>();
 
   public TimeSeriesQueryEnvironment(PinotConfiguration config, RoutingManager routingManager, TableCache tableCache) {
     _routingManager = routingManager;
     _tableCache = tableCache;
-    _tableMetadataProvider = new TimeSeriesTableMetadataProvider(_tableCache);
+    _metadataProvider = new TimeSeriesTableMetadataProvider(_tableCache);
   }
 
   public void init(PinotConfiguration config) {
@@ -82,7 +82,7 @@ public class TimeSeriesQueryEnvironment {
     Preconditions.checkState(_plannerMap.containsKey(request.getLanguage()),
         "No logical planner found for engine: %s. Available: %s", request.getLanguage(),
         _plannerMap.keySet());
-    return _plannerMap.get(request.getLanguage()).plan(request, _tableMetadataProvider);
+    return _plannerMap.get(request.getLanguage()).plan(request, _metadataProvider);
   }
 
   public TimeSeriesDispatchablePlan buildPhysicalPlan(RangeTimeSeriesRequest timeSeriesRequest,
