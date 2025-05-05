@@ -102,7 +102,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRoutingManager.class);
 
   private final BrokerMetrics _brokerMetrics;
-  private final Map<String, RoutingEntry> _routingEntryMap;
+  private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the synchronized block
   private final Set<String> _excludedServers = new HashSet<>();
@@ -122,7 +122,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
-    _routingEntryMap = new ConcurrentHashMap<>();
   }
 
   @Override
