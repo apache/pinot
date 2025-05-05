@@ -64,6 +64,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
   public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
@@ -1506,6 +1507,13 @@ public class CommonConstants {
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
+
+    /**
+     * Enable splitting of data block payload during mailbox transfer.
+     */
+    public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
+          "pinot.query.runner.enable.data.block.payload.split";
+    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
     /**
      * Configuration for server port, port that opens and accepts

@@ -1833,6 +1833,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
+    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+        boolean forceGetOffsetFromStream) {
+      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+    }
+
+    @Override
     protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
         long currentTimeMs) {
       return _exceededMaxSegmentCompletionTime;

@@ -42,6 +42,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -86,6 +87,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -199,22 +201,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Set up dedup/upsert metadata manager
     // NOTE: Dedup/upsert has to be set up when starting the server. Changing the table config without restarting the
     //       server won't enable/disable them on the fly.
-    IndexLoadingConfig indexLoadingConfig = _indexLoadingConfig;
-    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-    assert tableConfig != null;
+    Pair<TableConfig, Schema> tableConfigAndSchema = getCachedTableConfigAndSchema();
+    TableConfig tableConfig = tableConfigAndSchema.getLeft();
+    Schema schema = tableConfigAndSchema.getRight();
     if (tableConfig.isDedupEnabled()) {
-      Schema schema = indexLoadingConfig.getSchema();
-      assert schema != null;
       _tableDedupMetadataManager =
           TableDedupMetadataManagerFactory.create(_instanceDataManagerConfig.getDedupConfig(), tableConfig, schema,
               this);
     }
-
     if (tableConfig.isUpsertEnabled()) {
       Preconditions.checkState(_tableDedupMetadataManager == null,
           "Dedup and upsert cannot be both enabled for table: %s", _tableNameWithType);
-      Schema schema = indexLoadingConfig.getSchema();
-      assert schema != null;
       _tableUpsertMetadataManager =
           TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
               this);
@@ -492,7 +489,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   public void addConsumingSegment(String segmentName)
-      throws AttemptsExceededException, RetriableOperationException {
+      throws Exception {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -511,7 +508,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void doAddConsumingSegment(String segmentName)
-      throws AttemptsExceededException, RetriableOperationException {
+      throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     if (zkMetadata.getStatus().isCompleted()) {
       // NOTE:
@@ -542,6 +539,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert tableConfig != null && schema != null;
+    // Clone a schema to avoid modifying the cached one
+    schema = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
     validate(tableConfig, schema);
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
@@ -587,9 +586,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(status == Status.COMMITTING, "Invalid status: %s for segment: %s to be downloaded", status,
         segmentName);
-    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
-    assert tableConfig != null;
-    long downloadTimeoutMs = getDownloadTimeoutMs(tableConfig);
+    long downloadTimeoutMs = getDownloadTimeoutMs(getCachedTableConfigAndSchema().getLeft());
     long deadlineMs = System.currentTimeMillis() + downloadTimeoutMs;
     while (System.currentTimeMillis() < deadlineMs) {
       // ZK Metadata may change during segment download process; fetch it on every retry.
@@ -864,9 +861,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
-    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
-    assert tableConfig != null;
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    IngestionConfig ingestionConfig = getCachedTableConfigAndSchema().getLeft().getIngestionConfig();
     return ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
   }
 
