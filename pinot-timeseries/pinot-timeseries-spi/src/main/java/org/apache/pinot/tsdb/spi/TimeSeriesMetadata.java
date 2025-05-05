@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tsdb.spi;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -31,6 +32,7 @@ public interface TimeSeriesMetadata {
    * @param tableName name of the table
    * @return table config or null if not found
    */
+  @Nullable
   TableConfig getTableConfig(String tableName);
 
   /**
@@ -38,6 +40,7 @@ public interface TimeSeriesMetadata {
    * @param rawTableName raw table name without type suffix
    * @return schema or null if not found
    */
+  @Nullable
   Schema getSchema(String rawTableName);
 
   /**
@@ -45,5 +48,6 @@ public interface TimeSeriesMetadata {
    * @param tableName table name to look up
    * @return actual table name or null if not found
    */
+  @Nullable
   String getActualTableName(String tableName);
 }
