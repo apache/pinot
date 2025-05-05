@@ -38,7 +38,7 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
-import org.apache.pinot.tsdb.spi.TimeSeriesTableMetadata;
+import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
@@ -49,7 +49,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   }
 
   @Override
-  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesTableMetadata tableMetadata) {
+  public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata tableMetadata) {
     if (!request.getLanguage().equals(Constants.LANGUAGE)) {
       throw new IllegalArgumentException(
           String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(), Constants.LANGUAGE));

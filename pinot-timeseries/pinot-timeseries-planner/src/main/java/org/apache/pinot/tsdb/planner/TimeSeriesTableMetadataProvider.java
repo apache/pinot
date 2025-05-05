@@ -22,13 +22,13 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.tsdb.spi.TimeSeriesTableMetadata;
+import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 
 
 /**
  * Implementation of TimeSeriesTableMetadata that uses TableCache to provide table metadata.
  */
-public class TimeSeriesTableMetadataProvider implements TimeSeriesTableMetadata {
+public class TimeSeriesTableMetadataProvider implements TimeSeriesMetadata {
   private final TableCache _tableCache;
 
   public TimeSeriesTableMetadataProvider(TableCache tableCache) {

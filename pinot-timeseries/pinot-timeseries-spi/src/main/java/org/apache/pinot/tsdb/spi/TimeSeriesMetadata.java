@@ -25,7 +25,7 @@ import org.apache.pinot.spi.data.Schema;
 /**
  * Interface for accessing time series table metadata.
  */
-public interface TimeSeriesTableMetadata {
+public interface TimeSeriesMetadata {
   /**
    * Get the table config for a given table name
    * @param tableName name of the table

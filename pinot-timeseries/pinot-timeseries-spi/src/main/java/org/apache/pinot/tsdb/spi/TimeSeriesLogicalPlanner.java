@@ -34,5 +34,5 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 public interface TimeSeriesLogicalPlanner {
   void init(PinotConfiguration pinotConfiguration);
 
-  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesTableMetadata tableMetadata);
+  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata tableMetadata);
 }

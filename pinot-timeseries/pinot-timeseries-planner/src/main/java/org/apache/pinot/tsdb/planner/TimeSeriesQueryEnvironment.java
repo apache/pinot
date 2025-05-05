@@ -37,7 +37,7 @@ import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
-import org.apache.pinot.tsdb.spi.TimeSeriesTableMetadata;
+import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ public class TimeSeriesQueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesQueryEnvironment.class);
   private final RoutingManager _routingManager;
   private final TableCache _tableCache;
-  private final TimeSeriesTableMetadata _tableMetadataProvider;
+  private final TimeSeriesMetadata _tableMetadataProvider;
   private final Map<String, TimeSeriesLogicalPlanner> _plannerMap = new HashMap<>();
 
   public TimeSeriesQueryEnvironment(PinotConfiguration config, RoutingManager routingManager, TableCache tableCache) {

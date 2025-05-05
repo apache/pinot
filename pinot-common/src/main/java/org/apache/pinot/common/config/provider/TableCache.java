@@ -204,17 +204,6 @@ public class TableCache implements PinotConfigProvider {
     return tableConfigInfo != null ? tableConfigInfo._tableConfig : null;
   }
 
-  /**
-   * Returns all the table configs.
-   */
-  public List<TableConfig> getTableConfigs() {
-    List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
-    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
-      tableConfigs.add(tableConfigInfo._tableConfig);
-    }
-    return tableConfigs;
-  }
-
   @Override
   public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
     synchronized (_zkTableConfigChangeListener) {
@@ -374,6 +363,14 @@ public class TableCache implements PinotConfigProvider {
         tableConfigChangeListener.onChange(tableConfigs);
       }
     }
+  }
+
+  private List<TableConfig> getTableConfigs() {
+    List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      tableConfigs.add(tableConfigInfo._tableConfig);
+    }
+    return tableConfigs;
   }
 
   private void notifySchemaChangeListeners() {
