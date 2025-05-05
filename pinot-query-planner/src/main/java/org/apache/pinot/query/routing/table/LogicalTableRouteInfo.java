@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.request.TableRouteInfo;
+import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -55,12 +55,12 @@ public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.Ta
 
   @Override
   public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
-    Map<ServerInstance, List<TableRouteInfo>> offlineTableRouteInfo = new HashMap<>();
-    Map<ServerInstance, List<TableRouteInfo>> realtimeTableRouteInfo = new HashMap<>();
+    Map<ServerInstance, List<TableSegmentsInfo>> offlineTableRouteInfo = new HashMap<>();
+    Map<ServerInstance, List<TableSegmentsInfo>> realtimeTableRouteInfo = new HashMap<>();
 
     for (PhysicalTableRoute physicalTableRoute : _offlineTableRoutes) {
       for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
-        TableRouteInfo tableRouteInfo = new TableRouteInfo();
+        TableSegmentsInfo tableRouteInfo = new TableSegmentsInfo();
         tableRouteInfo.setTableName(physicalTableRoute.getTableName());
         tableRouteInfo.setSegments(entry.getValue().getSegments());
         if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
@@ -73,7 +73,7 @@ public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.Ta
 
     for (PhysicalTableRoute physicalTableRoute : _realtimeTableRoutes) {
       for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
-        TableRouteInfo tableRouteInfo = new TableRouteInfo();
+        TableSegmentsInfo tableRouteInfo = new TableSegmentsInfo();
         tableRouteInfo.setTableName(physicalTableRoute.getTableName());
         tableRouteInfo.setSegments(entry.getValue().getSegments());
         if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
@@ -85,13 +85,13 @@ public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.Ta
     }
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
 
-    for (Map.Entry<ServerInstance, List<TableRouteInfo>> entry : offlineTableRouteInfo.entrySet()) {
+    for (Map.Entry<ServerInstance, List<TableSegmentsInfo>> entry : offlineTableRouteInfo.entrySet()) {
       requestMap.put(
           new ServerRoutingInstance(entry.getKey().getHostname(), entry.getKey().getPort(), TableType.OFFLINE),
           getInstanceRequest(requestId, brokerId, _offlineBrokerRequest, entry.getValue()));
     }
 
-    for (Map.Entry<ServerInstance, List<TableRouteInfo>> entry : realtimeTableRouteInfo.entrySet()) {
+    for (Map.Entry<ServerInstance, List<TableSegmentsInfo>> entry : realtimeTableRouteInfo.entrySet()) {
       requestMap.put(
           new ServerRoutingInstance(entry.getKey().getHostname(), entry.getKey().getPort(), TableType.REALTIME),
           getInstanceRequest(requestId, brokerId, _realtimeBrokerRequest, entry.getValue()));
@@ -101,7 +101,7 @@ public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.Ta
   }
 
   private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
-      List<TableRouteInfo> tableRouteInfo) {
+      List<TableSegmentsInfo> tableSegmentsInfoList) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setCid(QueryThreadContext.getCid());
@@ -110,7 +110,7 @@ public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.Ta
     if (queryOptions != null) {
       instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
     }
-    instanceRequest.setLogicalTableRouteInfo(tableRouteInfo);
+    instanceRequest.setTableSegmentsInfoList(tableSegmentsInfoList);
     instanceRequest.setBrokerId(brokerId);
     return instanceRequest;
   }

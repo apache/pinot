@@ -39,7 +39,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
-import org.apache.pinot.common.request.TableRouteInfo;
+import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -56,7 +56,6 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -223,27 +222,27 @@ public class ServerPlanRequestUtils {
     Schema schema = ZKMetadataProvider.getSchema(helixPropertyStore, logicalTable.getPhysicalTableNames().get(0));
     Map<String, Map<String, List<String>>> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
-    List<TableRouteInfo> offlineTableRouteInfoList = new ArrayList<>();
-    List<TableRouteInfo> realtimeTableRouteInfoList = new ArrayList<>();
+    List<TableSegmentsInfo> offlineTableRouteInfoList = new ArrayList<>();
+    List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
 
     assert logicalTableSegmentsMap != null;
     for (Map.Entry<String, Map<String, List<String>>> entry : logicalTableSegmentsMap.entrySet()) {
       String rawTableName = entry.getKey();
       for (Map.Entry<String, List<String>> tableTypeSegmentListEntry : entry.getValue().entrySet()) {
         TableType tableType = TableType.valueOf(tableTypeSegmentListEntry.getKey());
-        TableRouteInfo tableRouteInfo = new TableRouteInfo();
-        tableRouteInfo.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-        tableRouteInfo.setSegments(tableTypeSegmentListEntry.getValue());
+        TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
+        tableSegmentsInfo.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+        tableSegmentsInfo.setSegments(tableTypeSegmentListEntry.getValue());
         if (tableType == TableType.REALTIME) {
-          realtimeTableRouteInfoList.add(tableRouteInfo);
+          realtimeTableRouteInfoList.add(tableSegmentsInfo);
         } else {
-          offlineTableRouteInfoList.add(tableRouteInfo);
+          offlineTableRouteInfoList.add(tableSegmentsInfo);
         }
       }
     }
 
     if (offlineTableRouteInfoList.isEmpty() || realtimeTableRouteInfoList.isEmpty()) {
-      List<TableRouteInfo> routeInfoList = offlineTableRouteInfoList.isEmpty()
+      List<TableSegmentsInfo> routeInfoList = offlineTableRouteInfoList.isEmpty()
           ? realtimeTableRouteInfoList : offlineTableRouteInfoList;
       String tableType = offlineTableRouteInfoList.isEmpty() ? TableType.REALTIME.name() : TableType.OFFLINE.name();
       if (tableType.equals(TableType.OFFLINE.name())) {
@@ -318,7 +317,7 @@ public class ServerPlanRequestUtils {
 
   private static InstanceRequest compileLogicalTableInstanceRequest(OpChainExecutionContext executionContext,
       PinotQuery pinotQuery, String tableNameWithType, @Nullable TableConfig tableConfig, @Nullable Schema schema,
-      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<TableRouteInfo> tableRouteInfoList) {
+      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<TableSegmentsInfo> tableRouteInfoList) {
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
     long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
@@ -348,7 +347,7 @@ public class ServerPlanRequestUtils {
     instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
-    instanceRequest.setLogicalTableRouteInfo(tableRouteInfoList);
+    instanceRequest.setTableSegmentsInfoList(tableRouteInfoList);
     instanceRequest.setQuery(brokerRequest);
 
     return instanceRequest;

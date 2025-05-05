@@ -194,7 +194,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableExecutionInfo executionInfo;
     try {
-      if (queryRequest.getTableRouteInfos() != null && !queryRequest.getTableRouteInfos().isEmpty()) {
+      if (queryRequest.getTableSegmentsContexts() != null && !queryRequest.getTableSegmentsContexts().isEmpty()) {
         executionInfo = LogicalTableExecutionInfo.create(_instanceDataManager, queryRequest, queryContext);
       } else {
         executionInfo =

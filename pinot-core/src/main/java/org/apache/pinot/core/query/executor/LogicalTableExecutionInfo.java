@@ -22,16 +22,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.TableSegmentsContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -46,12 +47,13 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
   public static LogicalTableExecutionInfo create(InstanceDataManager instanceDataManager,
       ServerQueryRequest queryRequest, QueryContext queryContext)
       throws TableNotFoundException {
-    List<TableRouteInfo> tableRouteInfos = queryRequest.getTableRouteInfos();
-    List<SingleTableExecutionInfo> tableExecutionInfos = new ArrayList<>(tableRouteInfos.size());
-    for (TableRouteInfo tableRouteInfo : tableRouteInfos) {
+    List<TableSegmentsContext> tableSegmentsContextList = queryRequest.getTableSegmentsContexts();
+    Objects.requireNonNull(tableSegmentsContextList);
+    List<SingleTableExecutionInfo> tableExecutionInfos = new ArrayList<>(tableSegmentsContextList.size());
+    for (TableSegmentsContext tableSegmentsContext : tableSegmentsContextList) {
       SingleTableExecutionInfo singleTableExecutionInfo =
-          SingleTableExecutionInfo.create(instanceDataManager, tableRouteInfo.getTableName(),
-              tableRouteInfo.getSegments(), tableRouteInfo.getOptionalSegments(), queryContext);
+          SingleTableExecutionInfo.create(instanceDataManager, tableSegmentsContext.getTableName(),
+              tableSegmentsContext.getSegments(), tableSegmentsContext.getOptionalSegments(), queryContext);
       tableExecutionInfos.add(singleTableExecutionInfo);
     }
 
