@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
@@ -52,8 +52,9 @@ public class PinotNameMatcher implements SqlNameMatcher {
     return _caseSensitive ? string.equals(name) : string.equalsIgnoreCase(name);
   }
 
+  @Nullable
   @Override
-  public <K extends List<String>, V> @Nullable V get(Map<K, V> map, List<String> prefixNames, List<String> names) {
+  public <K extends List<String>, V> V get(Map<K, V> map, List<String> prefixNames, List<String> names) {
     List<String> key = concat(prefixNames, names);
     if (_caseSensitive) {
       return map.get(key);
