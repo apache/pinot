@@ -20,10 +20,12 @@ package org.apache.pinot.query.service.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
+import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -50,6 +53,7 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -264,7 +268,21 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     long requestId = request.getRequestId();
     try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open()) {
       QueryThreadContext.setIds(requestId, request.getCid().isBlank() ? request.getCid() : Long.toString(requestId));
-      _queryRunner.cancel(requestId);
+      Map<Integer, MultiStageQueryStats.StageStats.Closed> stats = _queryRunner.cancel(requestId);
+
+      Worker.CancelResponse.Builder cancelBuilder = Worker.CancelResponse.newBuilder();
+      for (Map.Entry<Integer, MultiStageQueryStats.StageStats.Closed> statEntry : stats.entrySet()) {
+        try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream.Builder().get();
+            DataOutputStream daos = new DataOutputStream(baos)) {
+          statEntry.getValue().serialize(daos);
+
+          daos.flush();
+          byte[] byteArray = baos.toByteArray();
+          ByteString bytes = UnsafeByteOperations.unsafeWrap(byteArray);
+          cancelBuilder.putStatsByStage(statEntry.getKey(), bytes);
+        }
+      }
+      responseObserver.onNext(cancelBuilder.build());
     } catch (Throwable t) {
       LOGGER.error("Caught exception while cancelling opChain for request: {}", requestId, t);
     }
