@@ -32,6 +32,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.mockito.Mockito;
@@ -174,6 +175,7 @@ public class OpChainSchedulerServiceTest {
       cancelLatch.countDown();
       return null;
     }).when(_operatorA).cancel(Mockito.any());
+    Mockito.doAnswer(inv -> MultiStageQueryStats.emptyStats(1)).when(_operatorA).calculateStats();
 
     schedulerService.register(opChain);
 

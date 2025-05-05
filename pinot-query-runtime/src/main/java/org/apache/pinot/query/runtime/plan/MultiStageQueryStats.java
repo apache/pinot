@@ -206,6 +206,34 @@ public class MultiStageQueryStats {
   }
 
   /**
+   * Merge stats from an upstream stage into this one.
+   *
+   * This is similar to wrap the stats in a MultiStageQueryStats object and call
+   * {@link #mergeUpstream(MultiStageQueryStats)} but it is easier to call and slightly more efficient.
+   *
+   * @param stageId the stage id of the upstream stage
+   * @param closedStats the stats to merge
+   */
+  public void mergeUpstream(int stageId, StageStats.Closed closedStats) {
+    Preconditions.checkArgument(_currentStageId <= stageId,
+        "Cannot merge stats from early stage %s into stats of later stage %s",
+        stageId, _currentStageId);
+
+    growUpToStage(stageId);
+    int selfIdx = stageId - _currentStageId - 1;
+    StageStats.Closed myStats = _closedStats.get(selfIdx);
+    try {
+      if (myStats == null) {
+        _closedStats.set(selfIdx, closedStats);
+      } else {
+        myStats.merge(closedStats);
+      }
+    } catch (IllegalArgumentException | IllegalStateException ex) {
+      LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", stageId, ex);
+    }
+  }
+
+  /**
    * Merge upstream stats from another MultiStageQueryStats object into this one.
    *
    * This method is equivalent to calling {@link #mergeUpstream(MultiStageQueryStats, boolean)} with bubbleUp set to

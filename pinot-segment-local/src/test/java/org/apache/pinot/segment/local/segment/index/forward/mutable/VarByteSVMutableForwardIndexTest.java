@@ -71,6 +71,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(readerWriter.getString(i), data[i]);
       }
+      Assert.assertTrue(readerWriter.canAddMore());
     }
   }
 
@@ -94,6 +95,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(new String(readerWriter.getBytes(i), UTF_8), data[i]);
       }
+      Assert.assertTrue(readerWriter.canAddMore());
     }
   }
 }

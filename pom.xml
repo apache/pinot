@@ -139,7 +139,7 @@
 
     <arrow.version>18.2.0</arrow.version>
     <avro.version>1.11.4</avro.version>
-    <parquet.version>1.15.1</parquet.version>
+    <parquet.version>1.15.2</parquet.version>
     <orc.version>1.9.5</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
@@ -164,7 +164,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.7-2</zstd-jni.version>
+    <zstd-jni.version>1.5.7-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.24.3</log4j.version>
@@ -177,8 +177,8 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.29</aws.sdk.version>
-    <azure.sdk.version>1.2.33</azure.sdk.version>
+    <aws.sdk.version>2.31.35</aws.sdk.version>
+    <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
@@ -207,7 +207,7 @@
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.14.0</commons-csv.version>
-    <commons-configuration2.version>2.11.0</commons-configuration2.version>
+    <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-beanutils.version>1.10.1</commons-beanutils.version>
     <commons-io.version>2.19.0</commons-io.version>
     <commons-codec.version>1.18.0</commons-codec.version>
@@ -279,7 +279,7 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
-    <checker-qual.version>3.49.2</checker-qual.version>
+    <checker-qual.version>3.49.3</checker-qual.version>
     <groovy-all.version>2.4.21</groovy-all.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.3.0</roaring-bitmap.version>
@@ -304,7 +304,7 @@
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
-    <equalsverifier.version>3.19.3</equalsverifier.version>
+    <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>1.21.0</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
@@ -2545,7 +2545,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.23.0</version>
+            <version>10.23.1</version>
           </dependency>
         </dependencies>
         <executions>
