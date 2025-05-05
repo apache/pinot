@@ -95,11 +95,9 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     if (_skipModules != null && !_skipModules.trim().isEmpty()) {
       Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
       Path modulePath = project.getBasedir().toPath().toAbsolutePath().normalize();
-      Path relPath = rootPath.relativize(modulePath);
-
-      String rel = relPath.toString();
+      String pathString = modulePath.toString();
       for (String skip : _skipModuleList) {
-        if (rel.contains(skip)) {
+        if (pathString.contains(skip)) {
           return;
         }
       }
