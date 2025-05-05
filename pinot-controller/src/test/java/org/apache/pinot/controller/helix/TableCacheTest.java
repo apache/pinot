@@ -144,15 +144,15 @@ public class TableCacheTest {
     assertEquals(schemaChangeListener._schemaList.size(), 1);
     assertEquals(schemaChangeListener._schemaList.get(0), expectedSchema);
 
-    TestLogicalTableConfigChangeListener logicalTableChangeListener = new TestLogicalTableConfigChangeListener();
-    assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableChangeListener));
-    assertEquals(logicalTableChangeListener._logicalTableConfigList.size(), 1);
-    assertEquals(logicalTableChangeListener._logicalTableConfigList.get(0), logicalTableConfig);
+    TestLogicalTableConfigChangeListener logicalTableConfigChangeListener = new TestLogicalTableConfigChangeListener();
+    assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableConfigChangeListener));
+    assertEquals(logicalTableConfigChangeListener._logicalTableConfigList.size(), 1);
+    assertEquals(logicalTableConfigChangeListener._logicalTableConfigList.get(0), logicalTableConfig);
 
     // Re-register the change listener should fail
     assertFalse(tableCache.registerTableConfigChangeListener(tableConfigChangeListener));
     assertFalse(tableCache.registerSchemaChangeListener(schemaChangeListener));
-    assertFalse(tableCache.registerLogicalTableConfigChangeListener(logicalTableChangeListener));
+    assertFalse(tableCache.registerLogicalTableConfigChangeListener(logicalTableConfigChangeListener));
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
@@ -264,7 +264,7 @@ public class TableCacheTest {
     // NOTE:
     // - Verify if the callback is fully done by checking the logical table change lister because it is the last step of
     //   the callback handling
-    TestUtils.waitForCondition(aVoid -> logicalTableChangeListener._logicalTableConfigList.isEmpty(), 10_000L,
+    TestUtils.waitForCondition(aVoid -> logicalTableConfigChangeListener._logicalTableConfigList.isEmpty(), 10_000L,
         "Failed to remove the logical table from the cache");
 
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
@@ -275,7 +275,7 @@ public class TableCacheTest {
     assertNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME));
     assertEquals(schemaChangeListener._schemaList.size(), 0);
     assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
-    assertEquals(logicalTableChangeListener._logicalTableConfigList.size(), 0);
+    assertEquals(logicalTableConfigChangeListener._logicalTableConfigList.size(), 0);
 
     // Wait for external view to disappear to ensure a clean start for the next test
     TEST_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);

@@ -831,7 +831,7 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static List<LogicalTableConfig> getAllLogicalTables(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static List<LogicalTableConfig> getAllLogicalTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(PROPERTYSTORE_LOGICAL_PREFIX, null, AccessOption.PERSISTENT, 0, 0);
     if (znRecords != null) {

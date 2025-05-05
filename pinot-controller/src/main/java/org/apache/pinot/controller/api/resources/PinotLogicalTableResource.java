@@ -133,9 +133,9 @@ public class PinotLogicalTableResource {
   public SuccessResponse addLogicalTable(
       String logicalTableJsonString, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<LogicalTableConfig, Map<String, Object>> logicalTableAndUnrecognizedProps =
+    Pair<LogicalTableConfig, Map<String, Object>> logicalTableConfigAndUnrecognizedProps =
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
-    LogicalTableConfig logicalTableConfig = logicalTableAndUnrecognizedProps.getLeft();
+    LogicalTableConfig logicalTableConfig = logicalTableConfigAndUnrecognizedProps.getLeft();
     String tableName = DatabaseUtils.translateTableName(logicalTableConfig.getTableName(), httpHeaders);
     logicalTableConfig.setTableName(tableName);
 
@@ -144,7 +144,7 @@ public class PinotLogicalTableResource {
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
     SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
-    return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
+    return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
 
   @PUT
@@ -162,9 +162,9 @@ public class PinotLogicalTableResource {
   public SuccessResponse updateLogicalTable(
       @ApiParam(value = "Name of the logical table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers, String logicalTableJsonString) {
-    Pair<LogicalTableConfig, Map<String, Object>> logicalTableAndUnrecognizedProps =
+    Pair<LogicalTableConfig, Map<String, Object>> logicalTableConfigAndUnrecognizedProps =
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
-    LogicalTableConfig logicalTableConfig = logicalTableAndUnrecognizedProps.getLeft();
+    LogicalTableConfig logicalTableConfig = logicalTableConfigAndUnrecognizedProps.getLeft();
 
     Preconditions.checkArgument(logicalTableConfig.getTableName().equals(tableName),
         "Logical table name in the request body should match the table name in the URL");
@@ -173,7 +173,7 @@ public class PinotLogicalTableResource {
     logicalTableConfig.setTableName(tableName);
 
     SuccessResponse successResponse = updateLogicalTable(tableName, logicalTableConfig);
-    return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
+    return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
 
   @DELETE
@@ -199,13 +199,14 @@ public class PinotLogicalTableResource {
   }
 
   private Pair<LogicalTableConfig, Map<String, Object>> getLogicalAndUnrecognizedPropertiesFromJson(
-      String logicalTableJsonString)
+      String logicalTableConfigJsonString)
       throws ControllerApplicationException {
     try {
-      return JsonUtils.stringToObjectAndUnrecognizedProperties(logicalTableJsonString, LogicalTableConfig.class);
+      return JsonUtils.stringToObjectAndUnrecognizedProperties(logicalTableConfigJsonString, LogicalTableConfig.class);
     } catch (Exception e) {
       String msg =
-          String.format("Invalid logical table json config: %s. Reason: %s", logicalTableJsonString, e.getMessage());
+          String.format("Invalid logical table json config: %s. Reason: %s", logicalTableConfigJsonString,
+              e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }

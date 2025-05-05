@@ -2260,7 +2260,7 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllLogicalTableNames() {
-    return ZKMetadataProvider.getAllLogicalTables(_propertyStore).stream().map(LogicalTableConfig::getTableName)
+    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
         .collect(Collectors.toList());
   }
 

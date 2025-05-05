@@ -97,7 +97,8 @@ public class TableCache implements PinotConfigProvider {
   // Key is schema name, value is schema info
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
-  private final ZkLogicalTableChangeListener _zkLogicalTableConfigChangeListener = new ZkLogicalTableChangeListener();
+  private final ZkLogicalTableConfigChangeListener
+      _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
   // Key is table name, value is logical table info
   private final Map<String, LogicalTableConfigInfo> _logicalTableConfigInfoMap = new ConcurrentHashMap<>();
   // Key is lower case logical table name, value is actual logical table name
@@ -619,7 +620,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private class ZkLogicalTableChangeListener implements IZkChildListener, IZkDataListener {
+  private class ZkLogicalTableConfigChangeListener implements IZkChildListener, IZkDataListener {
 
     @Override
     public synchronized void handleChildChange(String path, List<String> logicalTableNames) {
