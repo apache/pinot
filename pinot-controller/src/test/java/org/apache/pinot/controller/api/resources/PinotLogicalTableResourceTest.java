@@ -71,6 +71,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         {"test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
         {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
         {"test_logical_table", List.of("db.test_table_1", "db.test_table_2"), List.of("db.test_table_3")},
+        {"test_table", List.of("db1.test_table", "db2.test_table"), List.of("db3.test_table")},
+        {"db0.test_table", List.of("db1.test_table", "db2.test_table"), List.of("db3.test_table")},
         {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3")},
         {"db.test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
         {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
