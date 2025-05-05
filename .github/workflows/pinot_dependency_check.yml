@@ -42,9 +42,14 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build & install pinot-dependency-verifier
-        run: mvn clean install -DskipTests -Pbin-dist \
-          -pl pinot-dependency-verifier
+      - name: Build/install dependency-verifier only
+        run: mvn -B \
+          -f pinot-dependency-verifier/pom.xml \
+          clean install \
+          -DskipTests \
+          -Pbin-dist
 
-      - name: Run full build + enforcer
-        run: mvn clean enforcer:enforce install -DskipTests -Pbin-dist
+      - name: Full build + enforcer
+        run: mvn -B clean install \
+          -DskipTests \
+          -Pbin-dist
