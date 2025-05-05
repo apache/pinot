@@ -277,7 +277,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
-      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions);
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
       QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
@@ -306,7 +306,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions) {
+  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+      long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -318,6 +319,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
     return QueryEnvironment.configBuilder()
+        .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
         .workerManager(_workerManager)
