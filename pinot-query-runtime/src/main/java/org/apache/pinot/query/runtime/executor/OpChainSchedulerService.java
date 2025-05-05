@@ -98,7 +98,6 @@ public class OpChainSchedulerService {
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, stats);
-            _opChainCache.invalidate(operatorChain.getId());
           }
         } catch (Exception e) {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
