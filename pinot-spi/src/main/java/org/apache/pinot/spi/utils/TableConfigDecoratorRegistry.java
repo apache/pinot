@@ -24,56 +24,57 @@ import org.apache.pinot.spi.config.table.TableConfigDecorator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Registry for TableConfigDecorator implementations.
  * Enables external plugins to register decorators that enhance TableConfig objects.
  * By default, no decorator is registered.
  */
 public class TableConfigDecoratorRegistry {
-    private TableConfigDecoratorRegistry() {
+  private TableConfigDecoratorRegistry() {
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigDecoratorRegistry.class);
+
+  // Default no-op decorator
+  private static final TableConfigDecorator NOOP = tableConfig -> tableConfig;
+
+  // Initialize with the no-op decorator
+  private static final AtomicReference<TableConfigDecorator> DECORATOR_INSTANCE = new AtomicReference<>(NOOP);
+
+  /**
+   * Registers a decorator during startup.
+   *
+   * @param decorator The decorator to register
+   * @return true if registration was successful, false if already registered
+   */
+  public static boolean register(TableConfigDecorator decorator) {
+    return DECORATOR_INSTANCE.compareAndSet(NOOP, decorator);
+  }
+
+  /**
+   * Applies the registered decorator to a TableConfig.
+   *
+   * @param tableConfig The config to decorate
+   * @return The decorated config or original if decoration fails
+   */
+  public static TableConfig applyDecorator(TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return null;
     }
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigDecoratorRegistry.class);
-
-    // Default no-op decorator
-    private static final TableConfigDecorator NOOP = tableConfig -> tableConfig;
-
-    // Initialize with the no-op decorator
-    private static final AtomicReference<TableConfigDecorator> DECORATOR_INSTANCE = new AtomicReference<>(NOOP);
-
-    /**
-     * Registers a decorator during startup.
-     *
-     * @param decorator The decorator to register
-     * @return true if registration was successful, false if already registered
-     */
-    public static boolean register(TableConfigDecorator decorator) {
-       return DECORATOR_INSTANCE.compareAndSet(NOOP, decorator);
+    TableConfigDecorator decorator = DECORATOR_INSTANCE.get();
+    if (decorator == null) {
+      LOGGER.debug("No decorator registered, returning original TableConfig");
+      return tableConfig;
     }
 
-    /**
-     * Applies the registered decorator to a TableConfig.
-     *
-     * @param tableConfig The config to decorate
-     * @return The decorated config or original if decoration fails
-     */
-    public static TableConfig applyDecorator(TableConfig tableConfig) {
-        if (tableConfig == null) {
-            return null;
-        }
-
-        TableConfigDecorator decorator = DECORATOR_INSTANCE.get();
-        if (decorator == null) {
-            LOGGER.debug("No decorator registered, returning original TableConfig");
-            return tableConfig;
-        }
-
-        try {
-            return decorator.decorate(tableConfig);
-        } catch (Exception e) {
-            LOGGER.error("Failed to apply decorator to table config for table: {}",
-                tableConfig.getTableName(), e);
-            return tableConfig;
-        }
+    try {
+      return decorator.decorate(tableConfig);
+    } catch (Exception e) {
+      LOGGER.error("Failed to apply decorator to table config for table: {}",
+          tableConfig.getTableName(), e);
+      return tableConfig;
     }
+  }
 }

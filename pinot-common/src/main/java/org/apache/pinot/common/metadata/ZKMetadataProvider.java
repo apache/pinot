@@ -604,7 +604,7 @@ public class ZKMetadataProvider {
     try {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
       TableConfig processedTableConfig = replaceVariables
-        ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+          ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
       return TableConfigDecoratorRegistry.applyDecorator(processedTableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);

@@ -25,13 +25,13 @@ package org.apache.pinot.spi.config.table;
  */
 public interface TableConfigDecorator {
 
-    /**
-     * Decorates the given TableConfig.
-     * Implementations should modify the provided TableConfig object or return a new one
-     * with the desired changes.
-     *
-     * @param tableConfig The original TableConfig loaded from the metadata store.
-     * @return The decorated (potentially modified) TableConfig.
-     */
-    TableConfig decorate(TableConfig tableConfig);
+  /**
+   * Decorates the given TableConfig.
+   * Implementations should modify the provided TableConfig object or return a new one
+   * with the desired changes.
+   *
+   * @param tableConfig The original TableConfig loaded from the metadata store.
+   * @return The decorated (potentially modified) TableConfig.
+   */
+  TableConfig decorate(TableConfig tableConfig);
 }
