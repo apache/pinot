@@ -124,6 +124,64 @@
           <reuseForks>true</reuseForks>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>com.github.siom79.japicmp</groupId>
+        <artifactId>japicmp-maven-plugin</artifactId>
+        <version>0.23.1</version>
+        <configuration>
+          <oldVersion>
+            <file>
+              <path>${basedir}/resources/pinot-spi-japicmp-baseline.jar</path>
+            </file>
+          </oldVersion>
+<!-- If oldVersion were left blank, 1.3.0 would be the baseline version for japicmp's comparing. However, we already
+introduced back-incompatible changes since the release of 1.4.0-SNAPSHOT, so we are using a baseline .jar of the repo here
+(with version as of PR #15684).
+TODO: At the time of the next Pinot release (1.4.0), update the baseline version here to 1.4.0 and remove pinot-spi/resources/pinot-spi-japicmp-baseline.jar from repo.-->
+          <newVersion>
+            <file>
+              <path>${project.build.directory}/${project.artifactId}-${project.version}.jar</path>
+            </file>
+          </newVersion>
+          <parameter>
+            <includes>org.apache.pinot.spi</includes>
+            <onlyModified>true</onlyModified>
+            <skipXmlReport>true</skipXmlReport>
+            <skipHtmlReport>true</skipHtmlReport>
+            <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
+            <overrideCompatibilityChangeParameters>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_NOW_VARARGS</compatibilityChange>
+                <sourceCompatible>false</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_IN_IMPLEMENTED_INTERFACE</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_IN_SUPERCLASS</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ABSTRACT_ADDED_TO_CLASS</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+              <overrideCompatibilityChangeParameter>
+                <compatibilityChange>METHOD_ADDED_TO_INTERFACE</compatibilityChange>
+                <sourceCompatible>true</sourceCompatible>
+              </overrideCompatibilityChangeParameter>
+            </overrideCompatibilityChangeParameters>
+          </parameter>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>cmp</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
