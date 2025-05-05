@@ -50,7 +50,6 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   private final String _columnName;
   private final String _keyName;
   private final Predicate _predicate;
-  private final JsonMatchPredicate _jsonMatchPredicate;
 
   public MapIndexFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
@@ -64,17 +63,18 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     }
 
     _columnName = arguments.get(0).getIdentifier();
-    _keyName = cleanKey(String.valueOf(arguments.get(1).getLiteral()));
+    _keyName = arguments.get(1).getLiteral().getStringValue();
 
     // Get JSON index and create operator
+    JsonMatchPredicate jsonMatchPredicate;
     DataSource dataSource = indexSegment.getDataSource(_columnName);
     JsonIndexReader jsonIndex = dataSource.getJsonIndex();
     if (jsonIndex != null && useJsonIndex(_predicate.getType())) {
-      _jsonMatchPredicate = createJsonMatchPredicate();
-      _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, numDocs);
+      jsonMatchPredicate = createJsonMatchPredicate();
+      _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, jsonMatchPredicate, numDocs);
       _expressionFilterOperator = null;
     } else {
-      _jsonMatchPredicate = null;
+      jsonMatchPredicate = null;
       _jsonMatchOperator = null;
       _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
     }
@@ -199,8 +199,9 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   /**
    * Initializes the JsonMatchFilterOperator with the given JsonIndexReader
    */
-  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex, int numDocs) {
-    return new JsonMatchFilterOperator(jsonIndex, _jsonMatchPredicate, numDocs);
+  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex,
+      JsonMatchPredicate jsonMatchPredicate, int numDocs) {
+    return new JsonMatchFilterOperator(jsonIndex, jsonMatchPredicate, numDocs);
   }
 
   private String createJsonEqPredicateValue(String key, String value) {
@@ -233,20 +234,6 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     }
     // Format: '"key" NOT IN (value1, value2)'
     return String.format("%s NOT IN (%s)", key, valuesStr);
-  }
-
-  /**
-   * Cleans the key by removing leading and trailing single quotes if present.
-   *
-   * @param key The original key string
-   * @return The cleaned key string
-   */
-  private static String cleanKey(String key) {
-    String cleanKey = key;
-    if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
-      cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
-    }
-    return cleanKey;
   }
 
   /**

@@ -194,7 +194,7 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
-  private boolean canApplyMapFilter(Predicate predicate, String column) {
+  private boolean canApplyMapFilter(Predicate predicate) {
     // Get column name and key name from function arguments
     FunctionContext function = predicate.getLhs().getFunction();
 
@@ -248,7 +248,7 @@ public class FilterPlanNode implements PlanNode {
             return new H3IndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
-          } else if (canApplyMapFilter(predicate, lhs.getIdentifier())) {
+          } else if (canApplyMapFilter(predicate)) {
             return new MapIndexFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
