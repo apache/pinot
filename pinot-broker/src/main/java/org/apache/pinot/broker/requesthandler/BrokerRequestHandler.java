@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -47,10 +48,39 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
+  /// Handle a request and return the full response.
+  ///
+  /// This method blocks until the full response is ready. This method is kept for compatibility reasons, but it is
+  /// recommended to use [#handleStreamingRequest] instead, as it can reduce memory consumption on the broker side for
+  /// long-running queries and, in general, reduce end-to-end query latency by pipelining data to the client as soon as
+  /// it is available.
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      // TODO: Remove HttpHeaders from here, should be part of PinotClientRequest, which should merge them into
+      //  sqlNodeAndOptions or request
+      @Nullable HttpHeaders httpHeaders)
       throws Exception;
 
+  /// Handle a request in streaming fashion.
+  ///
+  /// Contrary to [#handleRequest], this method is lazy, meaning it doesn't block until the full response is ready.
+  /// It is recommended to use this method for long-running queries to reduce memory consumption on the broker side, as
+  /// data can be pipelined to the client as soon as it is available, without buffering the full response on the broker.
+  ///
+  /// As a consequence of being lazy, any exception that happens during query processing (e.g. while waiting for
+  /// server responses, or during response aggregation) will be raised only when the client consumes the response, not
+  /// when this method is called.
+  StreamingBrokerResponse handleStreamingRequest(
+      JsonNode request,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext,
+      // TODO: Remove HttpHeaders from here, should be part of PinotClientRequest, which should merge them into
+      //  sqlNodeAndOptions or request
+      @Nullable HttpHeaders httpHeaders)
+      throws Exception;
+
+  /// Handle a request with a SQL string. This method is only for testing purpose and should not be used in production.
   @VisibleForTesting
   default BrokerResponse handleRequest(String sql)
       throws Exception {

@@ -39,16 +39,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -274,7 +271,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // query pinot
     runQuery(sql, expectErrorMsg, false).ifPresent(queryResult -> {
       try {
-        Assert.assertNull(queryResult.getProcessingException(), "Expected no exception");
+        Assertions.assertThat(queryResult.getExceptions())
+            .as("Expected no exception")
+            .isNullOrEmpty();
+        Assertions.assertThat(queryResult.getResultTable())
+            .as("Result table is null")
+            .isNotNull();
         compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
@@ -336,13 +338,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
-  private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
-
-    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
-
-    MultiStageStatsTreeBuilder multiStageStatsTreeBuilder =
-        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats());
-    ObjectNode jsonNodes = multiStageStatsTreeBuilder.jsonStatsByStage(1);
+  private Map<String, JsonNode> tableToStats(String sql, BrokerResponseNativeV2 queryResult) {
+    ObjectNode jsonNodes = queryResult.getStageStats();
 
     Map<String, JsonNode> map = new HashMap<>();
     tableToStatsRec(map, jsonNodes);
@@ -372,12 +369,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String expect, int numSegments)
       throws Exception {
     runQuery(sql, expect, true).ifPresent(queryResult -> {
-      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
-      for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
-        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponseNative, stats));
-      }
-
-      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
+      Assert.assertEquals(queryResult.getNumSegmentsQueried(), numSegments);
 
       Map<String, JsonNode> tableToStats = tableToStats(sql, queryResult);
       for (Map.Entry<String, JsonNode> entry : tableToStats.entrySet()) {
@@ -395,23 +387,21 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, @Nullable String expectedErrorMsg, boolean trace)
+  private Optional<BrokerResponseNativeV2> runQuery(String sql, @Nullable String expectedErrorMsg, boolean trace)
       throws Exception {
     try {
       // query pinot
-      QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
-      if (expectedErrorMsg == null) {
-        Assert.assertTrue(queryResult.getProcessingException() == null,
-            "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getProcessingException()));
-      } else {
-        Assert.assertTrue(queryResult.getProcessingException() != null,
+      BrokerResponseNativeV2 queryResult = queryRunner(sql, trace);
+      if (expectedErrorMsg != null) {
+        Assert.assertNotNull(queryResult.getExceptions(),
             "Expected error with message '" + expectedErrorMsg + "'. But instead no error was thrown.");
         Pattern pattern = Pattern.compile(expectedErrorMsg, Pattern.DOTALL);
-        Assertions.assertThat(queryResult.getProcessingException().getMessage()).matches(pattern);
+        Assertions.assertThat(queryResult.getExceptions())
+            .anySatisfy(exception -> Assertions.assertThat(exception.getMessage()).matches(pattern));
         return Optional.empty();
       }
-      Assert.assertNull(expectedErrorMsg, "Expected error with message '" + expectedErrorMsg
-          + "'. But instead rows were returned: " + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      Assert.assertNull(queryResult.getExceptions(),
+          "Unexpected exception: " + JsonUtils.objectToPrettyString(queryResult.getExceptions()));
       Assert.assertNotNull(queryResult.getResultTable(),
           "Result table is null: " + JsonUtils.objectToPrettyString(queryResult));
       return Optional.of(queryResult);

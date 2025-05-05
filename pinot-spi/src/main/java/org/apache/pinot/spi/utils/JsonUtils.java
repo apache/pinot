@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -86,7 +88,7 @@ public class JsonUtils {
 
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper DEFAULT_MAPPER = createMapper();
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
@@ -100,6 +102,22 @@ public class JsonUtils {
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws JsonProcessingException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
+  }
+
+  /**
+   * Creates the default ObjectMapper.
+   *
+   * The current implementation does not have any custom configuration, but given we may create new object mappers in
+   * order to use mixins or other features, we provide this method to encapsulate the creation logic in case we
+   * need to modify it in the future.
+   */
+  public static ObjectMapper createMapper() {
+    return new ObjectMapper();
+  }
+
+  public static SerializerProvider getSerializerProvider() {
+
+    return DEFAULT_MAPPER.getSerializerProvider();
   }
 
   public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
@@ -306,6 +324,12 @@ public class JsonUtils {
         return null;
       }
     }
+  }
+
+  public static JsonGenerator createJsonGenerator(OutputStream outputStream)
+      throws IOException {
+    JsonFactory jsonFactory = DEFAULT_MAPPER.getFactory();
+    return jsonFactory.createGenerator(outputStream);
   }
 
   private static Object extractSingleValue(JsonNode jsonValue, DataType dataType) {

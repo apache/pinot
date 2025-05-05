@@ -30,6 +30,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.EagerToLazyBrokerResponseAdaptor;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
@@ -126,7 +128,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
+      _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -150,9 +152,13 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       // will throw b/c mailboxService is mocked
-      QueryDispatcher.QueryResult queryResult =
-          _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      if (queryResult.getProcessingException() == null) {
+      QueryDispatcher.DispatcherStreamingBrokerResponse queryResult =
+          _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
+      StreamingBrokerResponse.Metainfo metainfo = queryResult.consumeData(
+          data -> {
+            // no-op
+          });
+      if (metainfo.getExceptions().isEmpty()) {
         Assert.fail("Method call above should have failed");
       }
     } catch (NullPointerException e) {

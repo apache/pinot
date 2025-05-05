@@ -94,10 +94,22 @@ public class PlanNodeToOpChain {
    */
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
-    MyVisitor visitor = new MyVisitor(tracker);
-    MultiStageOperator root = node.visit(visitor, context);
-    tracker.accept(node, root);
+    MultiStageOperator root = convertToOperator(node, context, tracker);
     return new OpChain(context, root);
+  }
+
+  public static MultiStageOperator convertToOperator(PlanNode node, OpChainExecutionContext context) {
+    return convertToOperator(node, context, (planNode, operator) -> {
+      // Do nothing
+    });
+  }
+
+  public static MultiStageOperator convertToOperator(PlanNode node, OpChainExecutionContext context,
+      BiConsumer<PlanNode, MultiStageOperator> tracker) {
+    MyVisitor visitor = new MyVisitor(tracker);
+    MultiStageOperator visit = node.visit(visitor, context);
+    tracker.accept(node, visit);
+    return visit;
   }
 
   private static class MyVisitor implements PlanNodeVisitor<MultiStageOperator, OpChainExecutionContext> {
