@@ -40,8 +40,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/// Similar to {@link org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils} which handles empty results on
-/// the server side, this class handles empty results on the broker side.
+/// Similar to [org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils] which handles empty results on the
+/// server side, this class handles empty results on the broker side.
+// TODO: Consider extracting common code for these 2 classes.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class EmptyResponseUtils {
   private EmptyResponseUtils() {
@@ -114,19 +115,17 @@ public class EmptyResponseUtils {
     return new ResultTable(new DataSchema(columnNames, columnDataTypes), List.of());
   }
 
-  /**
-   * Tries to fill an {@link DataSchema} when no row has been returned.
-   *
-   * Response data schema can be inaccurate (all columns set to STRING) when all segments are pruned on broker or
-   * server.
-   *
-   * Priority is:
-   * - Types from multi-stage engine validation for the given query (if allowed).
-   * - Types from schema for the given table (only applicable to identifiers).
-   * - Types from single-stage engine response (no action).
-   *
-   * Multi-stage engine schema will be available only if query compiles.
-   */
+  /// Tries to fill an [DataSchema] when no row has been returned.
+  ///
+  /// Response data schema can be inaccurate (all columns set to STRING) when all segments are pruned on broker or
+  /// server.
+  ///
+  /// Priority is:
+  /// - Types from multi-stage engine validation for the given query (if allowed).
+  /// - Types from schema for the given table (only applicable to identifiers).
+  /// - Types from single-stage engine response (no action).
+  ///
+  /// Multi-stage engine schema will be available only if query compiles.
   public static void fillEmptyResponseSchema(boolean useMSE, BrokerResponse response, TableCache tableCache,
       Schema schema, String database, String query) {
     Preconditions.checkState(response.getNumRowsResultSet() == 0, "Cannot fill schema for non-empty response");
