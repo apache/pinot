@@ -44,7 +44,6 @@ import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * The {@code TimePredicateFilterOptimizer} optimizes the time related predicates:
  * <ul>
@@ -91,6 +90,38 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         optimize(operand);
       }
     } else if (filterKind.isRange() || filterKind == FilterKind.EQUALS) {
+      Expression leftOperand = operands.get(0);
+      Expression rightOperand = operands.get(1);
+
+      // Check if the right operand is a function that we need to optimize
+      if (rightOperand.getType() == ExpressionType.FUNCTION && leftOperand.getType() != ExpressionType.FUNCTION) {
+        Function expressionFunction = rightOperand.getFunctionCall();
+        String functionName = StringUtils.remove(expressionFunction.getOperator(), '_');
+        if (functionName.equalsIgnoreCase(TimeConversionTransformFunction.FUNCTION_NAME)
+            || functionName.equalsIgnoreCase(DateTimeConversionTransformFunction.FUNCTION_NAME)
+            || functionName.equalsIgnoreCase(DateTruncTransformFunction.FUNCTION_NAME)) {
+          // Swap operands to convert "x = function()" to "function() = x"
+          operands.set(0, rightOperand);
+          operands.set(1, leftOperand);
+
+          // For range operators, we need to invert the operator when swapping operands
+          if (filterKind == FilterKind.GREATER_THAN) {
+            filterFunction.setOperator(FilterKind.LESS_THAN.name());
+            filterKind = FilterKind.LESS_THAN;
+          } else if (filterKind == FilterKind.LESS_THAN) {
+            filterFunction.setOperator(FilterKind.GREATER_THAN.name());
+            filterKind = FilterKind.GREATER_THAN;
+          } else if (filterKind == FilterKind.GREATER_THAN_OR_EQUAL) {
+            filterFunction.setOperator(FilterKind.LESS_THAN_OR_EQUAL.name());
+            filterKind = FilterKind.LESS_THAN_OR_EQUAL;
+          } else if (filterKind == FilterKind.LESS_THAN_OR_EQUAL) {
+            filterFunction.setOperator(FilterKind.GREATER_THAN_OR_EQUAL.name());
+            filterKind = FilterKind.GREATER_THAN_OR_EQUAL;
+          }
+        }
+      }
+
+      // Now check the left operand (which may have been swapped from right)
       Expression expression = operands.get(0);
       if (expression.getType() == ExpressionType.FUNCTION) {
         Function expressionFunction = expression.getFunctionCall();
