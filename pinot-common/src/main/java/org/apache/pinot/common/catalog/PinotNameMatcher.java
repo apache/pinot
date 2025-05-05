@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.catalog;
 
-import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
+import org.apache.pinot.common.utils.list.FlatViewList;
 
 
 /**
@@ -55,12 +55,12 @@ public class PinotNameMatcher implements SqlNameMatcher {
   @Nullable
   @Override
   public <K extends List<String>, V> V get(Map<K, V> map, List<String> prefixNames, List<String> names) {
-    List<String> key = concat(prefixNames, names);
     if (_caseSensitive) {
+      List<String> key = concat(prefixNames, names);
       return map.get(key);
     } else {
       for (Map.Entry<K, V> entry : map.entrySet()) {
-        if (this.listMatches(key, entry.getKey())) {
+        if (listMatches(prefixNames, names, entry.getKey())) {
           return entry.getValue();
         }
       }
@@ -98,18 +98,19 @@ public class PinotNameMatcher implements SqlNameMatcher {
   }
 
   private static List<String> concat(List<String> prefixNames, List<String> names) {
-    return (List<String>) (prefixNames.isEmpty() ? names : ImmutableList.builder()
-        .addAll(prefixNames).addAll(names).build());
+    return new FlatViewList<>(prefixNames, names);
   }
 
-  protected boolean listMatches(List<String> list0, List<String> list1) {
-    if (list0.size() != list1.size()) {
+  protected boolean listMatches(List<String> firstList0, List<String> firstList1, List<String> secondList) {
+    int firstListSize = firstList0.size() + firstList1.size();
+    if (firstListSize != secondList.size()) {
       return false;
     } else {
-      for (int i = 0; i < list0.size(); i++) {
-        String s0 = list0.get(i);
-        String s1 = list1.get(i);
-        if (!this.matches(s0, s1)) {
+      int breakIndex = firstList0.size();
+      for (int i = 0; i < firstListSize; i++) {
+        String s0 = i < breakIndex ? firstList0.get(i) : firstList1.get(i - breakIndex);
+        String s1 = secondList.get(i);
+        if (!matches(s0, s1)) {
           return false;
         }
       }
