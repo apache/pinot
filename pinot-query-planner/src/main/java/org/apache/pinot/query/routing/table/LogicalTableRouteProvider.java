@@ -27,9 +27,12 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategyFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
@@ -42,6 +45,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   private final String _logicalTableName;
   private final List<PhysicalTable> _offlineTables;
   private final List<PhysicalTable> _realtimeTables;
+  private final TimeBoundaryInfo _timeBoundaryInfo;
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegments = 0;
 
@@ -64,7 +68,18 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-    return new LogicalTableRouteProvider(logicalTable.getTableName(), offlineTables, realtimeTables);
+    TimeBoundaryInfo timeBoundaryInfo = null;
+    // If the logical table has both offline and realtime tables, get time boundary info
+    if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      timeBoundaryInfo = getTimeBoundaryInfo(logicalTable, tableCache, routingManager);
+    }
+
+    if (timeBoundaryInfo == null && !offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      LOGGER.info("No time boundary info found for hybrid table: {}", logicalTable.getTableName());
+      offlineTables.clear();
+    }
+
+    return new LogicalTableRouteProvider(logicalTable.getTableName(), offlineTables, realtimeTables, timeBoundaryInfo);
   }
 
   public static LogicalTableRouteProvider create(String logicalTableName, List<String> physicalTableNames,
@@ -84,15 +99,26 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
         }
       }
     }
-
-    return new LogicalTableRouteProvider(logicalTableName, offlineTables, realtimeTables);
+    return new LogicalTableRouteProvider(logicalTableName, offlineTables, realtimeTables, null);
   }
 
   private LogicalTableRouteProvider(String logicalTableName, List<PhysicalTable> offlineTables,
-      List<PhysicalTable> realtimeTables) {
+      List<PhysicalTable> realtimeTables, TimeBoundaryInfo timeBoundaryInfo) {
     _logicalTableName = logicalTableName;
     _offlineTables = offlineTables;
     _realtimeTables = realtimeTables;
+    _timeBoundaryInfo = timeBoundaryInfo;
+  }
+
+  private static TimeBoundaryInfo getTimeBoundaryInfo(LogicalTable logicalTable, TableCache tableCache,
+      RoutingManager routingManager) {
+    TimeBoundaryInfo timeBoundaryInfo = null;
+    TimeBoundaryConfig timeBoundaryConfig = logicalTable.getTimeBoundaryConfig();
+    TimeBoundaryStrategy timeBoundaryStrategy =
+        TimeBoundaryStrategyFactory.createTimeBoundaryStrategy(timeBoundaryConfig);
+    timeBoundaryInfo =
+        timeBoundaryStrategy.computeTimeBoundary(tableCache, logicalTable.getPhysicalTableNames(), routingManager);
+    return timeBoundaryInfo;
   }
 
   @Nullable
@@ -140,13 +166,13 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   @Nullable
   @Override
   public String getOfflineTableName() {
-    return !_offlineTables.isEmpty() ? _offlineTables.get(0).getTableName() : null;
+    return !_offlineTables.isEmpty() ? TableNameBuilder.OFFLINE.tableNameWithType(_logicalTableName) : null;
   }
 
   @Nullable
   @Override
   public String getRealtimeTableName() {
-    return !_realtimeTables.isEmpty() ? _realtimeTables.get(0).getTableName() : null;
+    return !_realtimeTables.isEmpty() ? TableNameBuilder.REALTIME.tableNameWithType(_logicalTableName) : null;
   }
 
   @Override
@@ -168,7 +194,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   @Nullable
   @Override
   public TimeBoundaryInfo getTimeBoundaryInfo() {
-    return null;
+    return _timeBoundaryInfo;
   }
 
   @Override

@@ -189,7 +189,7 @@ public abstract class QuickStartBase {
     return quickstartTableRequests;
   }
 
-  private static void copyResourceTableToTmpDirectory(String sourcePath, String tableName, File baseDir, File dataDir,
+  static void copyResourceTableToTmpDirectory(String sourcePath, String tableName, File baseDir, File dataDir,
       boolean isStreamTable)
       throws IOException {
     ClassLoader classLoader = Quickstart.class.getClassLoader();
@@ -257,7 +257,7 @@ public abstract class QuickStartBase {
     return quickstartTableRequests;
   }
 
-  private static void copyFilesystemTableToTmpDirectory(String sourcePath, String tableName, File baseDir)
+  static void copyFilesystemTableToTmpDirectory(String sourcePath, String tableName, File baseDir)
       throws IOException {
     File fileDb = new File(sourcePath);
 

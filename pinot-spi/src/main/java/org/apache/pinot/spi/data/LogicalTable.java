@@ -35,6 +35,7 @@ public class LogicalTable implements Serializable {
   private String _tableName;
   private String _brokerTenant;
   private List<String> _physicalTableNames;
+  private TimeBoundaryConfig _timeBoundaryConfig;
 
   public static LogicalTable fromFile(File logicalTableFile)
       throws IOException {
@@ -70,6 +71,14 @@ public class LogicalTable implements Serializable {
     _physicalTableNames = physicalTableNames;
   }
 
+  public TimeBoundaryConfig getTimeBoundaryConfig() {
+    return _timeBoundaryConfig;
+  }
+
+  public void setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
+    _timeBoundaryConfig = timeBoundaryConfig;
+  }
+
   public ObjectNode toJsonObject() {
     ObjectNode node = JsonUtils.newObjectNode().put("tableName", _tableName).put("brokerTenant", _brokerTenant);
     ArrayNode arrayNode = JsonUtils.newArrayNode();
@@ -77,6 +86,9 @@ public class LogicalTable implements Serializable {
       arrayNode.add(physicalTableName);
     }
     node.set("physicalTableNames", arrayNode);
+    if (_timeBoundaryConfig != null) {
+      node.set("timeBoundaryConfig", _timeBoundaryConfig.toJsonNode());
+    }
     return node;
   }
 

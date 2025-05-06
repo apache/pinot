@@ -496,7 +496,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
-      assert timeBoundaryInfo != null;
+      Preconditions.checkArgument(timeBoundaryInfo != null,
+          "Time boundary info should not be null for hybrid table: %s", offlineTableName);
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
@@ -505,6 +506,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
+      attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);

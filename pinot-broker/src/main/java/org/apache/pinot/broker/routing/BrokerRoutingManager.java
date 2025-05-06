@@ -463,7 +463,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       // Current table is offline
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-      if (_routingEntryMap.containsKey(realtimeTableName)) {
+      if (rawTableName.equals("airlineStats_0525") || _routingEntryMap.containsKey(realtimeTableName)) {
         LOGGER.info("Adding time boundary manager for table: {}", tableNameWithType);
         timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
         timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);

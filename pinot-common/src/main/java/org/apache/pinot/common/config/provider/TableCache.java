@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.arrow.util.Preconditions;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.AccessOption;
@@ -195,7 +196,15 @@ public class TableCache implements PinotConfigProvider {
    */
   @Nullable
   public Map<String, String> getColumnNameMap(String rawTableName) {
-    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    SchemaInfo schemaInfo;
+    if (isLogicalTable(rawTableName)) {
+      LogicalTable logicalTable = getLogicalTable(rawTableName);
+      Preconditions.checkArgument(logicalTable != null, "Logical table should not be null");
+      String physicalTableName = logicalTable.getPhysicalTableNames().get(0);
+      schemaInfo = _schemaInfoMap.get(TableNameBuilder.extractRawTableName(physicalTableName));
+    } else {
+      schemaInfo = _schemaInfoMap.get(rawTableName);
+    }
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 

@@ -238,10 +238,5 @@ public class MockRoutingManagerFactory {
     public Set<String> getServingInstances(String tableNameWithType) {
       return _serverInstances.keySet();
     }
-
-    @Override
-    public boolean isTableDisabled(String tableNameWithType) {
-      return _disabledTables.contains(tableNameWithType);
-    }
   }
 }
