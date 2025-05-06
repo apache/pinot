@@ -1353,13 +1353,6 @@ public class TableRebalancer {
         Thread.sleep(externalViewCheckIntervalInMs);
       } while (System.currentTimeMillis() < endTimeMs);
 
-      if (bestEfforts) {
-        tableRebalanceLogger.warn(
-            "ExternalView has not converged within: {}ms, continuing the rebalance (best-efforts)",
-            externalViewStabilizationTimeoutInMs);
-        return idealState;
-      }
-
       if (externalView == null) {
         tableRebalanceLogger.warn("ExternalView is null, will not extend the EV stabilization timeout.");
         throw new TimeoutException(
@@ -1375,6 +1368,13 @@ public class TableRebalancer {
       // likely due to CONSUMING segments committing, where the state of the segment change to ONLINE. Therefore, if
       // the segment had converged, it then becomes un-converged and thus increases the count.
       if (currentRemainingSegments >= previousRemainingSegments) {
+        if (bestEfforts) {
+          tableRebalanceLogger.warn(
+              "ExternalView has not made progress for the last {}ms, stop waiting after spending {}ms waiting ({} "
+                  + "extensions), continuing the rebalance (best-efforts)",
+              externalViewStabilizationTimeoutInMs, System.currentTimeMillis() - startTimeMs, extensionCount);
+          return idealState;
+        }
         throw new TimeoutException(
             String.format(
                 "ExternalView has not made progress for the last %dms, timeout after spending %dms waiting (%d "
