@@ -58,9 +58,10 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
   public ImplicitHybridTableRouteInfo() {
   }
 
-  public ImplicitHybridTableRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
-      Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+  public ImplicitHybridTableRouteInfo(@Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
     _offlineBrokerRequest = offlineBrokerRequest;
     _realtimeBrokerRequest = realtimeBrokerRequest;
     _offlineRoutingTable = offlineRoutingTable;
