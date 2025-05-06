@@ -21,13 +21,16 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,11 +48,13 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private final MailboxService _mailboxService;
   private final StreamObserver<MailboxStatus> _responseObserver;
 
+  private final List<ByteBuffer> _mailboxBuffers;
   private transient ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(MailboxService mailboxService, StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
     _responseObserver = responseObserver;
+    _mailboxBuffers = new ArrayList<>();
   }
 
   @Override
@@ -58,10 +63,15 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     if (_mailbox == null) {
       _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
     }
+    _mailboxBuffers.add(mailboxContent.getPayload().asReadOnlyByteBuffer());
+    if (mailboxContent.getWaitForMore()) {
+      return;
+    }
     try {
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      ByteBuffer buffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
-      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffer, timeoutMs);
+      List<ByteBuffer> buffers = new ArrayList<>(_mailboxBuffers);
+      _mailboxBuffers.clear();
+      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffers, timeoutMs);
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
@@ -113,9 +123,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   public void onError(Throwable t) {
     LOGGER.warn("Error on receiver side", t);
     if (_mailbox != null) {
-      _mailbox.setErrorBlock(
-          ErrorMseBlock.fromException(new RuntimeException("Cancelled by sender", t)),
-          Collections.emptyList());
+      String msg = t != null ? t.getMessage() : "Unknown";
+      _mailbox.setErrorBlock(ErrorMseBlock.fromError(
+          QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg), List.of());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
     }

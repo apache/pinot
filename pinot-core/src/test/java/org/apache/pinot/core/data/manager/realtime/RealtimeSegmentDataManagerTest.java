@@ -50,12 +50,8 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -112,15 +108,6 @@ public class RealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
     when(tableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
-    if (tableConfig.isUpsertEnabled()) {
-      when(tableDataManager.isUpsertEnabled()).thenReturn(true);
-      if (tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
-        when(tableDataManager.isPartialUpsertEnabled()).thenReturn(true);
-      }
-    }
-    if (tableConfig.isDedupEnabled()) {
-      when(tableDataManager.isDedupEnabled()).thenReturn(true);
-    }
     return tableDataManager;
   }
 
@@ -767,6 +754,8 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    when(instanceDataManagerConfig.getUpsertConfig()).thenReturn(new PinotConfiguration());
+    when(instanceDataManagerConfig.getDedupConfig()).thenReturn(new PinotConfiguration());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
     tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
     TableConfig tableConfig = createTableConfig();
@@ -785,8 +774,9 @@ public class RealtimeSegmentDataManagerTest {
       @Override
       public Long get() {
         long now = System.currentTimeMillis();
-        // now() is called once in the run() method, once before each batch reading and once for every row indexation
-        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 4) {
+        // now() is called once in the run() method, then once on setting consumeStartTime, once before each batch
+        // reading and once for every row indexation
+        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 5) {
           return now;
         }
         // Exceed segment time threshold
@@ -810,10 +800,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once more when metrics are updated after each batch is processed and then 4 more times in
-      // run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 8);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once more when metrics are updated after each batch
+      // is processed and then 4 more times in run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 9);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
@@ -845,69 +835,16 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once for metrics updates and then 4 more times in run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once for metrics updates and then 4 more times in
+      // run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 7);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    }
-  }
-
-  @Test
-  public void testParallelSegmentConsumptionPolicy()
-      throws Exception {
-    // no partial upsert or dedup enabled.
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager()) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
-    }
-
-    // enable dedup
-    TableConfig tableConfig = createTableConfig();
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE);
-    dedupConfig.setAllowDedupConsumptionDuringCommit(true);
-    tableConfig.setDedupConfig(dedupConfig);
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
-        null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
-    }
-    dedupConfig.setAllowDedupConsumptionDuringCommit(false);
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
-        null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
-    }
-
-    // enable partial upsert
-    tableConfig = createTableConfig();
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(true);
-    tableConfig.setUpsertConfig(upsertConfig);
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
-        null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
-    }
-    upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(false);
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
-        null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
-    }
-
-    // enable full upsert
-    tableConfig = createTableConfig();
-    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    tableConfig.setUpsertConfig(upsertConfig);
-    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
-        null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
-          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
   }
 

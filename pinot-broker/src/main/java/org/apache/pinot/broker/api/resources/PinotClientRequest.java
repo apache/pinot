@@ -90,6 +90,9 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -102,6 +105,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
+  private static final Marker RESPONSE_EXCEPTION_MARKER = MarkerFactory.getMarker("QUERY_RESPONSE_EXCEPTION");
 
   @Inject
   PinotConfiguration _brokerConf;
@@ -559,6 +563,16 @@ public class PinotClientRequest {
     if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+
+      // do log with the exception flagged with a particular marker for filtering
+      MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
+      StringBuilder sb = new StringBuilder();
+      sb.append("Query processing exceptions:");
+      for (QueryProcessingException exception : exceptions) {
+        sb.append(" ").append(exception.toString());
+      }
+      LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
+      MDC.remove("queryErrorCode");
     }
 
     // returning the Response with OK status and header value.

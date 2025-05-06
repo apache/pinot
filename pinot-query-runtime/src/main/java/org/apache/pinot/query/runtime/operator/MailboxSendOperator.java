@@ -225,7 +225,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     } catch (Exception e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId());
         sendEos(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);

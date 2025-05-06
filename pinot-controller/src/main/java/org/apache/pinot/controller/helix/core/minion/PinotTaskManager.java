@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -811,7 +812,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   protected void processTables(List<String> tableNamesWithType, Properties taskProperties) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setLeader(true)
-        .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name());
+        .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name())
+        .setTablesToSchedule(ImmutableSet.copyOf(tableNamesWithType));
     // cron schedule
     scheduleTasks(context);
   }

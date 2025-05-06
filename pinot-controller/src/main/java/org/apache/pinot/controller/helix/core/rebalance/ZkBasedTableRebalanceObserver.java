@@ -46,6 +46,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
   private final TableRebalanceContext _tableRebalanceContext;
+  // These previous stats are used for rollback scenarios where the IdealState update fails dure to a version
+  // change and the rebalance loop is retried.
+  private TableRebalanceProgressStats.RebalanceProgressStats _previousStepStats;
+  private TableRebalanceProgressStats.RebalanceProgressStats _previousOverallStats;
   private long _lastUpdateTimeMs;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
@@ -64,6 +68,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
+    _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats();
+    _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats();
     _numUpdatesToZk = 0;
     _controllerMetrics = ControllerMetrics.get();
   }
@@ -78,11 +84,16 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     switch (trigger) {
       case START_TRIGGER:
         updateOnStart(currentState, targetState, rebalanceContext);
+        emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         trackStatsInZk();
         updatedStatsInZk = true;
         break;
       // Write to Zk if there's change since previous stats computation
       case IDEAL_STATE_CHANGE_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         latest = getDifferenceBetweenTableRebalanceStates(targetState, currentState);
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.IDEAL_STATE_CHANGE_TRIGGER, _tableRebalanceProgressStats);
@@ -94,12 +105,19 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsOverall().equals(latestProgress)) {
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(latestProgress);
+            emitProgressMetric(latestProgress);
           }
           trackStatsInZk();
           updatedStatsInZk = true;
         }
         break;
       case EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
+        _previousOverallStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         latest = getDifferenceBetweenTableRebalanceStates(targetState, currentState);
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, _tableRebalanceProgressStats);
@@ -113,11 +131,16 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
             _tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(latestProgress);
           }
+          emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
           trackStatsInZk();
           updatedStatsInZk = true;
         }
         break;
       case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+        // Update the previous stats with the current values in case a rollback is needed due to IdealState version
+        // change
+        _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
+            _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
             Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
@@ -179,6 +202,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
     _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(progressStats);
     trackStatsInZk();
+    emitProgressMetricDone();
   }
 
   @Override
@@ -188,6 +212,15 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED);
     _tableRebalanceProgressStats.setCompletionStatusMsg(errorMsg);
+    trackStatsInZk();
+  }
+
+  @Override
+  public void onRollback() {
+    _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(
+        new TableRebalanceProgressStats.RebalanceProgressStats(_previousStepStats));
+    _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(
+        new TableRebalanceProgressStats.RebalanceProgressStats(_previousOverallStats));
     trackStatsInZk();
   }
 
@@ -203,6 +236,39 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   public int getNumUpdatesToZk() {
     return _numUpdatesToZk;
+  }
+
+  /**
+   * Emits the rebalance progress in percent to the metrics, which is calculated as:
+   *          (totalRemainingSegmentsToBeAdded + totalRemainingSegmentsToBeDeleted + totalRemainingSegmentsToConverge
+   *                       + totalCarryOverSegmentsToBeAdded + totalCarryOverSegmentsToBeDeleted)
+   * 100%  -   ------------------------------------------------------------------------------------------------- * 100%
+   *                                (totalSegmentsToBeAdded + totalSegmentsToBeDeleted)
+   * Notice that for some jobs, the metrics may not be exactly accurate and would not be 100% when the job is done.
+   * (e.g. when `lowDiskMode=false`, the job finishes without waiting for `totalRemainingSegmentsToBeDeleted` become
+   * 0, or when `bestEffort=true` the job finishes without waiting for both `totalRemainingSegmentsToBeAdded`,
+   * `totalRemainingSegmentsToBeDeleted`, and `totalRemainingSegmentsToConverge` become 0)
+   * Therefore `emitProgressMetricDone()` should be called to emit the final progress as the time job exits.
+   * @param overallProgress the latest overall progress
+   */
+  private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
+    // Round this up so the metric is 100 only when no segment remains
+    long progressPercent = 100 - (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
+        overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
+        overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
+            + overallProgress._totalRemainingSegmentsToConverge + overallProgress._totalCarryOverSegmentsToBeAdded
+            + overallProgress._totalCarryOverSegmentsToBeDeleted));
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
+        progressPercent < 0 ? 0 : progressPercent);
+  }
+
+  /**
+   * Emits the rebalance progress as 100 (%) to the metrics. This is to ensure that the progress is at least aligned
+   * when the job done to avoid confusion
+   */
+  private void emitProgressMetricDone() {
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
+        100);
   }
 
   @VisibleForTesting
@@ -266,6 +332,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           tableNameWithType, e);
     }
     return jobMetadata;
+  }
+
+  @VisibleForTesting
+  TableRebalanceProgressStats getTableRebalanceProgressStats() {
+    return _tableRebalanceProgressStats;
   }
 
   /**
@@ -552,10 +623,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         startTimeMs = existingProgressStats._startTimeMs;
         progressStats._estimatedTimeToCompleteAddsInSeconds =
             TableRebalanceProgressStats.calculateEstimatedTimeToCompleteChange(startTimeMs,
-                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+                progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
         progressStats._estimatedTimeToCompleteDeletesInSeconds =
             TableRebalanceProgressStats.calculateEstimatedTimeToCompleteChange(startTimeMs,
-                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
+                progressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         progressStats._averageSegmentSizeInBytes = existingProgressStats._averageSegmentSizeInBytes;
         progressStats._totalEstimatedDataToBeMovedInBytes =
             TableRebalanceProgressStats.calculateNewEstimatedDataToBeMovedInBytes(

@@ -19,18 +19,17 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server.Dedup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,20 +39,22 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
 
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
-  protected DedupContext _dedupContext;
-  private boolean _enablePreload;
+  protected DedupContext _context;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
-      ServerMetrics serverMetrics) {
+  public void init(PinotConfiguration instanceDedupConfig, TableConfig tableConfig, Schema schema,
+      TableDataManager tableDataManager) {
     _tableNameWithType = tableConfig.getTableName();
+
+    Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s",
+        _tableNameWithType);
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    assert dedupConfig != null;
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dedup enabled table: %s", _tableNameWithType);
 
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
-    Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
     double metadataTTL = dedupConfig.getMetadataTTL();
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (dedupTimeColumn == null) {
@@ -61,33 +62,46 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     }
     if (metadataTTL > 0) {
       Preconditions.checkArgument(dedupTimeColumn != null,
-          "When metadataTTL is configured, metadata time column or time column must be configured for "
-              + "dedup enabled table: %s", _tableNameWithType);
+          "When metadataTTL is configured, metadata time column or time column must be configured for dedup enabled "
+              + "table: %s", _tableNameWithType);
     }
-    _enablePreload = dedupConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
-    HashFunction hashFunction = dedupConfig.getHashFunction();
-    File tableIndexDir = tableDataManager.getTableDataDir();
-    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
-    dedupContextBuider.setTableConfig(tableConfig).setSchema(schema).setPrimaryKeyColumns(primaryKeyColumns)
-        .setHashFunction(hashFunction).setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL)
-        .setDedupTimeColumn(dedupTimeColumn).setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager);
-    _dedupContext = dedupContextBuider.build();
-    LOGGER.info(
-        "Initialized {} for table: {} with primary key columns: {}, hash function: {}, enable preload: {}, metadata "
-            + "TTL: {}, dedup time column: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
-        primaryKeyColumns, hashFunction, _enablePreload, metadataTTL, dedupTimeColumn, tableIndexDir);
+
+    boolean enablePreload =
+        dedupConfig.getPreload().isEnabled(() -> instanceDedupConfig.getProperty(Dedup.DEFAULT_ENABLE_PRELOAD, false));
+    if (enablePreload) {
+      if (tableDataManager.getSegmentPreloadExecutor() == null) {
+        LOGGER.warn("Preload cannot be enabled without segment preload executor for table: {}", _tableNameWithType);
+        enablePreload = false;
+      }
+    }
+
+    boolean ignoreNonDefaultTiers = dedupConfig.getIgnoreNonDefaultTiers()
+        .isEnabled(() -> instanceDedupConfig.getProperty(Dedup.DEFAULT_IGNORE_NON_DEFAULT_TIERS, false));
+
+    // NOTE: This field doesn't follow enablement override, and always enabled if enabled at instance level.
+    boolean allowDedupConsumptionDuringCommit = dedupConfig.isAllowDedupConsumptionDuringCommit();
+    if (!allowDedupConsumptionDuringCommit) {
+      allowDedupConsumptionDuringCommit =
+          instanceDedupConfig.getProperty(Dedup.DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT, false);
+    }
+
+    _context = new DedupContext.Builder()
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setTableDataManager(tableDataManager)
+        .setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(dedupConfig.getHashFunction())
+        .setMetadataTTL(metadataTTL)
+        .setDedupTimeColumn(dedupTimeColumn)
+        .setEnablePreload(enablePreload)
+        .setIgnoreNonDefaultTiers(ignoreNonDefaultTiers)
+        .setMetadataManagerConfigs(dedupConfig.getMetadataManagerConfigs())
+        .setAllowDedupConsumptionDuringCommit(allowDedupConsumptionDuringCommit)
+        .build();
+    LOGGER.info("Initialized {} for table: {} with: {}", getClass().getSimpleName(), _tableNameWithType, _context);
 
     initCustomVariables();
   }
-
-  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
-  }
-
-  /**
-   * Create PartitionDedupMetadataManager for given partition id.
-   */
-  abstract protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
 
   /**
    * Can be overridden to initialize custom variables after other variables are set
@@ -96,8 +110,24 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   }
 
   @Override
+  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
+  }
+
+  /**
+   * Create PartitionDedupMetadataManager for given partition id.
+   */
+  protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  @Override
+  public DedupContext getContext() {
+    return _context;
+  }
+
+  @Deprecated
+  @Override
   public boolean isEnablePreload() {
-    return _enablePreload;
+    return _context.isPreloadEnabled();
   }
 
   @Override

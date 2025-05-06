@@ -242,7 +242,8 @@ public class RequestContextUtils {
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return FilterContext.forPredicate(
-            new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)),
+                    operands.size() == 3 ? getStringValue(operands.get(2)) : null));
       case VECTOR_SIMILARITY:
         ExpressionContext lhs = getExpression(operands.get(0));
         float[] vectorValue = getVectorValue(operands.get(1));
@@ -404,7 +405,8 @@ public class RequestContextUtils {
       case TEXT_MATCH:
         return FilterContext.forPredicate(new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
       case JSON_MATCH:
-        return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+          return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1)),
+                  operands.size() == 3?getStringValue(operands.get(2)): null));
       case VECTOR_SIMILARITY:
         int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
         if (operands.size() == 3) {

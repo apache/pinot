@@ -176,6 +176,7 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -2205,6 +2206,64 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void addLogicalTable(LogicalTableConfig logicalTableConfig)
+      throws TableAlreadyExistsException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Adding logical table: {}", tableName);
+
+    // Check if the logical table name is already used
+    LogicalTableConfig existingLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (existingLogicalTableConfig != null) {
+      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
+    }
+
+    // Check if the table name is already used by a physical table
+    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
+        .findFirst().ifPresent(tableNameWithType -> {
+          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+        });
+
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+    LOGGER.info("Added logical table: {}", tableName);
+  }
+
+  public void updateLogicalTable(LogicalTableConfig logicalTableConfig)
+      throws TableNotFoundException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Updating logical table: {}", tableName);
+
+    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (oldLogicalTableConfig == null) {
+      throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
+    }
+
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+    LOGGER.info("Updated logical table: {}", tableName);
+  }
+
+  public boolean deleteLogicalTable(String tableName) {
+    LOGGER.info("Deleting logical table: {}", tableName);
+    boolean result = false;
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
+    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
+    }
+    LOGGER.info("Deleted logical table: {}", tableName);
+    return result;
+  }
+
+  public LogicalTableConfig getLogicalTableConfig(String tableName) {
+    return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+  }
+
+  public List<String> getAllLogicalTableNames() {
+    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
+        .collect(Collectors.toList());
+  }
+
   /**
    * Returns the ZK metdata for the given jobId and jobType
    * @param jobId the id of the job
@@ -2546,7 +2605,7 @@ public class PinotHelixResourceManager {
           InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
               InstancePartitionsType.OFFLINE));
     }
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+    if (tableConfig.isUpsertEnabled()) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       return Collections.singletonMap(InstancePartitionsType.CONSUMING,

@@ -64,6 +64,7 @@ public class CommonConstants {
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  @Deprecated
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
   public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
@@ -512,6 +513,7 @@ public class CommonConstants {
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
+        public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -1096,6 +1098,32 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
         "pinot.server.environmentProvider.factory";
     public static final String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
+
+    /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
+    public static class Upsert {
+      public static final String CONFIG_PREFIX = "upsert";
+      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      public static final String DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
+      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+
+      /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+      @Deprecated
+      public static final String DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
+          "default.allow.partial.upsert.consumption.during.commit";
+    }
+
+    /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
+    public static class Dedup {
+      public static final String CONFIG_PREFIX = "dedup";
+      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+      public static final String DEFAULT_IGNORE_NON_DEFAULT_TIERS = "default.ignore.non.default.tiers";
+
+      /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+      @Deprecated
+      public static final String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
+          "default.allow.dedup.consumption.during.commit";
+    }
   }
 
   public static class Controller {
@@ -1482,6 +1510,13 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
     /**
+     * Enable splitting of data block payload during mailbox transfer.
+     */
+    public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
+          "pinot.query.runner.enable.data.block.payload.split";
+    public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
+
+    /**
      * Configuration for server port, port that opens and accepts
      * {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} and start executing query stages.
      */
@@ -1518,7 +1553,6 @@ public class CommonConstants {
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
-
     public enum JoinOverFlowMode {
       THROW, BREAK
     }
@@ -1543,6 +1577,18 @@ public class CommonConstants {
     public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN =
         "pinot.query.multistage.explain.include.segment.plan";
     public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
+
+    /// Max number of rows operators stored in the op stats cache.
+    /// Although the cache stores stages, each entry has a weight equal to the number of operators in the stage.
+    public static final String KEY_OF_OP_STATS_CACHE_SIZE = "pinot.server.query.op.stats.cache.size";
+    public static final int DEFAULT_OF_OP_STATS_CACHE_SIZE = 1000;
+
+    /// Max time to keep the op stats in the cache.
+    public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
+    public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 60 * 1000;
+    /// Timeout of the cancel request, in milliseconds.
+    public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
+    public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
   }
 
   public static class NullValuePlaceHolder {

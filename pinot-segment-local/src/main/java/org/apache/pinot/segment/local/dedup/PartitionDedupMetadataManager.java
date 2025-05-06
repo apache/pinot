@@ -26,6 +26,9 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 public interface PartitionDedupMetadataManager extends Closeable {
+
+  DedupContext getContext();
+
   /**
    * Initializes the dedup metadata for the given immutable segment.
    */

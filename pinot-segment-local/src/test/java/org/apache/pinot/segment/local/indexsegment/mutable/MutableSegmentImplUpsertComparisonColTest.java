@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -38,6 +37,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -87,13 +87,10 @@ public class MutableSegmentImplUpsertComparisonColTest implements PinotBuffersAf
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     TableUpsertMetadataManager tableUpsertMetadataManager =
-        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
-    tableUpsertMetadataManager.init(_tableConfig, _schema, _tableDataManager);
+        TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), _tableConfig, _schema, _tableDataManager);
     _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);
-    _mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false, true, upsertConfig, "secondsSinceEpoch", _partitionUpsertMetadataManager,
-            null, null);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, true, "secondsSinceEpoch",
+        _partitionUpsertMetadataManager, null);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
         _schema.getColumnNames(), null)) {

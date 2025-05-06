@@ -26,13 +26,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -155,8 +155,7 @@ public class MockInstanceDataManagerFactory {
     when(tableDataManager.getTableName()).thenReturn(tableNameWithType);
     TableConfig tableConfig = createTableConfig(tableNameWithType);
     Schema schema = _schemaMap.get(TableNameBuilder.extractRawTableName(tableNameWithType));
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    when(tableDataManager.getIndexLoadingConfig()).thenReturn(indexLoadingConfig);
+    when(tableDataManager.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, schema));
 
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));

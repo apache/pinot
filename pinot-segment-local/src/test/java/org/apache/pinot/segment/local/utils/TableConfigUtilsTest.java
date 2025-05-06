@@ -37,7 +37,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -71,6 +70,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -1695,7 +1695,8 @@ public class TableConfigUtilsTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig())
+        .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1704,7 +1705,8 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig())
+        .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1717,7 +1719,9 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     Map<String, String> streamConfigs = getStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setStreamConfigs(streamConfigs).build();
+        .setDedupConfig(new DedupConfig())
+        .setStreamConfigs(streamConfigs)
+        .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1729,14 +1733,16 @@ public class TableConfigUtilsTest {
         Collections.singletonList(
             new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), null, 10);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setRoutingConfig(
+        .setDedupConfig(new DedupConfig())
+        .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     // Dedup and upsert can't be enabled simultaneously
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setRoutingConfig(
+        .setDedupConfig(new DedupConfig())
+        .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(streamConfigs).build();
     try {
@@ -2065,7 +2071,7 @@ public class TableConfigUtilsTest {
     // test enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
-    upsertConfig.setEnablePreload(true);
+    upsertConfig.setPreload(Enablement.ENABLE);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
@@ -2074,7 +2080,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+          "enableDeletedKeysCompactionConsistency and preload shouldn't exist together for upsert table");
     }
 
     // test enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
@@ -2096,7 +2102,7 @@ public class TableConfigUtilsTest {
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
-    upsertConfig.setEnableSnapshot(false);
+    upsertConfig.setSnapshot(Enablement.DISABLE);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
@@ -2105,14 +2111,14 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with snapshot for upsert table");
     }
 
     // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMerge task
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
@@ -2390,7 +2396,7 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     TableConfig tableConfigWithoutComparisonColumn =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
             .setUpsertConfig(upsertConfig).build();
@@ -2399,7 +2405,7 @@ public class TableConfigUtilsTest {
     // Invalid comparison columns: "myCol"
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumns(Collections.singletonList("myCol"));
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     upsertConfig.setMetadataTTL(3600);
     TableConfig tableConfigWithInvalidComparisonColumn =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
@@ -2414,7 +2420,7 @@ public class TableConfigUtilsTest {
     // Invalid comparison columns: multiple comparison columns are not supported for TTL-enabled upsert table.
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     upsertConfig.setMetadataTTL(3600);
     TableConfig tableConfigWithInvalidComparisonColumn2 =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
@@ -2433,7 +2439,7 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
-    upsertConfig.setEnableSnapshot(false);
+    upsertConfig.setSnapshot(Enablement.DISABLE);
     TableConfig tableConfigWithInvalidTTLConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
             .setUpsertConfig(upsertConfig).build();

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -34,7 +33,6 @@ import static org.testng.Assert.assertTrue;
 /**
  * Queries test for FUNNEL_COUNT queries.
  */
-@SuppressWarnings("rawtypes")
 public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
 
   @Override
@@ -60,9 +58,7 @@ public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false);
+    MutableSegment mutableSegment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }

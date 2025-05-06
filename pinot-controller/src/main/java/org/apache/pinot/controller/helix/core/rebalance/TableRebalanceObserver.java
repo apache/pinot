@@ -49,6 +49,8 @@ public interface TableRebalanceObserver {
 
   void onError(String errorMsg);
 
+  void onRollback();
+
   boolean isStopped();
 
   RebalanceResult.Status getStopStatus();

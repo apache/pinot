@@ -40,11 +40,11 @@ public class UpsertConfigTest {
     assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
 
     UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
-    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
-    partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
-    upsertConfig2.setPartialUpsertStrategies(partialUpsertStratgies);
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
+    partialUpsertStrategies.put("myCol", UpsertConfig.Strategy.INCREMENT);
+    upsertConfig2.setPartialUpsertStrategies(partialUpsertStrategies);
     upsertConfig2.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
-    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
+    assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStrategies);
   }
 
   @Test

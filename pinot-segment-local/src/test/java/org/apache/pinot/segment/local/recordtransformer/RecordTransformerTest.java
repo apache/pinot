@@ -543,7 +543,7 @@ public class RecordTransformerTest {
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
     ingestionConfig.setSchemaConformingTransformerConfig(
         new SchemaConformingTransformerConfig(null, "indexableExtras", false, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null));
+            null, null, null, null, null, null, null, null, null, null, null, null, null));
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setContinueOnError(false);
 

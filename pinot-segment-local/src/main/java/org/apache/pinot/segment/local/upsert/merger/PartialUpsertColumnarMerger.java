@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.columnar.ForceOverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.OverwriteMerger;
@@ -46,9 +46,10 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
     _defaultColumnValueMerger =
         PartialUpsertColumnMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
-    Preconditions.checkArgument(partialUpsertStrategies != null, "Partial upsert strategies must be configured");
-    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
-      _column2Mergers.put(entry.getKey(), PartialUpsertColumnMergerFactory.getMerger(entry.getValue()));
+    if (MapUtils.isNotEmpty(partialUpsertStrategies)) {
+      for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+        _column2Mergers.put(entry.getKey(), PartialUpsertColumnMergerFactory.getMerger(entry.getValue()));
+      }
     }
   }
 

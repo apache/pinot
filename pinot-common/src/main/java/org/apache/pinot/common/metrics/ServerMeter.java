@@ -133,6 +133,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
 
+  GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
+
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
 
   // Multi-stage

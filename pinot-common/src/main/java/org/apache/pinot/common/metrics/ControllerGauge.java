@@ -181,6 +181,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
 
+  TABLE_REBALANCE_IN_PROGRESS_GLOBAL("jobs", true),
+
   // Number of reingested segments getting uploaded
   REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
 
@@ -205,7 +207,20 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
 
   // ZK JUTE max buffer size in bytes
-  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  // Bytes to be read from deep store
+  DEEP_STORE_READ_BYTES_IN_PROGRESS("deepStoreReadBytesInProgress", true),
+  // Count of deep store segment downloads that are currently in progress
+  DEEP_STORE_READ_OPS_IN_PROGRESS("deepStoreReadOpsInProgress", true),
+  // Bytes to be written to deep store
+  DEEP_STORE_WRITE_BYTES_IN_PROGRESS("deepStoreWriteBytesInProgress", true),
+  // Count of deep store segment writes that are currently in progress
+  DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true),
+
+  // The progress of a certain table rebalance job of a table
+  TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false);
+
 
   private final String _gaugeName;
   private final String _unit;

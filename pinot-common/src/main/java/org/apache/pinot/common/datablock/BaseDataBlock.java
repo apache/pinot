@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -402,7 +403,14 @@ public abstract class BaseDataBlock implements DataBlock {
     if (_serialized == null) {
       _serialized = DataBlockUtils.serialize(this);
     }
-    return _serialized;
+    // Return a copy of the serialized data to avoid external modification.
+    List<ByteBuffer> copy = new ArrayList<>(_serialized.size());
+    for (ByteBuffer page: _serialized) {
+      ByteBuffer pageCopy = page.duplicate();
+      pageCopy.order(page.order());
+      copy.add(pageCopy);
+    }
+    return copy;
   }
 
   @Override

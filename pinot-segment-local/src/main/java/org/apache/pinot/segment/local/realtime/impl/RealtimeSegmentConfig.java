@@ -35,10 +35,8 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -56,23 +54,20 @@ public class RealtimeSegmentConfig {
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
+  @Nullable
   private final String _partitionColumn;
+  @Nullable
   private final PartitionFunction _partitionFunction;
   private final int _partitionId;
   private final boolean _aggregateMetrics;
+  @Nullable
+  private final List<AggregationConfig> _ingestionAggregationConfigs;
   private final boolean _nullHandlingEnabled;
-  private final UpsertConfig.Mode _upsertMode;
-  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
-  private final List<String> _upsertComparisonColumns;
-  private final String _upsertDeleteRecordColumn;
-  private final String _upsertOutOfOrderRecordColumn;
-  private final boolean _upsertDropOutOfOrderRecord;
+  @Nullable
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-  private final String _dedupTimeColumn;
+  @Nullable
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
-  private final List<FieldConfig> _fieldConfigList;
-  private final List<AggregationConfig> _ingestionAggregationConfigs;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -83,13 +78,11 @@ public class RealtimeSegmentConfig {
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Map<String, FieldIndexConfigs> indexConfigByCol,
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
-      RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
-      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, UpsertConfig.ConsistencyMode upsertConsistencyMode,
-      List<String> upsertComparisonColumns, String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn,
-      boolean upsertDropOutOfOrderRecord, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      String dedupTimeColumn, PartitionDedupMetadataManager partitionDedupMetadataManager,
-      List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs) {
+      RealtimeSegmentStatsHistory statsHistory, @Nullable String partitionColumn,
+      @Nullable PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics,
+      @Nullable List<AggregationConfig> ingestionAggregationConfigs, boolean nullHandlingEnabled,
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, String consumerDir) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -106,19 +99,11 @@ public class RealtimeSegmentConfig {
     _partitionFunction = partitionFunction;
     _partitionId = partitionId;
     _aggregateMetrics = aggregateMetrics;
-    _nullHandlingEnabled = nullHandlingEnabled;
-    _consumerDir = consumerDir;
-    _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
-    _upsertConsistencyMode = upsertConsistencyMode != null ? upsertConsistencyMode : UpsertConfig.ConsistencyMode.NONE;
-    _upsertComparisonColumns = upsertComparisonColumns;
-    _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
-    _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
-    _upsertDropOutOfOrderRecord = upsertDropOutOfOrderRecord;
-    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
-    _dedupTimeColumn = dedupTimeColumn;
-    _partitionDedupMetadataManager = partitionDedupMetadataManager;
-    _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
+    _nullHandlingEnabled = nullHandlingEnabled;
+    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _partitionDedupMetadataManager = partitionDedupMetadataManager;
+    _consumerDir = consumerDir;
   }
 
   public String getTableNameWithType() {
@@ -169,10 +154,12 @@ public class RealtimeSegmentConfig {
     return _statsHistory;
   }
 
+  @Nullable
   public String getPartitionColumn() {
     return _partitionColumn;
   }
 
+  @Nullable
   public PartitionFunction getPartitionFunction() {
     return _partitionFunction;
   }
@@ -185,60 +172,27 @@ public class RealtimeSegmentConfig {
     return _aggregateMetrics;
   }
 
+  @Nullable
+  public List<AggregationConfig> getIngestionAggregationConfigs() {
+    return _ingestionAggregationConfigs;
+  }
+
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
 
-  public String getConsumerDir() {
-    return _consumerDir;
-  }
-
-  public UpsertConfig.Mode getUpsertMode() {
-    return _upsertMode;
-  }
-
-  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
-    return _upsertConsistencyMode;
-  }
-
-  public boolean isDedupEnabled() {
-    return _partitionDedupMetadataManager != null;
-  }
-
-  public List<String> getUpsertComparisonColumns() {
-    return _upsertComparisonColumns;
-  }
-
-  public String getUpsertDeleteRecordColumn() {
-    return _upsertDeleteRecordColumn;
-  }
-
-  public String getUpsertOutOfOrderRecordColumn() {
-    return _upsertOutOfOrderRecordColumn;
-  }
-
-  public boolean isUpsertDropOutOfOrderRecord() {
-    return _upsertDropOutOfOrderRecord;
-  }
-
+  @Nullable
   public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
     return _partitionUpsertMetadataManager;
   }
 
-  public String getDedupTimeColumn() {
-    return _dedupTimeColumn;
-  }
-
+  @Nullable
   public PartitionDedupMetadataManager getPartitionDedupMetadataManager() {
     return _partitionDedupMetadataManager;
   }
 
-  public List<FieldConfig> getFieldConfigList() {
-    return _fieldConfigList;
-  }
-
-  public List<AggregationConfig> getIngestionAggregationConfigs() {
-    return _ingestionAggregationConfigs;
+  public String getConsumerDir() {
+    return _consumerDir;
   }
 
   public static class Builder {
@@ -257,24 +211,16 @@ public class RealtimeSegmentConfig {
     private String _partitionColumn;
     private PartitionFunction _partitionFunction;
     private int _partitionId;
-    private boolean _aggregateMetrics = false;
+    private boolean _aggregateMetrics;
+    private List<AggregationConfig> _ingestionAggregationConfigs;
     /**
      * Whether null handling is enabled by default. This value is only used if
      * {@link Schema#isEnableColumnBasedNullHandling()} is false.
      */
-    private boolean _defaultNullHandlingEnabled = false;
-    private String _consumerDir;
-    private UpsertConfig.Mode _upsertMode;
-    private UpsertConfig.ConsistencyMode _upsertConsistencyMode;
-    private List<String> _upsertComparisonColumns;
-    private String _upsertDeleteRecordColumn;
-    private String _upsertOutOfOrderRecordColumn;
-    private boolean _upsertDropOutOfOrderRecord;
+    private boolean _defaultNullHandlingEnabled;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-    private String _dedupTimeColumn;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
-    private List<FieldConfig> _fieldConfigList;
-    private List<AggregationConfig> _ingestionAggregationConfigs;
+    private String _consumerDir;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -397,6 +343,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setIngestionAggregationConfigs(List<AggregationConfig> ingestionAggregationConfigs) {
+      _ingestionAggregationConfigs = ingestionAggregationConfigs;
+      return this;
+    }
+
     /**
      * Whether null handling is enabled by default. This value is only used if
      * {@link Schema#isEnableColumnBasedNullHandling()} is false.
@@ -415,48 +366,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setConsumerDir(String consumerDir) {
-      _consumerDir = consumerDir;
-      return this;
-    }
-
-    public Builder setUpsertMode(UpsertConfig.Mode upsertMode) {
-      _upsertMode = upsertMode;
-      return this;
-    }
-
-    public Builder setUpsertConsistencyMode(UpsertConfig.ConsistencyMode upsertConsistencyMode) {
-      _upsertConsistencyMode = upsertConsistencyMode;
-      return this;
-    }
-
-    public Builder setUpsertComparisonColumns(List<String> upsertComparisonColumns) {
-      _upsertComparisonColumns = upsertComparisonColumns;
-      return this;
-    }
-
-    public Builder setUpsertDeleteRecordColumn(String upsertDeleteRecordColumn) {
-      _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
-      return this;
-    }
-
-    public Builder setUpsertOutOfOrderRecordColumn(String upsertOutOfOrderRecordColumn) {
-      _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
-      return this;
-    }
-
-    public Builder setUpsertDropOutOfOrderRecord(boolean upsertDropOutOfOrderRecord) {
-      _upsertDropOutOfOrderRecord = upsertDropOutOfOrderRecord;
-      return this;
-    }
-
     public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
       _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
-      return this;
-    }
-
-    public Builder setDedupTimeColumn(String dedupTimeColumn) {
-      _dedupTimeColumn = dedupTimeColumn;
       return this;
     }
 
@@ -465,13 +376,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setFieldConfigList(List<FieldConfig> fieldConfigList) {
-      _fieldConfigList = fieldConfigList;
-      return this;
-    }
-
-    public Builder setIngestionAggregationConfigs(List<AggregationConfig> ingestionAggregationConfigs) {
-      _ingestionAggregationConfigs = ingestionAggregationConfigs;
+    public Builder setConsumerDir(String consumerDir) {
+      _consumerDir = consumerDir;
       return this;
     }
 
@@ -484,10 +390,8 @@ public class RealtimeSegmentConfig {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _defaultNullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
-          _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
-          _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
-          _ingestionAggregationConfigs);
+          _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
+          _partitionDedupMetadataManager, _consumerDir);
     }
   }
 }

@@ -87,4 +87,13 @@ public class PhysicalSort extends Sort implements PRelNode {
     return new PhysicalSort(getCluster(), getTraitSet(), getHints(), getCollation(), offset, fetch, newInputs.get(0),
         newNodeId, newDistribution, _leafStage);
   }
+
+  @Override
+  public PRelNode asLeafStage() {
+    if (isLeafStage()) {
+      return this;
+    }
+    return new PhysicalSort(getCluster(), getTraitSet(), getHints(), getCollation(), offset, fetch, _pRelInputs.get(0),
+        _nodeId, _pinotDataDistribution, true);
+  }
 }
