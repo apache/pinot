@@ -62,19 +62,6 @@ public class TableConfigDecoratorRegistry {
     if (tableConfig == null) {
       return null;
     }
-
-    TableConfigDecorator decorator = DECORATOR_INSTANCE.get();
-    if (decorator == null) {
-      LOGGER.debug("No decorator registered, returning original TableConfig");
-      return tableConfig;
-    }
-
-    try {
-      return decorator.decorate(tableConfig);
-    } catch (Exception e) {
-      LOGGER.error("Failed to apply decorator to table config for table: {}",
-          tableConfig.getTableName(), e);
-      return tableConfig;
-    }
+    return DECORATOR_INSTANCE.get().decorate(tableConfig);
   }
 }
