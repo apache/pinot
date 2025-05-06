@@ -33,11 +33,15 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -87,6 +91,18 @@ public class PinotLogicalQueryPlanner {
 //      }
 //    }
 //    return subPlanMap.get(0);
+  }
+
+  public static Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> makePlanV2(RelRoot relRoot,
+      PhysicalPlannerContext physicalPlannerContext) {
+    PRelNode pRelNode = (PRelNode) relRoot.rel;
+    PlanFragmentAndMailboxAssignment planFragmentAndMailboxAssignment = new PlanFragmentAndMailboxAssignment();
+    PlanFragmentAndMailboxAssignment.Result result =
+        planFragmentAndMailboxAssignment.compute(pRelNode, physicalPlannerContext);
+    PlanFragment rootFragment = result._planFragmentMap.get(0);
+    SubPlan subPlan = new SubPlan(rootFragment,
+        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
+    return Pair.of(subPlan, result);
   }
 
   private static PlanFragment planNodeToPlanFragment(
