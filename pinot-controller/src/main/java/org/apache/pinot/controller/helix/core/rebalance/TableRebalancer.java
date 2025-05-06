@@ -1308,7 +1308,7 @@ public class TableRebalancer {
     IdealState idealState;
     ExternalView externalView;
     int previousRemainingSegments = -1;
-    tableRebalanceLogger.info("Starting EV-IS convergence check loop, {} segments to monitor in current step",
+    tableRebalanceLogger.info("Starting EV-IS convergence check loop, {} unique segments to monitor in current step",
         segmentsToMonitor.size());
     while (true) {
       do {
@@ -1342,10 +1342,10 @@ public class TableRebalancer {
           }
           if (previousRemainingSegments < 0) {
             // initialize previousRemainingSegments
-            previousRemainingSegments = getNumRemainingSegmentsToProcess(tableNameWithType,
+            previousRemainingSegments = getNumRemainingSegmentReplicasToProcess(tableNameWithType,
                 externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), lowDiskMode,
                 bestEfforts, segmentsToMonitor, tableRebalanceLogger, false);
-            tableRebalanceLogger.info("Remaining {} segments to be processed.", previousRemainingSegments);
+            tableRebalanceLogger.info("Remaining {} segment replicas to be processed.", previousRemainingSegments);
           }
         }
         tableRebalanceLogger.debug("ExternalView has not converged to IdealStates. Retry after: {}ms",
@@ -1360,7 +1360,7 @@ public class TableRebalancer {
                 externalViewStabilizationTimeoutInMs));
       }
 
-      int currentRemainingSegments = getNumRemainingSegmentsToProcess(tableNameWithType,
+      int currentRemainingSegments = getNumRemainingSegmentReplicasToProcess(tableNameWithType,
           externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts,
           segmentsToMonitor, tableRebalanceLogger, false);
 
@@ -1383,8 +1383,9 @@ public class TableRebalancer {
       }
 
       tableRebalanceLogger.info(
-          "Extending EV stabilization timeout for another {}ms, remaining {} segments to be processed. (Extension "
-              + "count: {})", externalViewStabilizationTimeoutInMs, currentRemainingSegments, ++extensionCount);
+          "Extending EV stabilization timeout for another {}ms, remaining {} segment replicas to be processed. "
+              + "(Extension count: {})",
+          externalViewStabilizationTimeoutInMs, currentRemainingSegments, ++extensionCount);
       previousRemainingSegments = currentRemainingSegments;
       endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
     }
@@ -1395,40 +1396,42 @@ public class TableRebalancer {
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor) {
-    return getNumRemainingSegmentsToProcess(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates,
-        lowDiskMode, bestEfforts, segmentsToMonitor, LOGGER, true) == 0;
+    return
+        getNumRemainingSegmentReplicasToProcess(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates,
+            lowDiskMode, bestEfforts, segmentsToMonitor, LOGGER, true) == 0;
   }
 
   /**
-   * Check if the external view has converged to the ideal state. See `getNumRemainingSegmentsToProcess` for details on
-   * how the convergence is determined.
+   * Check if the external view has converged to the ideal state. See `getNumRemainingSegmentReplicasToProcess` for
+   * details on how the convergence is determined.
    */
   private static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor, Logger tableRebalanceLogger) {
-    return getNumRemainingSegmentsToProcess(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates,
-        lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger, true) == 0;
+    return
+        getNumRemainingSegmentReplicasToProcess(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates,
+            lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger, true) == 0;
   }
 
   @VisibleForTesting
-  static int getNumRemainingSegmentsToProcess(String tableNameWithType,
+  static int getNumRemainingSegmentReplicasToProcess(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor) {
-    return getNumRemainingSegmentsToProcess(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates,
-        lowDiskMode, bestEfforts, segmentsToMonitor, LOGGER, false);
+    return getNumRemainingSegmentReplicasToProcess(tableNameWithType, externalViewSegmentStates,
+        idealStateSegmentStates, lowDiskMode, bestEfforts, segmentsToMonitor, LOGGER, false);
   }
 
   /**
-   * If `earlyReturn=false`, it returns the number of segments that are not in the expected state.
-   * If `earlyReturn=true` it returns 1 if the number of said segments are more than 0, returns 0 otherwise, which is
-   * used to check whether the ExternalView has converged to the IdealState.
+   * If `earlyReturn=false`, it returns the number of segment replicas that are not in the expected state.
+   * If `earlyReturn=true` it returns 1 if the number of said segment replicas are more than 0, returns 0 otherwise,
+   * which is used to check whether the ExternalView has converged to the IdealState.
    * The method checks the following:
    * Only the segments in the IdealState and being monitored. Extra segments in ExternalView are ignored
    * because they are not managed by the rebalancer.
    * For each segment, go through instances in the instance map from IdealState and compare it with the one in
-   * ExternalView, and increment the number of remaining segments to process if:
+   * ExternalView, and increment the number of remaining segment replicas to process if:
    * <ul>
    * <li> The instance appears in IS instance map, but there is no instance map in EV, unless the IS instance state is
    *   OFFLINE
@@ -1436,17 +1439,17 @@ public class TableRebalancer {
    * <li> The instance has different states between IS and EV instance map, unless the IS instance state is OFFLINE
    * </ul>
    * If `lowDiskMode=true`, go through the instance map from ExternalView and compare it with the one in IdealState,
-   * and also increment the number of remaining segments to process if:
+   * and also increment the number of remaining segment replicas to process if:
    * - The instance appears in EV instance map does not appear in the IS instance map
    * Once there's an ERROR state for any instance in ExternalView, throw an exception to abort the rebalance because
    * we are not able to get out of the ERROR state, unless `bestEfforts=true`, in which case, log a warning and keep
    * going as if that instance has converged.
    */
-  private static int getNumRemainingSegmentsToProcess(String tableNameWithType,
+  private static int getNumRemainingSegmentReplicasToProcess(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor, Logger tableRebalanceLogger, boolean earlyReturn) {
-    int remainingSegmentsToProcess = 0;
+    int remainingSegmentReplicasToProcess = 0;
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
       if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
@@ -1464,9 +1467,9 @@ public class TableRebalancer {
 
         // If the segment has not shown up in ExternalView, it is not added yet
         if (externalViewInstanceStateMap == null) {
-          remainingSegmentsToProcess++;
+          remainingSegmentReplicasToProcess++;
           if (earlyReturn) {
-            return remainingSegmentsToProcess;
+            return remainingSegmentReplicasToProcess;
           }
           continue;
         }
@@ -1479,9 +1482,9 @@ public class TableRebalancer {
             handleErrorInstance(tableNameWithType, segmentName, instanceName, bestEfforts, tableRebalanceLogger);
           } else {
             // The segment has been added, but not yet converged to the expected state
-            remainingSegmentsToProcess++;
+            remainingSegmentReplicasToProcess++;
             if (earlyReturn) {
-              return remainingSegmentsToProcess;
+              return remainingSegmentReplicasToProcess;
             }
           }
         }
@@ -1498,15 +1501,15 @@ public class TableRebalancer {
             handleErrorInstance(tableNameWithType, segmentName, instanceName, bestEfforts, tableRebalanceLogger);
           } else {
             // The segment should be deleted but still exists in ExternalView
-            remainingSegmentsToProcess++;
+            remainingSegmentReplicasToProcess++;
             if (earlyReturn) {
-              return remainingSegmentsToProcess;
+              return remainingSegmentReplicasToProcess;
             }
           }
         }
       }
     }
-    return remainingSegmentsToProcess;
+    return remainingSegmentReplicasToProcess;
   }
 
   private static void handleErrorInstance(String tableNameWithType, String segmentName, String instanceName,
