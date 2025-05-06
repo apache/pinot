@@ -1308,7 +1308,7 @@ public class TableRebalancer {
     IdealState idealState;
     ExternalView externalView;
     int previousRemainingSegments = -1;
-    tableRebalanceLogger.info("Waiting for ExternalView to converge, {} segments to monitor in current step",
+    tableRebalanceLogger.info("Starting EV-IS convergence check loop, {} segments to monitor in current step",
         segmentsToMonitor.size());
     while (true) {
       do {
@@ -1366,6 +1366,7 @@ public class TableRebalancer {
             String.format("ExternalView is null, cannot wait for it to converge within %dms",
                 externalViewStabilizationTimeoutInMs));
       }
+
       int currentRemainingSegments = getNumRemainingSegmentsToProcess(tableNameWithType,
           externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts,
           segmentsToMonitor, tableRebalanceLogger, false);
@@ -1380,12 +1381,12 @@ public class TableRebalancer {
                     + "extensions)", externalViewStabilizationTimeoutInMs, System.currentTimeMillis() - startTimeMs,
                 extensionCount));
       }
+
       tableRebalanceLogger.info(
-          "Extending EV stabilization timeout for another {}ms, remaining {} segments to be processed.",
-          externalViewStabilizationTimeoutInMs, currentRemainingSegments);
+          "Extending EV stabilization timeout for another {}ms, remaining {} segments to be processed. (Extension "
+              + "count: {})", externalViewStabilizationTimeoutInMs, currentRemainingSegments, ++extensionCount);
       previousRemainingSegments = currentRemainingSegments;
       endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
-      extensionCount++;
     }
   }
 
@@ -1420,10 +1421,10 @@ public class TableRebalancer {
   }
 
   /**
-   * Count the number of segments that are not in the expected state. If `earlyReturn=true` it returns as soon as the
-   * count becomes non-zero (effectively return 1). This is used to check whether the ExternalView has converged to
-   * the IdealState. The
-   * method checks the following:
+   * If `earlyReturn=false`, it returns the number of segments that are not in the expected state.
+   * If `earlyReturn=true` it returns 1 if the number of said segments are more than 0, returns 0 otherwise, which is
+   * used to check whether the ExternalView has converged to the IdealState.
+   * The method checks the following:
    * Only the segments in the IdealState and being monitored. Extra segments in ExternalView are ignored
    * because they are not managed by the rebalancer.
    * For each segment, go through instances in the instance map from IdealState and compare it with the one in
