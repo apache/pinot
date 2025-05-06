@@ -38,25 +38,26 @@ import org.apache.maven.project.MavenProject;
  */
 @Named("pinotCustomDependencyVersionRule")
 public class PinotCustomDependencyVersionRule implements EnforcerRule {
-
-  /**
-   * If true, skip this rule in the root project (where versions belong).
-   */
-  private boolean _skipRoot = true;
-
   /**
    * Comma-separated list of artifactIds to skip (e.g. "pinot-plugins,pinot-connectors").
    */
-  private String _skipModules;
   private List<String> _skipModuleList;
 
-//  public void setSkipRoot(boolean skipRoot) {
-//    _skipRoot = skipRoot;
-//  }
+  public PinotCustomDependencyVersionRule() { }
+
+  public PinotCustomDependencyVersionRule(String skipModules) {
+    setSkipModules(skipModules);
+  }
 
   public void setSkipModules(String skipModules) {
-    _skipModules = skipModules;
-    _skipModuleList = parseSkipModules(skipModules);
+    if (skipModules == null || skipModules.isBlank()) {
+      _skipModuleList = new ArrayList<>();
+    } else {
+      _skipModuleList = Arrays.stream(skipModules.split(","))
+          .map(String::trim)
+          .filter(s -> !s.isEmpty())
+          .collect(Collectors.toList());
+    }
   }
 
   @Override
@@ -92,7 +93,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     }
 
     // Skip configured modules
-    if (_skipModules != null && !_skipModules.trim().isEmpty()) {
+    if (_skipModuleList != null && !_skipModuleList.isEmpty()) {
       Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
       Path modulePath = project.getBasedir().toPath().toAbsolutePath().normalize();
       String pathString = modulePath.toString();
@@ -119,7 +120,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
   @Override
   public String getCacheId() {
     // Include skipRoot and skipModules in cache key
-    return String.format("skipRoot=%s;skipModules=%s", _skipRoot, _skipModules);
+    return String.format("skipModuleList=%s", _skipModuleList);
   }
   @Override
   public boolean isCacheable() {
@@ -129,15 +130,5 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
   @Override
   public boolean isResultValid(EnforcerRule arg0) {
     return false;
-  }
-
-  private List<String> parseSkipModules(String skips) {
-    if (skips == null || skips.isBlank()) {
-      return new ArrayList<>();
-    }
-    return Arrays.stream(_skipModules.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .collect(Collectors.toList());
   }
 }

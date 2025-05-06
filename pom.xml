@@ -2323,7 +2323,7 @@
                   </bannedDependencies>
                   <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                     <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
-                      pinot-tools,contrib</skipModules>
+                      pinot-tools,contrib,pinot-dependency-verifier</skipModules>
                   </pinotCustomDependencyVersionRule>
                 </rules>
                 <fail>true</fail>

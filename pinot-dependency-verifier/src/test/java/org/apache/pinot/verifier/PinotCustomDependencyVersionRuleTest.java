@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.verifier;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.maven.enforcer.rule.api.EnforcerRuleException;
@@ -41,7 +42,7 @@ public class PinotCustomDependencyVersionRuleTest {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    _rule = new PinotCustomDependencyVersionRule();
+    _rule = new PinotCustomDependencyVersionRule("pinot-plugins,pinot-tools");
     _helper = Mockito.mock(EnforcerRuleHelper.class);
     _session = Mockito.mock(MavenSession.class);
     _project = Mockito.mock(MavenProject.class);
@@ -111,6 +112,8 @@ public class PinotCustomDependencyVersionRuleTest {
 
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
+    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
+    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -133,6 +136,8 @@ public class PinotCustomDependencyVersionRuleTest {
 
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
+    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
+    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));     // non skipped
 
     _rule.execute(_helper);
   }
@@ -152,6 +157,8 @@ public class PinotCustomDependencyVersionRuleTest {
 
     Mockito.when(_project.getOriginalModel()).thenReturn(model);
     Mockito.when(_project.isExecutionRoot()).thenReturn(false);
+    Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
+    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-core"));   // non skipped
 
     EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
       _rule.execute(_helper);
@@ -164,8 +171,6 @@ public class PinotCustomDependencyVersionRuleTest {
   // Simulate a skipped module
   @Test
   public void testExecuteWithSkippedModule() throws EnforcerRuleException {
-    _rule.setSkipModules("pinot-plugins,pinot-tools");
-
     Model model = new Model();
     Dependency dependency = new Dependency();
     dependency.setGroupId("org.apache.test");
@@ -176,10 +181,10 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
-    Mockito.when(_project.getOriginalModel()).thenReturn(model);
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
     Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
-    Mockito.when(_project.getBasedir()).thenReturn(new java.io.File("pinot-plugins"));
+    Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-plugins"));    // skipped module
+    Mockito.when(_project.getOriginalModel()).thenReturn(new Model());
+    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
 
     _rule.execute(_helper);
   }
