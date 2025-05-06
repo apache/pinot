@@ -218,7 +218,7 @@ public class PinotLogicalTableResource {
         logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
-      LogicalTableUtils.validateLogicalTableName(
+      LogicalTableUtils.validateLogicalTableConfig(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
@@ -242,7 +242,7 @@ public class PinotLogicalTableResource {
         logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
-      LogicalTableUtils.validateLogicalTableName(
+      LogicalTableUtils.validateLogicalTableConfig(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()

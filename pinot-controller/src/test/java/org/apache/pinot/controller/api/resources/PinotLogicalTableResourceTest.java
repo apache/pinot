@@ -23,6 +23,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
@@ -197,6 +200,88 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       assertTrue(e.getMessage().contains("Reason: 'InvalidTenant' should be one of the existing broker tenants"),
           e.getMessage());
     }
+
+    // Test ref offline table name is null validation
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setRefOfflineTableName(null);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage()
+              .contains("Reason: 'refOfflineTableName' should not be null or empty when offline table exists"),
+          e.getMessage());
+    }
+
+    // Test ref realtime table name is null validation
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setRefRealtimeTableName(null);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage()
+              .contains("Reason: 'refRealtimeTableName' should not be null or empty when realtime table exists"),
+          e.getMessage());
+    }
+
+    // Test ref offline table is present in the offline tables validation
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setRefOfflineTableName("random_table_OFFLINE");
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: 'refOfflineTableName' should be one of the provided offline tables"),
+          e.getMessage());
+    }
+
+    // Test ref realtime table is present in the realtime tables validation
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setRefRealtimeTableName("random_table_REALTIME");
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(
+          e.getMessage().contains("Reason: 'refRealtimeTableName' should be one of the provided realtime tables"),
+          e.getMessage());
+    }
+
+    // Test quota.storage is not set validation
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", "999"));
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: 'quota.storage' should not be set for logical table"),
+          e.getMessage());
+    }
+  }
+
+  @DataProvider
+  public Object[][] tableTypeProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
+  }
+
+  @Test(dataProvider = "tableTypeProvider")
+  public void testCreateLogicalTable(TableType tableType)
+      throws IOException {
+    // Test logical table with only realtime table
+    String tableName = "test_table";
+    addDummySchema(tableName);
+    TableConfig tableConfig = createDummyTableConfig(tableName, tableType);
+    addTableConfig(tableConfig);
+    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(tableConfig.getTableName()), BROKER_TENANT);
+    ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
   }
 
   @Test

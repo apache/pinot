@@ -231,8 +231,13 @@ public class TableCache implements PinotConfigProvider {
    */
   @Nullable
   public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
+    tableNameWithType = _ignoreCase ? tableNameWithType.toLowerCase() : tableNameWithType;
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
-    return tableConfigInfo != null ? tableConfigInfo._expressionOverrideMap : null;
+    if (tableConfigInfo != null) {
+      return tableConfigInfo._expressionOverrideMap;
+    }
+    LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(tableNameWithType);
+    return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
   /**
@@ -663,6 +668,30 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
+  private static Map<Expression, Expression> crateExpressionOverrideMap(String tableName, QueryConfig queryConfig) {
+    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
+    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
+      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
+        try {
+          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
+          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
+          expressionOverrideMap.put(srcExp, destExp);
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
+              entry.getKey(), entry.getValue(), tableName);
+        }
+      }
+      int mapSize = expressionOverrideMap.size();
+      if (mapSize == 1) {
+        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
+        return Collections.singletonMap(entry.getKey(), entry.getValue());
+      } else if (mapSize > 1) {
+        return expressionOverrideMap;
+      }
+    }
+    return null;
+  }
+
   private static class TableConfigInfo {
     final TableConfig _tableConfig;
     final Map<Expression, Expression> _expressionOverrideMap;
@@ -671,31 +700,7 @@ public class TableCache implements PinotConfigProvider {
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
-      QueryConfig queryConfig = tableConfig.getQueryConfig();
-      if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-        Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-        for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-          try {
-            Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-            Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-            expressionOverrideMap.put(srcExp, destExp);
-          } catch (Exception e) {
-            LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-                entry.getKey(), entry.getValue(), tableConfig.getTableName());
-          }
-        }
-        int mapSize = expressionOverrideMap.size();
-        if (mapSize == 0) {
-          _expressionOverrideMap = null;
-        } else if (mapSize == 1) {
-          Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-          _expressionOverrideMap = Collections.singletonMap(entry.getKey(), entry.getValue());
-        } else {
-          _expressionOverrideMap = expressionOverrideMap;
-        }
-      } else {
-        _expressionOverrideMap = null;
-      }
+      _expressionOverrideMap = crateExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
@@ -712,10 +717,12 @@ public class TableCache implements PinotConfigProvider {
 
   private static class LogicalTableConfigInfo {
     final LogicalTableConfig _logicalTableConfig;
-    // TODO : Add expression override map for logical table, issue #15607
+    final Map<Expression, Expression> _expressionOverrideMap;
 
     private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
       _logicalTableConfig = logicalTableConfig;
+      _expressionOverrideMap = crateExpressionOverrideMap(logicalTableConfig.getTableName(),
+          logicalTableConfig.getQueryConfig());
     }
   }
 }
