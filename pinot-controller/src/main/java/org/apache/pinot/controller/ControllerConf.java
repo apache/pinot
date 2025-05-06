@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
@@ -367,7 +368,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
 
-  private final Map<String, String> _invalidConfigs = new HashMap<>();
+  private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -1085,7 +1086,7 @@ public class ControllerConf extends PinotConfiguration {
           .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
               () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
                   ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS));
-    }
+  }
 
 
   public boolean isAutoResetErrorSegmentsOnValidationEnabled() {
