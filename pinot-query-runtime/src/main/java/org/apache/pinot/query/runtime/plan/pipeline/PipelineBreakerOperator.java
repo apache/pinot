@@ -65,7 +65,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    throw new UnsupportedOperationException();
+    return Collections.emptyList();
   }
 
   @Override

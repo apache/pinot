@@ -24,7 +24,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  * Config for {@link AvroRecordReader}
  */
 public class AvroRecordReaderConfig implements RecordReaderConfig {
-  private boolean _enableLogicalTypes;
+  private boolean _enableLogicalTypes = true;
 
   public boolean isEnableLogicalTypes() {
     return _enableLogicalTypes;

@@ -27,6 +27,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
+import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -86,6 +87,20 @@ public class PinotDispatchPlanner {
       }
     }
     return actualTableNames;
+  }
+
+  public DispatchableSubPlan createDispatchableSubPlanV2(SubPlan subPlan,
+      PlanFragmentAndMailboxAssignment.Result result) {
+    // perform physical plan conversion and assign workers to each stage.
+    DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
+        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+    PlanFragment rootFragment = subPlan.getSubPlanRoot();
+    context.getDispatchablePlanMetadataMap().putAll(result._fragmentMetadataMap);
+    for (var entry : result._planFragmentMap.entrySet()) {
+      context.getDispatchablePlanStageRootMap().put(entry.getKey(), entry.getValue().getFragmentRoot());
+    }
+    runValidations(rootFragment, context);
+    return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
   /**
