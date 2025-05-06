@@ -21,10 +21,14 @@ package org.apache.pinot.controller.api;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -36,6 +40,12 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
+import org.glassfish.grizzly.monitoring.MonitoringAware;
+import org.glassfish.grizzly.monitoring.MonitoringConfig;
+import org.glassfish.grizzly.threadpool.AbstractThreadPool;
+import org.glassfish.grizzly.threadpool.ThreadPoolConfig;
+import org.glassfish.grizzly.threadpool.ThreadPoolProbe;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -129,5 +139,55 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   public HttpServer getHttpServer() {
     return _httpServer;
+  }
+
+  /**
+    * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
+    * Instead, it uses a custom ThreadPoolProbe to count active threads.
+   */
+  public void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
+    NetworkListener listener = _httpServer.getListeners().iterator().next();
+    ExecutorService executor = listener.getTransport().getWorkerThreadPool();
+    ThreadPoolConfig poolCfg = listener.getTransport().getWorkerThreadPoolConfig();
+
+    ActiveThreadProbe probe = new ActiveThreadProbe();
+    // Try to attach probe to the executor if it supports monitoring
+    if (executor instanceof MonitoringAware) {
+      @SuppressWarnings("unchecked")
+      MonitoringConfig<ThreadPoolProbe> mc = ((MonitoringAware<ThreadPoolProbe>) executor).getMonitoringConfig();
+      mc.addProbes(probe);
+    }
+
+    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION_PERCENT.getGaugeName(), () -> {
+      int max = poolCfg.getMaxPoolSize();
+      if (max <= 0) {
+        return 0L;
+      }
+      return Math.round(probe.getActiveCount() * 100.0 / max);
+    });
+  }
+
+  /**
+   * Custom probe to track busy threads in Grizzly thread pools without using reflection.
+   */
+  public static final class ActiveThreadProbe extends ThreadPoolProbe.Adapter {
+    private final AtomicInteger _active = new AtomicInteger();
+
+    @Override
+    public void onTaskDequeueEvent(AbstractThreadPool pool, Runnable task) {
+      // one more thread just got real work
+      _active.incrementAndGet();
+    }
+
+    @Override
+    public void onTaskCompleteEvent(AbstractThreadPool pool, Runnable task) {
+      // work finished, thread is idle again
+      _active.decrementAndGet();
+    }
+
+    /** Current number of active threads. */
+    public int getActiveCount() {
+      return _active.get();
+    }
   }
 }

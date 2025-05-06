@@ -219,7 +219,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   DEEP_STORE_WRITE_OPS_IN_PROGRESS("deepStoreWriteOpsInProgress", true),
 
   // The progress of a certain table rebalance job of a table
-  TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false);
+  TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
+  // HTTP thread utilization percent
+  HTTP_THREAD_UTILIZATION_PERCENT("httpThreadUtilizationPercent", true);
 
 
   private final String _gaugeName;
