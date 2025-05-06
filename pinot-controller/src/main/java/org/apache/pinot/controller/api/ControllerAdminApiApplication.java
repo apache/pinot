@@ -21,10 +21,13 @@ package org.apache.pinot.controller.api;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -36,6 +39,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
+import org.glassfish.grizzly.threadpool.ThreadPoolConfig;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -81,7 +86,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   public void start(List<ListenerConfig> listenerConfigs) {
     _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
-
+    NetworkListener listener = _httpServer.getListeners().iterator().next();
+    ThreadPoolConfig tpc = listener.getTransport().getWorkerThreadPoolConfig();
     try {
       _httpServer.start();
     } catch (IOException e) {
@@ -129,5 +135,23 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   public HttpServer getHttpServer() {
     return _httpServer;
+  }
+
+  private void registerHttpThreadUtilizationGauge(HttpServer httpServer) {
+    NetworkListener listener = httpServer.getListeners().iterator().next();
+    ThreadPoolConfig tpc = listener.getTransport().getWorkerThreadPoolConfig();
+
+    ControllerMetrics.get().addCallbackGauge(
+            ControllerGauge.HTTP_THREAD_UTILIZATION_PERCENT,
+            () -> {
+              // Busy threads as reported by Grizzly
+              ExecutorService executorService = listener.getTransport().getWorkerThreadPool();
+              int busy = listener.getTransport().getWorkerThreadPool();
+              int max  = tpc.getMaxPoolSize();        // -1 means “unbounded”
+              if (max <= 0) {
+                return 0L;  // avoid divide‑by‑zero, still publish something
+              }
+              return Math.round((busy * 100.0) / max);
+            });
   }
 }
