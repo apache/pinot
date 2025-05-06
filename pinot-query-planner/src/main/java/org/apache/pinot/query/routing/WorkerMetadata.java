@@ -43,6 +43,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
+  public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
 
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
@@ -89,7 +90,8 @@ public class WorkerMetadata {
   }
 
   public boolean isLeafStageWorker() {
-    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY);
+    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY) || _customProperties.containsKey(
+        LOGICAL_TABLE_SEGMENTS_MAP_KEY);
   }
 
   public void setTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
@@ -100,5 +102,31 @@ public class WorkerMetadata {
       throw new RuntimeException("Unable to serialize table segments map: " + tableSegmentsMap, e);
     }
     _customProperties.put(TABLE_SEGMENTS_MAP_KEY, tableSegmentsMapStr);
+  }
+
+  @Nullable
+  public Map<String, Map<String, List<String>>> getLogicalTableSegmentsMap() {
+    String logicalTableSegmentsMapStr = _customProperties.get(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+    if (logicalTableSegmentsMapStr != null) {
+      try {
+        return JsonUtils.stringToObject(logicalTableSegmentsMapStr,
+            new TypeReference<Map<String, Map<String, List<String>>>>() {
+            });
+      } catch (IOException e) {
+        throw new RuntimeException("Unable to deserialize table segments map: " + logicalTableSegmentsMapStr, e);
+      }
+    } else {
+      return null;
+    }
+  }
+
+  public void setLogicalTableSegmentsMap(Map<String, Map<String, List<String>>> logicalTableSegmentsMap) {
+    String logicalTableSegmentsMapStr;
+    try {
+      logicalTableSegmentsMapStr = JsonUtils.objectToString(logicalTableSegmentsMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Unable to serialize table segments map: " + logicalTableSegmentsMap, e);
+    }
+    _customProperties.put(LOGICAL_TABLE_SEGMENTS_MAP_KEY, logicalTableSegmentsMapStr);
   }
 }

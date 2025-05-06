@@ -1,0 +1,7 @@
+{
+  "tableName": "v2.airlineStats",
+  "brokerTenant": "DEFAULT_TENANT",
+  "physicalTableNames": [
+    "airlineStats_REALTIME"
+  ]
+}

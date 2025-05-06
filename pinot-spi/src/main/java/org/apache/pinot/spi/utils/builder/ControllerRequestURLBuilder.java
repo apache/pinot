@@ -493,6 +493,22 @@ public class ControllerRequestURLBuilder {
     return fullUrl.toString();
   }
 
+  public String forLogicalTableCreate() {
+    return StringUtil.join("/", _baseUrl, "logicalTables");
+  }
+
+  public String forLogicalTableUpdate(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forLogicalTableGet(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forLogicalTableDelete(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "LogicalTables", logicalTableName);
+  }
+
   private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
     if (url.length() == 0) {
       url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);

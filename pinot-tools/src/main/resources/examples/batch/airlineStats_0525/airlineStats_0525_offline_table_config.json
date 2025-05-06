@@ -1,0 +1,128 @@
+{
+  "tableName": "airlineStats_0525",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "DaysSinceEpoch",
+    "timeType": "DAYS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "1"
+  },
+  "tenants": {},
+  "fieldConfigList": [
+    {
+      "name": "ts",
+      "encodingType": "DICTIONARY",
+      "indexTypes": [
+        "TIMESTAMP"
+      ],
+      "timestampConfig": {
+        "granularities": [
+          "DAY",
+          "WEEK",
+          "MONTH"
+        ]
+      }
+    },
+    {
+      "name": "ArrTimeBlk",
+      "encodingType": "DICTIONARY",
+      "indexes": {
+        "inverted": {
+          "enabled": "true"
+        }
+      },
+      "tierOverwrites": {
+        "hotTier": {
+          "encodingType": "DICTIONARY",
+          "indexes": {
+            "bloom": {
+              "enabled": "true"
+            }
+          }
+        },
+        "coldTier": {
+          "encodingType": "RAW",
+          "indexes": {
+            "text": {
+              "enabled": "true"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "tableIndexConfig": {
+    "starTreeIndexConfigs": [
+      {
+        "dimensionsSplitOrder": [
+          "AirlineID",
+          "Origin",
+          "Dest"
+        ],
+        "skipStarNodeCreationForDimensions": [],
+        "functionColumnPairs": [
+          "COUNT__*",
+          "MAX__ArrDelay"
+        ],
+        "maxLeafRecords": 10
+      }
+    ],
+    "enableDynamicStarTreeCreation": true,
+    "loadMode": "MMAP",
+    "tierOverwrites": {
+      "hotTier": {
+        "starTreeIndexConfigs": [
+          {
+            "dimensionsSplitOrder": [
+              "Carrier",
+              "CancellationCode",
+              "Origin",
+              "Dest"
+            ],
+            "skipStarNodeCreationForDimensions": [],
+            "functionColumnPairs": [
+              "MAX__CarrierDelay",
+              "AVG__CarrierDelay"
+            ],
+            "maxLeafRecords": 10
+          }
+        ]
+      },
+      "coldTier": {
+        "starTreeIndexConfigs": []
+      }
+    }
+  },
+  "metadata": {
+    "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+      {
+        "columnName": "ts",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      },
+      {
+        "columnName": "tsRaw",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      }
+    ]
+  },
+  "tierConfigs": [
+    {
+      "name": "hotTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3130d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    },
+    {
+      "name": "coldTier",
+      "segmentSelectorType": "time",
+      "segmentAge": "3140d",
+      "storageType": "pinot_server",
+      "serverTag": "DefaultTenant_OFFLINE"
+    }
+  ]
+}

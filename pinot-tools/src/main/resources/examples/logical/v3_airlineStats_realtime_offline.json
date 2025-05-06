@@ -1,0 +1,14 @@
+{
+  "tableName": "v3.airlineStats",
+  "brokerTenant": "DEFAULT_TENANT",
+  "physicalTableNames": [
+    "airlineStats_REALTIME",
+    "airlineStats_0525_OFFLINE"
+  ],
+  "timeBoundaryConfig": {
+    "boundaryStrategy": "MIN",
+    "parameters": {
+      "includedTables": ["airlineStats_0525_OFFLINE"]
+    }
+  }
+}
