@@ -21,8 +21,6 @@ package org.apache.pinot.spi.utils;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigDecorator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -33,8 +31,6 @@ import org.slf4j.LoggerFactory;
 public class TableConfigDecoratorRegistry {
   private TableConfigDecoratorRegistry() {
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigDecoratorRegistry.class);
 
   // Default no-op decorator
   private static final TableConfigDecorator NOOP = tableConfig -> tableConfig;
@@ -59,9 +55,6 @@ public class TableConfigDecoratorRegistry {
    * @return The decorated config or original if decoration fails
    */
   public static TableConfig applyDecorator(TableConfig tableConfig) {
-    if (tableConfig == null) {
-      return null;
-    }
     return DECORATOR_INSTANCE.get().decorate(tableConfig);
   }
 }
