@@ -614,6 +614,8 @@ public class CommonConstants {
         // Use MSE compiler when trying to fill a response with no schema metadata
         // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
         public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
+
+        public static final String USE_MSE_LITE_MODE = "useLiteMode";
       }
 
       public static class QueryOptionValue {

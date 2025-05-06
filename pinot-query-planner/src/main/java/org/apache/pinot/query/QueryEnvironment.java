@@ -169,7 +169,7 @@ public class QueryEnvironment {
       workerManager = _envConfig.getWorkerManager();
       physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
-          workerManager.getInstanceId());
+          workerManager.getInstanceId(), PhysicalPlannerContext.useLiteMode(sqlNodeAndOptions.getOptions()));
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);

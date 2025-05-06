@@ -49,4 +49,9 @@ public abstract class PRelOptRule {
   public PRelNode getParentNode(PRelOptRuleCall call) {
     return call._parents.isEmpty() ? null : call._parents.getLast();
   }
+
+  public boolean isLeafBoundary(PRelOptRuleCall call) {
+    PRelNode parentNode = getParentNode(call);
+    return call._currentNode.isLeafStage() && (parentNode == null || !parentNode.isLeafStage());
+  }
 }
