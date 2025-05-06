@@ -22,11 +22,12 @@ import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
@@ -40,7 +41,11 @@ import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
+import org.glassfish.grizzly.monitoring.MonitoringAware;
+import org.glassfish.grizzly.monitoring.MonitoringConfig;
+import org.glassfish.grizzly.threadpool.AbstractThreadPool;
 import org.glassfish.grizzly.threadpool.ThreadPoolConfig;
+import org.glassfish.grizzly.threadpool.ThreadPoolProbe;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -137,21 +142,54 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     return _httpServer;
   }
 
-  private void registerHttpThreadUtilizationGauge(HttpServer httpServer) {
-    NetworkListener listener = httpServer.getListeners().iterator().next();
-    ThreadPoolConfig tpc = listener.getTransport().getWorkerThreadPoolConfig();
+  /**
+   * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
+   * Instead, it uses a custom ThreadPoolProbe to count active threads.
+   */
+  public void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
+    NetworkListener listener = _httpServer.getListeners().iterator().next();
+    ExecutorService executor = listener.getTransport().getWorkerThreadPool();
+    ThreadPoolConfig poolCfg = listener.getTransport().getWorkerThreadPoolConfig();
 
-    ControllerMetrics.get().addCallbackGauge(
-            ControllerGauge.HTTP_THREAD_UTILIZATION_PERCENT,
-            () -> {
-              // Busy threads as reported by Grizzly
-              ExecutorService executorService = listener.getTransport().getWorkerThreadPool();
-              int busy = listener.getTransport().getWorkerThreadPool();
-              int max  = tpc.getMaxPoolSize();        // -1 means “unbounded”
-              if (max <= 0) {
-                return 0L;  // avoid divide‑by‑zero, still publish something
-              }
-              return Math.round((busy * 100.0) / max);
-            });
+    BusyThreadProbe probe = new BusyThreadProbe();
+    // Try to attach probe to the executor if it supports monitoring
+    if (executor instanceof MonitoringAware) {
+      @SuppressWarnings("unchecked")
+      MonitoringConfig<ThreadPoolProbe> mc = ((MonitoringAware<ThreadPoolProbe>) executor).getMonitoringConfig();
+      mc.addProbes(probe);
+    }
+
+    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION_PERCENT.getGaugeName(), () -> {
+        int max = poolCfg.getMaxPoolSize();
+        if (max <= 0) {
+          return 0L;
+        }
+        int busy = probe.busyCount();
+        return Math.round(busy * 100.0 / max);
+    });
+  }
+
+  /**
+   * Custom probe to track busy threads in Grizzly thread pools without using reflection.
+   */
+  public final class BusyThreadProbe extends ThreadPoolProbe.Adapter {
+    private final AtomicInteger _busy = new AtomicInteger();
+
+    @Override
+    public void onTaskDequeueEvent(AbstractThreadPool pool, Runnable task) {
+      // one more thread just got real work
+      _busy.incrementAndGet();
+    }
+
+    @Override
+    public void onTaskCompleteEvent(AbstractThreadPool pool, Runnable task) {
+      // work finished, thread is idle again
+      _busy.decrementAndGet();
+    }
+
+    /** Current number of busy worker threads. */
+    public int busyCount() {
+      return _busy.get();
+    }
   }
 }
