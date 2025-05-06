@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,6 +54,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
@@ -63,6 +65,7 @@ import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
+import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.context.RuleTimingPlannerListener;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -75,6 +78,8 @@ import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
+import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -138,6 +143,7 @@ public class QueryEnvironment {
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
     this(configBuilder()
+        .requestId(-1L)
         .database(database)
         .tableCache(tableCache)
         .workerManager(workerManager)
@@ -149,7 +155,8 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
-    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig);
+    boolean usePhysicalOptimizer = PhysicalPlannerContext.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
+    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -157,8 +164,15 @@ public class QueryEnvironment {
         format = explain.getFormat();
       }
     }
+    PhysicalPlannerContext physicalPlannerContext = null;
+    if (usePhysicalOptimizer && _envConfig.getWorkerManager() != null) {
+      workerManager = _envConfig.getWorkerManager();
+      physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
+          workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
+          workerManager.getInstanceId());
+    }
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
-        sqlNodeAndOptions.getOptions(), _envConfig, format);
+        sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
   /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
@@ -309,6 +323,11 @@ public class QueryEnvironment {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);
+    if (plannerContext.isUsePhysicalOptimizer()) {
+      Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
+      optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
+          _envConfig.getTableCache()).unwrap();
+    }
     return relation.withRel(optimized);
   }
 
@@ -415,16 +434,25 @@ public class QueryEnvironment {
     }
   }
 
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    return toDispatchableSubPlan(relRoot, plannerContext, requestId, null);
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext) {
+    return toDispatchableSubPlan(relRoot, plannerContext, null);
   }
 
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    long requestId = _envConfig.getRequestId();
+    if (plannerContext.isUsePhysicalOptimizer()) {
+      Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
+          plannerContext.getPhysicalPlannerContext());
+      PinotDispatchPlanner pinotDispatchPlanner = new PinotDispatchPlanner(plannerContext,
+          _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
+      return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
+    }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
         _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
-        new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
+        new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
+            _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
   }
 
@@ -462,7 +490,8 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config) {
+  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
+      boolean usePhysicalOptimizer) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -470,18 +499,26 @@ public class QueryEnvironment {
 
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
-      if (isEligibleQueryPostRule(relOptRule, config)) {
-        hepProgramBuilder.addRuleInstance(relOptRule);
+    if (!usePhysicalOptimizer) {
+      for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
+        if (isEligibleQueryPostRule(relOptRule, config)) {
+          hepProgramBuilder.addRuleInstance(relOptRule);
+        }
+      }
+    } else {
+      for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
+        if (isEligibleQueryPostRule(relOptRule, config)) {
+          hepProgramBuilder.addRuleInstance(relOptRule);
+        }
       }
     }
-
-    // apply RelDistribution trait to all nodes
-    if (workerManager != null) {
-      hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withWorkerManager(workerManager));
+    if (!usePhysicalOptimizer) {
+      // apply RelDistribution trait to all nodes
+      if (workerManager != null) {
+        hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withWorkerManager(workerManager));
+      }
+      hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
     }
-    hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
-
     return hepProgramBuilder.build();
   }
 
@@ -507,6 +544,8 @@ public class QueryEnvironment {
 
   @Value.Immutable
   public interface Config {
+    long getRequestId();
+
     String getDatabase();
 
     /**
@@ -609,7 +648,7 @@ public class QueryEnvironment {
         SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
         if (explain instanceof SqlPhysicalExplain) {
           // get the physical plan for query.
-          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
           return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
               PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
         } else {
@@ -629,7 +668,7 @@ public class QueryEnvironment {
                 new TransformationTracker.ByIdentity.Builder<>();
             // Transform RelNodes into DispatchableSubPlan
             DispatchableSubPlan dispatchableSubPlan =
-                toDispatchableSubPlan(_relRoot, _plannerContext, requestId, nodeTracker);
+                toDispatchableSubPlan(_relRoot, _plannerContext, nodeTracker);
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
@@ -652,7 +691,7 @@ public class QueryEnvironment {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext);
         return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
       } catch (QueryException e) {
         throw e;

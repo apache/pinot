@@ -22,7 +22,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
-
 /**
  * Allows time-series query languages to implement their own logical planner. The input to this planner is a
  * {@link RangeTimeSeriesRequest} and the output is a {@link TimeSeriesLogicalPlanResult}. Put simply, this abstraction
@@ -35,5 +34,5 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 public interface TimeSeriesLogicalPlanner {
   void init(PinotConfiguration pinotConfiguration);
 
-  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request);
+  TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata metadata);
 }
