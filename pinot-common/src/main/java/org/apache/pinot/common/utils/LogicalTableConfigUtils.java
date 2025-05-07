@@ -36,9 +36,9 @@ import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-public class LogicalTableUtils {
+public class LogicalTableConfigUtils {
 
-  private LogicalTableUtils() {
+  private LogicalTableConfigUtils() {
     // Utility class
   }
 

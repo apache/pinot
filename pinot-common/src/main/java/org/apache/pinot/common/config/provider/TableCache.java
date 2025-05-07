@@ -39,7 +39,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.utils.LogicalTableUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
@@ -368,7 +368,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void putLogicalTableConfig(ZNRecord znRecord)
       throws IOException {
-    LogicalTableConfig logicalTableConfig = LogicalTableUtils.fromZNRecord(znRecord);
+    LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
     if (_ignoreCase) {
       _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
@@ -668,7 +668,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private static Map<Expression, Expression> crateExpressionOverrideMap(String tableName, QueryConfig queryConfig) {
+  private static Map<Expression, Expression> createExpressionOverrideMap(String tableName, QueryConfig queryConfig) {
     Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
     if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
       for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
@@ -700,7 +700,7 @@ public class TableCache implements PinotConfigProvider {
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
-      _expressionOverrideMap = crateExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
@@ -721,7 +721,7 @@ public class TableCache implements PinotConfigProvider {
 
     private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
       _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = crateExpressionOverrideMap(logicalTableConfig.getTableName(),
+      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
           logicalTableConfig.getQueryConfig());
     }
   }

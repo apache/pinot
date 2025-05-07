@@ -70,6 +70,7 @@ import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -406,6 +407,7 @@ public class ControllerTest {
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
         .setQuotaConfig(new QuotaConfig(null, "999"))
+        .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }

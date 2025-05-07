@@ -47,7 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.LogicalTableUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -218,7 +218,7 @@ public class PinotLogicalTableResource {
         logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
-      LogicalTableUtils.validateLogicalTableConfig(
+      LogicalTableConfigUtils.validateLogicalTableConfig(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
@@ -242,7 +242,7 @@ public class PinotLogicalTableResource {
         logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
       }
 
-      LogicalTableUtils.validateLogicalTableConfig(
+      LogicalTableConfigUtils.validateLogicalTableConfig(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
