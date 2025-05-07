@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -38,10 +38,170 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class TestZkBasedTableRebalanceObserver {
+  @Test
+  void testZkObserverProgressStats() {
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    // Mocking this. We will verify using numZkUpdate stat
+    when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
+    ControllerMetrics controllerMetrics = ControllerMetrics.get();
+    TableRebalanceContext retryCtx = new TableRebalanceContext();
+    retryCtx.setConfig(new RebalanceConfig());
+    ZkBasedTableRebalanceObserver observer =
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
+    Map<String, Map<String, String>> source = new TreeMap<>();
+    Map<String, Map<String, String>> target = new TreeMap<>();
+    Map<String, Map<String, String>> targetIntermediate = new TreeMap<>();
+    Map<String, Map<String, String>> sourceIntermediate = new TreeMap<>();
+    source.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ONLINE));
+    source.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4"), ONLINE));
+    target.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    target.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5", "host6"), ONLINE));
+    targetIntermediate.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2"), ONLINE));
+    targetIntermediate.put("segment2",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4", "host5"), ONLINE));
+
+    sourceIntermediate.put("segment1",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2"), ONLINE));
+    sourceIntermediate.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host4"), ONLINE));
+
+    Set<String> segmentSet = new HashSet<>(source.keySet());
+    segmentSet.addAll(target.keySet());
+    TableRebalanceObserver.RebalanceContext rebalanceContext =
+        new TableRebalanceObserver.RebalanceContext(-1, segmentSet, segmentSet);
+    // START_TRIGGER will set up the ZK progress stats to have the diff between source and target. When calling the
+    // triggers for IS and EV-IS, since source and source are compared, the diff will change for the IS trigger
+    // but not for the EV-IS trigger, so ZK must be updated 1 extra time
+    observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
+    TableRebalanceProgressStats.RebalanceProgressStats overallStats =
+        observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    TableRebalanceProgressStats.RebalanceProgressStats currentStepStats =
+        observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+    // This simulates the first step of rebalance, where the IS is set to the intermediate assignment
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, source, targetIntermediate,
+        rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+        sourceIntermediate, targetIntermediate, rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 3);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 1);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+
+    // Assume bestEfforts=true and we didn't wait for the second segment to converge before moving to next step
+    // Here the currentAssignment is based on the IS and not the EV. IS is fully updated to the targetIntermediate
+    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, targetIntermediate, target,
+        rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 1);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+    // Next assignment calculated based on the IS, IS should be same as the previous targetAssignment
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, targetIntermediate, target,
+        rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
+        sourceIntermediate, target, rebalanceContext);
+    overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
+    assertEquals(overallStats._totalSegmentsToBeAdded, 4);
+    assertEquals(overallStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(overallStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeAdded, 1);
+    assertEquals(overallStats._totalCarryOverSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeAdded, 2);
+    assertEquals(currentStepStats._totalRemainingSegmentsToBeDeleted, 0);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeAdded, 1);
+    assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
+    checkProgressPercentMetrics(controllerMetrics, observer);
+  }
 
   // This is a test to verify if Zk stats are pushed out correctly
   @Test
@@ -49,7 +209,7 @@ public class TestZkBasedTableRebalanceObserver {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     // Mocking this. We will verify using numZkUpdate stat
     when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
-    ControllerMetrics controllerMetrics = Mockito.mock(ControllerMetrics.class);
+    ControllerMetrics controllerMetrics = ControllerMetrics.get();
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
@@ -67,21 +227,41 @@ public class TestZkBasedTableRebalanceObserver {
         segmentSet, segmentSet);
     observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
     assertEquals(observer.getNumUpdatesToZk(), 1);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source, rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, source,
         rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     // START_TRIGGER will set up the ZK progress stats to have the diff between source and target. When calling the
     // triggers for IS and EV-IS, since source and source are compared, the diff will change for the IS trigger
     // but not for the EV-IS trigger, so ZK must be updated 1 extra time
     assertEquals(observer.getNumUpdatesToZk(), 2);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target,
         rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     // Both of the changes above will update ZK for progress stats
     assertEquals(observer.getNumUpdatesToZk(), 4);
     // Try a rollback and this should trigger a ZK update as well
     observer.onRollback();
     assertEquals(observer.getNumUpdatesToZk(), 5);
+  }
+
+  private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
+      ZkBasedTableRebalanceObserver observer) {
+    Long progressGaugeValue =
+        controllerMetrics.getGaugeValue(ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT.getGaugeName() + ".dummy");
+    assertNotNull(progressGaugeValue);
+    TableRebalanceProgressStats.RebalanceProgressStats overallProgress =
+        observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
+    long progressRemained = (long) Math.ceil(TableRebalanceProgressStats.calculatePercentageChange(
+        overallProgress._totalSegmentsToBeAdded + overallProgress._totalSegmentsToBeDeleted,
+        overallProgress._totalRemainingSegmentsToBeAdded + overallProgress._totalRemainingSegmentsToBeDeleted
+            + overallProgress._totalRemainingSegmentsToConverge + overallProgress._totalCarryOverSegmentsToBeAdded
+            + overallProgress._totalCarryOverSegmentsToBeDeleted));
+    assertEquals(progressGaugeValue, progressRemained > 100 ? 0 : 100 - progressRemained);
   }
 
   @Test

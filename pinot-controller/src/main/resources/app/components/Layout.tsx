@@ -32,7 +32,7 @@ let navigationItems = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
   { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
-  { id: 4, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
+  { id: 4, name: 'Swagger REST API', link: './help', target: '_blank', icon: <SwaggerIcon /> }
 ];
 
 const Layout = (props) => {
