@@ -140,7 +140,7 @@ public abstract class SegmentDirectory implements Closeable {
    * It is possible that this called multiple times.
    * @param fetchContext context for this segment's fetch
    */
-  public void release(FetchContext fetchContext) {
+  public void release(FetchContext fetchContext, int useless) {
   }
 
   /**
