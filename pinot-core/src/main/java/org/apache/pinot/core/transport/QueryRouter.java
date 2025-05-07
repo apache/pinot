@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.core.transport;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -37,8 +35,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +88,16 @@ public class QueryRouter {
       @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
+    TableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest,
+        offlineRoutingTable, realtimeRoutingTable);
+
+    return submitQuery(requestId, rawTableName, tableRouteInfo, timeoutMs);
+  }
+
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs) {
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
+
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
@@ -101,25 +107,7 @@ public class QueryRouter {
     boolean skipUnavailableServers = isSkipUnavailableServers(offlineBrokerRequest, realtimeBrokerRequest);
 
     // Build map from server to request based on the routing table
-    Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-    if (offlineBrokerRequest != null) {
-      assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
-      }
-    }
-    if (realtimeBrokerRequest != null) {
-      assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
-      }
-    }
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = route.getRequestMap(requestId, _brokerId, preferTls);
 
     // Create the asynchronous query response with the request map
     AsyncQueryResponse asyncQueryResponse =
@@ -218,26 +206,5 @@ public class QueryRouter {
 
   void markQueryDone(long requestId) {
     _asyncQueryResponseMap.remove(requestId);
-  }
-
-  private InstanceRequest getInstanceRequest(long requestId, BrokerRequest brokerRequest,
-      ServerRouteInfo segments) {
-    InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setQuery(brokerRequest);
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    if (queryOptions != null) {
-      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
-    }
-    instanceRequest.setSearchSegments(segments.getSegments());
-    instanceRequest.setBrokerId(_brokerId);
-    if (CollectionUtils.isNotEmpty(segments.getOptionalSegments())) {
-      // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
-      // compatible, as there are places like in multi-stage query engine where this field is not set today when
-      // creating the InstanceRequest.
-      instanceRequest.setOptionalSegments(segments.getOptionalSegments());
-    }
-    return instanceRequest;
   }
 }
