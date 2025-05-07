@@ -82,6 +82,10 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
+import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
+import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
@@ -523,8 +527,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-      return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity, schema, query,
-          database);
+      return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
+          schema, query, database);
     }
 
     if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -601,8 +605,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         return BrokerResponseNative.fromBrokerErrors(errorMsgs);
       } else {
         // If no route is found, send an empty response
-        return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity, schema, query,
-            database);
+        return getEmptyBrokerOnlyResponse(pinotQuery, serverPinotQuery, requestContext, tableName, requesterIdentity,
+            schema, query, database);
       }
     }
     long routingEndTimeNs = System.nanoTime();
@@ -731,11 +735,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
-    if (brokerResponse.getNumRowsResultSet() == 0) {
-      boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
-          pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
-      ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
-    }
+    fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
 
     // Set total query processing time
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
@@ -957,23 +957,47 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
   }
 
-  private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, RequestContext requestContext,
-      String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema, String query, String database) {
+  private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, PinotQuery serverPinotQuery,
+      RequestContext requestContext, String tableName, @Nullable RequesterIdentity requesterIdentity, Schema schema,
+      String query, String database) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
     }
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
-    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
-        pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
-    ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    try {
+      QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
+      ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(serverQueryContext);
+      brokerResponse.setResultTable(resultTable);
+      if (pinotQuery != serverPinotQuery) {
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+        if (gapfillType == null) {
+          throw new BadQueryRequestException("Nested query is not supported without gapfill");
+        }
+        BaseGapfillProcessor gapfillProcessor = GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
+        gapfillProcessor.process(brokerResponse);
+      }
+      fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while building empty response for request {}: {}, {}",
+          requestContext.getRequestId(), query, e.getMessage());
+    }
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
-    _queryLogger.log(
-        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
-            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
+    _queryLogger.log(new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
     return brokerResponse;
+  }
+
+  private void fillEmptyResponseSchema(PinotQuery pinotQuery, BrokerResponse brokerResponse, Schema schema,
+      String database, String query) {
+    if (brokerResponse.getNumRowsResultSet() == 0) {
+      boolean useMSE =
+          QueryOptionsUtils.isUseMSEToFillEmptySchema(pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
+      EmptyResponseUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+    }
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
