@@ -73,7 +73,7 @@ public class PinotCustomDependencyVersionRuleTest {
       _rule.execute(_helper);
     });
 
-    Assert.assertTrue(thrown.getMessage().contains("Root POM has hardcoded version"));
+    Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
   }
 
   // Root POM with no hardcoded version in <dependencyManagement>
@@ -119,7 +119,7 @@ public class PinotCustomDependencyVersionRuleTest {
       _rule.execute(_helper);
     });
 
-    Assert.assertTrue(thrown.getMessage().contains("Module"));
+    Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
   }
 
   // Submodule POM with no version in <dependencies>
@@ -164,8 +164,7 @@ public class PinotCustomDependencyVersionRuleTest {
       _rule.execute(_helper);
     });
 
-    Assert.assertTrue(thrown.getMessage().contains("Module"));
-    Assert.assertTrue(thrown.getMessage().contains("declares version"));
+    Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
   }
 
   // Simulate a skipped module

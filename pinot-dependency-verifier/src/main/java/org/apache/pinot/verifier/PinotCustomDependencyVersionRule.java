@@ -88,7 +88,9 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
         String version = dep.getVersion();
         if (version != null && !version.trim().startsWith("${")) {
           throw new EnforcerRuleException(String.format(
-              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s. Use a property instead.",
+              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s."
+              + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
+                  + "/dependency-management for the best practice",
               dep.getVersion(), dep.getGroupId(), dep.getArtifactId()
           ));
         }
@@ -100,7 +102,8 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
         for (Dependency dep : directDependencies) {
           throw new EnforcerRuleException(String.format(
               "Root POM defines a dependency (%s:%s) outside <dependencyManagement>. "
-                  + "Define dependencies only in <dependencyManagement>, or within <build><plugins>.",
+                  + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
+                  + "/dependency-management for the best practice",
               dep.getGroupId(), dep.getArtifactId()
           ));
         }
@@ -116,7 +119,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
       String topLevelModule = relativePath.getNameCount() > 0 ? relativePath.getName(0).toString() : "";
 
       for (String skip : _skipModuleList) {
-        if (topLevelModule.contains(skip)) {
+        if (topLevelModule.equals(skip)) {
           return;
         }
       }
@@ -128,7 +131,8 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
       if (d.getVersion() != null) {
         throw new EnforcerRuleException(
             String.format("Module '%s' declares version '%s' for dependency %s:%s. "
-                    + "Versions must be managed in root dependencyManagement.",
+                    + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
+                    + "/dependency-management for the best practice",
                 project.getArtifactId(), d.getVersion(), d.getGroupId(), d.getArtifactId())
         );
       }
