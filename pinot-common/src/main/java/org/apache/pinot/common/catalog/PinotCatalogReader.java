@@ -25,7 +25,16 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 
-
+/// A custom catalog reader that uses a custom name matcher to bypass Calcite's built-in support for case-insensitive
+/// schema definition.
+///
+/// Calcite's built-in support for case-insensitive schema is way too aggressive, leading to all identifiers being
+/// transformed to lowercase after the validation stage. This is cumbersome and breaks several funcionalities of Apache
+/// Pinot during query processing.
+///
+/// Because of that, we need to implement a custom catalog reader with a name matcher that although implementing a
+/// case-insensitive lookup for schema identifiers makes Calcite unaware of it to avoid the toLowerCase transformation
+/// made by the library for its internal memory structures.
 public class PinotCatalogReader extends CalciteCatalogReader {
   public PinotCatalogReader(CalciteSchema rootSchema, List<String> defaultSchema,
       RelDataTypeFactory typeFactory, CalciteConnectionConfig config, boolean caseSensitive) {

@@ -30,10 +30,13 @@ import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.pinot.common.utils.list.FlatViewList;
 
 
-/**
- * A custom name matcher that, although matches names based on config-provided case-sensitiveness, always reports to be
- * case-sensitive so Calcite does not transform identifiers to lower case.
- */
+/// A custom name matcher that, although matches names based on config-provided case-sensitiveness, always reports to be
+/// case-sensitive so Calcite does not transform identifiers to lower case.
+///
+/// It is an improved implementation of Calcite's SqlNameMatchers.BaseMatcher that always true when asked if
+/// isCaseSensitive() even when actual lookups are case-insensitive.
+/// 
+/// See [PinotCatalogReader] comments for more context.
 public class PinotNameMatcher implements SqlNameMatcher {
 
   private final boolean _caseSensitive;
