@@ -147,6 +147,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseServerStarter.class);
 
   private static final long CONSUMER_DIRECTORY_EXCEPTION_VALUE = -1L;
+
   protected String _helixClusterName;
   protected String _zkAddress;
   protected PinotConfiguration _serverConf;
@@ -705,9 +706,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
 
+    // Start a background task to monitor Helix message count
+    int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
+        Server.DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS);
     _helixMessageCountScheduler = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("message-count-scheduler-%d").setDaemon(true).build());
-    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, 10, TimeUnit.SECONDS);
+    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, refreshIntervalSeconds, TimeUnit.SECONDS);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
     try {
@@ -742,9 +746,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager.addPreConnectCallback(
         () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
-
-    // Add metric for Helix message count
-    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.HELIX_MESSAGE_COUNT, this::getHelixServerMessageCount);
 
     // Register the service status handler
     registerServiceStatusHandler();
@@ -1078,13 +1079,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
       HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
       List<String> children = dataAccessor.getBaseDataAccessor()
           .getChildNames(String.format("/%s/INSTANCES/%s/MESSAGES", _helixClusterName, _instanceId), 0);
-      _cachedMessageCount.set(children == null ? 0 : children.size());
+      int messageCount = children == null ? 0 : children.size();
+      _cachedMessageCount.set(messageCount);
+      ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.HELIX_MESSAGES_COUNT, messageCount);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Updated Helix message count to: {}", messageCount);
+      }
     } catch (Exception e) {
-      LOGGER.warn("Failed to get Helix message count", e);
-      _cachedMessageCount.set(0);
+      LOGGER.warn("Failed to refresh Helix message count", e);
     }
-  }
-  private int getHelixServerMessageCount() {
-    return _cachedMessageCount.get();
   }
 }
