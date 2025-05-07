@@ -140,7 +140,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": 3600000,
         "type": "INTEGER",
         "label": "External View Stabilization Timeout In Milliseconds",
-        "description": "How long to wait for EV-IS convergence, increase this timeout for large tables (TBs in size)",
+        "description": "Maximum time (in milliseconds) to wait for external view to converge with ideal states. It automatically extends the time if progress has been made",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
