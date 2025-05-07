@@ -35,7 +35,7 @@ import org.apache.pinot.common.utils.list.FlatViewList;
 ///
 /// It is an improved implementation of Calcite's SqlNameMatchers.BaseMatcher that always true when asked if
 /// isCaseSensitive() even when actual lookups are case-insensitive.
-/// 
+///
 /// See [PinotCatalogReader] comments for more context.
 public class PinotNameMatcher implements SqlNameMatcher {
 
@@ -77,8 +77,9 @@ public class PinotNameMatcher implements SqlNameMatcher {
     throw new UnsupportedOperationException();
   }
 
+  @Nullable
   @Override
-  public @Nullable RelDataTypeField field(RelDataType rowType, String fieldName) {
+  public RelDataTypeField field(RelDataType rowType, String fieldName) {
     return rowType.getField(fieldName, _caseSensitive, false);
   }
 
@@ -104,6 +105,10 @@ public class PinotNameMatcher implements SqlNameMatcher {
     return new FlatViewList<>(prefixNames, names);
   }
 
+  /// Checks if the concatenation of two string lists matches a third list.
+  /// This is adapted from the original `SqlNameMatchers.BaseMatcher.listMatches(list0, list1)` that allocates a new
+  /// list with the concatenation of prefixes and names before checking if it matches the third list. Checking values
+  /// directly from the two input lists avoids the need to allocate a new list and copy the values.
   protected boolean listMatches(List<String> firstList0, List<String> firstList1, List<String> secondList) {
     int firstListSize = firstList0.size() + firstList1.size();
     if (firstListSize != secondList.size()) {
