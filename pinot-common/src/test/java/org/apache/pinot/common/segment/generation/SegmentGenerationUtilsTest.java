@@ -240,6 +240,18 @@ public class SegmentGenerationUtilsTest {
     });
   }
 
+  @Test
+  public void testRelativeURIsWithSpaces()
+          throws URISyntaxException {
+    URI inputDirURI = new URI("hdfs://namenode1:9999/path/to/");
+    URI inputFileURI = new URI(SegmentGenerationUtils.sanitizeURIString("hdfs://namenode1:9999/path/to/sub dir/file"));
+    URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
+    URI segmentTarFileName = new URI("file.tar.gz");
+    URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
+            .resolve(segmentTarFileName);
+    Assert.assertEquals(outputSegmentTarURI.toString(), "hdfs://namenode2/output/dir/sub_dir/file.tar.gz");
+  }
+
   private File makeTestDir()
       throws IOException {
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
