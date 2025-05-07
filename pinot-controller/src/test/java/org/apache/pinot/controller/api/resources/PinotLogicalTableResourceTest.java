@@ -84,6 +84,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testCreateUpdateDeleteLogicalTables(String logicalTableName, List<String> physicalTableNames,
       List<String> physicalTablesToUpdate)
       throws IOException {
+    addDummySchema(logicalTableName);
     // verify logical table does not exist
     String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
@@ -197,6 +198,28 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       assertTrue(e.getMessage().contains("Reason: 'InvalidTenant' should be one of the existing broker tenants"),
           e.getMessage());
     }
+
+    // Test logical table schema does not exist
+    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: Schema with same name as logical table '" + LOGICAL_TABLE_NAME
+          + "' does not exist"), e.getMessage());
+    }
+
+    // Test logical table with db prefix but schema without db prefix
+    addDummySchema(LOGICAL_TABLE_NAME);
+    logicalTableConfig = getDummyLogicalTableConfig("db." + LOGICAL_TABLE_NAME, physicalTableNamesWithType,
+        BROKER_TENANT);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: Schema with same name as logical table 'db." + LOGICAL_TABLE_NAME
+          + "' does not exist"), e.getMessage());
+    }
   }
 
   @Test
@@ -208,6 +231,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     LogicalTableConfig
         logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    addDummySchema(LOGICAL_TABLE_NAME);
     ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
     try {
@@ -217,11 +241,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Logical table: test_logical_table already exists"), e.getMessage());
     }
-
-    // clean up the logical table
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(LOGICAL_TABLE_NAME);
-    ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-    verifyLogicalTableDoesNotExists(getLogicalTableUrl);
   }
 
   @DataProvider
@@ -270,6 +289,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
 
     for (int i = 0; i < logicalTableNames.size(); i++) {
+      addDummySchema(logicalTableNames.get(i));
       LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableNames.get(i), List.of(
           physicalTableNamesWithType.get(2 * i), physicalTableNamesWithType.get(2 * i + 1)), BROKER_TENANT);
 
@@ -280,13 +300,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     // verify logical table names
     String getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
     assertEquals(getLogicalTableNamesResponse, objectMapper.writeValueAsString(logicalTableNames));
-
-    // cleanup: delete logical tables
-    for (String logicalTableName : logicalTableNames) {
-      String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
-      String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-      assertEquals(deleteResponse, "{\"status\":\"" + logicalTableName + " logical table successfully deleted.\"}");
-    }
   }
 
   private void verifyLogicalTableExists(String getLogicalTableUrl, LogicalTableConfig logicalTableConfig)

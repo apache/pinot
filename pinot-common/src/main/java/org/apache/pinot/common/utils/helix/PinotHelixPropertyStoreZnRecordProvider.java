@@ -51,6 +51,10 @@ public class PinotHelixPropertyStoreZnRecordProvider {
     return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/SEGMENTS");
   }
 
+  public static PinotHelixPropertyStoreZnRecordProvider forLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/LOGICAL/TABLE");
+  }
+
   public ZNRecord get(String name) {
     return _propertyStore.get(_pathPrefix + "/" + name, null, AccessOption.PERSISTENT);
   }

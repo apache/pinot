@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -74,7 +76,7 @@ public class LogicalTableUtils {
   }
 
   public static void validateLogicalTableName(LogicalTableConfig logicalTableConfig, List<String> allPhysicalTables,
-      Set<String> allBrokerTenantNames) {
+      Set<String> allBrokerTenantNames, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String tableName = logicalTableConfig.getTableName();
     if (StringUtils.isEmpty(tableName)) {
       throw new IllegalArgumentException("Invalid logical table name. Reason: 'tableName' should not be null or empty");
@@ -113,6 +115,12 @@ public class LogicalTableUtils {
     if (!allBrokerTenantNames.contains(brokerTenant)) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: '" + brokerTenant + "' should be one of the existing broker tenants");
+    }
+
+    // Validate schema with same name as logical table exists
+    if (!ZKMetadataProvider.isSchemaExists(propertyStore, tableName)) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: Schema with same name as logical table '" + tableName + "' does not exist");
     }
   }
 }

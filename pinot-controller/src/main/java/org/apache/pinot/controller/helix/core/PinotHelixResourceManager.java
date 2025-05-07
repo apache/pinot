@@ -1637,6 +1637,12 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
+  public List<String> getAllSchemaNames() {
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT
+    );
+  }
+
   public List<String> getSchemaNames() {
     return getSchemaNames(null);
   }
@@ -2260,8 +2266,9 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllLogicalTableNames() {
-    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
-        .collect(Collectors.toList());
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
+        AccessOption.PERSISTENT);
   }
 
   /**

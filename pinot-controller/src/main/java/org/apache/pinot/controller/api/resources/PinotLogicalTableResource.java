@@ -221,7 +221,8 @@ public class PinotLogicalTableResource {
       LogicalTableUtils.validateLogicalTableName(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames()
+          _pinotHelixResourceManager.getAllBrokerTenantNames(),
+          _pinotHelixResourceManager.getPropertyStore()
       );
       _pinotHelixResourceManager.addLogicalTable(logicalTableConfig);
       return new SuccessResponse(tableName + " logical table successfully added.");
@@ -245,8 +246,8 @@ public class PinotLogicalTableResource {
       LogicalTableUtils.validateLogicalTableName(
           logicalTableConfig,
           _pinotHelixResourceManager.getAllTables(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames()
-      );
+          _pinotHelixResourceManager.getAllBrokerTenantNames(),
+          _pinotHelixResourceManager.getPropertyStore());
       _pinotHelixResourceManager.updateLogicalTable(logicalTableConfig);
       return new SuccessResponse(logicalTableConfig.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {
