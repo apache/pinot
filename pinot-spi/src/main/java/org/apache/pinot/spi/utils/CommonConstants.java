@@ -1042,7 +1042,7 @@ public class CommonConstants {
     public static final int DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS = 10;
 
     public static final String CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS =
-        "server.messagesCount.refreshIntervalSeconds";
+        "pinot.server.messagesCount.refreshIntervalSeconds";
     public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
 
     public static class SegmentCompletionProtocol {
