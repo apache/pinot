@@ -296,7 +296,7 @@
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
-    <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
+    <openhft.chronicle-core.version>2.27ea3</openhft.chronicle-core.version>
     <jdom2.version>2.0.6</jdom2.version>
     <maven.version>3.9.7</maven.version>
     <plexus-utils.version>3.5.1</plexus-utils.version>

@@ -88,7 +88,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
         String version = dep.getVersion();
         if (version != null && !version.trim().startsWith("${")) {
           throw new EnforcerRuleException(String.format(
-              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s."
+              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s. "
               + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
                   + "/dependency-management for the best practice",
               dep.getVersion(), dep.getGroupId(), dep.getArtifactId()
