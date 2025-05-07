@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
-  private IndexTypeMap _indexTypeMap;
+  private final IndexTypeMap _indexTypeMap;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -53,7 +53,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       fieldIndexConfigs = FieldIndexConfigs.EMPTY;
     }
 
-    ArrayList<IndexType> indexTypes = new ArrayList();
+    ArrayList<IndexType> indexTypes = new ArrayList<>();
     ArrayList<IndexReader> readers = new ArrayList<>();
 
     try {

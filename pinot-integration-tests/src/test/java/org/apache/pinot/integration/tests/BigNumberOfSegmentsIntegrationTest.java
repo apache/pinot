@@ -38,7 +38,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.Nullable;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -155,7 +154,7 @@ public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Override
-  protected @Nullable List<String> getRangeIndexColumns() {
+  protected List<String> getRangeIndexColumns() {
     return Arrays.asList(INT_COL);
   }
 
