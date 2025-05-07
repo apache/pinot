@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -147,7 +146,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseServerStarter.class);
 
   private static final long CONSUMER_DIRECTORY_EXCEPTION_VALUE = -1L;
-
   protected String _helixClusterName;
   protected String _zkAddress;
   protected PinotConfiguration _serverConf;
