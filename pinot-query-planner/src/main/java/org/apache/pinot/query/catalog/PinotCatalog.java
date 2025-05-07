@@ -62,6 +62,7 @@ public class PinotCatalog implements Schema {
    * @param name name of the table.
    * @return table object used by calcite planner.
    */
+  @Nullable
   @Override
   public Table getTable(String name) {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
