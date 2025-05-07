@@ -1604,7 +1604,7 @@ public class TableRebalancer {
       boolean anyServerExhaustedBatchSize = false;
       if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
         Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
-        // All partitions should be assigned to the same set of servers so it is enough to check for whether any server
+        // Each partition should be assigned to the same set of servers so it is enough to check for whether any server
         // for one segment is above the limit or not
         Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
         SingleSegmentAssignment firstAssignment =
