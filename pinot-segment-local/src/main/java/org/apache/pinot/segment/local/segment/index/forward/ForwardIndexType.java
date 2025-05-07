@@ -200,7 +200,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    */
   public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata,
       FieldIndexConfigs fieldIndexConfigs)
-      throws IOException {
+      throws IOException, IndexReaderConstraintException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
     return read(dataBuffer, fieldIndexConfigs, columnMetadata);
   }
@@ -211,10 +211,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    * This method will return the default reader, skipping any index overload.
    */
   public static ForwardIndexReader read(PinotDataBuffer dataBuffer, FieldIndexConfigs fieldIndexConfigs,
-      ColumnMetadata metadata) {
+      ColumnMetadata metadata)
+      throws IndexReaderConstraintException {
     ForwardIndexConfig fwdIndexConfig =
         fieldIndexConfigs == null ? null : fieldIndexConfigs.getConfig(StandardIndexes.forward());
-    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, fwdIndexConfig, metadata);
+    return ForwardIndexReaderFactory.getInstance().createIndexReader(dataBuffer, metadata, fwdIndexConfig);
   }
 
   /**
