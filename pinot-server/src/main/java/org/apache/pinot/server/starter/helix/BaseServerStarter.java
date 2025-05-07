@@ -711,7 +711,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS);
     _helixMessageCountScheduler = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("message-count-scheduler-%d").setDaemon(true).build());
-    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, refreshIntervalSeconds, TimeUnit.SECONDS);
+    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, refreshIntervalSeconds,
+        TimeUnit.SECONDS);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
     try {
