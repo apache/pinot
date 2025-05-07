@@ -80,20 +80,6 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return createIndexReader(dataBuffer, metadata);
   }
 
-  public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ForwardIndexConfig indexConfig,
-      ColumnMetadata metadata) {
-    if (indexConfig != null && indexConfig.getConfigs().containsKey(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME)) {
-      String className = indexConfig.getConfigs().get(ForwardIndexType.FORWARD_INDEX_READER_CLASS_NAME).toString();
-      try {
-        return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
-            .newInstance(dataBuffer, metadata);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to create ForwardIndexReader", e);
-      }
-    }
-    return createIndexReader(dataBuffer, metadata);
-  }
-
   private static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
