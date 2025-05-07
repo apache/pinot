@@ -116,10 +116,15 @@ import org.slf4j.LoggerFactory;
 // make sure there is a worker manager when executing queries.
 @Value.Enclosing
 public class QueryEnvironment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
 
   static {
+    // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
+    // This is because Calcite is way too invasive when configured as case-insensitive and doing so leads to all
+    // identifiers being transformed to lower-case after the compilation and validation stage, which is cumbersome for
+    // further processing of the query.
+    // Instead of configuring Calcite as case-insensitive, we force the case-insensitive behavior in specific places
+    // such as [DispatchablePlanVisitor.visitTableScan] and [PinotNameMatcher] used by [PinotCatalogReader].
     Properties connectionConfigProperties = new Properties();
     connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
     CONNECTION_CONFIG = new CalciteConnectionConfigImpl(connectionConfigProperties);
