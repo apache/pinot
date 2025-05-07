@@ -169,7 +169,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   private ScheduledExecutorService _helixMessageCountScheduler;
-  private final AtomicInteger _cachedMessageCount = new AtomicInteger(0);
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -1081,12 +1080,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       List<String> children = dataAccessor.getBaseDataAccessor()
           .getChildNames(String.format("/%s/INSTANCES/%s/MESSAGES", _helixClusterName, _instanceId), 0);
       int messageCount = children == null ? 0 : children.size();
-      _cachedMessageCount.set(messageCount);
       ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
       serverMetrics.setValueOfGlobalGauge(ServerGauge.HELIX_MESSAGES_COUNT, messageCount);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Updated Helix message count to: {}", messageCount);
-      }
     } catch (Exception e) {
       LOGGER.warn("Failed to refresh Helix message count", e);
     }
