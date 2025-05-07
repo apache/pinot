@@ -49,6 +49,10 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     setSkipModules(skipModules);
   }
 
+  /**
+   * Setter method used by Maven to inject the <skipModules> parameter
+   * from the POM into this rule, parsing String into a list
+   */
   public void setSkipModules(String skipModules) {
     if (skipModules == null || skipModules.isBlank()) {
       _skipModuleList = new ArrayList<>();
@@ -73,8 +77,8 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
 
     Model originalModel = project.getOriginalModel();
 
-    // Check if Root POM has hardcoded in <dependencyManagement>
     if (project.isExecutionRoot()) {
+      // Check if Root POM has hardcoded in <dependencyManagement>
       DependencyManagement depMgmt = originalModel.getDependencyManagement();
       if (depMgmt == null || depMgmt.getDependencies() == null) {
         return;
@@ -89,6 +93,18 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
           ));
         }
       }
+
+      // Check if any dependencies are defined outside <dependencyManagement> (defining in <plugins> is valid)
+      List<Dependency> directDependencies = originalModel.getDependencies();
+      if (directDependencies != null && !directDependencies.isEmpty()) {
+        for (Dependency dep : directDependencies) {
+          throw new EnforcerRuleException(String.format(
+              "Root POM defines a dependency (%s:%s) outside <dependencyManagement>. "
+                  + "Define dependencies only in <dependencyManagement>, or within <build><plugins>.",
+              dep.getGroupId(), dep.getArtifactId()
+          ));
+        }
+      }
       return;
     }
 
@@ -96,9 +112,11 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     if (_skipModuleList != null && !_skipModuleList.isEmpty()) {
       Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
       Path modulePath = project.getBasedir().toPath().toAbsolutePath().normalize();
-      String pathString = modulePath.toString();
+      Path relativePath = rootPath.relativize(modulePath);
+      String topLevelModule = relativePath.getNameCount() > 0 ? relativePath.getName(0).toString() : "";
+
       for (String skip : _skipModuleList) {
-        if (pathString.contains(skip)) {
+        if (topLevelModule.contains(skip)) {
           return;
         }
       }
