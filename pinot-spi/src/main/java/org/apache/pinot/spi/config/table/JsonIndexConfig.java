@@ -181,12 +181,12 @@ public class JsonIndexConfig extends IndexConfig {
     _skipInvalidJson = skipInvalidJson;
   }
 
-  public long getMaxBytesSize() {
-    return _maxBytesSize == null ? Long.MAX_VALUE : _maxBytesSize;
+  @Nullable
+  public Long getMaxBytesSize() {
+    return _maxBytesSize;
   }
 
-  public void setMaxBytesSize(Long maxBytesSize) {
-    Preconditions.checkArgument(maxBytesSize > 0, "Max bytes size must be greater than 0");
+  public void setMaxBytesSize(@Nullable Long maxBytesSize) {
     _maxBytesSize = maxBytesSize;
   }
 

@@ -77,6 +77,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   private final ReentrantReadWriteLock.WriteLock _writeLock;
   private final String _segmentName;
   private final String _columnName;
+  private final long _maxBytesSize;
 
   private int _nextDocId;
   private int _nextFlattenedDocId;
@@ -89,6 +90,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     _columnName = columnName;
     _postingListMap = new TreeMap<>();
     _docIdMapping = new IntArrayList();
+    _maxBytesSize = jsonIndexConfig.getMaxBytesSize() == null ? Long.MAX_VALUE : jsonIndexConfig.getMaxBytesSize();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     _readLock = readWriteLock.readLock();
@@ -755,7 +757,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   @Override
   public boolean canAddMore() {
-    return _bytesSize < _jsonIndexConfig.getMaxBytesSize();
+    return _bytesSize < _maxBytesSize;
   }
 
   // AND given bitmaps, optionally converting first one to mutable (if it's not already)
