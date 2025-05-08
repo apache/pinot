@@ -1233,7 +1233,7 @@ public class ControllerTest {
     // Delete logical tables
     List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();
     for (String logicalTableName : logicalTables) {
-      _helixResourceManager.deleteLogicalTable(logicalTableName);
+      _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
     }
 
     // Delete all tables
