@@ -97,6 +97,51 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
     return routeInfo;
   }
 
+  public LogicalTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache) {
+    LogicalTableConfig logicalTable = tableCache.getLogicalTableConfig(tableName);
+    if (logicalTable == null) {
+      return new LogicalTableRouteInfo();
+    }
+
+    PhysicalTableRouteProvider routeProvider = new PhysicalTableRouteProvider();
+
+    List<TableRouteInfo> offlineTables = new ArrayList<>();
+    List<TableRouteInfo> realtimeTables = new ArrayList<>();
+    for (String physicalTableName : logicalTable.getPhysicalTableConfigMap().keySet()) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
+      Preconditions.checkNotNull(tableType);
+      TableRouteInfo physicalTableInfo = routeProvider.getTableRouteInfo(physicalTableName, tableCache);
+
+      if (physicalTableInfo.isExists()) {
+        if (tableType == TableType.OFFLINE) {
+          offlineTables.add(physicalTableInfo);
+        } else {
+          realtimeTables.add(physicalTableInfo);
+        }
+      }
+    }
+
+    LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTable);
+    if (!offlineTables.isEmpty()) {
+      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTable.getRefOfflineTableName());
+      Preconditions.checkNotNull(offlineTableConfig,
+          "Offline table config not found: " + logicalTable.getRefOfflineTableName());
+      routeInfo.setOfflineTables(offlineTables);
+      routeInfo.setOfflineTableConfig(offlineTableConfig);
+    }
+
+    if (!realtimeTables.isEmpty()) {
+      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTable.getRefRealtimeTableName());
+      Preconditions.checkNotNull(realtimeTableConfig,
+          "Realtime table config not found: " + logicalTable.getRefRealtimeTableName());
+      routeInfo.setRealtimeTables(realtimeTables);
+      routeInfo.setRealtimeTableConfig(realtimeTableConfig);
+    }
+
+    routeInfo.setQueryConfig(logicalTable.getQueryConfig());
+    return routeInfo;
+  }
+
   @Override
   public void calculateRoutes(TableRouteInfo tableRouteInfo, RoutingManager routingManager,
       BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest, long requestId) {
@@ -107,8 +152,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     if (routeInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableInfo : routeInfo.getOfflineTables()) {
-        routeProvider.calculateRoutes(physicalTableInfo, routingManager, offlineBrokerRequest, null,
-            requestId);
+        routeProvider.calculateRoutes(physicalTableInfo, routingManager, offlineBrokerRequest, null, requestId);
         numPrunedSegments += physicalTableInfo.getNumPrunedSegmentsTotal();
         if (physicalTableInfo.getUnavailableSegments() != null) {
           unavailableSegments.addAll(physicalTableInfo.getUnavailableSegments());
@@ -118,8 +162,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     if (routeInfo.getRealtimeTables() != null) {
       for (TableRouteInfo physicalTableInfo : routeInfo.getRealtimeTables()) {
-        routeProvider.calculateRoutes(physicalTableInfo, routingManager, null, realtimeBrokerRequest,
-            requestId);
+        routeProvider.calculateRoutes(physicalTableInfo, routingManager, null, realtimeBrokerRequest, requestId);
         numPrunedSegments += physicalTableInfo.getNumPrunedSegmentsTotal();
         if (physicalTableInfo.getUnavailableSegments() != null) {
           unavailableSegments.addAll(physicalTableInfo.getUnavailableSegments());

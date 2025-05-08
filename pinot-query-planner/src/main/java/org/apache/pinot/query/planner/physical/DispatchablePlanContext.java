@@ -103,6 +103,8 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
+      Map<Integer, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> workerIdToTableNameSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
@@ -114,6 +116,9 @@ public class DispatchablePlanContext {
         WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
         if (workerIdToSegmentsMap != null) {
           workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+        }
+        if (workerIdToTableNameSegmentsMap != null) {
+          workerMetadata.setLogicalTableSegmentsMap(workerIdToTableNameSegmentsMap.get(workerId));
         }
         workerMetadataArray[workerId] = workerMetadata;
       }
