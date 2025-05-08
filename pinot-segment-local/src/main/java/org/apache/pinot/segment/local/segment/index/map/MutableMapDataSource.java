@@ -71,6 +71,12 @@ public class MutableMapDataSource extends BaseMapDataSource {
     return _mapIndexReader;
   }
 
+  @Nullable
+  @Override
+  public MapIndexReader getMapIndex() {
+    return _mapIndexReader;
+  }
+
   private static class MutableMapDataSourceMetadata implements DataSourceMetadata {
     final FieldSpec _fieldSpec;
     final int _numDocs;
