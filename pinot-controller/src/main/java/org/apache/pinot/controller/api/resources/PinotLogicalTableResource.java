@@ -190,7 +190,7 @@ public class PinotLogicalTableResource {
       @ApiParam(value = "Logical table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    if (_pinotHelixResourceManager.deleteLogicalTable(tableName)) {
+    if (_pinotHelixResourceManager.deleteLogicalTableConfig(tableName)) {
       return new SuccessResponse(tableName + " logical table successfully deleted.");
     } else {
       throw new ControllerApplicationException(LOGGER, "Failed to delete logical table",
@@ -223,7 +223,7 @@ public class PinotLogicalTableResource {
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
       );
-      _pinotHelixResourceManager.addLogicalTable(logicalTableConfig);
+      _pinotHelixResourceManager.addLogicalTableConfig(logicalTableConfig);
       return new SuccessResponse(tableName + " logical table successfully added.");
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -247,7 +247,7 @@ public class PinotLogicalTableResource {
           _pinotHelixResourceManager.getAllTables(),
           _pinotHelixResourceManager.getAllBrokerTenantNames()
       );
-      _pinotHelixResourceManager.updateLogicalTable(logicalTableConfig);
+      _pinotHelixResourceManager.updateLogicalTableConfig(logicalTableConfig);
       return new SuccessResponse(logicalTableConfig.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find logical table " + tableName,

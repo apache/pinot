@@ -119,7 +119,7 @@ public class TableCacheTest {
     // Add logical table
     LogicalTableConfig logicalTableConfig =
         ControllerTest.getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME), "DefaultTenant");
-    TEST_INSTANCE.getHelixResourceManager().addLogicalTable(logicalTableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addLogicalTableConfig(logicalTableConfig);
     // Wait for at most 10 seconds for the callback to add the logical table to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME) != null, 10_000L,
         "Failed to add the logical table to the cache");
@@ -230,7 +230,7 @@ public class TableCacheTest {
     logicalTableConfig.setQueryConfig(new QueryConfig(
         1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L
     ));
-    TEST_INSTANCE.getHelixResourceManager().updateLogicalTable(logicalTableConfig);
+    TEST_INSTANCE.getHelixResourceManager().updateLogicalTableConfig(logicalTableConfig);
     TestUtils.waitForCondition(
         aVoid -> Objects.requireNonNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME))
             .getPhysicalTableConfigMap().size() == 2, 10_000L,
@@ -273,7 +273,7 @@ public class TableCacheTest {
         "Failed to remove the schema from the cache");
 
     // Remove logical table
-    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTable(LOGICAL_TABLE_NAME);
+    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTableConfig(LOGICAL_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the logical table from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the logical table change lister because it is the last step of
