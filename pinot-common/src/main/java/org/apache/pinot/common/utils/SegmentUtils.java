@@ -112,4 +112,11 @@ public class SegmentUtils {
     }
     return segmentZKMetadata.getCreationTime();
   }
+
+  /**
+   * Return table name without type from segment name
+   */
+  public static String getTableNameFromSegmentName(String segmentName) {
+    return segmentName.substring(0, segmentName.indexOf("__"));
+  }
 }

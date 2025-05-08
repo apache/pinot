@@ -63,6 +63,11 @@ public class JsonIndexConfig extends IndexConfig {
   private int _maxValueLength = 0;
   private boolean _skipInvalidJson = false;
 
+  /**
+   * Max on-heap bytes size of the mutable JSON index. An underestimate, as this excludes the posting lists.
+   */
+  private Long _maxBytesSize;
+
   public JsonIndexConfig() {
     super(false);
   }
@@ -80,7 +85,8 @@ public class JsonIndexConfig extends IndexConfig {
       @JsonProperty("excludeFields") @Nullable Set<String> excludeFields,
       @JsonProperty("indexPaths") @Nullable Set<String> indexPaths,
       @JsonProperty("maxValueLength") int maxValueLength,
-      @JsonProperty("skipInvalidJson") boolean skipInvalidJson) {
+      @JsonProperty("skipInvalidJson") boolean skipInvalidJson,
+      @JsonProperty("maxBytesSize") @Nullable Long maxBytesSize) {
     super(disabled);
     _maxLevels = maxLevels;
     _excludeArray = excludeArray;
@@ -91,6 +97,7 @@ public class JsonIndexConfig extends IndexConfig {
     _indexPaths = indexPaths;
     _maxValueLength = maxValueLength;
     _skipInvalidJson = skipInvalidJson;
+    _maxBytesSize = maxBytesSize;
   }
 
   public int getMaxLevels() {
@@ -172,6 +179,15 @@ public class JsonIndexConfig extends IndexConfig {
 
   public void setSkipInvalidJson(boolean skipInvalidJson) {
     _skipInvalidJson = skipInvalidJson;
+  }
+
+  @Nullable
+  public Long getMaxBytesSize() {
+    return _maxBytesSize;
+  }
+
+  public void setMaxBytesSize(@Nullable Long maxBytesSize) {
+    _maxBytesSize = maxBytesSize;
   }
 
   @Override
