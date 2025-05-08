@@ -59,6 +59,7 @@ jobs:
       - name: Install dependency-verifier into repo
         run: |
           mvn clean install \
+          -N \
           -f pinot-dependency-verifier/pom.xml \
           -DskipTests
       - name: Full reactor build + dependency-verifier
