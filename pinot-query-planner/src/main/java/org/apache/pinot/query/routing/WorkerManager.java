@@ -35,18 +35,22 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
+import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -373,7 +377,11 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
     Map<String, String> tableOptions = metadata.getTableOptions();
     if (tableOptions == null) {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      if (metadata.getLogicalTableRouteInfo() != null) {
+        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
+      } else {
+        assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      }
       return;
     }
 
@@ -392,7 +400,11 @@ public class WorkerManager {
     if (Boolean.parseBoolean(tableOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
       setSegmentsForReplicatedLeafFragment(metadata);
     } else {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      if (metadata.getLogicalTableRouteInfo() != null) {
+        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
+      } else {
+        assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      }
     }
   }
 
@@ -537,6 +549,94 @@ public class WorkerManager {
   private List<String> setSegmentsHelper(String tableNameWithType) {
     return _routingManager.getSegments(
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""));
+  }
+
+  private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    LogicalTableRouteInfo logicalTableRouteInfo = metadata.getLogicalTableRouteInfo();
+    Preconditions.checkNotNull(logicalTableRouteInfo);
+    LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+
+    if (logicalTableRouteInfo.hasOffline()) {
+      offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getOfflineTableName() + "\"");
+    }
+
+    if (logicalTableRouteInfo.hasRealtime()) {
+      realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getRealtimeTableName() + "\"");
+    }
+
+    tableRouteProvider.calculateRoutes(logicalTableRouteInfo, _routingManager, offlineBrokerRequest,
+        realtimeBrokerRequest, context.getRequestId());
+
+    assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
+
+    // TODO: Set Time Boundary Info if applicable. https://github.com/apache/pinot/issues/15640
+  }
+
+  private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
+      DispatchablePlanMetadata metadata) {
+    Map<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> serverInstanceToLogicalSegmentsMap =
+        new HashMap<>();
+
+    String tableType = TableType.OFFLINE.name();
+    if (logicalTableRouteInfo.getOfflineTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
+        Preconditions.checkNotNull(physicalTableRoute.getOfflineRoutingTable());
+        transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
+            physicalTableRoute.getOfflineRoutingTable(), tableType, serverInstanceToLogicalSegmentsMap);
+      }
+    }
+
+    tableType = TableType.REALTIME.name();
+    if (logicalTableRouteInfo.getRealtimeTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
+        Preconditions.checkNotNull(physicalTableRoute.getRealtimeRoutingTable());
+        transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
+            physicalTableRoute.getRealtimeRoutingTable(), tableType, serverInstanceToLogicalSegmentsMap);
+      }
+    }
+
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> workerIdToLogicalTableSegmentsMap =
+        new HashMap<>();
+    for (Map.Entry<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> entry
+        : serverInstanceToLogicalSegmentsMap.entrySet()) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
+    }
+
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    metadata.setWorkerIdToTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
+  }
+
+  private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
+      Map<ServerInstance, ServerRouteInfo> segmentsMap, String tableType,
+      Map<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap>
+          serverInstanceToLogicalSegmentsMap) {
+    Map<ServerInstance, DispatchablePlanMetadata.TableTypeToSegmentsMap> serverInstanceToTableTypeToSegmentsMap =
+        new HashMap<>();
+    for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+      DispatchablePlanMetadata.TableTypeToSegmentsMap tableTypeToSegmentsMap =
+          serverInstanceToTableTypeToSegmentsMap.computeIfAbsent(serverEntry.getKey(),
+              k -> new DispatchablePlanMetadata.TableTypeToSegmentsMap());
+      // TODO: support optional segments for multi-stage engine.
+      Preconditions.checkState(tableTypeToSegmentsMap._map.put(tableType, serverEntry.getValue().getSegments()) == null,
+          "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+    }
+
+    for (Map.Entry<ServerInstance, DispatchablePlanMetadata.TableTypeToSegmentsMap> entry
+        : serverInstanceToTableTypeToSegmentsMap.entrySet()) {
+      DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap =
+          serverInstanceToLogicalSegmentsMap.computeIfAbsent(entry.getKey(),
+              k -> new DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap());
+      logicalTableSegmentsMap._map.put(physicalTableName, entry.getValue());
+    }
   }
 
   // --------------------------------------------------------------------------

@@ -99,6 +99,33 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
     return tableRouteInfo;
   }
 
+  public ImplicitHybridTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache) {
+    ImplicitHybridTableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo();
+
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+
+    if (tableType == TableType.OFFLINE) {
+      tableRouteInfo.setOfflineTableName(tableName);
+    } else if (tableType == TableType.REALTIME) {
+      tableRouteInfo.setRealtimeTableName(tableName);
+    } else {
+      tableRouteInfo.setOfflineTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      tableRouteInfo.setRealtimeTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    }
+
+    String offlineTableName = tableRouteInfo.getOfflineTableName();
+    String realtimeTableName = tableRouteInfo.getRealtimeTableName();
+
+    if (offlineTableName != null) {
+      tableRouteInfo.setOfflineTableConfig(tableCache.getTableConfig(offlineTableName));
+    }
+
+    if (realtimeTableName != null) {
+      tableRouteInfo.setRealtimeTableConfig(tableCache.getTableConfig(realtimeTableName));
+    }
+    return tableRouteInfo;
+  }
+
   @Override
   public void calculateRoutes(TableRouteInfo tableRouteInfo, RoutingManager routingManager,
       BrokerRequest offlineBrokerRequest,
