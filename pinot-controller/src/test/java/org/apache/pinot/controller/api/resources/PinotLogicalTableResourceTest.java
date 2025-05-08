@@ -249,7 +249,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   @Test
   public void testLogicalTableNameSuffixValidation()
       throws IOException {
-    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_4"));
 
     // Test logical table name with _OFFLINE and _REALTIME is not allowed
     LogicalTableConfig logicalTableConfig =
@@ -300,7 +300,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testLogicalTableWithSameNameNotAllowed()
       throws IOException {
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
-    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1", "test_table_2"));
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_5"));
 
     LogicalTableConfig
         logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
