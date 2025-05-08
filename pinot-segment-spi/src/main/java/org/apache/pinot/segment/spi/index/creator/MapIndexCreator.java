@@ -26,6 +26,7 @@ import java.util.Map;
  * the IndexCreationContext and the implementation of this Interface can use that to determine the on
  * disk representation of the Map.
  */
+@Deprecated
 public interface MapIndexCreator extends ForwardIndexCreator {
   int VERSION_1 = 1;
 
