@@ -208,7 +208,6 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   @Deprecated
-  @JsonCreator
   public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
       @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
