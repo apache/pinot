@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -1122,7 +1121,7 @@ public class ForwardIndexHandlerTest {
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column), null);
+            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertEquals(forwardIndexReader.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
@@ -1149,7 +1148,7 @@ public class ForwardIndexHandlerTest {
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column), null);
+            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertNull(forwardIndexReader.getDictIdCompressionType());
@@ -2020,14 +2019,12 @@ public class ForwardIndexHandlerTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted);
-    } catch (IndexReaderConstraintException e) {
-      throw new RuntimeException(e);
     }
   }
 
   private void validateForwardIndex(SegmentDirectory segmentDirectory, SegmentDirectory.Reader reader,
       String columnName, @Nullable CompressionCodec expectedCompressionType, boolean isSorted)
-      throws IOException, IndexReaderConstraintException {
+      throws IOException {
     ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     boolean isSingleValue = columnMetadata.isSingleValue();
 
@@ -2039,7 +2036,7 @@ public class ForwardIndexHandlerTest {
     assertTrue(reader.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata, null);
+    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertNotNull(fwdIndexCompressionType);
@@ -2048,7 +2045,7 @@ public class ForwardIndexHandlerTest {
       assertNull(fwdIndexCompressionType);
     }
 
-    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, columnMetadata, null)) {
+    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);

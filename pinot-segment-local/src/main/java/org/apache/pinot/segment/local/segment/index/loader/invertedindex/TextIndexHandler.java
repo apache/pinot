@@ -188,9 +188,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 
-    try (
-        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
-            columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
       if (columnMetadata.isSingleValue()) {
