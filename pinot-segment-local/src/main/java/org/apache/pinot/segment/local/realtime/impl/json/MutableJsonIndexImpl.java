@@ -746,7 +746,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   public void close() {
     try {
       String tableName = SegmentUtils.getTableNameFromSegmentName(_segmentName);
-      _serverMetrics.addMeteredTableValue(tableName, _columnName, ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE,
+      _serverMetrics.addMeteredTableValue(tableName, _columnName, ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE,
           _bytesSize);
     } catch (Exception e) {
       LOGGER.warn(

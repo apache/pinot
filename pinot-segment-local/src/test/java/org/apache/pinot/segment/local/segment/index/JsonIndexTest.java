@@ -942,7 +942,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
 
     verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table1"), eq("col"),
-        eq(ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE),
+        eq(ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE),
         eq(25L)); // bytes(.key) + bytes(.key\u0000value) +  bytes(.key\u0000value2)
 
     jsonIndexConfig.setMaxBytesSize(5L);
@@ -954,7 +954,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       fail();
     }
     verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table2"), eq("col"),
-        eq(ServerMeter.REALTIME_JSON_INDEX_MEMORY_USAGE),
+        eq(ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE),
         eq(35L)); // bytes(.anotherKey) + bytes(.anotherKey\u0000anotherValue)
   }
 
