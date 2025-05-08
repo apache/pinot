@@ -25,6 +25,8 @@ java -version
 ifconfig
 netstat -i
 
+# build & install every module
+mvn -B -ntp -T1C clean install -DskipTests || exit 1
 
 mvn -B -ntp -T1C license:check || exit 1
 mvn -B -ntp -T1C checkstyle:check || exit 1
