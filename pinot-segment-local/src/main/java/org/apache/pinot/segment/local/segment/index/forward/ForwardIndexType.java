@@ -76,7 +76,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   );
   //@formatter:on
 
-  private static ForwardIndexType _instance = new ForwardIndexType();
+  private static volatile ForwardIndexType _instance = new ForwardIndexType();
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
