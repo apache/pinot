@@ -55,6 +55,8 @@ public class PinotDispatchPlanner {
    */
   public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
     // perform physical plan conversion and assign workers to each stage.
+    // metadata may come directly from Calcite's RelNode which has not resolved actual table names (taking
+    // case-sensitivity into account) yet, so we need to ensure table names are resolved while creating the subplan.
     DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
         subPlan.getSubPlanMetadata().getFields(),
         resolveActualTableNames(subPlan.getSubPlanMetadata().getTableNames()));
@@ -76,6 +78,8 @@ public class PinotDispatchPlanner {
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
+  /// Returns the actual table names taking the case-sensitivity configured within the `TableCache` instance into
+  /// account.
   private Set<String> resolveActualTableNames(Set<String> tableNames) {
     Set<String> actualTableNames = new HashSet<>();
     for (String tableName : tableNames) {

@@ -102,7 +102,12 @@ public class PinotNameMatcher implements SqlNameMatcher {
   }
 
   private static List<String> concat(List<String> prefixNames, List<String> names) {
-    return new FlatViewList<>(prefixNames, names);
+    /// Calcite's original code at `SqlNameMatchers.BaseMatcher.concat` creates a new list with the concatenation of
+    /// prefixNames and names, leading to an extra allocation and potential copy of the values that we can avoid when
+    /// the only purpose of the returning list is to iterate over its elements during an equality check. FlatViewList
+    /// is a custom implementation that allows to iterate over the element of the two input lists without allocation a
+    /// new one.
+    return prefixNames.isEmpty() ? names : new FlatViewList<>(prefixNames, names);
   }
 
   /// Checks if the concatenation of two string lists matches a third list.

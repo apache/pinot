@@ -25,7 +25,9 @@ import java.util.ListIterator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-
+/// A list that flattens multiple lists into a single view, allowing to iterate over them in an ordered manner without
+/// the need of allocation a new list and potentially copying the original values. As a View it is immutable and will
+/// throw an error for any modification operation.
 public class FlatViewList<T> implements List<T> {
 
   private final List<T>[] _parts;
