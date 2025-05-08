@@ -45,7 +45,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class LogicalTableRouteInfo extends BaseTableRouteInfo {
-  private final LogicalTableConfig _logicalTable;
+  private final String _logicalTableName;
   private List<TableRouteInfo> _offlineTables;
   private List<TableRouteInfo> _realtimeTables;
   private TableConfig _offlineTableConfig;
@@ -58,12 +58,12 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
   private BrokerRequest _realtimeBrokerRequest;
   private TimeBoundaryInfo _timeBoundaryInfo;
 
-  LogicalTableRouteInfo() {
-    _logicalTable = null;
+  public LogicalTableRouteInfo() {
+    _logicalTableName = null;
   }
 
   public LogicalTableRouteInfo(LogicalTableConfig logicalTable) {
-    _logicalTable = logicalTable;
+    _logicalTableName = logicalTable.getTableName();
   }
 
   @Override
@@ -137,6 +137,11 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     instanceRequest.setTableSegmentsInfoList(tableSegmentsInfoList);
     instanceRequest.setBrokerId(brokerId);
     return instanceRequest;
+  }
+
+  @Nullable
+  public String getLogicalTableName() {
+    return _logicalTableName;
   }
 
   @Nullable
@@ -234,15 +239,15 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
   @Nullable
   @Override
   public String getOfflineTableName() {
-    return hasOffline() && _logicalTable != null ? TableNameBuilder.OFFLINE.tableNameWithType(
-        _logicalTable.getTableName()) : null;
+    return hasOffline() && _logicalTableName != null ? TableNameBuilder.OFFLINE.tableNameWithType(_logicalTableName)
+        : null;
   }
 
   @Nullable
   @Override
   public String getRealtimeTableName() {
-    return hasRealtime() && _logicalTable != null ? TableNameBuilder.REALTIME.tableNameWithType(
-        _logicalTable.getTableName()) : null;
+    return hasRealtime() && _logicalTableName != null ? TableNameBuilder.REALTIME.tableNameWithType(_logicalTableName)
+        : null;
   }
 
   @Nullable

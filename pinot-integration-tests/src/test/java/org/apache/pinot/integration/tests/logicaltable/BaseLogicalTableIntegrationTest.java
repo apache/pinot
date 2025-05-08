@@ -344,22 +344,29 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(new HashSet<>(getPhysicalTableNames()), logicalTableConfig.getPhysicalTableConfigMap().keySet());
   }
 
-  @Test
-  public void testHardcodedQueries()
+  @Override
+  protected Map<String, String> getExtraQueryProperties() {
+    return Map.of(); //"timeoutMs", "300000");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
   public void testQueriesFromQueryFile()
       throws Exception {
+    setUseMultiStageQueryEngine(false);
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries(true, false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test
