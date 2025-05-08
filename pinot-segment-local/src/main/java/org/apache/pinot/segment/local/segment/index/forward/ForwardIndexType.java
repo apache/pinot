@@ -61,9 +61,6 @@ import org.apache.pinot.spi.data.Schema;
 
 public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "forward";
-  public static final String FORWARD_INDEX_READER_CLASS_NAME = "forwardIndexReaderClassName";
-  public static final String FORWARD_INDEX_CREATOR_CLASS_NAME = "forwardIndexCreatorClassName";
-
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -79,8 +76,18 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   );
   //@formatter:on
 
+  private static ForwardIndexType _instance = new ForwardIndexType();
+
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
+  }
+
+  public static ForwardIndexType getInstance() {
+    return _instance;
+  }
+
+  public static void setInstance(ForwardIndexType instance) {
+    _instance = instance;
   }
 
   @Override
@@ -198,11 +205,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    *
    * This method will return the default reader, skipping any index overload.
    */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata,
-      FieldIndexConfigs fieldIndexConfigs)
-      throws IOException, IndexReaderConstraintException {
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
+      throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
-    return read(dataBuffer, fieldIndexConfigs, columnMetadata);
+    return read(dataBuffer, columnMetadata);
   }
 
   /**
@@ -210,12 +216,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    *
    * This method will return the default reader, skipping any index overload.
    */
-  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, FieldIndexConfigs fieldIndexConfigs,
-      ColumnMetadata metadata)
-      throws IndexReaderConstraintException {
-    ForwardIndexConfig fwdIndexConfig =
-        fieldIndexConfigs == null ? null : fieldIndexConfigs.getConfig(StandardIndexes.forward());
-    return ForwardIndexReaderFactory.getInstance().createIndexReader(dataBuffer, metadata, fwdIndexConfig);
+  public static ForwardIndexReader read(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+    return ForwardIndexReaderFactory.createIndexReader(dataBuffer, metadata);
   }
 
   /**

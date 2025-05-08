@@ -202,9 +202,7 @@ public class VectorIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .build();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
-    try (
-        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
-            columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         VectorIndexCreator vectorIndexCreator = StandardIndexes.vector().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();

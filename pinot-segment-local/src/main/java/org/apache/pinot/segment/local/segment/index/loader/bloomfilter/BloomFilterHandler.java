@@ -133,15 +133,13 @@ public class BloomFilterHandler extends BaseIndexHandler {
       BloomFilterConfig bloomFilterConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    String columnName = columnMetadata.getColumnName();
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .build();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);
-        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, _fieldIndexConfigs.get(columnName),
-            columnMetadata);
+        ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
         // SV
