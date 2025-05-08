@@ -231,7 +231,6 @@ public class TableCache implements PinotConfigProvider {
    */
   @Nullable
   public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
-    tableNameWithType = _ignoreCase ? tableNameWithType.toLowerCase() : tableNameWithType;
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     if (tableConfigInfo != null) {
       return tableConfigInfo._expressionOverrideMap;
@@ -262,7 +261,6 @@ public class TableCache implements PinotConfigProvider {
   @Nullable
   @Override
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName) {
-    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(logicalTableName);
     return logicalTableConfigInfo != null ? logicalTableConfigInfo._logicalTableConfig : null;
   }
@@ -370,12 +368,11 @@ public class TableCache implements PinotConfigProvider {
       throws IOException {
     LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
+    _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
     if (_ignoreCase) {
       _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
-      _logicalTableConfigInfoMap.put(logicalTableName.toLowerCase(), new LogicalTableConfigInfo(logicalTableConfig));
     } else {
       _logicalTableNameMap.put(logicalTableName, logicalTableName);
-      _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
     }
   }
 
@@ -413,8 +410,8 @@ public class TableCache implements PinotConfigProvider {
   private void removeLogicalTableConfig(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkLogicalTableConfigChangeListener);
     String logicalTableName = path.substring(LOGICAL_TABLE_PATH_PREFIX.length());
-    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     _logicalTableConfigInfoMap.remove(logicalTableName);
+    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     _logicalTableNameMap.remove(logicalTableName);
   }
 

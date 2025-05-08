@@ -126,8 +126,6 @@ public class TableCacheTest {
     // Logical table can be accessed by the logical table name
     if (isCaseInsensitive) {
       assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
-      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
-      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
       assertNull(tableCache.getExpressionOverrideMap(MANGLED_LOGICAL_TABLE_NAME));
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
@@ -237,9 +235,7 @@ public class TableCacheTest {
         "Failed to update the logical table in the cache"
     );
     if (isCaseInsensitive) {
-      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
-      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), getExpectedSchema(ANOTHER_TABLE));
-      assertNotNull(tableCache.getExpressionOverrideMap(MANGLED_LOGICAL_TABLE_NAME));
+      assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
@@ -262,6 +258,15 @@ public class TableCacheTest {
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
+    // Remove logical table
+    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTableConfig(LOGICAL_TABLE_NAME);
+    // Wait for at most 10 seconds for the callback to remove the logical table from the cache
+    // NOTE:
+    // - Verify if the callback is fully done by checking the logical table change lister because it is the last step of
+    //   the callback handling
+    TestUtils.waitForCondition(aVoid -> logicalTableConfigChangeListener._logicalTableConfigList.isEmpty(), 10_000L,
+        "Failed to remove the logical table from the cache");
+
     // Remove the schema
     TEST_INSTANCE.getHelixResourceManager().deleteSchema(RAW_TABLE_NAME);
     TEST_INSTANCE.getHelixResourceManager().deleteSchema(ANOTHER_TABLE);
@@ -271,15 +276,6 @@ public class TableCacheTest {
     //   callback handling
     TestUtils.waitForCondition(aVoid -> schemaChangeListener._schemaList.isEmpty(), 10_000L,
         "Failed to remove the schema from the cache");
-
-    // Remove logical table
-    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTableConfig(LOGICAL_TABLE_NAME);
-    // Wait for at most 10 seconds for the callback to remove the logical table from the cache
-    // NOTE:
-    // - Verify if the callback is fully done by checking the logical table change lister because it is the last step of
-    //   the callback handling
-    TestUtils.waitForCondition(aVoid -> logicalTableConfigChangeListener._logicalTableConfigList.isEmpty(), 10_000L,
-        "Failed to remove the logical table from the cache");
 
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getSchema(ANOTHER_TABLE));
