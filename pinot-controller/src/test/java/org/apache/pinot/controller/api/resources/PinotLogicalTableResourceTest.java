@@ -132,20 +132,16 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     verifyLogicalTableDoesNotExists(getLogicalTableUrl);
   }
 
-  @Test
-  public void testLogicalTableQuoteConfigValidation()
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Reason: 'quota.storage' should not be set for logical table.*")
+  public void testLogicalTableQuotaConfigValidation()
       throws IOException {
     List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
     LogicalTableConfig logicalTableConfig =
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
     logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", "999"));
-    try {
-      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'quota.storage' should not be set for logical table"),
-          e.getMessage());
-    }
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    fail("Logical Table POST request should have failed");
   }
 
   @Test
@@ -202,19 +198,16 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Reason: 'InvalidTenant' should be one of the existing broker tenants.*")
   public void testLogicalTableBrokerTenantValidation()
       throws IOException {
-    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_3"));
     LogicalTableConfig logicalTableConfig =
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
-    try {
-      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'InvalidTenant' should be one of the existing broker tenants"),
-          e.getMessage());
-    }
+
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    fail("Logical Table POST request should have failed");
   }
 
   @Test
@@ -241,18 +234,16 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Table name: test_table_1 already exists.*")
   public void testLogicalTableNameCannotSameAsPhysicalTableNameValidation()
       throws IOException {
-    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
+    String tableName = "test_table_1";
+    List<String> physicalTableNamesWithType = createHybridTables(List.of(tableName));
     LogicalTableConfig logicalTableConfig =
-        getDummyLogicalTableConfig("test_table_1", physicalTableNamesWithType, BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Table name: test_table_1 already exists"), e.getMessage());
-    }
+        getDummyLogicalTableConfig(tableName, physicalTableNamesWithType, BROKER_TENANT);
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    fail("Logical Table POST request should have failed");
   }
 
   @Test
