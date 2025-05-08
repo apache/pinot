@@ -127,6 +127,7 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.LogicalTableUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -1831,6 +1832,17 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table {}: Start", tableName);
 
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableUtils.validateLogicalTableName(
+        logicalTableConfig,
+        getAllTables(),
+        getAllBrokerTenantNames(),
+        _propertyStore
+    );
+
     // Check if the logical table name is already used
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
@@ -2108,6 +2120,17 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table {}: Start", tableName);
 
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableUtils.validateLogicalTableName(
+        logicalTableConfig,
+        getAllTables(),
+        getAllBrokerTenantNames(),
+        _propertyStore
+    );
+
     if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
@@ -2320,9 +2343,10 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllLogicalTableNames() {
-    return _propertyStore.getChildNames(
+    List<String> logicalTableNames = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
         AccessOption.PERSISTENT);
+    return logicalTableNames != null ? logicalTableNames : Collections.emptyList();
   }
 
   /**
