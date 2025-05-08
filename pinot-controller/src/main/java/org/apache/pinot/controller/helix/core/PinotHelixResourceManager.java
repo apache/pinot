@@ -539,6 +539,7 @@ public class PinotHelixResourceManager {
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
   }
 
+  @Nullable
   private String getBrokerTenantName(String tableName) {
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     if (offlineTableConfig != null) {
@@ -1819,7 +1820,7 @@ public class PinotHelixResourceManager {
    * @param logicalTableConfig The logical table config to be added
    * @throws TableAlreadyExistsException If the logical table already exists
    */
-  public void addLogicalTable(LogicalTableConfig logicalTableConfig)
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws TableAlreadyExistsException {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table {}: Start", tableName);
@@ -2096,7 +2097,7 @@ public class PinotHelixResourceManager {
    * @param logicalTableConfig The logical table config to be updated
    * @throws TableNotFoundException If the logical table does not exist
    */
-  public void updateLogicalTable(LogicalTableConfig logicalTableConfig)
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws TableNotFoundException {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table {}: Start", tableName);
@@ -2250,7 +2251,7 @@ public class PinotHelixResourceManager {
    * @param tableName The logical table name
    * @return True if the logical table was deleted, false otherwise
    */
-  public boolean deleteLogicalTable(String tableName) {
+  public boolean deleteLogicalTableConfig(String tableName) {
     LOGGER.info("Deleting logical table {}: Start", tableName);
     if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new ControllerApplicationException(LOGGER,

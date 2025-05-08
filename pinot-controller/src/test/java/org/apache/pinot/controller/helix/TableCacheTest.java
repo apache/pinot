@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
@@ -84,11 +85,7 @@ public class TableCacheTest {
     TestUtils.waitForCondition(aVoid -> tableCache.getSchema(RAW_TABLE_NAME) != null, 10_000L,
         "Failed to add the schema to the cache");
     // Schema can be accessed by the schema name, but not by the table name because table config is not added yet
-    Schema expectedSchema =
-        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
-            .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
-            .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
-            .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
+    Schema expectedSchema = getExpectedSchema(RAW_TABLE_NAME);
     Map<String, String> expectedColumnMap = new HashMap<>();
     expectedColumnMap.put(isCaseInsensitive ? "testcolumn" : "testColumn", "testColumn");
     expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
@@ -118,7 +115,7 @@ public class TableCacheTest {
 
     // Add logical table
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME));
-    TEST_INSTANCE.getHelixResourceManager().addLogicalTable(logicalTableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addLogicalTableConfig(logicalTableConfig);
     // Wait for at most 10 seconds for the callback to add the logical table to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME) != null, 10_000L,
         "Failed to add the logical table to the cache");
@@ -223,15 +220,21 @@ public class TableCacheTest {
         "Failed to add the table config to the cache");
     // update the logical table
     logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
-    TEST_INSTANCE.getHelixResourceManager().updateLogicalTable(logicalTableConfig);
+    TEST_INSTANCE.getHelixResourceManager().updateLogicalTableConfig(logicalTableConfig);
+    // Wait for at most 10 seconds for the callback to update the logical table in the cache
+    TestUtils.waitForCondition(
+        aVoid -> Objects.requireNonNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME))
+            .getPhysicalTableConfigMap().size() == 2, 10_000L,
+        "Failed to update the logical table in the cache");
+
     if (isCaseInsensitive) {
       assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
-      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
+      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), getExpectedSchema(ANOTHER_TABLE));
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
     assertEquals(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME), logicalTableConfig);
-    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), getExpectedSchema(ANOTHER_TABLE));
 
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
@@ -259,7 +262,7 @@ public class TableCacheTest {
         "Failed to remove the schema from the cache");
 
     // Remove logical table
-    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTable(LOGICAL_TABLE_NAME);
+    TEST_INSTANCE.getHelixResourceManager().deleteLogicalTableConfig(LOGICAL_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the logical table from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the logical table change lister because it is the last step of
@@ -280,6 +283,13 @@ public class TableCacheTest {
     // Wait for external view to disappear to ensure a clean start for the next test
     TEST_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
     TEST_INSTANCE.waitForEVToDisappear(ANOTHER_TABLE_OFFLINE);
+  }
+
+  private static Schema getExpectedSchema(String tableName) {
+    return new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("testColumn", DataType.INT)
+        .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
+        .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
+        .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
   }
 
   private static LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames) {
