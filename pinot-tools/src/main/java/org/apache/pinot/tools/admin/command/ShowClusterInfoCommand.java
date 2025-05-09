@@ -166,7 +166,11 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
         }
 
         for (String serverName : serverStateMapFromIS.keySet()) {
-          segmentInfo._segmentStateMap.put(serverName, serverStateMapFromEV.get(serverName));
+          String evState =
+              serverStateMapFromIS.get(serverName).equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)
+                  && !serverStateMapFromEV.containsKey(serverName)
+                  ? CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE : serverStateMapFromEV.get(serverName);
+          segmentInfo._segmentStateMap.put(serverName, evState);
         }
         tableInfo.addSegmentInfo(segmentInfo);
       }
