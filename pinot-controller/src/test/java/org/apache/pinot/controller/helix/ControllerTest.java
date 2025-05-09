@@ -1254,7 +1254,7 @@ public class ControllerTest {
     }, 60_000L, "Failed to clean up all the external views");
 
     // Delete all schemas.
-    List<String> schemaNames = _helixResourceManager.getSchemaNames();
+    List<String> schemaNames = _helixResourceManager.getAllSchemaNames();
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(schemaName);

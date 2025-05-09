@@ -643,6 +643,17 @@ public class ZKMetadataProvider {
   }
 
   /**
+   * Check if the schema exists in the property store.
+   *
+   * @param propertyStore Helix property store
+   * @param schemaName Schema name
+   * @return true if the schema exists, false otherwise
+   */
+  public static boolean isSchemaExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
+    return propertyStore.exists(constructPropertyStorePathForSchema(schemaName), AccessOption.PERSISTENT);
+  }
+
+  /**
    * Get the schema associated with the given table name.
    *
    * @param propertyStore Helix property store
