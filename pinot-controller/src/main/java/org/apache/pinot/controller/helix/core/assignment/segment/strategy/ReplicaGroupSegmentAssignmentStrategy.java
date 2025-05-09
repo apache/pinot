@@ -40,9 +40,9 @@ import org.slf4j.LoggerFactory;
 class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
-  private static HelixManager _helixManager;
-  private static String _tableName;
-  private static String _partitionColumn;
+  private HelixManager _helixManager;
+  private String _tableName;
+  private String _partitionColumn;
   private int _replication;
   private TableConfig _tableConfig;
 

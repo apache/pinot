@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.common.config.provider;
 
 import com.google.common.base.Preconditions;
@@ -25,17 +43,15 @@ public class TableConfigAndSchemaCache {
     }
 
     public static void init(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-        if (_instance != null) {
-            throw new IllegalStateException("Instance already initialized.");
-        }
         _instance = new TableConfigAndSchemaCache(propertyStore);
     }
 
     public static TableConfigAndSchemaCache getInstance() {
-        if (INSTANCE == null) {
-            throw new IllegalStateException("Instance not initialized.");
+        if (_instance == null) {
+            // This is a fallback for cases where init() is not called used in tests
+            _instance = new TableConfigAndSchemaCache(null);
         }
-        return INSTANCE;
+        return _instance;
     }
 
     /**
@@ -84,5 +100,13 @@ public class TableConfigAndSchemaCache {
         Preconditions.checkState(schema != null, "Failed to find schema for table: %s", rawTableName);
         _tableSchemaCache.put(rawTableName, schema);
         return schema;
+    }
+
+    public void setTableConfig(TableConfig tableConfig) {
+        _tableConfigCache.put(tableConfig.getTableName(), tableConfig);
+    }
+
+    public void setSchema(Schema schema) {
+        _tableSchemaCache.put(schema.getSchemaName(), schema);
     }
 }

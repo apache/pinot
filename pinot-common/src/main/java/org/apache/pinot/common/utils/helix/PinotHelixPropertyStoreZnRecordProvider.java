@@ -44,11 +44,15 @@ public class PinotHelixPropertyStoreZnRecordProvider {
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forTable(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/CONFIGS/TABLES");
+    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/CONFIGS/TABLE");
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forSegments(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/SEGMENTS");
+  }
+
+  public static PinotHelixPropertyStoreZnRecordProvider forLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/LOGICAL/TABLE");
   }
 
   public ZNRecord get(String name) {

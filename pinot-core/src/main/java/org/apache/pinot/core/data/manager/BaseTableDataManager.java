@@ -190,7 +190,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    _tableConfigAndSchemaCache.set(_tableNameWithType, tableConfig, schema);
+    _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
+    _tableConfigAndSchemaCache.setTableConfig(tableConfig);
+    _tableConfigAndSchemaCache.setSchema(schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -227,7 +229,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
-    _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
 
     doInit();
 
