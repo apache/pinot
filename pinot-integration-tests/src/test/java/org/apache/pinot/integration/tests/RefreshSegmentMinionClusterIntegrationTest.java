@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
@@ -413,7 +414,7 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     }
 
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQuotaConfig(new QuotaConfig(null, "10"));
+    tableConfig.setQuotaConfig(new QuotaConfig(null, TimeUnit.SECONDS, 1d, 10d));
 
     updateTableConfig(tableConfig);
 
