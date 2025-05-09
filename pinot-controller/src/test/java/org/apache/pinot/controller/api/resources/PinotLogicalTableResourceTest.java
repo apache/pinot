@@ -141,7 +141,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
     logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", "999"));
     ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-    fail("Logical Table POST request should have failed");
   }
 
   @Test
@@ -207,7 +206,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
 
     ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-    fail("Logical Table POST request should have failed");
   }
 
   @Test
@@ -243,7 +241,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     LogicalTableConfig logicalTableConfig =
         getDummyLogicalTableConfig(tableName, physicalTableNamesWithType, BROKER_TENANT);
     ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-    fail("Logical Table POST request should have failed");
   }
 
   @Test
