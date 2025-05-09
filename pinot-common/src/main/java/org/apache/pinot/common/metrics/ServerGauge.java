@@ -117,7 +117,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_CACHE_SIZE_SMALL("bytes", true),
   MAILBOX_SERVER_CACHE_SIZE_NORMAL("bytes", true),
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
-  MAILBOX_SERVER_CHUNK_SIZE("bytes", true);
+  MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
+
+  // how many message are there in the server's message queue in helix
+  HELIX_MESSAGES_COUNT("count", true);
 
   private final String _gaugeName;
   private final String _unit;
