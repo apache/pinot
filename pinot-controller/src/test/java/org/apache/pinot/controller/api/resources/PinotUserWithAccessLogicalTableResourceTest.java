@@ -88,6 +88,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     } catch (Exception e) {
       // ignore
     }
+    stopFakeInstances();
     stopController();
     stopZk();
   }

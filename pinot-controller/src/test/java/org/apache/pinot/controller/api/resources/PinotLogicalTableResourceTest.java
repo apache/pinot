@@ -22,7 +22,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -35,6 +39,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
@@ -44,6 +49,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
   private static final String LOGICAL_TABLE_NAME = "test_logical_table";
   public static final String BROKER_TENANT = "DefaultTenant";
+  public static final String NEW_BROKER_TENANT = "NewBrokerTenant";
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
   private String _addLogicalTableUrl;
 
@@ -52,14 +58,17 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       throws Exception {
     startZk();
     startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(2, false);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
     _controllerRequestURLBuilder = getControllerRequestURLBuilder();
     _addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    createBrokerTenant(BROKER_TENANT, 1);
+    createBrokerTenant(NEW_BROKER_TENANT, 1);
   }
 
   @AfterClass
   public void tearDownClass() {
+    stopFakeInstances();
     stopController();
     stopZk();
   }
@@ -399,6 +408,49 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     // verify logical table names
     String getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
     assertEquals(getLogicalTableNamesResponse, objectMapper.writeValueAsString(logicalTableNames));
+  }
+
+  @Test
+  public void testLogicalTableUpdateBrokerTenantUpdate()
+      throws Exception {
+    PinotHelixResourceManager helixResourceManager = getHelixResourceManager();
+    String logicalTableName = "test_logical_table";
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
+    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+
+    // Create a logical table
+    addDummySchema(logicalTableName);
+    List<String> physicalTables = createHybridTables(List.of("physical_table"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(logicalTableName, physicalTables, BROKER_TENANT);
+    String addLogicalTableResponse =
+        ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    assertEquals(addLogicalTableResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName + " logical table successfully added.\"}");
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+
+    // verify table broker node and broker tenant node is same
+    IdealState brokerIdealStates = HelixHelper.getBrokerIdealStates(helixResourceManager.getHelixAdmin(),
+        helixResourceManager.getHelixClusterName());
+    Map<String, String> instanceStateMap = brokerIdealStates.getInstanceStateMap(logicalTableName);
+    Set<String> brokerForTenant = helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT);
+    assertEquals(brokerForTenant, instanceStateMap.keySet());
+
+    //verify broker tenant node sets are different
+    Set<String> allInstancesForBrokerTenant = helixResourceManager.getAllInstancesForBrokerTenant(NEW_BROKER_TENANT);
+    assertNotEquals(brokerForTenant, allInstancesForBrokerTenant);
+
+    // update logical table with new broker tenant
+    logicalTableConfig.setBrokerTenant(NEW_BROKER_TENANT);
+    sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+
+    // verify the broker node set is updated in IS
+    brokerIdealStates = HelixHelper.getBrokerIdealStates(helixResourceManager.getHelixAdmin(),
+        helixResourceManager.getHelixClusterName());
+    instanceStateMap = brokerIdealStates.getInstanceStateMap(logicalTableName);
+    Set<String> brokerForNewTenant = helixResourceManager.getAllInstancesForBrokerTenant(NEW_BROKER_TENANT);
+    assertEquals(brokerForNewTenant, instanceStateMap.keySet());
   }
 
   private void verifyLogicalTableExists(String getLogicalTableUrl, LogicalTableConfig logicalTableConfig)
