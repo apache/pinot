@@ -1838,8 +1838,8 @@ public class PinotHelixResourceManager {
 
     LogicalTableUtils.validateLogicalTableName(
         logicalTableConfig,
-        getAllTables(),
-        getAllBrokerTenantNames(),
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
         _propertyStore
     );
 
@@ -2126,8 +2126,8 @@ public class PinotHelixResourceManager {
 
     LogicalTableUtils.validateLogicalTableName(
         logicalTableConfig,
-        getAllTables(),
-        getAllBrokerTenantNames(),
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
         _propertyStore
     );
 

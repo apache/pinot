@@ -21,9 +21,8 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Predicate;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -75,8 +74,11 @@ public class LogicalTableUtils {
     return record;
   }
 
-  public static void validateLogicalTableName(LogicalTableConfig logicalTableConfig, List<String> allPhysicalTables,
-      Set<String> allBrokerTenantNames, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static void validateLogicalTableName(
+      LogicalTableConfig logicalTableConfig,
+      Predicate<String> physicalTableExistsPredicate,
+      Predicate<String> brokerTenantExistsPredicate,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String tableName = logicalTableConfig.getTableName();
     if (StringUtils.isEmpty(tableName)) {
       throw new IllegalArgumentException("Invalid logical table name. Reason: 'tableName' should not be null or empty");
@@ -98,7 +100,7 @@ public class LogicalTableUtils {
       PhysicalTableConfig physicalTableConfig = entry.getValue();
 
       // validate physical table exists
-      if (!allPhysicalTables.contains(physicalTableName)) {
+      if (!physicalTableExistsPredicate.test(physicalTableName)) {
         throw new IllegalArgumentException(
             "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables");
       }
@@ -110,9 +112,9 @@ public class LogicalTableUtils {
       }
     }
 
-    // validate broker tenant
+    // validate broker tenant exists
     String brokerTenant = logicalTableConfig.getBrokerTenant();
-    if (!allBrokerTenantNames.contains(brokerTenant)) {
+    if (!brokerTenantExistsPredicate.test(brokerTenant)) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: '" + brokerTenant + "' should be one of the existing broker tenants");
     }
