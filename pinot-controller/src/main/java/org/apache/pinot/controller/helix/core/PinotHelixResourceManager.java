@@ -127,7 +127,7 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.LogicalTableUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -541,19 +541,22 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  private String getBrokerTenantName(String tableName) {
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+  private String getBrokerTenantName(String physicalOrLogicalTableName) {
+    TableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(_propertyStore, physicalOrLogicalTableName);
     if (offlineTableConfig != null) {
       return offlineTableConfig.getTenantConfig().getBroker();
     }
 
-    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    TableConfig realtimeTableConfig =
+        ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, physicalOrLogicalTableName);
     if (realtimeTableConfig != null) {
       return realtimeTableConfig.getTenantConfig().getBroker();
     }
 
     // If the table is not found, check if it is a logical table
-    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    LogicalTableConfig logicalTableConfig =
+        ZKMetadataProvider.getLogicalTableConfig(_propertyStore, physicalOrLogicalTableName);
     if (logicalTableConfig != null) {
       return logicalTableConfig.getBrokerTenant();
     }
@@ -1752,6 +1755,12 @@ public class PinotHelixResourceManager {
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
           + " with it.");
     }
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, rawTableName)) {
+      throw new TableAlreadyExistsException("Logical table '" + rawTableName
+          + "' already exists. Please use a different name for the physical table.");
+    }
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType) != null) {
       throw new TableAlreadyExistsException("External view for " + tableNameWithType
           + " still exists. If the table is just deleted, please wait for the clean up to finish before recreating it. "
@@ -1772,7 +1781,7 @@ public class PinotHelixResourceManager {
             _enableBatchMessageMode);
     TableType tableType = tableConfig.getTableType();
     // Ensure that table is not created if schema is not present
-    if (ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType)) == null) {
+    if (ZKMetadataProvider.getSchema(_propertyStore, rawTableName) == null) {
       throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
     }
     Preconditions.checkState(tableType == TableType.OFFLINE || tableType == TableType.REALTIME,
@@ -1836,9 +1845,11 @@ public class PinotHelixResourceManager {
       logicalTableConfig.setBrokerTenant("DefaultTenant");
     }
 
-    LogicalTableUtils.validateLogicalTableName(
+    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
+    LogicalTableConfigUtils.validateLogicalTableConfig(
         logicalTableConfig,
-        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        pinotHelixPropertyStoreZnRecordProvider::exist,
         getAllBrokerTenantNames()::contains,
         _propertyStore
     );
@@ -1849,10 +1860,10 @@ public class PinotHelixResourceManager {
     }
 
     // Check if the table name is already used by a physical table
-    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
-        .findFirst().ifPresent(tableNameWithType -> {
-          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
-        });
+    if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
+    || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+      throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+    }
 
     LOGGER.info("Adding logical table {}: Creating logical table config in the property store", tableName);
     ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
@@ -2124,22 +2135,25 @@ public class PinotHelixResourceManager {
       logicalTableConfig.setBrokerTenant("DefaultTenant");
     }
 
-    LogicalTableUtils.validateLogicalTableName(
+    LogicalTableConfigUtils.validateLogicalTableConfig(
         logicalTableConfig,
         PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
         getAllBrokerTenantNames()::contains,
         _propertyStore
     );
 
-    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (oldLogicalTableConfig == null) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
 
     LOGGER.info("Updating logical table {}: Updating logical table config in the property store", tableName);
     ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
 
-    LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
-    updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    if (!oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
+      LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
+      updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    }
 
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
   }

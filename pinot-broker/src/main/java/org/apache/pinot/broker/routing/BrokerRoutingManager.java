@@ -414,15 +414,17 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
-   * Builds/rebuilds the routing for the given table.
+   * Builds/rebuilds the routing for the physical table, for logical tables it is skipped.
+   * @param physicalOrLogicalTable a physical table with type or logical table name
    */
-  public synchronized void buildRouting(String tableNameWithType) {
+  public synchronized void buildRouting(String physicalOrLogicalTable) {
     // skip route building for logical tables
-    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableNameWithType)) {
-      LOGGER.info("Skipping route building for logical table: {}", tableNameWithType);
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+      LOGGER.info("Skipping route building for logical table: {}", physicalOrLogicalTable);
       return;
     }
 
+    String tableNameWithType = physicalOrLogicalTable;
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
