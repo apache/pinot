@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -41,6 +42,11 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
+  private final TableCache _tableCache;
+
+  public DispatchablePlanVisitor(TableCache tableCache) {
+    _tableCache = tableCache;
+  }
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
       DispatchablePlanContext context) {
@@ -131,7 +137,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.addScannedTable(node.getTableName());
+    dispatchablePlanMetadata.addScannedTable(_tableCache.getActualTableName(node.getTableName()));
     dispatchablePlanMetadata.setTableOptions(
         node.getNodeHint().getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
     return null;

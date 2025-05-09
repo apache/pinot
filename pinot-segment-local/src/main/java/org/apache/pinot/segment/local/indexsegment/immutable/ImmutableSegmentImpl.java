@@ -240,7 +240,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     DataSource dataSource = _dataSources.get(column);
     if (dataSource == null) {
       // Populate a virtual data source
-      dataSource = SegmentPreloadUtils.getVirtualDataSource(_segmentMetadata.getSchema().getSchemaName(),
+      dataSource = SegmentPreloadUtils.getVirtualDataSource(_segmentMetadata.getTableName(),
               column, _segmentMetadata.getTotalDocs());
       _dataSources.put(column, dataSource);
     }

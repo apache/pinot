@@ -627,7 +627,8 @@ public class PinotTableRestletResource {
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
-      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
+          + "Extends if progress has been made during the wait, otherwise times out") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
       @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,

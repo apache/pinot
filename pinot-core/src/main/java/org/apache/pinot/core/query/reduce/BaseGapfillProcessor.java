@@ -41,7 +41,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-abstract class BaseGapfillProcessor {
+public abstract class BaseGapfillProcessor {
   protected final QueryContext _queryContext;
 
   protected final int _limitForAggregatedResult;

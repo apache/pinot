@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -863,6 +864,35 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
+  }
+
+  @Test
+  public void testTableWithSameNameAsLogicalTableIsNotAllowed()
+      throws IOException {
+    // Create physical table
+    String tableName = "testTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
+    String creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE successfully added\"}");
+
+    // create logical table with above physical table
+    String logicalTableName = "testTable_LOGICAL";
+    DEFAULT_INSTANCE.addDummySchema(logicalTableName);
+    LogicalTableConfig logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(
+        logicalTableName, List.of(offlineTableConfig.getTableName()), "DefaultTenant");
+    String addLogicalTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forLogicalTableCreate();
+    String logicalTableResponse = sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString());
+    assertEquals(logicalTableResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"testTable_LOGICAL logical table successfully added.\"}");
+
+    // create table with same as logical table and should fail
+    TableConfig offlineTableConfig2 = _offlineBuilder.setTableName(logicalTableName).build();
+    IOException aThrows = expectThrows(IOException.class,
+        () -> sendPostRequest(_createTableUrl, offlineTableConfig2.toJsonString()));
+    assertTrue(aThrows.getMessage().contains("Logical table '" + logicalTableName + "' already exists"),
+        aThrows.getMessage());
   }
 
   /**

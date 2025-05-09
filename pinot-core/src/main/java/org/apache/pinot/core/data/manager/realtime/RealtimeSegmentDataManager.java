@@ -1726,8 +1726,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       makeStreamConsumer("Starting");
       createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
-      _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics,
-              _realtimeTableDataManager);
+      _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
@@ -1738,9 +1737,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
     } catch (Throwable t) {
-      // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
-      // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
-      // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
@@ -1751,18 +1747,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
       // invoke controller API mark it OFFLINE in the idealstate.
       new Thread(() -> {
-        ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset, _segmentNameStr, _instanceId,
-            _protocolHandler, "Consuming segment initialization error", _segmentLogger);
-        try {
-          // Allow 30s for Helix to mark currentstate and externalview to ERROR, because
-          // we are about to receive an ERROR->OFFLINE state transition once we call
-          // postSegmentStoppedConsuming() method.
-          Thread.sleep(30_000);
-          indicator.postSegmentStoppedConsuming();
-        } catch (InterruptedException ie) {
-          // We got interrupted trying to post stop-consumed message. Give up at this point
-          return;
-        }
+        // Allow 30s for Helix to mark currentstate and externalview to ERROR, because
+        // we are about to receive an ERROR->OFFLINE state transition once we call
+        // postSegmentStoppedConsuming() method.
+        Uninterruptibles.sleepUninterruptibly(30, TimeUnit.SECONDS);
+        postStopConsumedMsg("Consuming segment initialization error");
       }).start();
       throw t;
     }

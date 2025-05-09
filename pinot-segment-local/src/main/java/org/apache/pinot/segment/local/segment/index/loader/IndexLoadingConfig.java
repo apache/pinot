@@ -55,7 +55,7 @@ public class IndexLoadingConfig {
 
   private final InstanceDataManagerConfig _instanceDataManagerConfig;
   private final TableConfig _tableConfig;
-  private Schema _schema;
+  private final Schema _schema;
 
   // These fields can be modified after initialization
   // TODO: Revisit them
@@ -128,10 +128,6 @@ public class IndexLoadingConfig {
   @Nullable
   public Schema getSchema() {
     return _schema;
-  }
-
-  public void setSchema(Schema schema) {
-    _schema = schema;
   }
 
   private void init() {

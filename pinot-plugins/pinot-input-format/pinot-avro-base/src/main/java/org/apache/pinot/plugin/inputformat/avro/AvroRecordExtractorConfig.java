@@ -26,7 +26,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  * Config for {@link AvroRecordExtractor}
  */
 public class AvroRecordExtractorConfig implements RecordExtractorConfig {
-  private boolean _enableLogicalTypes = false;
+  private boolean _enableLogicalTypes = true;
 
   @Override
   public void init(Map<String, String> props) {

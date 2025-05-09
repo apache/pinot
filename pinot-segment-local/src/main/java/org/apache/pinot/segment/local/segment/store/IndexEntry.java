@@ -19,14 +19,10 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /* package-private */
 class IndexEntry {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexEntry.class);
-
   final IndexKey _key;
   long _startOffset = -1;
   long _size = -1;

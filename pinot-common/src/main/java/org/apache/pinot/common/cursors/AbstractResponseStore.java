@@ -185,7 +185,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     int totalTableRows = response.getNumRowsResultSet();
 
     if (totalTableRows == 0 && offset == 0) {
-      // If sum records is 0, then result set is empty.
+      // TODO: Set a result table with schema and no rows
       response.setResultTable(null);
       response.setOffset(0);
       response.setNumRows(0);

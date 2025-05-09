@@ -63,6 +63,8 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -360,13 +362,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @param column column name.
    */
-  protected void removeColumnIndices(String column)
-      throws IOException {
+  protected void removeColumnIndices(String column) {
     String segmentName = _segmentMetadata.getName();
     LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
-    // Delete existing dictionary and forward index
-    _segmentWriter.removeIndex(column, StandardIndexes.dictionary());
-    _segmentWriter.removeIndex(column, StandardIndexes.forward());
+    // Remove indexes
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      _segmentWriter.removeIndex(column, indexType);
+    }
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
     LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);

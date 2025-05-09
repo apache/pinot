@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.metadata;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -37,6 +40,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -45,10 +49,12 @@ import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.TableConfigDecoratorRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -67,6 +73,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX = "/PAUSELESS_DEBUG_METADATA";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
+  private static final String PROPERTYSTORE_LOGICAL_PREFIX = "/LOGICAL/TABLE";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
@@ -304,6 +311,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
   }
 
+  public static String constructPropertyStorePathForLogical(String tableName) {
+    return StringUtil.join("/", PROPERTYSTORE_LOGICAL_PREFIX, tableName);
+  }
+
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
       String segmentName) {
     return propertyStore.exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName),
@@ -376,6 +387,7 @@ public class ZKMetadataProvider {
     return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
         AccessOption.PERSISTENT);
   }
+
   public static boolean removePauselessDebugMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     String pauselessDebugMetadataPath = constructPropertyStorePathForPauselessDebugMetadata(tableNameWithType);
@@ -384,7 +396,6 @@ public class ZKMetadataProvider {
     }
     return true;
   }
-
 
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
@@ -602,7 +613,9 @@ public class ZKMetadataProvider {
     }
     try {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
-      return replaceVariables ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      TableConfig processedTableConfig = replaceVariables
+          ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
+      return TableConfigDecoratorRegistry.applyDecorator(processedTableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
@@ -627,6 +640,17 @@ public class ZKMetadataProvider {
       LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
       return null;
     }
+  }
+
+  /**
+   * Check if the schema exists in the property store.
+   *
+   * @param propertyStore Helix property store
+   * @param schemaName Schema name
+   * @return true if the schema exists, false otherwise
+   */
+  public static boolean isSchemaExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
+    return propertyStore.exists(constructPropertyStorePathForSchema(schemaName), AccessOption.PERSISTENT);
   }
 
   /**
@@ -808,5 +832,52 @@ public class ZKMetadataProvider {
       }
       return result;
     }
+  }
+
+  public static void setLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      LogicalTableConfig logicalTableConfig) {
+    try {
+      ZNRecord znRecord = LogicalTableConfigUtils.toZNRecord(logicalTableConfig);
+      String path = constructPropertyStorePathForLogical(logicalTableConfig.getTableName());
+      propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to convert logical table to ZNRecord", e);
+    }
+  }
+
+  public static List<LogicalTableConfig> getAllLogicalTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    List<ZNRecord> znRecords =
+        propertyStore.getChildren(PROPERTYSTORE_LOGICAL_PREFIX, null, AccessOption.PERSISTENT, 0, 0);
+    if (znRecords != null) {
+      return znRecords.stream().map(znRecord -> {
+        try {
+          return LogicalTableConfigUtils.fromZNRecord(znRecord);
+        } catch (IOException e) {
+          LOGGER.error("Caught exception while converting ZNRecord to LogicalTable: {}", znRecord.getId(), e);
+          return null;
+        }
+      }).filter(Objects::nonNull).collect(Collectors.toList());
+    } else {
+      return Collections.emptyList();
+    }
+  }
+
+  public static LogicalTableConfig getLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableName) {
+    try {
+      ZNRecord logicalTableZNRecord =
+          propertyStore.get(constructPropertyStorePathForLogical(tableName), null, AccessOption.PERSISTENT);
+      if (logicalTableZNRecord == null) {
+        return null;
+      }
+      return LogicalTableConfigUtils.fromZNRecord(logicalTableZNRecord);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting logical table: {}", tableName, e);
+      return null;
+    }
+  }
+
+  public static boolean isLogicalTableExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    return propertyStore.exists(constructPropertyStorePathForLogical(tableName), AccessOption.PERSISTENT);
   }
 }

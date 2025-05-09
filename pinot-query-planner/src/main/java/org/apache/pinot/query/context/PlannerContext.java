@@ -21,6 +21,7 @@ package org.apache.pinot.query.context;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
@@ -53,10 +54,12 @@ public class PlannerContext implements AutoCloseable {
   private final Map<String, String> _options;
   private final Map<String, String> _plannerOutput;
   private final SqlExplainFormat _sqlExplainFormat;
+  @Nullable
+  private final PhysicalPlannerContext _physicalPlannerContext;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
-      SqlExplainFormat sqlExplainFormat) {
+      SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
@@ -65,6 +68,7 @@ public class PlannerContext implements AutoCloseable {
     _options = options;
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
+    _physicalPlannerContext = physicalPlannerContext;
   }
 
   public PlannerImpl getPlanner() {
@@ -98,5 +102,14 @@ public class PlannerContext implements AutoCloseable {
 
   public SqlExplainFormat getSqlExplainFormat() {
     return _sqlExplainFormat;
+  }
+
+  @Nullable
+  public PhysicalPlannerContext getPhysicalPlannerContext() {
+    return _physicalPlannerContext;
+  }
+
+  public boolean isUsePhysicalOptimizer() {
+    return _physicalPlannerContext != null;
   }
 }

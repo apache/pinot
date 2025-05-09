@@ -60,7 +60,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay "
           + "ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
   private static final String EMPTY_RESULT_QUERY =
-      "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
+      "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
 
   private static int _resultSize;
 

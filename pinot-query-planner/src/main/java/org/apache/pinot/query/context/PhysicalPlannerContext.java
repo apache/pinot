@@ -24,6 +24,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
 /**
@@ -104,5 +105,12 @@ public class PhysicalPlannerContext {
 
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return false;
+    }
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
   }
 }

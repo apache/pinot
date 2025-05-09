@@ -19,33 +19,17 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.model.HelixConfigScope;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
-import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -53,8 +37,6 @@ import static org.testng.Assert.assertTrue;
  * Integration test that checks data types for queries with no rows returned.
  */
 public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
   private static final String[] SELECT_STAR_TYPES = new String[]{
       "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT", "INT", "STRING", "INT",
       "STRING", "INT", "INT", "INT", "INT", "INT", "DOUBLE", "FLOAT", "INT", "STRING", "INT", "STRING", "INT", "INT",
@@ -64,28 +46,22 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
       "STRING", "INT", "STRING", "INT", "INT", "STRING_ARRAY", "INT", "STRING", "INT", "INT", "INT", "STRING", "INT",
       "INT", "INT", "INT"
   };
-
-  private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
-      new ArrayList<>(getNumBrokers() + getNumServers());
-
-  protected int getNumBrokers() {
-    return NUM_BROKERS;
-  }
-
-  protected int getNumServers() {
-    return NUM_SERVERS;
-  }
-
-  @Override
-  protected List<FieldConfig> getFieldConfigs() {
-    return Collections.singletonList(
-        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-            CompressionCodec.MV_ENTRY_DICT, null));
-  }
+  private static final String SELECT_STAR_QUERY = "SELECT * FROM myTable WHERE %s";
+  private static final String SELECT_COLUMN_QUERY = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable WHERE %s";
+  private static final String SELECT_TRANSFORM_QUERY = "SELECT AirlineID, ArrTime, ArrTime + 1 FROM myTable WHERE %s";
+  private static final String DISTINCT_QUERY = "SELECT DISTINCT AirlineID, ArrTime FROM myTable WHERE %s";
+  private static final String AGGREGATE_QUERY = "SELECT avg(ArrTime) FROM myTable WHERE %s";
+  private static final String GROUP_BY_QUERY =
+      "SELECT AirlineID, avg(ArrTime) FROM myTable WHERE %s GROUP BY AirlineID";
+  private static final String SERVER_PRUNE_FILTER = "AirlineID = 0";
+  private static final String BROKER_PRUNE_FILTER = "false";
+  // A filter that is not compilable with MSE
+  private static final String SCHEMA_FALLBACK_FILTER = " AND add(AirTime, AirTime, ArrTime) > 0";
+  private static final String QUERY_OPTION_NOT_USE_MSE = "SET useMSEToFillEmptyResponseSchema = false; ";
+  private static final String QUERY_OPTION_ENABLE_NULL_HANDLING = "SET enableNullHandling = true; ";
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
     brokerConf.setProperty(CommonConstants.Broker.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
   }
 
@@ -97,14 +73,8 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     // Start the Pinot cluster
     startZk();
     startController();
-    // Set hyperloglog log2m value to 12.
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-    startBrokers();
-    startServers();
+    startBroker();
+    startServer();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -112,200 +82,127 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
-    // Unpack the Avro files
+    // Create and upload the segments
     List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Create and upload segments. For exhaustive testing, concurrently upload multiple segments with the same name
-    // and validate correctness with parallel push protection enabled.
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    // Create a copy of _tarDir to create multiple segments with the same name.
-    File tarDir2 = new File(_tempDir, "tarDir2");
-    FileUtils.copyDirectory(_tarDir, tarDir2);
-
-    List<File> tarDirs = new ArrayList<>();
-    tarDirs.add(_tarDir);
-    tarDirs.add(tarDir2);
-    try {
-      uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
-    } catch (Exception e) {
-      // If enableParallelPushProtection is enabled and the same segment is uploaded concurrently, we could get one
-      // of the three exception:
-      //   - 409 conflict of the second call enters ProcessExistingSegment
-      //   - segmentZkMetadata creation failure if both calls entered ProcessNewSegment
-      //   - Failed to copy segment tar file to final location due to the same segment pushed twice concurrently
-      // In such cases we upload all the segments again to ensure that the data is set up correctly.
-      assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
-          .contains("Failed to create ZK metadata for segment") || e.getMessage()
-          .contains("java.nio.file.FileAlreadyExistsException"), e.getMessage());
-      uploadSegments(getTableName(), _tarDir);
-    }
-
-    // Set up service status callbacks
-    // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
-    // resources to monitor
-    registerCallbackHandlers();
+    uploadSegments(getTableName(), _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startBrokers()
+  @Test
+  public void testSelectStar()
       throws Exception {
-    startBrokers(getNumBrokers());
+    verifyWithAndWithoutMSE(String.format(SELECT_STAR_QUERY, SERVER_PRUNE_FILTER), false, SELECT_STAR_TYPES);
+    verifyWithAndWithoutMSE(String.format(SELECT_STAR_QUERY, BROKER_PRUNE_FILTER), true, SELECT_STAR_TYPES);
+    verifyWithAndWithoutMSE(String.format(SELECT_STAR_QUERY, SERVER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), false,
+        SELECT_STAR_TYPES);
+    verifyWithAndWithoutMSE(String.format(SELECT_STAR_QUERY, BROKER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), true,
+        SELECT_STAR_TYPES);
   }
 
-  protected void startServers()
+  private void verifyWithAndWithoutMSE(String sql, boolean prunedOnBroker, String... expectedTypes)
       throws Exception {
-    startServers(getNumServers());
-  }
-
-  private void registerCallbackHandlers() {
-    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    instances.removeIf(
-        instanceId -> !InstanceTypeUtils.isBroker(instanceId) && !InstanceTypeUtils.isServer(instanceId));
-    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
-    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
-        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
-    for (String instance : instances) {
-      List<String> resourcesToMonitor = new ArrayList<>();
-      for (String resourceName : resourcesInCluster) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), resourceName);
-        for (String partitionName : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partitionName).contains(instance)) {
-            resourcesToMonitor.add(resourceName);
-            break;
-          }
-        }
-      }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
-              instance, resourcesToMonitor, 100.0),
-          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
-              instance, resourcesToMonitor, 100.0))));
+    for (String query : new String[]{sql, QUERY_OPTION_NOT_USE_MSE + sql}) {
+      JsonNode response = postQuery(query);
+      verifyResponse(response, prunedOnBroker, expectedTypes);
     }
   }
 
-  @Test
-  public void testInstancesStarted() {
-    assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
-    for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
-      assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+  private void verifyResponse(JsonNode response, boolean prunedOnBroker, String... expectedTypes) {
+    JsonNode resultTable = response.get("resultTable");
+    assertTrue(resultTable.get("rows").isEmpty());
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), expectedTypes.length);
+    for (int i = 0; i < expectedTypes.length; i++) {
+      assertEquals(columnDataTypes.get(i).asText(), expectedTypes[i]);
     }
+    assertEquals(response.get("numServersQueried").asInt(), prunedOnBroker ? 0 : 1);
   }
 
   @Test
-  public void testStarField()
+  public void testSelectColumn()
       throws Exception {
-    String sqlQuery = "SELECT * FROM myTable WHERE AirlineID = 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, SELECT_STAR_TYPES);
+    String[] expectedTypes = new String[]{"LONG", "INT", "STRING"};
+    verifyWithAndWithoutMSE(String.format(SELECT_COLUMN_QUERY, SERVER_PRUNE_FILTER), false, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(SELECT_COLUMN_QUERY, BROKER_PRUNE_FILTER), true, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(SELECT_COLUMN_QUERY, SERVER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), false,
+        expectedTypes);
+    verifyWithAndWithoutMSE(String.format(SELECT_COLUMN_QUERY, BROKER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), true,
+        expectedTypes);
   }
 
   @Test
-  public void testSelectionFields()
+  public void testSelectTransform()
       throws Exception {
-    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable WHERE AirlineID = 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "INT", "STRING");
+    verifyTransform(SERVER_PRUNE_FILTER, false);
+    verifyTransform(BROKER_PRUNE_FILTER, true);
+  }
+
+  /// Transform can only be filled with MSE
+  private void verifyTransform(String filter, boolean prunedOnBroker)
+      throws Exception {
+    String sql = String.format(SELECT_TRANSFORM_QUERY, filter);
+    verifyResponse(postQuery(sql), prunedOnBroker, "LONG", "INT", "INT");
+
+    sql = QUERY_OPTION_NOT_USE_MSE + sql;
+    verifyResponse(postQuery(sql), prunedOnBroker, "LONG", "INT", "STRING");
+
+    sql = String.format(SELECT_TRANSFORM_QUERY, filter + SCHEMA_FALLBACK_FILTER);
+    verifyResponse(postQuery(sql), prunedOnBroker, "LONG", "INT", "STRING");
   }
 
   @Test
-  public void testTransformedFields()
+  public void testDistinct()
       throws Exception {
-    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTime+1 FROM myTable WHERE AirlineID = 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "INT", "INT");
+    String[] expectedTypes = new String[]{"LONG", "INT"};
+    verifyWithAndWithoutMSE(String.format(DISTINCT_QUERY, SERVER_PRUNE_FILTER), false, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(DISTINCT_QUERY, BROKER_PRUNE_FILTER), true, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(DISTINCT_QUERY, SERVER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), false,
+        expectedTypes);
+    verifyWithAndWithoutMSE(String.format(DISTINCT_QUERY, BROKER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), true,
+        expectedTypes);
   }
 
   @Test
-  public void testAggregatedFields()
+  public void testAggregate()
       throws Exception {
-    String sqlQuery = "SELECT AirlineID, avg(ArrTime) FROM myTable WHERE AirlineID = 0 GROUP BY AirlineID LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "DOUBLE");
+    verifyAggregate(SERVER_PRUNE_FILTER, false);
+    verifyAggregate(BROKER_PRUNE_FILTER, true);
+  }
+
+  /// Aggregate does not require backfill of data type
+  private void verifyAggregate(String filter, boolean prunedOnBroker)
+      throws Exception {
+    String sql = String.format(AGGREGATE_QUERY, filter);
+
+    JsonNode response = postQuery(sql);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asDouble(), Double.NEGATIVE_INFINITY);
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+    assertEquals(response.get("numServersQueried").asInt(), prunedOnBroker ? 0 : 1);
+
+    response = postQuery(QUERY_OPTION_ENABLE_NULL_HANDLING + sql);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).isNull());
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+    assertEquals(response.get("numServersQueried").asInt(), prunedOnBroker ? 0 : 1);
   }
 
   @Test
-  public void testSchemaFallbackStarField()
+  public void testGroupBy()
       throws Exception {
-    String sqlQuery = "SELECT * FROM myTable WHERE AirlineID = 0 AND add(AirTime, AirTime, ArrTime) > 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, SELECT_STAR_TYPES);
-  }
-
-  @Test
-  public void testSchemaFallbackSelectionFields()
-      throws Exception {
-    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable"
-        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "INT", "STRING");
-  }
-
-  @Test
-  public void testSchemaFallbackTransformedFields()
-      throws Exception {
-    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTime+1 FROM myTable"
-        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "INT", "STRING");
-  }
-
-  @Test
-  public void testSchemaFallbackAggregatedFields()
-      throws Exception {
-    String sqlQuery = "SELECT AirlineID, avg(ArrTime) FROM myTable"
-        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 GROUP BY AirlineID LIMIT 1";
-    JsonNode response = postQuery(sqlQuery);
-    assertNoRowsReturned(response);
-    assertDataTypes(response, "LONG", "DOUBLE");
-  }
-
-  @Test
-  public void testDataSchemaForBrokerPrunedEmptyResults()
-      throws Exception {
-    TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setRoutingConfig(
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE), null, null));
-    updateTableConfig(tableConfig);
-
-    String query =
-        "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231 and FlightNum > 121231231231";
-
-    // Parse the Json response. Assert if DestAirportID has columnDatatype INT and Carrier has columnDatatype STRING.
-    JsonNode queryResponse = postQuery(query);
-    assertNoRowsReturned(queryResponse);
-    assertDataTypes(queryResponse, "INT", "STRING");
-
-    query = "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231";
-    queryResponse = postQuery(query);
-    assertNoRowsReturned(queryResponse);
-    assertDataTypes(queryResponse, "INT", "STRING");
-
-    // Reset the routing config
-    tableConfig.setRoutingConfig(null);
-    updateTableConfig(tableConfig);
-  }
-
-  private void assertNoRowsReturned(JsonNode response) {
-    assertNotNull(response.get("resultTable"));
-    assertNotNull(response.get("resultTable").get("rows"));
-    assertEquals(response.get("resultTable").get("rows").size(), 0);
-  }
-
-  private void assertDataTypes(JsonNode response, String... types)
-      throws Exception {
-    assertNotNull(response.get("resultTable"));
-    assertNotNull(response.get("resultTable").get("dataSchema"));
-    assertNotNull(response.get("resultTable").get("dataSchema").get("columnDataTypes"));
-    String expected = new ObjectMapper().writeValueAsString(types);
-    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").toString(), expected);
+    String[] expectedTypes = new String[]{"LONG", "DOUBLE"};
+    verifyWithAndWithoutMSE(String.format(GROUP_BY_QUERY, SERVER_PRUNE_FILTER), false, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(GROUP_BY_QUERY, BROKER_PRUNE_FILTER), true, expectedTypes);
+    verifyWithAndWithoutMSE(String.format(GROUP_BY_QUERY, SERVER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), false,
+        expectedTypes);
+    verifyWithAndWithoutMSE(String.format(GROUP_BY_QUERY, BROKER_PRUNE_FILTER + SCHEMA_FALLBACK_FILTER), true,
+        expectedTypes);
   }
 }

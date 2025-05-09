@@ -20,16 +20,12 @@ package org.apache.pinot.segment.local.segment.store;
 
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Class representing index name and type
  */
 public class IndexKey implements Comparable<IndexKey> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
-
   final String _name;
   final IndexType<?, ?, ?> _type;
 
