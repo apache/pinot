@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.integration.tests.logicaltable;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +33,14 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.QueryGenerator;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -48,6 +54,8 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -221,14 +229,31 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     // @formatter:on
   }
 
+  public static LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames,
+      String brokerTenant) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : physicalTableNames) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    String offlineTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isOfflineTableResource).findFirst().orElse(null);
+    String realtimeTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isRealtimeTableResource).findFirst().orElse(null);
+    LogicalTableConfigBuilder builder =
+        new LogicalTableConfigBuilder().setTableName(tableName).setBrokerTenant(brokerTenant)
+            .setRefOfflineTableName(offlineTableName).setRefRealtimeTableName(realtimeTableName)
+            .setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
+  }
+
   protected void createLogicalTable()
       throws IOException {
     String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     Schema logicalTableSchema = createSchema(getSchemaFileName());
     logicalTableSchema.setSchemaName(getLogicalTableName());
     addSchema(logicalTableSchema);
-    LogicalTableConfig
-        logicalTable = getDummyLogicalTableConfig(getLogicalTableName(), getPhysicalTableNames(), getBrokerTenant());
+    LogicalTableConfig logicalTable =
+        getLogicalTableConfig(getLogicalTableName(), getPhysicalTableNames(), getBrokerTenant());
     String resp =
         ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
     assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + getLogicalTableName()
@@ -241,6 +266,16 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
         _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
     String resp = ControllerTest.sendGetRequest(getLogicalTableUrl, getHeaders());
     return LogicalTableConfig.fromString(resp);
+  }
+
+  protected void updateLogicalTableConfig(String logicalTableName, LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+    String resp =
+        ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+
+    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + getLogicalTableName()
+        + " logical table successfully updated.\"}");
   }
 
   protected void deleteLogicalTable()
@@ -349,5 +384,132 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   public void testGeneratedQueries()
       throws Exception {
     super.testGeneratedQueries(true, false);
+  }
+
+  @Test
+  public void testDisableGroovyQueryTableConfigOverride()
+      throws Exception {
+    QueryConfig queryConfig = new QueryConfig(null, false, null, null, null, null);
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+
+    String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
+        + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
+
+    // Query should not throw exception
+    postQuery(groovyQuery);
+
+    // Disable groovy explicitly
+    queryConfig = new QueryConfig(null, true, null, null, null, null);
+
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+
+    // grpc and http throw different exceptions. So only check error message.
+    Exception athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
+    assertTrue(athrows.getMessage().contains("Groovy transform functions are disabled for queries"));
+
+    // Remove query config
+    logicalTableConfig.setQueryConfig(null);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+
+    athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
+    assertTrue(athrows.getMessage().contains("Groovy transform functions are disabled for queries"));
+  }
+
+  @Test
+  public void testMaxQueryResponseSizeTableConfig()
+      throws Exception {
+    String starQuery = "SELECT * from mytable";
+
+    QueryConfig queryConfig = new QueryConfig(null, null, null, null, 100L, null);
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+
+    JsonNode response = postQuery(starQuery);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(!exceptions.isEmpty()
+        && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
+
+    // Query Succeeds with a high limit.
+    queryConfig = new QueryConfig(null, null, null, null, 1000000L, null);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+
+    //Reset to null.
+    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+  }
+
+  @Test
+  public void testMaxServerResponseSizeTableConfig()
+      throws Exception {
+    String starQuery = "SELECT * from mytable";
+
+    QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L);
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    JsonNode response = postQuery(starQuery);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(!exceptions.isEmpty()
+        && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId());
+
+    // Query Succeeds with a high limit.
+    queryConfig = new QueryConfig(null, null, null, null, null, 1000000L);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+
+    //Reset to null.
+    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+  }
+
+  @Test
+  public void testQueryTimeOut()
+      throws Exception {
+    String starQuery = "SELECT * from mytable";
+    QueryConfig queryConfig = new QueryConfig(5L, null, null, null, null, null);
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    JsonNode response = postQuery(starQuery);
+    JsonNode exceptions = response.get("exceptions");
+    assertTrue(
+        !exceptions.isEmpty() && (exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.BROKER_TIMEOUT.getId()
+            // Timeout may occur just before submitting the request. Then this error code is thrown.
+            || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
+
+    // Query Succeeds with a high limit.
+    queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+
+    //Reset to null.
+    queryConfig = new QueryConfig(null, null, null, null, null, null);
+    logicalTableConfig.setQueryConfig(queryConfig);
+    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    response = postQuery(starQuery);
+    exceptions = response.get("exceptions");
+    assertTrue(exceptions.isEmpty(), "Query should not throw exception");
   }
 }

@@ -444,9 +444,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String realtimeTableName = routeInfo.getRealtimeTableName();
     TableConfig offlineTableConfig = routeInfo.getOfflineTableConfig();
     TableConfig realtimeTableConfig = routeInfo.getRealtimeTableConfig();
+    QueryConfig offlineTableQueryConfig = routeInfo.getOfflineTableQueryConfig();
+    QueryConfig realtimeTableQueryConfig = routeInfo.getRealtimeTableQueryConfig();
     TimeBoundaryInfo timeBoundaryInfo = routeInfo.getTimeBoundaryInfo();
 
-    HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
+    HandlerContext handlerContext = getHandlerContext(offlineTableQueryConfig, realtimeTableQueryConfig);
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
     if (handlerContext._useApproximateFunction) {
       handleApproximateFunctionOverride(serverPinotQuery);
@@ -648,13 +650,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     //       each table type, and broker should wait for both types to return.
     long remainingTimeMs = 0;
     try {
+      Long logicalTableQueryTimeout = logicalTable != null && logicalTable.getQueryConfig() != null
+          && logicalTable.getQueryConfig().getTimeoutMs() != null ? logicalTable.getQueryConfig().getTimeoutMs() : null;
       if (offlineBrokerRequest != null) {
-        remainingTimeMs =
-            setQueryTimeout(offlineTableName, offlineBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs);
+        remainingTimeMs = setQueryTimeout(offlineTableName, logicalTableQueryTimeout,
+            offlineBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs);
       }
       if (realtimeBrokerRequest != null) {
-        remainingTimeMs = Math.max(remainingTimeMs,
-            setQueryTimeout(realtimeTableName, realtimeBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs));
+        remainingTimeMs = Math.max(remainingTimeMs, setQueryTimeout(realtimeTableName, logicalTableQueryTimeout,
+            realtimeBrokerRequest.getPinotQuery().getQueryOptions(), timeSpentMs));
       }
     } catch (TimeoutException e) {
       String errorMessage = e.getMessage();
@@ -675,7 +679,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     if (offlineBrokerRequest != null) {
       Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
-      setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+      setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableQueryConfig);
       // Set the query option to directly return final result for single server query unless it is explicitly disabled
       if (numServers == 1) {
         // Set the same flag in the original server request to be used in the reduce phase for hybrid table
@@ -688,7 +692,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     if (realtimeBrokerRequest != null) {
       Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
-      setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+      setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableQueryConfig);
       // Set the query option to directly return final result for single server query unless it is explicitly disabled
       if (numServers == 1) {
         // Set the same flag in the original server request to be used in the reduce phase for hybrid table
@@ -1418,12 +1422,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  private HandlerContext getHandlerContext(@Nullable TableConfig offlineTableConfig,
-      @Nullable TableConfig realtimeTableConfig) {
+  private HandlerContext getHandlerContext(@Nullable QueryConfig offlineTableQueryConfig,
+      @Nullable QueryConfig realtimeTableQueryConfig) {
     Boolean disableGroovyOverride = null;
     Boolean useApproximateFunctionOverride = null;
-    if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
-      QueryConfig offlineTableQueryConfig = offlineTableConfig.getQueryConfig();
+    if (offlineTableQueryConfig != null) {
       Boolean disableGroovyOfflineTableOverride = offlineTableQueryConfig.getDisableGroovy();
       if (disableGroovyOfflineTableOverride != null) {
         disableGroovyOverride = disableGroovyOfflineTableOverride;
@@ -1433,8 +1436,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         useApproximateFunctionOverride = useApproximateFunctionOfflineTableOverride;
       }
     }
-    if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
-      QueryConfig realtimeTableQueryConfig = realtimeTableConfig.getQueryConfig();
+    if (realtimeTableQueryConfig != null) {
       Boolean disableGroovyRealtimeTableOverride = realtimeTableQueryConfig.getDisableGroovy();
       if (disableGroovyRealtimeTableOverride != null) {
         if (disableGroovyOverride == null) {
@@ -1865,7 +1867,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * <p>For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
    * timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
    */
-  private long setQueryTimeout(String tableNameWithType, Map<String, String> queryOptions, long timeSpentMs)
+  private long setQueryTimeout(String tableNameWithType, Long logicalTableQueryTimeout,
+      Map<String, String> queryOptions, long timeSpentMs)
       throws TimeoutException {
     long queryTimeoutMs;
     Long queryLevelTimeoutMs = QueryOptionsUtils.getTimeoutMs(queryOptions);
@@ -1877,6 +1880,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (tableLevelTimeoutMs != null) {
         // Use table-level timeout if exists
         queryTimeoutMs = tableLevelTimeoutMs;
+      } else if (logicalTableQueryTimeout != null) {
+        queryTimeoutMs = logicalTableQueryTimeout;
       } else {
         // Use instance-level timeout
         queryTimeoutMs = _brokerTimeoutMs;
@@ -1907,7 +1912,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
   private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
-      @Nullable TableConfig tableConfig) {
+      @Nullable QueryConfig queryConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
       return;
@@ -1920,8 +1925,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // TableConfig
-    if (tableConfig != null && tableConfig.getQueryConfig() != null) {
-      QueryConfig queryConfig = tableConfig.getQueryConfig();
+    if (queryConfig != null) {
       if (queryConfig.getMaxServerResponseSizeBytes() != null) {
         queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
             Long.toString(queryConfig.getMaxServerResponseSizeBytes()));

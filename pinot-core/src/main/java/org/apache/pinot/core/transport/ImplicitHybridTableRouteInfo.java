@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -110,6 +111,18 @@ public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
   @Override
   public TableConfig getRealtimeTableConfig() {
     return _realtimeTableConfig;
+  }
+
+  @Nullable
+  @Override
+  public QueryConfig getOfflineTableQueryConfig() {
+    return _offlineTableConfig != null ? _offlineTableConfig.getQueryConfig() : null;
+  }
+
+  @Nullable
+  @Override
+  public QueryConfig getRealtimeTableQueryConfig() {
+    return _realtimeTableConfig != null ? _realtimeTableConfig.getQueryConfig() : null;
   }
 
   public void setRealtimeTableConfig(TableConfig realtimeTableConfig) {

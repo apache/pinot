@@ -35,6 +35,7 @@ import org.apache.pinot.core.transport.BaseTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -47,6 +48,9 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
   private final LogicalTableConfig _logicalTable;
   private List<TableRouteInfo> _offlineTables;
   private List<TableRouteInfo> _realtimeTables;
+  private TableConfig _offlineTableConfig;
+  private TableConfig _realtimeTableConfig;
+  private QueryConfig _queryConfig;
   private List<String> _unavailableSegments;
   private int _numPrunedSegments = 0;
 
@@ -135,19 +139,40 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     return instanceRequest;
   }
 
-  // TODO: https://github.com/apache/pinot/issues/15710
   @Nullable
   @Override
   public TableConfig getOfflineTableConfig() {
-    return _offlineTables != null && !_offlineTables.isEmpty() ? _offlineTables.get(0).getOfflineTableConfig() : null;
+    return _offlineTableConfig;
   }
 
-  // TODO: https://github.com/apache/pinot/issues/15710
+  public void setOfflineTableConfig(TableConfig offlineTableConfig) {
+    _offlineTableConfig = offlineTableConfig;
+  }
+
   @Nullable
   @Override
   public TableConfig getRealtimeTableConfig() {
-    return _realtimeTables != null && !_realtimeTables.isEmpty() ? _realtimeTables.get(0).getRealtimeTableConfig()
-        : null;
+    return _realtimeTableConfig;
+  }
+
+  public void setRealtimeTableConfig(TableConfig realtimeTableConfig) {
+    _realtimeTableConfig = realtimeTableConfig;
+  }
+
+  @Nullable
+  @Override
+  public QueryConfig getOfflineTableQueryConfig() {
+    return _queryConfig;
+  }
+
+  @Nullable
+  @Override
+  public QueryConfig getRealtimeTableQueryConfig() {
+    return _queryConfig;
+  }
+
+  public void setQueryConfig(QueryConfig queryConfig) {
+    _queryConfig = queryConfig;
   }
 
   @Override

@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -61,14 +62,22 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-
     LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTable);
     if (!offlineTables.isEmpty()) {
+      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTable.getRefOfflineTableName());
+      Preconditions.checkNotNull(offlineTableConfig,
+          "Offline table config not found: " + logicalTable.getRefOfflineTableName());
       routeInfo.setOfflineTables(offlineTables);
+      routeInfo.setOfflineTableConfig(offlineTableConfig);
     }
     if (!realtimeTables.isEmpty()) {
+      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTable.getRefRealtimeTableName());
+      Preconditions.checkNotNull(realtimeTableConfig,
+          "Realtime table config not found: " + logicalTable.getRefRealtimeTableName());
       routeInfo.setRealtimeTables(realtimeTables);
+      routeInfo.setRealtimeTableConfig(realtimeTableConfig);
     }
+    routeInfo.setQueryConfig(logicalTable.getQueryConfig());
     return routeInfo;
   }
 
