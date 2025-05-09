@@ -1552,18 +1552,18 @@ public class TableRebalancer {
    * the minimum available replicas requirement. For strict replica-group mode, track the available instances for all
    * the segments with the same instances in the next assignment, and ensure the minimum available replicas requirement
    * is met. If adding the assignment for a segment breaks the requirement, use the current assignment for the segment.
-   *
+   * <p>
    * For strict replica group routing only (where the segment assignment is not StrictRealtimeSegmentAssignment)
    * if batching is enabled, the instances assigned for the same partitionId can be different for different segments.
-   * For strict replica group routing with strict replica group assignment on the other hand, the assignment for a given
+   * For strict replica group routing with StrictRealtimeSegmentAssignment on the other hand, the assignment for a given
    * partitionId will be the same across all segments. We can treat both cases similarly by creating a mapping from
    * partitionId -> unique set of instance assignments -> currentAssignment. With StrictRealtimeSegmentAssignment,
    * this map will have a single entry for 'unique set of instance assignments'.
-   *
+   * <p>
    * TODO: Ideally if strict replica group routing is enabled then StrictRealtimeSegmentAssignment should be used, but
    *       this is not enforced in the code today. Once enforcement is added, then the routing side and assignment side
    *       will be equivalent and all segments belonging to a given partitionId will be assigned to the same set of
-   *       instances. Special handling to check each group of instances can be removed in that case.
+   *       instances. Special handling to check each group of assigned instances can be removed in that case.
    */
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
@@ -1831,10 +1831,7 @@ public class TableRebalancer {
         nextAssignment.put(segmentName, currentInstanceStateMap);
       } else {
         // Add the next assignment and update the segments added so far counts
-        for (String server : serversAddedForSegment) {
-          int numSegmentsAdded = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
-          serverToNumSegmentsAddedSoFar.put(server, numSegmentsAdded + 1);
-        }
+        serversAddedForSegment.forEach(server -> serverToNumSegmentsAddedSoFar.merge(server, 1, Integer::sum));
         nextAssignment.put(segmentName, nextInstanceStateMap);
         updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(),
             nextInstanceStateMap.keySet());

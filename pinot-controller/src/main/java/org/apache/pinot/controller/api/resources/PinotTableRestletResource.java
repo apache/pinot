@@ -626,11 +626,12 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
       @ApiParam(value = "How many maximum segment adds per server to update in the IdealState in each step. For "
-          + "non-strict replica group based assignment, this number will be the closest possible without splitting up "
-          + "a single segment's step's replicas across steps (so some servers may get fewer segments). For strict "
-          + "replica group based assignment, this is a per-server best effort value since each partition of a replica "
-          + "group must be moved as a whole and at least one partition in a replica group should be moved. A value of "
-          + "-1 is used to disable batching (unlimited segments).")
+          + "non-strict replica group based assignment, this number will be capped at the batchSizePerServer value "
+          + "per rebalance step (some servers may get fewer segments). For strict replica group based assignment, "
+          + "this is a per-server best effort value since each partition of a replica group must be moved as a whole "
+          + "and at least one partition in a replica group should be moved. A value of -1 is used to disable batching "
+          + "(select as many segments as possible per incremental step in rebalance such that minAvailableReplicas is "
+          + "honored).")
       @DefaultValue("-1") @QueryParam("batchSizePerServer") int batchSizePerServer,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
