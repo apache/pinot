@@ -195,9 +195,15 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         // Attempt partitioned distribution
         String tableType = partitionedTableTypes.iterator().next();
         String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableType)).tableNameWithType(tableName);
+        TablePartitionInfo tpi = tpiMap.get(tableType);
         TableScanWorkerAssignmentResult assignmentResult = attemptPartitionedDistribution(tableNameWithType,
-            fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)), tpiMap.get(tableType),
+            fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)), tpi,
             inferInvalidPartitionSegment);
+        if (tpi != null && CollectionUtils.isNotEmpty(tpi.getSegmentsWithInvalidPartition())) {
+          // Use SegmentPartitionMetadataManager's logs to find the segments with invalid partitions.
+          BROKER_METRICS.addMeteredTableValue(tableNameWithType, BrokerMeter.INVALID_SEGMENT_PARTITION_IN_QUERY,
+              tpi.getSegmentsWithInvalidPartition().size());
+        }
         if (assignmentResult != null) {
           return assignmentResult;
         }
@@ -252,16 +258,6 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     String tableType =
         Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType),
             "Illegal state: expected table name with type").toString();
-    Map<Integer, List<String>> invalidSegmentsByInferredPartition;
-    try {
-      invalidSegmentsByInferredPartition = getInvalidSegmentsByInferredPartition(
-          tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition, tableNameWithType);
-    } catch (Throwable t) {
-      // Use SegmentPartitionMetadataManager's logs to find the segments with invalid partitions.
-      BROKER_METRICS.addMeteredTableValue(tableNameWithType, BrokerMeter.INVALID_SEGMENT_PARTITION_IN_QUERY,
-          tablePartitionInfo.getSegmentsWithInvalidPartition().size());
-      return null;
-    }
     int numPartitions = tablePartitionInfo.getNumPartitions();
     int keyIndex = fieldNames.indexOf(tablePartitionInfo.getPartitionColumn());
     String function = tablePartitionInfo.getPartitionFunctionName();
@@ -274,6 +270,14 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       return null;
     } else if (numSelectedServers == 1) {
       // ==> scan will have a single stream, so partitioned distribution doesn't matter
+      return null;
+    }
+    Map<Integer, List<String>> invalidSegmentsByInferredPartition;
+    try {
+      invalidSegmentsByInferredPartition = getInvalidSegmentsByInferredPartition(
+          tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition, tableNameWithType,
+          numPartitions);
+    } catch (Throwable t) {
       return null;
     }
     // Pre-compute segmentToServer map for quick lookup later.
@@ -346,14 +350,19 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   }
 
   /**
-   * Infers partition from invalid segments if the passed flag is set to true.
+   * Infers partition from invalid segments if the passed flag is set to true. Inference is done by simply:
+   * <ol>
+   *   <li>Extracting the stream partition number from the segment name</li>
+   *   <li>Doing a modulus with the numPartitions.</li>
+   * </ol>
    */
   @VisibleForTesting
   static Map<Integer, List<String>> getInvalidSegmentsByInferredPartition(@Nullable List<String> invalidSegments,
-      boolean inferPartitionsForInvalidSegments, String tableNameWithType) {
+      boolean inferPartitionsForInvalidSegments, String tableNameWithType, int numPartitions) {
     if (CollectionUtils.isEmpty(invalidSegments)) {
       return Map.of();
-    } else if (!Objects.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType), TableType.REALTIME)
+    }
+    if (!Objects.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType), TableType.REALTIME)
         || !inferPartitionsForInvalidSegments) {
       throw new IllegalStateException(String.format("Table %s has %s segments with invalid partition info. Will "
           + "assume un-partitioned distribution. Sampled: %s", tableNameWithType, invalidSegments.size(),
@@ -378,6 +387,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         throw new IllegalStateException(String.format("Could not infer partition for segment: %s. Falling back to "
             + "un-partitioned distribution", invalidPartitionSegment));
       }
+      partitionId = partitionId % numPartitions;
       invalidSegmentsByInferredPartition.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(
           invalidPartitionSegment);
     }

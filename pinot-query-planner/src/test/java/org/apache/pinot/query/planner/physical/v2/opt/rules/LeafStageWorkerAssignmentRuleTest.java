@@ -185,16 +185,18 @@ public class LeafStageWorkerAssignmentRuleTest {
 
   @Test
   public void testGetInvalidSegmentsByInferredPartitionWhenSegmentNamesDontConform() {
+    final int numPartitions = 4;  // arbitrary for this test
     final boolean inferPartitions = true;
     final String tableNameWithType = "foobar_REALTIME";
     assertThrows(IllegalStateException.class, () -> LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(
-        List.of("foobar_123"), inferPartitions, tableNameWithType));
+        List.of("foobar_123"), inferPartitions, tableNameWithType, numPartitions));
     assertThrows(IllegalStateException.class, () -> LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(
-        List.of("foobar_123_123"), inferPartitions, tableNameWithType));
+        List.of("foobar_123_123"), inferPartitions, tableNameWithType, numPartitions));
     assertThrows(IllegalStateException.class, () -> LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(
-        List.of("foobar_123_123_123"), inferPartitions, tableNameWithType));
+        List.of("foobar_123_123_123"), inferPartitions, tableNameWithType, numPartitions));
     assertThrows(IllegalStateException.class, () -> LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(
-        List.of("foobar__9__35__20250509T1444Z", "foobar_123_123_123"), inferPartitions, tableNameWithType));
+        List.of("foobar__9__35__20250509T1444Z", "foobar_123_123_123"), inferPartitions, tableNameWithType,
+        numPartitions));
   }
 
   @Test
@@ -204,14 +206,18 @@ public class LeafStageWorkerAssignmentRuleTest {
     // Should return segments by inferred partition when valid LLC Segment Name.
     assertEquals(Map.of(9, List.of("foobar__9__35__20250509T1444Z")),
         LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of("foobar__9__35__20250509T1444Z"),
-        inferPartitions, tableNameWithType));
+        inferPartitions, tableNameWithType, 256));
     assertEquals(Map.of(101, List.of("foobar__101__35__20250509T1Z")),
         LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of("foobar__101__35__20250509T1Z"),
-        inferPartitions, tableNameWithType));
-    // Should return segments by inferred partition when valid Upload segment name.
+        inferPartitions, tableNameWithType, 256));
+    // Should return segments by inferred partition when valid Uploaded segment name.
     assertEquals(Map.of(11, List.of("uploaded__table_name__11__20240530T0000Z__suffix")),
         LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of(
-            "uploaded__table_name__11__20240530T0000Z__suffix"), inferPartitions, tableNameWithType));
+            "uploaded__table_name__11__20240530T0000Z__suffix"), inferPartitions, tableNameWithType, 256));
+    // Should handle when numPartitions is less than kafka partition count.
+    assertEquals(Map.of(1, List.of("foobar__9__35__20250509T1444Z")),
+        LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of("foobar__9__35__20250509T1444Z"),
+            inferPartitions, tableNameWithType, 8));
   }
 
   @Test
