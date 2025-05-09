@@ -176,8 +176,8 @@ public class ImmutableMapIndexReader implements MapIndexReader<ForwardIndexReade
       }
 
       @Override
-      public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
-        return Map.of();
+      public long getIndexSizeFor(IndexType type) {
+        return ColumnMetadata.INDEX_NOT_FOUND;
       }
 
       @Override
