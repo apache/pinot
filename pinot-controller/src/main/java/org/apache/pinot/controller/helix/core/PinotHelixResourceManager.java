@@ -127,6 +127,7 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -1649,6 +1650,12 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
+  public List<String> getAllSchemaNames() {
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT
+    );
+  }
+
   public List<String> getSchemaNames() {
     return getSchemaNames(null);
   }
@@ -1824,6 +1831,17 @@ public class PinotHelixResourceManager {
       throws TableAlreadyExistsException {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table {}: Start", tableName);
+
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableConfigUtils.validateLogicalTableConfig(
+        logicalTableConfig,
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
+        _propertyStore
+    );
 
     // Check if the logical table name is already used
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
@@ -2102,6 +2120,17 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table {}: Start", tableName);
 
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableConfigUtils.validateLogicalTableConfig(
+        logicalTableConfig,
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
+        _propertyStore
+    );
+
     if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
       throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
     }
@@ -2314,8 +2343,10 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllLogicalTableNames() {
-    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
-        .collect(Collectors.toList());
+    List<String> logicalTableNames = _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
+        AccessOption.PERSISTENT);
+    return logicalTableNames != null ? logicalTableNames : Collections.emptyList();
   }
 
   /**
