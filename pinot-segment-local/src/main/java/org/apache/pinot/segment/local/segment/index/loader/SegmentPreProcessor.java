@@ -130,7 +130,24 @@ public class SegmentPreProcessor implements AutoCloseable {
         if (type != StandardIndexes.forward()) {
           IndexHandler handler = createHandler(type);
           indexHandlers.add(handler);
-          handler.updateIndices(segmentWriter);
+          try {
+            handler.updateIndices(segmentWriter);
+          } catch (IllegalStateException | UnsupportedOperationException e) {
+            // The index creation failure is expected in some cases, like when the index is not supported for the
+            // column or segment type.
+            // E.g. non-dictionary encoded TIMESTAMP type doesn't support range index, meanwhile dictionary encoded
+            // TIMESTAMP type supports range index.
+            // Since we allow users to change a column from non-dictionary to dictionary encoding, so we cannot
+            // simplify fail segment pre-process.
+            // In such cases, we log the error and continue with the next index handler.
+            LOGGER.error("Failed to create index: {} for segment: {}", type, _segmentMetadata.getName(), e);
+            indexHandlers.remove(handler);
+          } catch (Exception e) {
+            // Handle unexpected exceptions separately to avoid masking critical issues.
+            LOGGER.error("Unexpected error while creating index: {} for segment: {}", type, _segmentMetadata.getName(),
+                e);
+            throw e;
+          }
           // Other IndexHandler classes may modify the segment metadata while creating a temporary forward
           // index to generate their respective indexes from if the forward index was disabled. This new metadata is
           // needed to construct other indexes like RangeIndex.
