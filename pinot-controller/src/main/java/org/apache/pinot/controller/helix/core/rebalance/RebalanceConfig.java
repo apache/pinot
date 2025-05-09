@@ -27,6 +27,7 @@ import org.apache.pinot.spi.utils.Enablement;
 
 @ApiModel
 public class RebalanceConfig {
+  public static final int DISABLE_BATCH_SIZE_PER_SERVER = -1;
   public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
@@ -91,6 +92,16 @@ public class RebalanceConfig {
   @JsonProperty("minimizeDataMovement")
   @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
   private Enablement _minimizeDataMovement = Enablement.ENABLE;
+
+  // How many segment add updates to make per server to the IdealState as part of each rebalance step. This is used
+  // as closest estimated upper-bound. For strict replica group based assignment, there is the additional constraint
+  // to move each partitionId replica as a whole rather than splitting it up. In this case the total segment adds per
+  // server may be above the threshold to accommodate a full partition. The minReplicasAvailable invariant is also
+  // maintained, so fewer segments than the batchSizePerServer may also be selected. Batching is disabled by default by
+  // setting it to -1.
+  @JsonProperty("batchSizePerServer")
+  @ApiModelProperty(example = "100")
+  private int _batchSizePerServer = DISABLE_BATCH_SIZE_PER_SERVER;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -197,6 +208,14 @@ public class RebalanceConfig {
     _bestEfforts = bestEfforts;
   }
 
+  public int getBatchSizePerServer() {
+    return _batchSizePerServer;
+  }
+
+  public void setBatchSizePerServer(int batchSizePerServer) {
+    _batchSizePerServer = batchSizePerServer;
+  }
+
   public long getExternalViewCheckIntervalInMs() {
     return _externalViewCheckIntervalInMs;
   }
@@ -268,11 +287,12 @@ public class RebalanceConfig {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
         + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
         + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
-        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs="
-        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
-        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
-        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
-        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSizePerServer=" + _batchSizePerServer
+        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
+        + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
+        + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -285,6 +305,8 @@ public class RebalanceConfig {
     rc._downtime = cfg._downtime;
     rc._minAvailableReplicas = cfg._minAvailableReplicas;
     rc._bestEfforts = cfg._bestEfforts;
+    rc._minimizeDataMovement = cfg._minimizeDataMovement;
+    rc._batchSizePerServer = cfg._batchSizePerServer;
     rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;

@@ -203,11 +203,13 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.enableLocalTierMigration";
     public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
         "controller.segmentRelocator.rebalanceTablesSequentially";
-    public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
+    public static final String SEGMENT_RELOCATOR_INCLUDE_CONSUMING =
         "controller.segmentRelocator.includeConsuming";
     // Available options are: "ENABLE", "DISABLE", "DEFAULT"
-    public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
+    public static final String SEGMENT_RELOCATOR_MINIMIZE_DATA_MOVEMENT =
         "controller.segmentRelocator.minimizeDataMovement";
+    public static final String SEGMENT_RELOCATOR_BATCH_SIZE_PER_SERVER =
+        "controller.segmentRelocator.batchSizePerServer";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
@@ -834,17 +836,22 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean isSegmentRelocatorIncludingConsuming() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING, false);
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_INCLUDE_CONSUMING, false);
   }
 
-  public Enablement getSegmentRelocatorRebalanceMinimizeDataMovement() {
-    String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT,
+  public Enablement getSegmentRelocatorMinimizeDataMovement() {
+    String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_MINIMIZE_DATA_MOVEMENT,
         Enablement.ENABLE.name());
     try {
       return Enablement.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
       return Enablement.ENABLE;
     }
+  }
+
+  public int getSegmentRelocatorBatchSizePerServer() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_BATCH_SIZE_PER_SERVER,
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER);
   }
 
   public boolean tieredSegmentAssignmentEnabled() {

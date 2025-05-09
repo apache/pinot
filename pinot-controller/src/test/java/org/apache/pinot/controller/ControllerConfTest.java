@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -165,6 +167,9 @@ public class ControllerConfTest {
     Assert.assertFalse(conf.getSegmentRelocatorDowntime());
     Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -1);
     Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+    Assert.assertFalse(conf.isSegmentRelocatorIncludingConsuming());
+    Assert.assertEquals(conf.getSegmentRelocatorMinimizeDataMovement(), Enablement.ENABLE);
+    Assert.assertEquals(conf.getSegmentRelocatorBatchSizePerServer(), RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER);
   }
 
   @Test
@@ -175,6 +180,9 @@ public class ControllerConfTest {
     properties.put(SEGMENT_RELOCATOR_DOWNTIME, true);
     properties.put(SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS, -2);
     properties.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
+    properties.put(SEGMENT_RELOCATOR_INCLUDE_CONSUMING, true);
+    properties.put(SEGMENT_RELOCATOR_MINIMIZE_DATA_MOVEMENT, "DISABLE");
+    properties.put(SEGMENT_RELOCATOR_BATCH_SIZE_PER_SERVER, 42);
 
     ControllerConf conf = new ControllerConf(properties);
     Assert.assertTrue(conf.getSegmentRelocatorReassignInstances());
@@ -182,6 +190,9 @@ public class ControllerConfTest {
     Assert.assertTrue(conf.getSegmentRelocatorDowntime());
     Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -2);
     Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+    Assert.assertTrue(conf.isSegmentRelocatorIncludingConsuming());
+    Assert.assertEquals(conf.getSegmentRelocatorMinimizeDataMovement(), Enablement.DISABLE);
+    Assert.assertEquals(conf.getSegmentRelocatorBatchSizePerServer(), 42);
   }
 
   @Test
