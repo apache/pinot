@@ -226,15 +226,16 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * Returns the expression override map for the given table, or {@code null} if no override is configured.
+   * Returns the expression override map for the given logical or physical table, or {@code null} if no override is
+   * configured.
    */
   @Nullable
-  public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
-    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+  public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
     if (tableConfigInfo != null) {
       return tableConfigInfo._expressionOverrideMap;
     }
-    LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(tableNameWithType);
+    LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(physicalOrLogicalTableName);
     return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
@@ -646,7 +647,8 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private static Map<Expression, Expression> createExpressionOverrideMap(String tableName, QueryConfig queryConfig) {
+  private static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
+      QueryConfig queryConfig) {
     Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
     if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
       for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
@@ -656,7 +658,7 @@ public class TableCache implements PinotConfigProvider {
           expressionOverrideMap.put(srcExp, destExp);
         } catch (Exception e) {
           LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-              entry.getKey(), entry.getValue(), tableName);
+              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
         }
       }
       int mapSize = expressionOverrideMap.size();
