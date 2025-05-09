@@ -342,11 +342,6 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
-    _skipSegmentPreprocess = skipSegmentPreprocess;
-    return this;
-  }
-
   public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
     return this;
@@ -370,6 +365,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {
     _columnMajorSegmentBuilderEnabled = columnMajorSegmentBuilderEnabled;
+    return this;
+  }
+
+  public TableConfigBuilder setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
+    _skipSegmentPreprocess = skipSegmentPreprocess;
     return this;
   }
 
@@ -502,6 +502,7 @@ public class TableConfigBuilder {
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setColumnMajorSegmentBuilderEnabled(_columnMajorSegmentBuilderEnabled);
+    indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
@@ -513,7 +514,6 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
     indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
-    indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
