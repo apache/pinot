@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -154,7 +155,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
     LogicalTableConfig logicalTableConfig =
         getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
-    logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", "999"));
+    logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", TimeUnit.SECONDS, 1d, 999d));
     ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
   }
 
