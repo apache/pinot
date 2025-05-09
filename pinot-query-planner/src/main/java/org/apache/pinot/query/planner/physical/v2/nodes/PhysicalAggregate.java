@@ -129,4 +129,10 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
   public int getLimit() {
     return _limit;
   }
+
+  public PhysicalAggregate withLimit(int newLimit) {
+    return new PhysicalAggregate(getCluster(), getTraitSet(), getHints(), groupSet, groupSets, aggCalls, _nodeId,
+        _pRelInputs.get(0), _pinotDataDistribution, _leafStage, _aggType, _leafReturnFinalResult, _collations,
+        newLimit);
+  }
 }
