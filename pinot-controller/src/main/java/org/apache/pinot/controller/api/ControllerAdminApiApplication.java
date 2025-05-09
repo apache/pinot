@@ -89,7 +89,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(binder);
   }
 
-  public void start(List<ListenerConfig> listenerConfigs) {
+  public void start(List<ListenerConfig> listenerConfigs, ControllerMetrics controllerMetrics) {
     _httpServer = ListenerConfigUtil.buildHttpServer(this, listenerConfigs);
 
     try {
@@ -114,6 +114,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration()
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
+    registerHttpThreadUtilizationGauge(controllerMetrics);
   }
 
   public void stop() {
@@ -145,7 +146,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     * Registers a gauge that tracks HTTP thread pool utilization without using reflection.
     * Instead, it uses a custom ThreadPoolProbe to count active threads.
    */
-  public void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
+  private void registerHttpThreadUtilizationGauge(ControllerMetrics metrics) {
     NetworkListener listener = _httpServer.getListeners().iterator().next();
     ExecutorService executor = listener.getTransport().getWorkerThreadPool();
     ThreadPoolConfig poolCfg = listener.getTransport().getWorkerThreadPoolConfig();
@@ -158,7 +159,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       mc.addProbes(probe);
     }
 
-    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION_PERCENT.getGaugeName(), () -> {
+    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION.getGaugeName(), () -> {
       int max = poolCfg.getMaxPoolSize();
       if (max <= 0) {
         return 0L;
