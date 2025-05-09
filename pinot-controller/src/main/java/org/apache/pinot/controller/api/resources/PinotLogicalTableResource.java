@@ -152,7 +152,8 @@ public class PinotLogicalTableResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a logical table", notes = "Updates a logical table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated logical table"), @ApiResponse(code = 404, message = "Schema "
+      @ApiResponse(code = 200, message = "Successfully updated logical table"),
+      @ApiResponse(code = 404, message = "Schema "
       + "not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500,
       message = "Internal error")
   })
