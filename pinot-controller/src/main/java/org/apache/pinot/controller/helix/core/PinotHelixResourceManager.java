@@ -2150,7 +2150,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updating logical table {}: Updating logical table config in the property store", tableName);
     ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
 
-    if (oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
+    if (!oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
       LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
       updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
     }
