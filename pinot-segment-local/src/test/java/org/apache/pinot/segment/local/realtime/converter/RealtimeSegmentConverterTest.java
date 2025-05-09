@@ -170,7 +170,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
 
       File outputDir = new File(tmpDir, "outputDir");
@@ -242,7 +242,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
       List<GenericRow> rows = generateTestData();
 
@@ -322,7 +322,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
 
       File outputDir = new File(tmpDir, "outputDir");
@@ -394,7 +394,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
       List<GenericRow> rows = generateTestData();
 
@@ -446,8 +446,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       indexContainerMap.put(entry.getKey(),
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
-    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null,
-            null);
+    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
 
     GenericRow readRow = new GenericRow();
     int docId = 0;
@@ -509,7 +508,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
       List<GenericRow> rows = new ArrayList<>();
       for (int i = 0; i < 10; i++) {
@@ -628,7 +627,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     RealtimeLuceneTextIndexSearcherPool.init(1);
     RealtimeLuceneIndexRefreshManager.init(1, 10);
     ImmutableSegmentImpl segmentFile = null;
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null, null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     try {
       List<GenericRow> rows = generateTestDataForReusePath();
 
@@ -673,7 +672,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         indexContainerMap.put(entry.getKey(),
             new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
       }
-      segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null, null);
+      segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
 
       // test forward index contents
       GenericRow readRow = new GenericRow();

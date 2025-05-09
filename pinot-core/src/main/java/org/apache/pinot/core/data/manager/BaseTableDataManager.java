@@ -52,6 +52,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -146,8 +147,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
-  // Caches the latest TableConfig and Schema pair. The cache should not be modified.
-  protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
+  protected TableConfigAndSchemaCache _tableConfigAndSchemaCache;
 
   protected volatile boolean _shutDown;
 
@@ -190,7 +190,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    _tableConfigAndSchemaCache.set(_tableNameWithType, tableConfig, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -227,6 +227,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
+    _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
 
     doInit();
 
@@ -383,19 +384,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public IndexLoadingConfig fetchIndexLoadingConfig() {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig,
+            _tableConfigAndSchemaCache.getLatestTableConfig(_tableNameWithType),
+            _tableConfigAndSchemaCache.getLatestSchema(_tableNameWithType));
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
     return indexLoadingConfig;
   }
 
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
-    return _cachedTableConfigAndSchema;
+    return Pair.of(
+        _tableConfigAndSchemaCache.getTableConfig(_tableNameWithType),
+        _tableConfigAndSchemaCache.getSchema(_tableNameWithType));
   }
 
   @Override
@@ -433,8 +433,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler, this),
-            zkMetadata);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -813,7 +812,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
           _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
           // No reprocessing needed, reuse the same segment
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, this);
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
           addSegment(segment, zkMetadata);
           return;
         }
@@ -834,8 +833,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler,
-              this);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
       addSegment(segment, zkMetadata);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -1214,7 +1212,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
-      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, this);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
       addSegment(segment, zkMetadata);
       _logger.info("Loaded existing segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
           TierConfigUtils.normalizeTierName(segmentTier));

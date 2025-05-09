@@ -55,6 +55,7 @@ import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -259,6 +260,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     ContinuousJfrStarter.init(_serverConf);
+    TableConfigAndSchemaCache.init(_helixManager.getHelixPropertyStore());
   }
 
   /// Can be overridden to apply custom configs to the server conf.

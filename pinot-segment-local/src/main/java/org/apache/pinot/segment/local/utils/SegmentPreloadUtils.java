@@ -32,6 +32,7 @@ import java.util.function.BiPredicate;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
@@ -56,6 +57,8 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentPreloadUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreloadUtils.class);
+  private static final TableConfigAndSchemaCache TABLE_CONFIG_AND_SCHEMA_CACHE
+          = TableConfigAndSchemaCache.getInstance();
 
   private SegmentPreloadUtils() {
   }
@@ -200,14 +203,12 @@ public class SegmentPreloadUtils {
     return segmentMetadataMap;
   }
 
-  public static DataSource getVirtualDataSource(TableDataManager tableDataManager, String column,
-                                                int totalDocCount) {
-    // First check is the schema is already updated with the virtual column
-    Schema schema = tableDataManager.getCachedTableConfigAndSchema().getRight();
+  public static DataSource getVirtualDataSource(String schemaName, String column, int totalDocCount) {
+    Schema schema = TABLE_CONFIG_AND_SCHEMA_CACHE.getSchema(schemaName);
     assert schema != null : "Schema should not be null";
     if (!schema.hasColumn(column)) {
-      // Get the latest schema from the table data manager
-      schema = tableDataManager.fetchIndexLoadingConfig().getSchema();
+      // Get the latest schema and see if the column is present in the latest schema
+      schema = TABLE_CONFIG_AND_SCHEMA_CACHE.getLatestSchema(schemaName);
     }
     assert schema != null;
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);

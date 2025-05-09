@@ -47,7 +47,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -187,10 +186,8 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
-  private final TableDataManager _tableDataManager;
 
-  public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics,
-                            @Nullable TableDataManager tableDataManager) {
+  public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
     _realtimeTableName = config.getTableNameWithType();
     _segmentName = config.getSegmentName();
@@ -425,7 +422,6 @@ public class MutableSegmentImpl implements MutableSegment {
       _validDocIds = null;
       _queryableDocIds = null;
     }
-    _tableDataManager = tableDataManager;
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -993,7 +989,7 @@ public class MutableSegmentImpl implements MutableSegment {
       return indexContainer.toDataSource();
     } else {
       // Virtual column
-      return SegmentPreloadUtils.getVirtualDataSource(_tableDataManager, column, _numDocsIndexed);
+      return SegmentPreloadUtils.getVirtualDataSource(_schema.getSchemaName(), column, _numDocsIndexed);
     }
   }
 
