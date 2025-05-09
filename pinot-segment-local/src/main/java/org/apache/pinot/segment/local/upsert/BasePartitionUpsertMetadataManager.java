@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -1145,5 +1146,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return _newlyAddedSegments.keySet();
     }
     return Collections.emptySet();
+  }
+
+  public static double toDouble(Object obj) {
+    if (obj instanceof Number) {
+      return ((Number) obj).doubleValue();
+    } else if (obj instanceof String) {
+      return ((Number) TimestampUtils.toMillisSinceEpoch(obj.toString())).doubleValue();
+    } else {
+      throw new IllegalStateException("Unsupported comparison value type: " + obj.getClass());
+    }
   }
 }
