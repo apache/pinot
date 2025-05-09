@@ -108,6 +108,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
+  private final boolean _enablePartitionMetadataManager;
 
   private BaseDataAccessor<ZNRecord> _zkDataAccessor;
   private String _externalViewPathPrefix;
@@ -122,6 +123,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     _brokerMetrics = brokerMetrics;
     _serverRoutingStatsManager = serverRoutingStatsManager;
     _pinotConfig = pinotConfig;
+    _enablePartitionMetadataManager =
+        pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
+            CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
   }
 
   @Override
@@ -512,19 +516,20 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     SegmentPartitionMetadataManager partitionMetadataManager = null;
     // TODO: Support multiple partition columns
     // TODO: Make partition pruner on top of the partition metadata manager to avoid keeping 2 copies of the metadata
-    if (_pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
-        CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER)) {
+    if (_enablePartitionMetadataManager) {
       SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
-      if (segmentPartitionConfig == null || segmentPartitionConfig.getColumnPartitionMap().size() != 1) {
-        LOGGER.warn("Cannot enable SegmentPartitionMetadataManager. "
-            + "Expecting SegmentPartitionConfig with exact 1 partition column");
-      } else {
-        Map.Entry<String, ColumnPartitionConfig> partitionConfig =
-            segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
-        LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}", tableNameWithType,
-            partitionConfig.getKey());
-        partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-            partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+      if (segmentPartitionConfig != null) {
+        Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+        if (columnPartitionMap.size() == 1) {
+          Map.Entry<String, ColumnPartitionConfig> partitionConfig = columnPartitionMap.entrySet().iterator().next();
+          LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}",
+              tableNameWithType, partitionConfig.getKey());
+          partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+              partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+        } else {
+          LOGGER.warn("Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
+              tableNameWithType, columnPartitionMap.keySet());
+        }
       }
     }
 
