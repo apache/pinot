@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -787,7 +788,7 @@ public class ZKMetadataProvider {
   }
 
   public static boolean setApplicationQpsQuota(ZkHelixPropertyStore<ZNRecord> propertyStore, String applicationName,
-      Double value) {
+      TimeUnit ratelimiterUnit, Double ratelimterDuration, Double maxQueriesValue) {
     final ZNRecord znRecord;
     final String path = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
 
@@ -805,7 +806,8 @@ public class ZKMetadataProvider {
       quotas = new HashMap<>();
       znRecord.setMapField(CLUSTER_APPLICATION_QUOTAS, quotas);
     }
-    quotas.put(applicationName, value != null ? value.toString() : null);
+    quotas.put(applicationName,
+        new QuotaConfig(null, ratelimiterUnit, ratelimterDuration, maxQueriesValue).toJsonString());
 
     if (doCreate) {
       return propertyStore.create(path, znRecord, AccessOption.PERSISTENT);
@@ -815,7 +817,7 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static Map<String, Double> getApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static Map<String, QuotaConfig> getApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
     if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
       ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
@@ -829,18 +831,26 @@ public class ZKMetadataProvider {
     }
   }
 
-  private static Map<String, Double> toApplicationQpsQuotas(Map<String, String> quotas) {
+  private static Map<String, QuotaConfig> toApplicationQpsQuotas(Map<String, String> quotas) {
     if (quotas == null) {
       return new HashMap<>();
     } else {
-      HashMap<String, Double> result = new HashMap<>();
+      HashMap<String, QuotaConfig> result = new HashMap<>();
       for (Map.Entry<String, String> entry : quotas.entrySet()) {
-        if (entry.getValue() != null) {
+        String applicationName = entry.getKey();
+        String quotaJsonString = entry.getValue();
+        if (quotaJsonString != null && !quotaJsonString.isEmpty()) {
           try {
-            double value = Double.parseDouble(entry.getValue());
-            result.put(entry.getKey(), value);
-          } catch (NumberFormatException nfe) {
-            continue;
+            QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaJsonString, QuotaConfig.class);
+            if (quotaConfig != null) {
+              result.put(applicationName, quotaConfig);
+            } else {
+              LOGGER.error("Deserialized QuotaConfig is null for application '{}'. JSON: '{}'. "
+                  + "This entry will be skipped.", applicationName, quotaJsonString);
+            }
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error deserializing QuotaConfig for application '" + applicationName
+                + "'. JSON: '" + quotaJsonString + "'. Error: " + e.getMessage() + ". This entry will be skipped.");
           }
         }
       }

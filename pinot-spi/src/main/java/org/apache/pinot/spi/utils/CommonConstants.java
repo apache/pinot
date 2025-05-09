@@ -60,6 +60,9 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
+  public static final String APPLICATION = "application";
+  public static final String DEFAULT_APPLICATION = "application";
+
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -87,6 +90,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
   }
+
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";
@@ -1670,7 +1674,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 

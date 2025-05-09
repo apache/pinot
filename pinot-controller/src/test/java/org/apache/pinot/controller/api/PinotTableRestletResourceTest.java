@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.task.TaskState;
@@ -347,7 +348,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     DEFAULT_INSTANCE.addSchema(schema);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
-        .setQuotaConfig(new QuotaConfig("500G", null)).build();
+        .setQuotaConfig(new QuotaConfig("500G", null, null, null)).build();
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       fail("Creation of a DIMENSION table with larger than allowed storage quota should fail");
@@ -363,7 +364,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addSchema(schema);
     String goodQuota = "100M";
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
-        .setQuotaConfig(new QuotaConfig(goodQuota, null)).build();
+        .setQuotaConfig(new QuotaConfig(goodQuota, null, null, null)).build();
     sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     tableConfig = getTableConfig(tableName, "OFFLINE");
     assertEquals(tableConfig.getQuotaConfig().getStorage(), goodQuota);
@@ -401,21 +402,23 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Realtime
     DEFAULT_INSTANCE.addDummySchema(tableName);
-    tableConfigString = _realtimeBuilder.setTableName(tableName).setNumReplicas(2).build().toJsonString();
+    tableConfigString = _realtimeBuilder.setTableName(tableName).setNumReplicas(2).setQuotaConfig(null).build()
+        .toJsonString();
     sendPostRequest(_createTableUrl, tableConfigString);
     tableConfig = getTableConfig(tableName, "REALTIME");
     assertEquals(tableConfig.getValidationConfig().getRetentionTimeValue(), "5");
     assertEquals(tableConfig.getValidationConfig().getRetentionTimeUnit(), "DAYS");
+    // QuotaConfig should be null since we explicitly set it to null
     assertNull(tableConfig.getQuotaConfig());
 
-    QuotaConfig quota = new QuotaConfig("10G", "100.0");
+    QuotaConfig quota = new QuotaConfig("10G", TimeUnit.SECONDS, 1d, 100d);
     tableConfig.setQuotaConfig(quota);
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
         tableConfig.toJsonString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     assertNotNull(modifiedConfig.getQuotaConfig());
     assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
-    assertEquals(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.0");
+    assertEquals(modifiedConfig.getQuotaConfig().getRateLimits(), 100d);
 
     try {
       // table does not exist
@@ -697,7 +700,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // table delete with raw table name and type also should fail
     msg = expectThrows(IOException.class,
         () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName + "?type=" + tableType)))
-            .getMessage();
+        .getMessage();
     assertTrue(msg.contains(
         "Cannot delete table config: " + tableName + " because it is referenced in logical table: logicalTable"), msg);
 
@@ -1116,6 +1119,285 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
+  public void testCreateOfflineTableWithFlexibleQuotaConfig()
+      throws Exception {
+    // Test creating OFFLINE table with flexible quota configuration using SECONDS
+    String tableName = "quotaTableOfflineSeconds";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    QuotaConfig quotaConfig = new QuotaConfig("5G", TimeUnit.SECONDS, 5.0, 100.0);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config was set correctly
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getStorage(), "5G");
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.SECONDS);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 5.0);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 100.0);
+  }
+
+  @Test
+  public void testCreateRealtimeTableWithFlexibleQuotaConfig()
+      throws Exception {
+    // Test creating REALTIME table with flexible quota configuration using MINUTES
+    String tableName = "quotaTableRealtimeMinutes";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    QuotaConfig quotaConfig = new QuotaConfig("10G", TimeUnit.MINUTES, 2.0, 240.0);
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config was set correctly
+    TableConfig retrievedConfig = getTableConfig(tableName, "REALTIME");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getStorage(), "10G");
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 2.0);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 240.0);
+  }
+
+  @Test
+  public void testCreateTableWithFractionalRateLimits()
+      throws Exception {
+    // Test creating table with fractional rate limits
+    String tableName = "quotaTableFractional";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 0.25 queries per second (should be internally adjusted to 1 query per 4 seconds)
+    QuotaConfig quotaConfig = new QuotaConfig("2G", TimeUnit.SECONDS, 1.0, 0.25);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 0.25);
+  }
+
+  @Test
+  public void testCreateTableWithVerySmallFractionalRates()
+      throws Exception {
+    // Test creating table with very small fractional rates
+    String tableName = "quotaTableVerySmall";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 0.01 queries per second (1 query per 100 seconds)
+    QuotaConfig quotaConfig = new QuotaConfig("1G", TimeUnit.SECONDS, 1.0, 0.01);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 0.01);
+  }
+
+  @Test
+  public void testCreateTableWithComplexDurationAndRate()
+      throws Exception {
+    // Test creating table with complex duration and rate combinations
+    String tableName = "quotaTableComplex";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 1.5 queries per 5 seconds
+    QuotaConfig quotaConfig = new QuotaConfig("3G", TimeUnit.SECONDS, 5.0, 1.5);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 5.0);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 1.5);
+  }
+
+  @Test
+  public void testUpdateTableQuotaConfigFromSecondsToMinutes()
+      throws Exception {
+    // Test updating table quota config from SECONDS to MINUTES
+    String tableName = "quotaUpdateTableSecondsToMinutes";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Create table with SECONDS-based quota
+    QuotaConfig initialQuotaConfig = new QuotaConfig("5G", TimeUnit.SECONDS, 1.0, 50.0);
+    TableConfig tableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(initialQuotaConfig).build();
+
+    sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+
+    // Verify initial config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.SECONDS);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 50.0);
+
+    // Update to MINUTES-based quota
+    QuotaConfig updatedQuotaConfig = new QuotaConfig("10G", TimeUnit.MINUTES, 2.0, 120.0);
+    tableConfig.setQuotaConfig(updatedQuotaConfig);
+
+    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        tableConfig.toJsonString());
+
+    // Verify updated config
+    TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
+    assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
+    assertEquals(modifiedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(modifiedConfig.getQuotaConfig().getRateLimiterDuration(), 2.0);
+    assertEquals(modifiedConfig.getQuotaConfig().getRateLimits(), 120.0);
+  }
+
+  @Test
+  public void testUpdateTableQuotaConfigToFractionalRates()
+      throws Exception {
+    // Test updating table quota config to fractional rates
+    String tableName = "quotaUpdateTableFractional";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Create table with integer rate
+    QuotaConfig initialQuotaConfig = new QuotaConfig("2G", TimeUnit.SECONDS, 1.0, 100.0);
+    TableConfig tableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(initialQuotaConfig).build();
+
+    sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+
+    // Update to fractional rate
+    QuotaConfig updatedQuotaConfig = new QuotaConfig("3G", TimeUnit.SECONDS, 1.0, 0.333);
+    tableConfig.setQuotaConfig(updatedQuotaConfig);
+
+    sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        tableConfig.toJsonString());
+
+    // Verify updated config
+    TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
+    assertEquals(modifiedConfig.getQuotaConfig().getRateLimits(), 0.333, 0.001);
+  }
+
+  @Test
+  public void testCreateTableWithMinutesAndFractionalRates()
+      throws Exception {
+    // Test creating table with MINUTES time unit and fractional rates
+    String tableName = "quotaTableMinutesFractional";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 0.5 queries per minute (1 query per 2 minutes)
+    QuotaConfig quotaConfig = new QuotaConfig("4G", TimeUnit.MINUTES, 1.0, 0.5);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 0.5);
+  }
+
+  @Test
+  public void testCreateTableWithComplexMinutesDurationAndFractionalRate()
+      throws Exception {
+    // Test creating table with complex minutes duration and fractional rate
+    String tableName = "quotaTableComplexMinutes";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 2.5 queries per 5 minutes
+    QuotaConfig quotaConfig = new QuotaConfig("6G", TimeUnit.MINUTES, 5.0, 2.5);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 5.0);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 2.5);
+  }
+
+  @Test
+  public void testCreateRealtimeTableWithComplexQuotaConfiguration()
+      throws Exception {
+    // Test creating REALTIME table with complex quota configuration
+    String tableName = "quotaRealtimeTableComplex";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    // Test 0.75 queries per 10 seconds
+    QuotaConfig quotaConfig = new QuotaConfig("8G", TimeUnit.SECONDS, 10.0, 0.75);
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    String response = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    assertTrue(response.contains("successfully added"));
+
+    // Verify the quota config
+    TableConfig retrievedConfig = getTableConfig(tableName, "REALTIME");
+    assertNotNull(retrievedConfig.getQuotaConfig());
+    assertEquals(retrievedConfig.getQuotaConfig().getStorage(), "8G");
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.SECONDS);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 10.0);
+    assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 0.75);
+  }
+
+  @Test
+  public void testCreateTableWithCommonFractionalScenarios()
+      throws Exception {
+    // Test common real-world fractional scenarios
+
+    // Scenario 1: 1 query every 3 seconds (0.333... qps)
+    {
+      String tableName = "quotaTableEvery3Seconds";
+      DEFAULT_INSTANCE.addDummySchema(tableName);
+
+      QuotaConfig quotaConfig = new QuotaConfig("1G", TimeUnit.SECONDS, 3.0, 1.0);
+      TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+          .setQuotaConfig(quotaConfig).build();
+
+      String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      assertTrue(response.contains("successfully added"));
+
+      TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+      assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 3.0);
+      assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 1.0);
+    }
+
+    // Scenario 2: 2 queries every 5 minutes
+    {
+      String tableName = "quotaTable2Every5Minutes";
+      DEFAULT_INSTANCE.addDummySchema(tableName);
+
+      QuotaConfig quotaConfig = new QuotaConfig("2G", TimeUnit.MINUTES, 5.0, 2.0);
+      TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName)
+          .setQuotaConfig(quotaConfig).build();
+
+      String response = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      assertTrue(response.contains("successfully added"));
+
+      TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+      assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+      assertEquals(retrievedConfig.getQuotaConfig().getRateLimiterDuration(), 5.0);
+      assertEquals(retrievedConfig.getQuotaConfig().getRateLimits(), 2.0);
+    }
+  }
+
   @Test
   public void testTableTasksValidationWithNullTaskConfig()
       throws Exception {
@@ -1239,6 +1521,73 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String deleteResponse = sendDeleteRequest(
         DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
+  }
+
+  public void testBothOfflineAndRealtimeTablesWithDifferentQuotaConfigs()
+      throws Exception {
+    // Test creating both OFFLINE and REALTIME tables with different quota configurations
+    String rawTableName = "quotaBothTableTypes";
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+
+    // Create OFFLINE table with SECONDS-based fractional quota
+    QuotaConfig offlineQuotaConfig = new QuotaConfig("5G", TimeUnit.SECONDS, 1.0, 0.5);
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(rawTableName)
+        .setQuotaConfig(offlineQuotaConfig).build();
+
+    String offlineResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertTrue(offlineResponse.contains("successfully added"));
+
+    // Create REALTIME table with MINUTES-based quota
+    QuotaConfig realtimeQuotaConfig = new QuotaConfig("10G", TimeUnit.MINUTES, 3.0, 180.0);
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(rawTableName)
+        .setQuotaConfig(realtimeQuotaConfig).build();
+
+    String realtimeResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    assertTrue(realtimeResponse.contains("successfully added"));
+
+    // Verify both configurations
+    TableConfig offlineRetrievedConfig = getTableConfig(rawTableName, "OFFLINE");
+    assertNotNull(offlineRetrievedConfig.getQuotaConfig());
+    assertEquals(offlineRetrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.SECONDS);
+    assertEquals(offlineRetrievedConfig.getQuotaConfig().getRateLimits(), 0.5);
+
+    TableConfig realtimeRetrievedConfig = getTableConfig(rawTableName, "REALTIME");
+    assertNotNull(realtimeRetrievedConfig.getQuotaConfig());
+    assertEquals(realtimeRetrievedConfig.getQuotaConfig().getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(realtimeRetrievedConfig.getQuotaConfig().getRateLimiterDuration(), 3.0);
+    assertEquals(realtimeRetrievedConfig.getQuotaConfig().getRateLimits(), 180.0);
+  }
+
+  @Test
+  public void testTableQuotaConfigSerialization()
+      throws Exception {
+    // Test that flexible quota configurations are properly serialized and deserialized
+    String tableName = "quotaSerializationTest";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    QuotaConfig quotaConfig = new QuotaConfig("7G", TimeUnit.MINUTES, 10.0, 1.25);
+    TableConfig tableConfig = _offlineBuilder.setTableName(tableName)
+        .setQuotaConfig(quotaConfig).build();
+
+    // Create table
+    sendPostRequest(_createTableUrl, tableConfig.toJsonString());
+
+    // Retrieve and verify all fields are correctly serialized/deserialized
+    TableConfig retrievedConfig = getTableConfig(tableName, "OFFLINE");
+    QuotaConfig retrievedQuotaConfig = retrievedConfig.getQuotaConfig();
+
+    assertNotNull(retrievedQuotaConfig);
+    assertEquals(retrievedQuotaConfig.getStorage(), "7G");
+    assertEquals(retrievedQuotaConfig.getRateLimiterUnit(), TimeUnit.MINUTES);
+    assertEquals(retrievedQuotaConfig.getRateLimiterDuration(), 10.0);
+    assertEquals(retrievedQuotaConfig.getRateLimits(), 1.25);
+
+    // Test that JsonNode conversion preserves all fields
+    JsonNode quotaJson = retrievedQuotaConfig.toJsonNode();
+    assertEquals(quotaJson.get("storage").asText(), "7G");
+    assertEquals(quotaJson.get("rateLimiterUnit").asText(), "MINUTES");
+    assertEquals(quotaJson.get("rateLimiterDuration").asDouble(), 10.0);
+    assertEquals(quotaJson.get("rateLimits").asDouble(), 1.25);
   }
 
   @AfterMethod

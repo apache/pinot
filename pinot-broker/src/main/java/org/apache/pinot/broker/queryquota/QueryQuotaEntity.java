@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.broker.queryquota;
 
-import com.google.common.util.concurrent.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiter;
 
 
 public class QueryQuotaEntity {

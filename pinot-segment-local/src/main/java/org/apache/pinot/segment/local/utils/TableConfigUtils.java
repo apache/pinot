@@ -1376,13 +1376,14 @@ public final class TableConfigUtils {
 
       if (quotaConfig == null) {
         // set a default storage quota
-        tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, null));
+        tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, null, null, null));
         LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
             tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
           // set a default storage quota and keep the RPS value
-          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getRateLimiterUnit(),
+              quotaConfig.getRateLimiterDuration(), quotaConfig.getRateLimits()));
           LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
               tableConfig.getTableName());
         } else {

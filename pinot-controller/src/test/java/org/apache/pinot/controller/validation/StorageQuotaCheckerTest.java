@@ -103,15 +103,14 @@ public class StorageQuotaCheckerTest {
         new StorageQuotaChecker(_tableSizeReader, controllerMetrics, mock(LeadControllerManager.class),
             pinotHelixResourceManager, _controllerConf);
 
-    tableConfig.setQuotaConfig(new QuotaConfig(null, null));
+    tableConfig.setQuotaConfig(new QuotaConfig(null, null, null, null));
     assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
 
-    tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
+    tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null, null, null));
 
     // Within quota but with missing segments, should pass without updating metrics
     mockTableSizeResult(REALTIME_TABLE_NAME, 4 * 1024, 1);
     assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
-
 
     // Exceed quota and with missing segments, should fail without updating metrics
     mockTableSizeResult(REALTIME_TABLE_NAME, 8 * 1024, 1);
@@ -127,7 +126,7 @@ public class StorageQuotaCheckerTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, controllerMetrics,
         mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class), _controllerConf);
-    tableConfig.setQuotaConfig(new QuotaConfig(null, null));
+    tableConfig.setQuotaConfig(new QuotaConfig(null, null, null, null));
     assertTrue(isSegmentWithinQuota(tableConfig));
   }
 
@@ -143,7 +142,7 @@ public class StorageQuotaCheckerTest {
     _storageQuotaChecker =
         new StorageQuotaChecker(_tableSizeReader, controllerMetrics, mock(LeadControllerManager.class),
             pinotHelixResourceManager, _controllerConf);
-    tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
+    tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null, null, null));
 
     // No response from server, should pass without updating metrics
     mockTableSizeResult(OFFLINE_TABLE_NAME, -1, 0);
@@ -158,7 +157,6 @@ public class StorageQuotaCheckerTest {
     assertFalse(
         MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
-
 
     // Exceed quota and with missing segments, should fail without updating metrics
     mockTableSizeResult(OFFLINE_TABLE_NAME, 8 * 1024, 1);

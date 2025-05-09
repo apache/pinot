@@ -161,6 +161,7 @@ import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
@@ -1732,7 +1733,24 @@ public class PinotHelixResourceManager {
    * @param value           quota value to set
    */
   public void updateApplicationQpsQuota(String applicationName, Double value) {
-    if (!ZKMetadataProvider.setApplicationQpsQuota(_propertyStore, applicationName, value)) {
+    if (!ZKMetadataProvider.setApplicationQpsQuota(_propertyStore, applicationName, TimeUnit.SECONDS, 1d, value)) {
+      throw new RuntimeException("Failed to create query quota for application: " + applicationName);
+    }
+    sendApplicationQpsQuotaRefreshMessage(applicationName);
+  }
+
+  /**
+   * Updates application quota and sends out a refresh message.
+   *
+   * @param applicationName name of application to set quota for
+   * @param ratelimiterUnit           quota unit to set
+   * @param ratelimiterDuration           quota duration to set
+   * @param maxQueriesValue           quota value to set
+   */
+  public void updateApplicationQpsQuota(String applicationName, String ratelimiterUnit, Double ratelimiterDuration,
+      Double maxQueriesValue) {
+    if (!ZKMetadataProvider.setApplicationQpsQuota(_propertyStore, applicationName,
+        TimeUtils.timeUnitFromString(ratelimiterUnit), ratelimiterDuration, maxQueriesValue)) {
       throw new RuntimeException("Failed to create query quota for application: " + applicationName);
     }
     sendApplicationQpsQuotaRefreshMessage(applicationName);
@@ -3483,7 +3501,12 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public Map<String, Double> getApplicationQuotas() {
-    return ZKMetadataProvider.getApplicationQpsQuotas(_propertyStore);
+    Map<String, Double> quotas = new HashMap<>();
+    Map<String, QuotaConfig> quotaConfigs = ZKMetadataProvider.getApplicationQpsQuotas(_propertyStore);
+    for (Map.Entry<String, QuotaConfig> entry : quotaConfigs.entrySet()) {
+      quotas.put(entry.getKey(), (double) entry.getValue().getRateLimits());
+    }
+    return quotas;
   }
 
   /**

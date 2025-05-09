@@ -313,6 +313,7 @@
     <assertj.version>3.27.4</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
+    <resilience4j.version>1.7.1</resilience4j.version>
 
     <japicmp.skip>true</japicmp.skip>
   </properties>
@@ -2142,6 +2143,11 @@
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-utils</artifactId>
         <version>${plexus-utils.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-ratelimiter</artifactId>
+        <version>${resilience4j.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -19,7 +19,8 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
@@ -79,13 +80,15 @@
                   <groupId>commons-io</groupId>
                   <artifactId>commons-io</artifactId>
                   <version>2.11.0</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin
+                  </outputDirectory>
                 </artifactItem>
                 <artifactItem>
                   <groupId>com.yammer.metrics</groupId>
                   <artifactId>metrics-core</artifactId>
                   <version>2.1.5</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin
+                  </outputDirectory>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -109,7 +112,8 @@
                   <groupId>org.apache.pinot</groupId>
                   <artifactId>pinot-yammer</artifactId>
                   <version>0.10.0</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes
+                  </outputDirectory>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -231,6 +235,10 @@
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-ratelimiter</artifactId>
     </dependency>
   </dependencies>
   <profiles>

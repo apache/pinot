@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -33,20 +34,36 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
  */
 public class QuotaConfig extends BaseJsonConfig {
   private static final long INVALID_STORAGE_IN_BYTES = -1L;
-  private static final double INVALID_MAX_QPS = -1.0;
+  private static final double INVALID_RATELIMITER_DURATION = -1;
+  private static final double INVALID_RATELIMITS = -1;
 
   @JsonPropertyDescription("Storage allocated for this table, e.g. \"10G\"")
   private final String _storage;
 
-  private final String _maxQueriesPerSecond;
+  @Deprecated
+  private final String _maxQueriesPerSecond = null;
+
+  @Deprecated
+  private transient final double _maxQPS = -1d;
+
+  private final TimeUnit _rateLimiterUnit;
+  private final double _rateLimiterDuration;
+  private final double _rateLimits;
 
   // NOTE: These two fields are not to be serialized
   private transient final long _storageInBytes;
-  private transient final double _maxQPS;
+
+  @Deprecated
+  public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
+      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
+    this(storage, null, null, null);
+  }
 
   @JsonCreator
   public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
-      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
+      @JsonProperty("rateLimiterUnit") @Nullable TimeUnit rateLimiterUnit,
+      @JsonProperty("rateLimiterDuration") @Nullable Double rateLimiterDuration,
+      @JsonProperty("rateLimits") @Nullable Double rateLimits) {
     // Validate and standardize the value
     if (storage != null) {
       try {
@@ -59,17 +76,21 @@ public class QuotaConfig extends BaseJsonConfig {
       _storageInBytes = INVALID_STORAGE_IN_BYTES;
       _storage = null;
     }
-    if (maxQueriesPerSecond != null) {
+
+    if (rateLimiterUnit != null && rateLimiterDuration != null && rateLimits != null) {
       try {
-        _maxQPS = Double.parseDouble(maxQueriesPerSecond);
-        Preconditions.checkArgument(_maxQPS > 0);
+        Preconditions.checkArgument(rateLimiterDuration > 0);
+        Preconditions.checkArgument(rateLimits > 0);
+        _rateLimiterUnit = rateLimiterUnit;
+        _rateLimiterDuration = rateLimiterDuration;
+        _rateLimits = rateLimits;
       } catch (Exception e) {
-        throw new IllegalArgumentException("Invalid 'maxQueriesPerSecond': " + storage);
+        throw new IllegalArgumentException("Invalid 'ratelimits arguments': " + storage);
       }
-      _maxQueriesPerSecond = Double.toString(_maxQPS);
     } else {
-      _maxQPS = INVALID_MAX_QPS;
-      _maxQueriesPerSecond = null;
+      _rateLimiterUnit = null;
+      _rateLimiterDuration = INVALID_RATELIMITER_DURATION;
+      _rateLimits = INVALID_RATELIMITS;
     }
   }
 
@@ -78,17 +99,33 @@ public class QuotaConfig extends BaseJsonConfig {
     return _storage;
   }
 
-  @Nullable
-  public String getMaxQueriesPerSecond() {
-    return _maxQueriesPerSecond;
-  }
-
   @JsonIgnore
   public long getStorageInBytes() {
     return _storageInBytes;
   }
 
-  @JsonIgnore
+  public TimeUnit getRateLimiterUnit() {
+    return _rateLimiterUnit;
+  }
+
+  public double getRateLimiterDuration() {
+    return _rateLimiterDuration;
+  }
+
+  public double getRateLimits() {
+    return _rateLimits;
+  }
+
+  public boolean isQuotaConfigSet() {
+    return _rateLimits != INVALID_RATELIMITS;
+  }
+
+  @Deprecated
+  public String getMaxQueriesPerSecond() {
+    return _maxQueriesPerSecond;
+  }
+
+  @Deprecated
   public double getMaxQPS() {
     return _maxQPS;
   }

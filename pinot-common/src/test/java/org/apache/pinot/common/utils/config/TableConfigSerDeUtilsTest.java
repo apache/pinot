@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -98,7 +99,7 @@ public class TableConfigSerDeUtilsTest {
     }
     {
       // With quota config
-      QuotaConfig quotaConfig = new QuotaConfig("30g", "100.00");
+      QuotaConfig quotaConfig = new QuotaConfig("30g", TimeUnit.SECONDS, 1d, 100d);
       TableConfig tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
 
       checkQuotaConfig(tableConfig);
@@ -416,7 +417,7 @@ public class TableConfigSerDeUtilsTest {
     QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
     assertNotNull(quotaConfig);
     assertEquals(quotaConfig.getStorage(), "30G");
-    assertEquals(quotaConfig.getMaxQueriesPerSecond(), "100.0");
+    assertEquals(quotaConfig.getRateLimits(), 100.0);
   }
 
   private void checkTenantConfigWithoutTagOverride(TableConfig tableConfig) {
