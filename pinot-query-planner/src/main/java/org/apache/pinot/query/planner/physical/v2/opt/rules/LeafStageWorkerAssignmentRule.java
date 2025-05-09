@@ -40,6 +40,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -91,6 +93,7 @@ import org.slf4j.LoggerFactory;
 public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageWorkerAssignmentRule.class);
   private static final int LIMIT_OF_INVALID_SEGMENTS_TO_LOG = 3;
+  private static final BrokerMetrics BROKER_METRICS = BrokerMetrics.get();
   private final TableCache _tableCache;
   private final RoutingManager _routingManager;
   private final PhysicalPlannerContext _physicalPlannerContext;
@@ -254,7 +257,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       invalidSegmentsByInferredPartition = getInvalidSegmentsByInferredPartition(
           tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition, tableNameWithType);
     } catch (Throwable t) {
-      LOGGER.info(String.valueOf(t.getMessage()));
+      // Use SegmentPartitionMetadataManager's logs to find the segments with invalid partitions.
+      BROKER_METRICS.addMeteredTableValue(tableNameWithType, BrokerMeter.INVALID_SEGMENT_PARTITION_IN_QUERY,
+          tablePartitionInfo.getSegmentsWithInvalidPartition().size());
       return null;
     }
     int numPartitions = tablePartitionInfo.getNumPartitions();
@@ -376,9 +381,6 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       invalidSegmentsByInferredPartition.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(
           invalidPartitionSegment);
     }
-    LOGGER.info("Realtime Table {} has {} segments with invalid partition info. Assuming partitionId from stream "
-            + "partition ID. Sampled segments: {}", tableNameWithType, invalidSegments,
-            sampleSegmentsForLogging(invalidSegments));
     return invalidSegmentsByInferredPartition;
   }
 

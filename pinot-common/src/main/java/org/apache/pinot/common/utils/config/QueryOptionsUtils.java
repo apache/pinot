@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -381,7 +380,7 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
-    return BooleanUtils.toBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
   }
 
   @Nullable
