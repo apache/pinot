@@ -105,6 +105,7 @@ public class TableConfigBuilder {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
+  private boolean _skipSegmentPreprocess;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
@@ -341,6 +342,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
+    _skipSegmentPreprocess = skipSegmentPreprocess;
+    return this;
+  }
+
   public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
     return this;
@@ -507,6 +513,7 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
     indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
+    indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

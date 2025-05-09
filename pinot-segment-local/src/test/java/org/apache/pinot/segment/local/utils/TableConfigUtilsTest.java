@@ -2347,6 +2347,14 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateSkipSegmentPreprocessFlag() {
+    TableConfig tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(
+        "timeColumn").setSkipSegmentPreprocess(true).build();
+    Assert.assertTrue(tableconfig.getIndexingConfig().isSkipSegmentPreprocess(),
+        "skipSegmentPreprocess will be true");
+  }
+
+  @Test
   public void testValidateHybridTableConfig() {
     TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
