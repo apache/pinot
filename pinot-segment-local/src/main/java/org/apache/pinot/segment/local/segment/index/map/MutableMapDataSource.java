@@ -55,15 +55,13 @@ public class MutableMapDataSource extends BaseMapDataSource {
             partitionFunction, partitions, minValue, maxValue, maxRowLengthInBytes),
         new ColumnIndexContainer.FromMap.Builder().withAll(mutableIndexes).build());
     _mutableIndexes = mutableIndexes;
-    MapIndexReader mapIndexReader = getMapIndex();
-    if (mapIndexReader == null) {
-      // Fallback to use forward index
-      ForwardIndexReader<?> forwardIndex = getForwardIndex();
-      if (forwardIndex instanceof MapIndexReader) {
-        mapIndexReader = (MapIndexReader) forwardIndex;
-      } else {
-        mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
-      }
+    MapIndexReader mapIndexReader;
+    // Fallback to use forward index
+    ForwardIndexReader<?> forwardIndex = getForwardIndex();
+    if (forwardIndex instanceof MapIndexReader) {
+      mapIndexReader = (MapIndexReader) forwardIndex;
+    } else {
+      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
     }
     _mapIndexReader = mapIndexReader;
   }

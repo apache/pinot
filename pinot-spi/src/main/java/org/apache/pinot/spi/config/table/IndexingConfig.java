@@ -45,6 +45,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _jsonIndexColumns;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<String> _mapIndexColumns;
+  @Deprecated
   private Map<String, MapIndexConfig> _mapIndexConfigs;
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
@@ -163,10 +164,12 @@ public class IndexingConfig extends BaseJsonConfig {
     _mapIndexColumns = mapIndexColumns;
   }
 
+  @Deprecated
   public void setMapIndexConfigs(Map<String, MapIndexConfig> mapIndexConfigs) {
     _mapIndexConfigs = mapIndexConfigs;
   }
 
+  @Deprecated
   public Map<String, MapIndexConfig> getMapIndexConfigs() {
     return _mapIndexConfigs;
   }

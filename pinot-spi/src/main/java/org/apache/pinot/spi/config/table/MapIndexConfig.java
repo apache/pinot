@@ -28,7 +28,10 @@ import javax.annotation.Nullable;
 
 /**
  * Configs related to the MAP index:
+ * @deprecated This class is deprecated and will be removed in a future version.
+ * Use alternative configuration methods instead.
  */
+@Deprecated
 public class MapIndexConfig extends IndexConfig {
   public static final MapIndexConfig DEFAULT = new MapIndexConfig();
   public static final MapIndexConfig DISABLED = new MapIndexConfig(true);
