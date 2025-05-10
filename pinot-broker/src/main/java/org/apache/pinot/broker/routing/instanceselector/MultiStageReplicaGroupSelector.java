@@ -66,9 +66,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
-                   IdealState idealState, ExternalView externalView,
-                   Set<String> onlineSegments) {
+  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments) {
     super.init(enabledInstances, enabledServerMap, idealState, externalView, onlineSegments);
     _instancePartitions = getInstancePartitions();
   }

@@ -127,7 +127,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
 
     _priorityGroupInstanceSelector = _adaptiveServerSelector == null ? null : new PriorityGroupInstanceSelector(
-            _adaptiveServerSelector);
+        _adaptiveServerSelector);
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");

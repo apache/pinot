@@ -51,15 +51,21 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter QUERIES_GLOBAL = create("QUERIES_GLOBAL", "queries", true);
   /**
-   * Number of queries executed, this metric is not global and is attached to a particular replica group.
+   * Number of queries executed per replica group.
    * <p>
-   * At this moment, this counter include single stage queries only.
+   * This metric is used to monitor query traffic distribution across replica groups.
+   * Currently only includes single-stage queries.
    */
   public static final BrokerMeter REPLICA_QUERIES = create("REPLICA_QUERIES", "routing", false);
   /**
-   * Number of segment queries executed, this metric is not global and is attached to a particular replica group.
+   * Number of segment selected per replica gorup during query execution.
    * <p>
-   * At this moment, this counter include single stage queries only.
+   * This metric is not global and is attached to a particular replica group.
+   * Currently this counter include single stage queries only.
+   * <p>
+   * Let's say the query option orderedReferredReplicas is set and a few nodes in the preferred replica group are down.
+   * The other metric {@link #REPLICA_QUERIES} shows the traffic are relatively equal over replica groups.
+   * This metric is still going to show that most of segments are still selected from the preferred replica group.
    */
   public static final BrokerMeter REPLICA_SEG_QUERIES = create("REPLICA_SEG_QUERIES", "routing", false);
   /**

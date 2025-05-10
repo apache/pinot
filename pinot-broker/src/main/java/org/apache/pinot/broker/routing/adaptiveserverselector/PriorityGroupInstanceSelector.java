@@ -110,6 +110,7 @@ public class PriorityGroupInstanceSelector {
    * @param candidates the list of server candidates to choose from
    * @return the selected server instance as a SegmentInstanceCandidate, or null if no candidates are available
    */
+  @Nullable
   public SegmentInstanceCandidate select(ServerSelectionContext ctx,
       @Nullable List<SegmentInstanceCandidate> candidates) {
     assert _adaptiveServerSelector != null;
@@ -123,25 +124,25 @@ public class PriorityGroupInstanceSelector {
       return choose(candidates);
     }
     Set<Integer> groupSet = new HashSet<>(groups);
-    Map<Integer, List<Integer>> groupToServerPos = new HashMap<>();
+    Map<Integer, List<SegmentInstanceCandidate>> groupToServerPos = new HashMap<>();
     // Group servers by their replica groups. For servers not in preferred groups,
     // use Integer.MAX_VALUE as a sentinel value to ensure they are processed last.
     // This allows us to:
     // 1. Process preferred groups in their specified order
     // 2. Handle all non-preferred servers as a single group with lowest priority
     // 3. Avoid complex conditional logic for handling non-preferred servers
-    for (int i = 0; i < candidates.size(); i++) {
-      int group = candidates.get(i).getReplicaGroup();
+    for (SegmentInstanceCandidate candidate : candidates) {
+      int group = candidate.getReplicaGroup();
       group = groupSet.contains(group) ? group : SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS;
-      groupToServerPos.computeIfAbsent(group, k -> new ArrayList<>()).add(i);
+      groupToServerPos.computeIfAbsent(group, k -> new ArrayList<>()).add(candidate);
     }
     // Add Integer.MAX_VALUE to the end of preferred groups to ensure non-preferred servers
     // are processed after all preferred groups
     groups.add(SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS);
     for (int group : groups) {
-      List<Integer> instancesInGroup = groupToServerPos.get(group);
+      List<SegmentInstanceCandidate> instancesInGroup = groupToServerPos.get(group);
       if (instancesInGroup != null) {
-        return choose(instancesInGroup.stream().map(candidates::get).collect(Collectors.toList()));
+        return choose(instancesInGroup);
       }
     }
     assert false;

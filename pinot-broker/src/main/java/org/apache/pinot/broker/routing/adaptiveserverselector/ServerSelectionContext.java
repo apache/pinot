@@ -29,9 +29,20 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * servers are selected for query execution.
  */
 public class ServerSelectionContext {
-  // Multiple query options can be used to influence server selection. Passed into the context class to avoid endless constructor arguments changes.
+  /**
+   * Map of query options that can influence server selection behavior.
+   * These options are passed into the context class to avoid endless constructor argument changes
+   * as new server selection preferences are added. Examples of such options include:
+   * <ul>
+   *   <li>Preferred replica groups for routing</li>
+   *   <li>Boolean fixedReplicaGroup</li>
+   *   <li>Other server selection related configurations in the future</li>
+   * </ul>
+   * The options are processed once during construction to extract relevant information
+   * (like ordered preferred groups) to avoid repeated parsing.
+   */
   private final Map<String, String> _queryOptions;
-  // If some query options need further processing, store the parsing result here to avoid duplicate parsing.
+  // If some query options need further processing, store the parsing result below to avoid duplicate parsing.
   private final List<Integer> _orderedPreferredGroups;
 
   /**
