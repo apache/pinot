@@ -77,6 +77,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
         numEntriesScannedForNonScanBasedDocIdSets += docIdSet.getNumEntriesScannedInFilter();
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
+        bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
         numEntriesScannedForNonScanBasedDocIdSets += docIdSet.getNumEntriesScannedInFilter();
       } else {
         remainingDocIdIterators.add(docIdIterator);
