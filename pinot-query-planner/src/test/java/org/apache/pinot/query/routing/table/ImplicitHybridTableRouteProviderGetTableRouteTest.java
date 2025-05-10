@@ -86,26 +86,6 @@ public class ImplicitHybridTableRouteProviderGetTableRouteTest extends BaseTable
     assertFalse(routeInfo.isExists(), "The table should not exist");
   }
 
-  @DataProvider(name = "routeExistsProvider")
-  public static Object[][] routeExistsProvider() {
-    //@formatter:off
-    return new Object[][] {
-        {"a"},
-        {"a_REALTIME"},
-        {"b"},
-        {"b_OFFLINE"},
-        {"b_REALTIME"},
-        {"c"},
-        {"c_OFFLINE"},
-        {"d"},
-        {"d_OFFLINE"},
-        {"e"},
-        {"e_OFFLINE"},
-        {"e_REALTIME"}
-    };
-    //@formatter:on
-  }
-
   @Test(dataProvider = "routeExistsProvider")
   public void testRouteExists(String parameter) {
     ImplicitHybridTableRouteInfo routeInfo =
