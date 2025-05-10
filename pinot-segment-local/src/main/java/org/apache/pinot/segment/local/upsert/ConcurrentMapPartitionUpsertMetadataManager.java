@@ -196,8 +196,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         _metadataTTL > 0 ? largestSeenComparisonValue - _metadataTTL : Double.NEGATIVE_INFINITY;
     double deletedKeysThreshold =
         _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : Double.NEGATIVE_INFINITY;
+    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
+      return;
+    }
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-      double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
+      double comparisonValue = (BasePartitionUpsertMetadataManager.toDouble(recordLocation.getComparisonValue()));
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
         numMetadataTTLKeysRemoved.getAndIncrement();
