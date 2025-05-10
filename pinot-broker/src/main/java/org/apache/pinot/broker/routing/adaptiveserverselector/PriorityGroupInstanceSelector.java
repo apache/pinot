@@ -32,12 +32,36 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 
 
+/**
+ * A server selector that implements priority-based server selection based on replica groups.
+ * This selector works in conjunction with an {@link AdaptiveServerSelector} to provide
+ * a two-level selection strategy:
+ * <ol>
+ *   <li>First level: Select servers based on replica group priorities</li>
+ *   <li>Second level: Use adaptive selection within the chosen replica group</li>
+ * </ol>
+ *
+ * <p>The selector maintains the following invariants:</p>
+ * <ul>
+ *   <li>Servers from preferred replica groups are always selected before non-preferred groups</li>
+ *   <li>Within each replica group, servers are selected using adaptive selection criteria</li>
+ *   <li>When no preferred groups are available, falls back to non-preferred groups</li>
+ * </ul>
+ */
 public class PriorityGroupInstanceSelector {
 
+  /** The underlying adaptive server selector used for selection within replica groups */
   private final AdaptiveServerSelector _adaptiveServerSelector;
 
+  /** Sentinel value used to group all non-preferred servers together */
   private static final int SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS = Integer.MAX_VALUE;
 
+  /**
+   * Creates a new priority group instance selector with the given adaptive server selector.
+   *
+   * @param adaptiveServerSelector the adaptive server selector to use for selection within groups
+   * @throws IllegalArgumentException if adaptiveServerSelector is null
+   */
   public PriorityGroupInstanceSelector(AdaptiveServerSelector adaptiveServerSelector) {
     assert adaptiveServerSelector != null;
     _adaptiveServerSelector = adaptiveServerSelector;

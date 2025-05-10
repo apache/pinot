@@ -29,7 +29,9 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
  * servers are selected for query execution.
  */
 public class ServerSelectionContext {
+  // Multiple query options can be used to influence server selection. Passed into the context class to avoid endless constructor arguments changes.
   private final Map<String, String> _queryOptions;
+  // If some query options need further processing, store the parsing result here to avoid duplicate parsing.
   private final List<Integer> _orderedPreferredGroups;
 
   /**
