@@ -24,7 +24,9 @@ import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 
 
 /**
@@ -36,6 +38,8 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  *   - the last ingested message is within {@link #_minFreshnessMs} of the current system time
  */
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
+  public static final int DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS = 5000;
+
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;
 
@@ -73,15 +77,28 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
-    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
-    if (isOffsetCaughtUp(segmentName, currentOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
-          _minFreshnessMs, currentOffset);
+    StreamPartitionMsgOffset latestStreamOffset =
+        rtSegmentDataManager.fetchLatestStreamOffset(DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS);
+    StreamMetadataProvider partitionMetadataProvider = rtSegmentDataManager.getPartitionMetadataProvider();
+    try {
+      if (partitionMetadataProvider.isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
+        _logger.info(
+            "Segment {} with freshness {}ms has not caught up within min freshness {}. But the current ingested "
+                + "offset is equal to the latest available offset {}.",
+            segmentName, freshnessMs, _minFreshnessMs, currentOffset);
+        return true;
+      }
+    } catch (UnsupportedOffsetCatchUpCheckException e) {
+      // Cannot conclude if segment has caught up or not. Skip such segments.
+      _logger.warn(
+          "Received UnsupportedOffsetCatchUpCheckException for segment: {}. Latest stream offset: {}, current stream "
+              + "offset: {}",
+          segmentName, latestStreamOffset, currentOffset);
       return true;
     }
 
-    StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
+    StreamPartitionMsgOffset earliestStreamOffset =
+        rtSegmentDataManager.fetchEarliestStreamOffset(DEFAULT_PARTITION_METADATA_FETCH_TIMEOUT_MS);
 
     long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
