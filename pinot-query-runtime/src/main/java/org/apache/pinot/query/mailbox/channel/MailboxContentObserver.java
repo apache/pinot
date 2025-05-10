@@ -46,10 +46,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentObserver.class);
 
   private final MailboxService _mailboxService;
-  private final String _mailboxId;
   private final StreamObserver<MailboxStatus> _responseObserver;
 
   private final List<ByteBuffer> _mailboxBuffers;
+  private transient String _mailboxId;
   private transient ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(
@@ -57,12 +57,17 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     _mailboxService = mailboxService;
     _mailboxId = mailboxId;
     _responseObserver = responseObserver;
-    _mailbox = mailboxService.getReceivingMailbox(mailboxId);
     _mailboxBuffers = new ArrayList<>();
   }
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
+    if (_mailboxId == null) {
+      _mailboxId = mailboxContent.getMailboxId();
+    }
+    if (_mailbox == null) {
+      _mailbox = _mailboxService.getReceivingMailbox(_mailboxId);
+    }
     _mailboxBuffers.add(mailboxContent.getPayload().asReadOnlyByteBuffer());
     if (mailboxContent.getWaitForMore()) {
       return;
@@ -122,6 +127,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   @Override
   public void onError(Throwable t) {
     LOGGER.warn("Error on receiver side", t);
+    if (_mailboxId != null) {
+      _mailbox = _mailboxService.getReceivingMailbox(_mailboxId);
+    }
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";
       _mailbox.setErrorBlock(ErrorMseBlock.fromError(

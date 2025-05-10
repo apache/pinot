@@ -40,7 +40,6 @@ public class MailboxContentObserverTest {
     StreamObserver<MailboxStatus> mockStatusObserver = mock(StreamObserver.class);
 
     MailboxContentObserver observer = new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver);
-    verify(mailboxService, times(1)).getReceivingMailbox(TEST_MAILBOX_ID);
 
     // Now simulate receiving a mailbox content message
     MailboxContent mockContent = Mockito.mock(MailboxContent.class);
@@ -48,7 +47,6 @@ public class MailboxContentObserverTest {
     when(mockContent.getMailboxId()).thenReturn(TEST_MAILBOX_ID);
     observer.onNext(mockContent);
 
-    // Mailbox should not be called again in onNext.
     verify(mailboxService, times(1)).getReceivingMailbox(TEST_MAILBOX_ID);
     verifyNoMoreInteractions(mailboxService);
   }
