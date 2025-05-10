@@ -69,7 +69,7 @@ public class PRelNodeTreeValidator {
     }
   }
 
-  static class Context {
+  private static class Context {
     int _joinCount = 0;
     int _windowCount = 0;
   }

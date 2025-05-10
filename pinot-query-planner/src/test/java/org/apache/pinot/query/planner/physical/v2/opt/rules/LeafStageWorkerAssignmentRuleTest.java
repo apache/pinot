@@ -221,6 +221,17 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   @Test
+  public void testInferPartitionId() {
+    // Valid name cases. When numPartitions is less than the stream partition number, then we expect modulus to be used.
+    assertEquals(9, LeafStageWorkerAssignmentRule.inferPartitionId("foobar__9__35__20250509T1444Z", 16));
+    assertEquals(1, LeafStageWorkerAssignmentRule.inferPartitionId("foobar__9__35__20250509T1444Z", 8));
+    assertEquals(0, LeafStageWorkerAssignmentRule.inferPartitionId("foobar__16__35__20250509T1444Z", 16));
+    assertEquals(16, LeafStageWorkerAssignmentRule.inferPartitionId("foobar__16__35__20250509T1444Z", 32));
+    // Invalid segment name case.
+    assertEquals(-1, LeafStageWorkerAssignmentRule.inferPartitionId("foobar_invalid_123_123", 4));
+  }
+
+  @Test
   public void testSampleSegmentsForLogging() {
     assertEquals(List.of(), LeafStageWorkerAssignmentRule.sampleSegmentsForLogging(List.of()));
     assertEquals(List.of("s0"), LeafStageWorkerAssignmentRule.sampleSegmentsForLogging(List.of("s0")));

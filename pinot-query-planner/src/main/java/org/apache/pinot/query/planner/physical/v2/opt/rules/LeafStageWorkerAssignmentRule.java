@@ -191,6 +191,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Set<String> partitionedTableTypes = tableTypes.stream().filter(tpiMap::containsKey).collect(Collectors.toSet());
     Preconditions.checkState(!tableTypes.isEmpty(), "No routing entry for offline or realtime type");
     if (tableTypes.equals(partitionedTableTypes)) {
+      // TODO(mse-physical): Support auto-partitioning inference for Hybrid tables.
       if (partitionedTableTypes.size() == 1) {
         // Attempt partitioned distribution
         String tableType = partitionedTableTypes.iterator().next();
@@ -207,9 +208,6 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         if (assignmentResult != null) {
           return assignmentResult;
         }
-      } else {
-        // TODO(mse-physical): Support automatic partitioned dist for hybrid tables.
-        LOGGER.warn("Automatic Partitioned Distribution not supported for Hybrid Tables yet");
       }
     }
     // For each server, we want to know the segments for each table-type.
@@ -362,7 +360,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     if (CollectionUtils.isEmpty(invalidSegments)) {
       return Map.of();
     }
-    if (!Objects.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType), TableType.REALTIME)
+    if (!TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType))
         || !inferPartitionsForInvalidSegments) {
       throw new IllegalStateException(String.format("Table %s has %s segments with invalid partition info. Will "
           + "assume un-partitioned distribution. Sampled: %s", tableNameWithType, invalidSegments.size(),
@@ -370,28 +368,27 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     Map<Integer, List<String>> invalidSegmentsByInferredPartition = new HashMap<>();
     for (String invalidPartitionSegment : invalidSegments) {
-      int partitionId = -1;
-      if (LLCSegmentName.isLLCSegment(invalidPartitionSegment)) {
-        LLCSegmentName llcSegmentName = LLCSegmentName.of(invalidPartitionSegment);
-        if (llcSegmentName != null) {
-          partitionId = llcSegmentName.getPartitionGroupId();
-        }
-      } else if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(invalidPartitionSegment)) {
-        UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(
-            invalidPartitionSegment);
-        if (uploadedRealtimeSegmentName != null) {
-          partitionId = uploadedRealtimeSegmentName.getPartitionId();
-        }
-      }
+      int partitionId = inferPartitionId(invalidPartitionSegment, numPartitions);
       if (partitionId == -1) {
         throw new IllegalStateException(String.format("Could not infer partition for segment: %s. Falling back to "
             + "un-partitioned distribution", invalidPartitionSegment));
       }
-      partitionId = partitionId % numPartitions;
       invalidSegmentsByInferredPartition.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(
           invalidPartitionSegment);
     }
     return invalidSegmentsByInferredPartition;
+  }
+
+  @VisibleForTesting
+  static int inferPartitionId(String segmentName, int numPartitions) {
+    if (LLCSegmentName.isLLCSegment(segmentName)) {
+      LLCSegmentName llc = LLCSegmentName.of(segmentName);
+      return llc != null ? (llc.getPartitionGroupId() % numPartitions) : -1;
+    } else if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)) {
+      UploadedRealtimeSegmentName uploaded = UploadedRealtimeSegmentName.of(segmentName);
+      return uploaded != null ? (uploaded.getPartitionId() % numPartitions) : -1;
+    }
+    return -1;
   }
 
   @VisibleForTesting
