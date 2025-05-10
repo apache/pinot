@@ -34,6 +34,8 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 /**
@@ -46,7 +48,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitFilter(FilterNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getCondition())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in FILTER Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in FILTER Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -55,7 +58,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitJoin(JoinNode node, Boolean isIntermediateStage) {
     if (containsArrayToMv(node.getNonEquiConditions())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
@@ -76,7 +80,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitAggregate(AggregateNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in AGGREGATE Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in AGGREGATE Intermediate Stage");
     }
     if (isIntermediateStage) {
       node.getInputs().forEach(e -> e.visit(this, true));
@@ -89,7 +94,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   public Void visitProject(ProjectNode node, Boolean isIntermediateStage) {
     // V1 project node contains arrayToMv function is not supported as it will be transferred using toString.
     if (containsArrayToMv(node.getProjects())) {
-      throw new UnsupportedOperationException(
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Function 'ArrayToMv' is not supported in PROJECT " + (isIntermediateStage ? "Intermediate Stage"
               : "Leaf Stage"));
     }
@@ -116,7 +121,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   @Override
   public Void visitWindow(WindowNode node, Boolean isIntermediateStage) {
     if (isIntermediateStage && containsArrayToMv(node.getAggCalls())) {
-      throw new UnsupportedOperationException("Function 'ArrayToMv' is not supported in WINDOW Intermediate Stage");
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
+          "Function 'ArrayToMv' is not supported in WINDOW Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;
