@@ -61,7 +61,7 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.operator.LeafStageOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -471,10 +471,8 @@ public class QueryRunner {
 
     Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
     BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
-      if (operator instanceof LeafStageTransferableBlockOperator) {
-        LeafStageTransferableBlockOperator leafOperator = (LeafStageTransferableBlockOperator) operator;
-        ExplainedNode explainedNode = leafOperator.explain();
-        leafNodes.put(node, explainedNode);
+      if (operator instanceof LeafStageOperator) {
+        leafNodes.put(node, ((LeafStageOperator) operator).explain());
       }
     };
     // compile OpChain

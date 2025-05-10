@@ -42,7 +42,7 @@ public class RowHeapDataBlock implements MseBlock.Data {
   private final List<Object[]> _rows;
   /// This is a hack we created to support different hash exchange distributions.
   /// We should find a new way to keep this information that is more solid than the current one.
-  /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator] and
+  /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafStageOperator] and
   /// [org.apache.pinot.query.runtime.operator.AggregateOperator] and consumed in
   /// [org.apache.pinot.query.runtime.operator.exchange.HashExchange] when we need to shuffle data.
   /// This means that the value of this attribute is the same for all blocks in the stage, so we should be able to
