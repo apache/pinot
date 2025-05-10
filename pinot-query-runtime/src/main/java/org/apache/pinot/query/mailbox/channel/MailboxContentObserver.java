@@ -46,23 +46,23 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentObserver.class);
 
   private final MailboxService _mailboxService;
+  private final String _mailboxId;
   private final StreamObserver<MailboxStatus> _responseObserver;
 
   private final List<ByteBuffer> _mailboxBuffers;
   private transient ReceivingMailbox _mailbox;
 
-  public MailboxContentObserver(MailboxService mailboxService, StreamObserver<MailboxStatus> responseObserver) {
+  public MailboxContentObserver(
+    MailboxService mailboxService, String mailboxId, StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
+    _mailboxId = mailboxId;
     _responseObserver = responseObserver;
+    _mailbox = mailboxService.getReceivingMailbox(mailboxId);
     _mailboxBuffers = new ArrayList<>();
   }
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
-    String mailboxId = mailboxContent.getMailboxId();
-    if (_mailbox == null) {
-      _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
-    }
     _mailboxBuffers.add(mailboxContent.getPayload().asReadOnlyByteBuffer());
     if (mailboxContent.getWaitForMore()) {
       return;
@@ -74,34 +74,34 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffers, timeoutMs);
       switch (status) {
         case SUCCESS:
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(_mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
         case CANCELLED:
-          LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
+          LOGGER.warn("Mailbox: {} already cancelled from upstream", _mailboxId);
           cancelStream();
           break;
         case FIRST_ERROR:
           return;
         case ERROR:
-          LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
+          LOGGER.warn("Mailbox: {} already errored out (received error block before)", _mailboxId);
           cancelStream();
           break;
         case TIMEOUT:
-          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
+          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", _mailboxId, timeoutMs);
           cancelStream();
           break;
         case EARLY_TERMINATED:
-          LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+          LOGGER.debug("Mailbox: {} has been early terminated", _mailboxId);
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(_mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
           break;
         default:
           throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
     } catch (Exception e) {
-      String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
+      String errorMessage = "Caught exception while processing blocks for mailbox: " + _mailboxId;
       LOGGER.error(errorMessage, e);
       _mailbox.setErrorBlock(
           ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), Collections.emptyList());

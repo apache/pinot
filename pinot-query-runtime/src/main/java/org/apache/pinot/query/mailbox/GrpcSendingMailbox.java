@@ -38,6 +38,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.MailboxClientInterceptor;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -172,6 +173,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private StreamObserver<MailboxContent> getContentObserver() {
     return PinotMailboxGrpc.newStub(_channelManager.getChannel(_hostname, _port))
+        .withInterceptors(new MailboxClientInterceptor(_id))
         .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
         .open(_statusObserver);
   }

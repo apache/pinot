@@ -18,17 +18,31 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
-import io.grpc.Context;
+import io.grpc.CallOptions;
+import io.grpc.Channel;
+import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
+import io.grpc.ForwardingClientCall;
 import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 
-public class ChannelUtils {
-  private ChannelUtils() {
+
+public class MailboxClientInterceptor implements ClientInterceptor {
+  private final String _mailboxId;
+
+  public MailboxClientInterceptor(String mailboxId) {
+    _mailboxId = mailboxId;
   }
 
-  public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
-  public static final String MAILBOX_METADATA_REQUEST_EARLY_TERMINATE = "request.early.terminate";
-
-  public static final Metadata.Key<String> MAILBOX_ID_METADATA_KEY =
-    Metadata.Key.of("mailbox-id", Metadata.ASCII_STRING_MARSHALLER);
-  public static final Context.Key<String> MAILBOX_ID_CTX_KEY = Context.key("mailboxId");
+  @Override
+  public <T, R> ClientCall<T, R> interceptCall(
+    MethodDescriptor<T, R> method, CallOptions callOptions, Channel next) {
+    return new ForwardingClientCall.SimpleForwardingClientCall<>(next.newCall(method, callOptions)) {
+      @Override
+      public void start(Listener<R> responseListener, Metadata headers) {
+        headers.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _mailboxId);
+        super.start(responseListener, headers);
+      }
+    };
+  }
 }
