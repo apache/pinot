@@ -56,6 +56,7 @@ import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -76,6 +77,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -4012,5 +4014,101 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNoError(result);
 
     assertEquals(result.get("clientRequestId").asText(), clientRequestId);
+  }
+
+  @Test
+  public void testQueryOnNewColumnAdditionWithPartialReload() throws Exception {
+    String testColumn = "TestColumn";
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    // Pick any existing INT column name for the “valid” cases
+    String validColumnName = oldSchema.getAllFieldSpecs().stream()
+            .filter(fs -> fs.getDataType() == DataType.INT)
+            .findFirst()
+            .get()
+            .getName();
+
+    // Pair each query with whether it should succeed (true) or fail (false) before full reload
+    List<String> queries = List.of(
+      SELECT_STAR_QUERY,
+      SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
+      SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
+      SELECT_STAR_QUERY + " WHERE " + testColumn + " > 0 LIMIT 10000",
+      SELECT_STAR_QUERY + " ORDER BY " + testColumn + " LIMIT 10000",
+      "SELECT " + testColumn + " FROM " + DEFAULT_TABLE_NAME + "_OFFLINE"
+    );
+
+    for (String query: queries) {
+      try {
+        // Build new schema with the extra column
+        Schema newSchema = new Schema();
+        newSchema.setSchemaName(oldSchema.getSchemaName());
+        for (FieldSpec fs : oldSchema.getAllFieldSpecs()) {
+          newSchema.addField(fs);
+        }
+        newSchema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
+        updateSchema(newSchema);
+
+        // Partially reload one segment
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
+                listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+        // Column still not present until full reload
+        runQueryAndAssert(query, testColumn);
+        // Now do a full reload and assert the column shows up
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+        runQueryAndAssert(query, testColumn);
+      } finally {
+        // Reset back to the original schema for the next iteration
+        forceUpdateSchema(oldSchema);
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+      }
+    }
+  }
+
+  private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
+    String response = (segmentName != null)
+        ? reloadOfflineSegment(tableNameWithType, segmentName, true)
+        : reloadOfflineTable(tableNameWithType, true);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    String jobId;
+    if (segmentName != null) {
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      jobId = statusString.substring(startIdx, endIdx).trim();
+    } else {
+      // Full table reload response: structured JSON
+      JsonNode tableLevelDetails
+              = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
+      assertEquals(tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText(), "SUCCESS");
+      jobId = tableLevelDetails.get("reloadJobId").asText();
+    }
+    String finalJobId = jobId;
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return isReloadJobCompleted(finalJobId);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Reload job did not complete in 10 minutes");
+  }
+
+  private void runQueryAndAssert(String query, String newAddedColumn) throws Exception {
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    JsonNode rows = response.get("resultTable").get("rows");
+    JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
+    DataSchema resultSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
+
+    assert !rows.isEmpty();
+    boolean columnPresent = false;
+    for (String columnName : resultSchema.getColumnNames()) {
+      if (columnName.equals(newAddedColumn)) {
+          columnPresent = true;
+          break;
+      }
+    }
+    assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
 }
