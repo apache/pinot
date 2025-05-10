@@ -40,6 +40,7 @@ import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.PRelNodeTreeValidator;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -95,6 +96,8 @@ public class PinotLogicalQueryPlanner {
   public static Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> makePlanV2(RelRoot relRoot,
       PhysicalPlannerContext physicalPlannerContext) {
     PRelNode pRelNode = (PRelNode) relRoot.rel;
+    // TODO(mse-physical): Don't emit metrics for explain statements.
+    PRelNodeTreeValidator.emitMetrics(pRelNode);
     PlanFragmentAndMailboxAssignment planFragmentAndMailboxAssignment = new PlanFragmentAndMailboxAssignment();
     PlanFragmentAndMailboxAssignment.Result result =
         planFragmentAndMailboxAssignment.compute(pRelNode, physicalPlannerContext);
