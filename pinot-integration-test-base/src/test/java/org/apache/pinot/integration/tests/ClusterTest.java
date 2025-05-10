@@ -628,21 +628,27 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   private static JsonNode sanitizeResponse(JsonNode responseJsonNode) {
+    JsonNode resultTable = responseJsonNode.get("resultTable");
+    if (resultTable == null) {
+      return responseJsonNode;
+    }
+    JsonNode rows = resultTable.get("rows");
+    if (rows == null || rows.isEmpty()) {
+      return responseJsonNode;
+    }
     try {
-      DataSchema schema =
-          JsonUtils.jsonNodeToObject(responseJsonNode.get("resultTable").get("dataSchema"), DataSchema.class);
-      JsonNode rowsJsonNode = responseJsonNode.get("resultTable").get("rows");
-      if (rowsJsonNode != null) {
-        for (int i = 0; i < rowsJsonNode.size(); i++) {
-          ArrayNode rowJsonNode = (ArrayNode) rowsJsonNode.get(i);
-          for (int j = 0; j < schema.size(); j++) {
-            DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(j);
-            JsonNode jsonValue = rowJsonNode.get(j);
-            if (columnDataType.isArray()) {
-              rowJsonNode.set(j, extractArray(columnDataType, jsonValue));
-            } else if (columnDataType != DataSchema.ColumnDataType.MAP) {
-              rowJsonNode.set(j, extractValue(columnDataType, jsonValue));
-            }
+      int numRows = rows.size();
+      DataSchema dataSchema = JsonUtils.jsonNodeToObject(resultTable.get("dataSchema"), DataSchema.class);
+      int numColumns = dataSchema.size();
+      for (int i = 0; i < numRows; i++) {
+        ArrayNode row = (ArrayNode) rows.get(i);
+        for (int j = 0; j < numColumns; j++) {
+          DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(j);
+          JsonNode value = row.get(j);
+          if (columnDataType.isArray()) {
+            row.set(j, extractArray(columnDataType, value));
+          } else if (columnDataType != DataSchema.ColumnDataType.MAP) {
+            row.set(j, extractValue(columnDataType, value));
           }
         }
       }

@@ -217,7 +217,8 @@ public class FluentQueryTest {
     /**
      * Creates one segment on the first instance (aka server) with the given content.
      * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
-     *                that should be compatible with the table definition.
+     *                that should be compatible with the table definition. Note that the values should be in the order
+     *                following the alphabetical order of the column names.
      */
     public OnFirstInstance onFirstInstance(Object[]... content) {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)

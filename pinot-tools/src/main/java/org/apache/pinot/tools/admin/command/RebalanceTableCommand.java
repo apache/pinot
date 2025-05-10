@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotTableRebalancer;
@@ -61,8 +62,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @CommandLine.Option(names = {"-minimizeDataMovement"}, description = "Whether to enable, disable minimize data "
       + "movement algorithm, or use table's default config")
-  private RebalanceConfig.MinimizeDataMovementOptions _minimizeDataMovement =
-      RebalanceConfig.MinimizeDataMovementOptions.ENABLE;
+  private Enablement _minimizeDataMovement = Enablement.ENABLE;
 
   @CommandLine.Option(names = {"-bootstrap"},
       description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"

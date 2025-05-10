@@ -118,6 +118,7 @@ import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -608,7 +609,7 @@ public class PinotTableRestletResource {
       @QueryParam("includeConsuming") boolean includeConsuming,
       @ApiParam(value = "Whether to enable minimize data movement on rebalance, DEFAULT will use "
           + "the minimizeDataMovement in table config") @DefaultValue("ENABLE")
-      @QueryParam("minimizeDataMovement") RebalanceConfig.MinimizeDataMovementOptions minimizeDataMovement,
+      @QueryParam("minimizeDataMovement") Enablement minimizeDataMovement,
       @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
           + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
@@ -626,7 +627,8 @@ public class PinotTableRestletResource {
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
-      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
+          + "Extends if progress has been made during the wait, otherwise times out") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
       @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,

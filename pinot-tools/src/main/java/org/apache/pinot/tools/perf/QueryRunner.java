@@ -330,6 +330,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         long clientTime = response.get("totalTime").asLong();
         totalClientTime += clientTime;
         boolean hasException = !response.get("exceptions").isEmpty();
+        if (hasException) {
+          LOGGER.error("Query: {} failed with errors: {}", query, response.get("exceptions").toString());
+        }
         numExceptions += hasException ? 1 : 0;
         statisticsList.get(0).addValue(clientTime);
         if (queryStatMap != null) {
@@ -834,6 +837,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long clientTime = response.get("totalTime").asLong();
     totalClientTime.getAndAdd(clientTime);
     boolean hasException = !response.get("exceptions").isEmpty();
+    if (hasException) {
+      LOGGER.error("Query: {} failed with errors: {}", query, response.get("exceptions").toString());
+    }
     numExceptions.getAndAdd(hasException ? 1 : 0);
     if (queryStatMap != null) {
       queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);

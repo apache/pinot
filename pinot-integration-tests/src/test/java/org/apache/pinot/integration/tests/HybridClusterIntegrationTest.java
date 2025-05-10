@@ -58,6 +58,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
+  protected static final int NUM_SERVERS_OFFLINE = 1;
+  protected static final int NUM_SERVERS_REALTIME = 1;
+  protected static final int NUM_SERVERS = NUM_SERVERS_OFFLINE + NUM_SERVERS_REALTIME;
 
   @Override
   protected String getBrokerTenant() {
@@ -138,11 +141,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(12));
     startBroker();
-    startServers(2);
+    startServers(NUM_SERVERS);
     startKafka();
 
     // Create tenants
-    createServerTenant(TENANT_NAME, 1, 1);
+    createServerTenant(TENANT_NAME, NUM_SERVERS_OFFLINE, NUM_SERVERS_REALTIME);
   }
 
   @Test

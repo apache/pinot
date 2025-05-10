@@ -148,6 +148,16 @@ public class ControllerRequestClient {
     }
   }
 
+  public void toggleTableState(String tableName, TableType type, boolean enable)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendPutRequest(
+          new URI(_controllerRequestURLBuilder.forToggleTableState(tableName, type, enable)), null, _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void deleteTable(String tableNameWithType)
       throws IOException {
     deleteTable(tableNameWithType, null);

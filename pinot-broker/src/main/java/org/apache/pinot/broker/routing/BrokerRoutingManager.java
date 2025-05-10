@@ -417,6 +417,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * Builds/rebuilds the routing for the given table.
    */
   public synchronized void buildRouting(String tableNameWithType) {
+    // skip route building for logical tables
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableNameWithType)) {
+      LOGGER.info("Skipping route building for logical table: {}", tableNameWithType);
+      return;
+    }
+
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -611,6 +617,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * @param tableNameWithType Table name with type
    * @return Whether the given table is enabled
    */
+  @Override
   public boolean isTableDisabled(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
     if (routingEntry == null) {

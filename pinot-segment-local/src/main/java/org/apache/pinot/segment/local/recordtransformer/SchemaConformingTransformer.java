@@ -20,11 +20,9 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -94,8 +92,8 @@ import org.slf4j.LoggerFactory;
  * }
  * Apart from the basic transformation above, this transformer today also does the following additional tasks (which in
  * future can be decoupled from this transformer):
- *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate text indexing and search. This
- *       extra step can be enabled via mergedTextIndexFieldSpec.
+ *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate full text indexing and search.
+ *    This extra step can be enabled via mergedTextIndexFieldSpec.
  *    2. Allow users to tag certain fields in the input record not to be included in the catch-all field.
  * </pre>
  * <p>
@@ -120,6 +118,10 @@ public class SchemaConformingTransformer implements RecordTransformer {
   private int _jsonKeyValueSeparatorByteCount;
   private long _mergedTextIndexDocumentBytesCount = 0L;
   private long _mergedTextIndexDocumentCount = 0L;
+  private GenericRow _reusedOutputRecord = new GenericRow();
+  private Map<String, Object> _reusedMergedTextIndexMap = new HashMap<>();
+  private Map<String, Object> _reusedIndexableExtras = new HashMap<>();
+  private Map<String, Object> _reusedUnindexableExtras = new HashMap<>();
 
   public SchemaConformingTransformer(TableConfig tableConfig, Schema schema) {
     if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
@@ -317,34 +319,35 @@ public class SchemaConformingTransformer implements RecordTransformer {
   @Nullable
   @Override
   public GenericRow transform(GenericRow record) {
-    GenericRow outputRecord = new GenericRow();
-    Map<String, Object> mergedTextIndexMap = new HashMap<>();
+    _reusedOutputRecord.clear();
+    _reusedMergedTextIndexMap.clear();
+    _reusedIndexableExtras.clear();
+    _reusedUnindexableExtras.clear();
 
     try {
-      Deque<String> jsonPath = new ArrayDeque<>();
-      ExtraFieldsContainer extraFieldsContainer =
-          new ExtraFieldsContainer(null != _transformerConfig.getUnindexableExtrasField());
+      List<String> jsonPath = new ArrayList<>();
       for (Map.Entry<String, Object> recordEntry : record.getFieldToValueMap().entrySet()) {
         String recordKey = recordEntry.getKey();
         Object recordValue = recordEntry.getValue();
-        jsonPath.addLast(recordKey);
-        ExtraFieldsContainer currentFieldsContainer =
-            processField(_schemaTree, jsonPath, recordValue, true, outputRecord, mergedTextIndexMap);
-        extraFieldsContainer.addChild(currentFieldsContainer);
-        jsonPath.removeLast();
+        jsonPath.add(recordKey);
+        processField(_schemaTree, jsonPath, recordValue, true, _reusedOutputRecord,
+            _reusedMergedTextIndexMap, _reusedIndexableExtras, _reusedUnindexableExtras);
+        jsonPath.remove(jsonPath.size() - 1);
       }
-      putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType,
-          extraFieldsContainer.getIndexableExtras(), outputRecord);
-      putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
-          extraFieldsContainer.getUnindexableExtras(), outputRecord);
 
-      // Generate merged text index
-      if (null != _mergedTextIndexFieldSpec && !mergedTextIndexMap.isEmpty()) {
-        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(mergedTextIndexMap);
+      putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType,
+          _reusedIndexableExtras, _reusedOutputRecord);
+      putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
+          _reusedUnindexableExtras, _reusedOutputRecord);
+
+      // Generate merged text index. This optional step puts all field + value pairs in the input record in a special
+      // column "_mergedTextIndex" to perform full text indexing and search.
+      if (null != _mergedTextIndexFieldSpec && !_reusedMergedTextIndexMap.isEmpty()) {
+        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(_reusedMergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          outputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
+          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
         } else {
-          outputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
+          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
         }
       }
     } catch (Exception e) {
@@ -352,10 +355,10 @@ public class SchemaConformingTransformer implements RecordTransformer {
         throw e;
       }
       _logger.error("Couldn't transform record: {}", record.toString(), e);
-      outputRecord.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+      _reusedOutputRecord.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
     }
 
-    return outputRecord;
+    return _reusedOutputRecord;
   }
 
   /**
@@ -405,25 +408,25 @@ public class SchemaConformingTransformer implements RecordTransformer {
    * @return ExtraFieldsContainer carries the indexable and unindexable fields of the current node as well as its
    * subtree
    */
-  private ExtraFieldsContainer processField(SchemaTreeNode parentNode, Deque<String> jsonPath, Object value,
-      boolean isIndexable, GenericRow outputRecord, Map<String, Object> mergedTextIndexMap) {
+  private void processField(SchemaTreeNode parentNode, List<String> jsonPath, Object value,
+      boolean isIndexable, GenericRow outputRecord, Map<String, Object> mergedTextIndexMap,
+      Map<String, Object> indexableExtras, Map<String, Object> unindexableExtras) {
     // Common variables
     boolean storeIndexableExtras = _transformerConfig.getIndexableExtrasField() != null;
     boolean storeUnindexableExtras = _transformerConfig.getUnindexableExtrasField() != null;
-    String key = jsonPath.peekLast();
-    ExtraFieldsContainer extraFieldsContainer = new ExtraFieldsContainer(storeUnindexableExtras);
+    String key = jsonPath.get(jsonPath.size() - 1);
 
     // Base case
     if (StreamDataDecoderImpl.isSpecialKeyType(key) || GenericRow.isSpecialKeyType(key)) {
       outputRecord.putValue(key, value);
-      return extraFieldsContainer;
+      return;
     }
 
     String keyJsonPath = String.join(".", jsonPath);
 
     Set<String> fieldPathsToDrop = _transformerConfig.getFieldPathsToDrop();
     if (null != fieldPathsToDrop && fieldPathsToDrop.contains(keyJsonPath)) {
-      return extraFieldsContainer;
+      return;
     }
 
     SchemaTreeNode currentNode =
@@ -438,29 +441,29 @@ public class SchemaConformingTransformer implements RecordTransformer {
       if (_transformerConfig.getFieldPathsToPreserveInputWithIndex().contains(keyJsonPath)) {
         flattenAndAddToMergedTextIndexMap(mergedTextIndexMap, keyJsonPath, value);
       }
-      return extraFieldsContainer;
+      return;
     }
     String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
     isIndexable = isIndexable && (null == unindexableFieldSuffix || !key.endsWith(unindexableFieldSuffix));
 
     // return in advance to truncate the subtree if nothing left to be added
     if (currentNode == null && !storeIndexableExtras && !storeUnindexableExtras) {
-      return extraFieldsContainer;
+      return;
     }
 
     if (value == null) {
-      return extraFieldsContainer;
+      return;
     }
     if (!(value instanceof Map)) {
       // leaf node
       if (!isIndexable) {
-        extraFieldsContainer.addUnindexableEntry(key, value);
+        addEntryToExtras(jsonPath, unindexableExtras, key, value);
       } else {
         if (null != currentNode && currentNode.isColumn()) {
           // In schema
           outputRecord.putValue(currentNode.getColumnName(), currentNode.getValue(value));
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
-            extraFieldsContainer.addIndexableEntry(key, value);
+            addEntryToExtras(jsonPath, indexableExtras, key, value);
           }
           mergedTextIndexMap.put(currentNode.getColumnName(), value);
         } else {
@@ -468,24 +471,22 @@ public class SchemaConformingTransformer implements RecordTransformer {
           // into the extraField column of the table.
           if (storeIndexableExtras) {
             if (!_transformerConfig.getFieldPathsToSkipStorage().contains(keyJsonPath)) {
-              extraFieldsContainer.addIndexableEntry(key, value);
+              addEntryToExtras(jsonPath, indexableExtras, key, value);
             }
             mergedTextIndexMap.put(keyJsonPath, value);
           }
         }
       }
-      return extraFieldsContainer;
+      return;
     }
     // Traverse the subtree
     Map<String, Object> valueAsMap = (Map<String, Object>) value;
     for (Map.Entry<String, Object> entry : valueAsMap.entrySet()) {
-      jsonPath.addLast(entry.getKey());
-      ExtraFieldsContainer childContainer =
-          processField(currentNode, jsonPath, entry.getValue(), isIndexable, outputRecord, mergedTextIndexMap);
-      extraFieldsContainer.addChild(key, childContainer);
-      jsonPath.removeLast();
+      jsonPath.add(entry.getKey());
+      processField(currentNode, jsonPath, entry.getValue(), isIndexable, outputRecord, mergedTextIndexMap,
+          indexableExtras, unindexableExtras);
+      jsonPath.remove(jsonPath.size() - 1);
     }
-    return extraFieldsContainer;
   }
 
   /**
@@ -522,6 +523,15 @@ public class SchemaConformingTransformer implements RecordTransformer {
 
     // If the value is a single value
     addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, kv.getValue().toString());
+  }
+
+  private void addEntryToExtras(List<String> jsonPath, Map<String, Object> extras, String key, Object value) {
+    Map<String, Object> curMap = extras;
+    for (int i = 0; i < jsonPath.size() - 1; i++) {
+      String curKey = jsonPath.get(i);
+      curMap = (Map<String, Object>) curMap.computeIfAbsent(curKey, k -> new HashMap<String, Object>());
+    }
+    curMap.put(key, value);
   }
 
   private void addLuceneDoc(List<String> indexDocuments, Integer mergedTextIndexDocumentMaxLength, String key,
@@ -572,7 +582,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
    */
   private void putExtrasField(String fieldName, DataType fieldType, Map<String, Object> field,
       GenericRow outputRecord) {
-    if (null == field) {
+    if (null == field || field.isEmpty()) {
       return;
     }
 
@@ -596,11 +606,14 @@ public class SchemaConformingTransformer implements RecordTransformer {
     final Integer mergedTextIndexDocumentMaxLength = _transformerConfig.getMergedTextIndexDocumentMaxLength();
     final @Nullable
     List<String> luceneDocuments = new ArrayList<>();
-    mergedTextIndexMap.entrySet().stream().filter(kv -> null != kv.getKey() && null != kv.getValue())
-        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
-        kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
-            _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength())).filter(
-        kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
+    mergedTextIndexMap.entrySet().stream()
+        .filter(kv -> null != kv.getKey() && null != kv.getValue())
+        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey()))
+        .filter(kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
+            _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength()))
+        .filter(kv -> _transformerConfig.getMergedTextIndexPrefixToExclude().stream()
+            .noneMatch(prefix -> kv.getKey().startsWith(prefix)))
+        .filter(kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
             .anyMatch(suffix -> kv.getKey().endsWith(suffix))).forEach(kv -> {
       generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
     });
@@ -754,89 +767,5 @@ class SchemaTreeNode {
       return _keyName;
     }
     return _parentPath + JsonUtils.KEY_SEPARATOR + _keyName;
-  }
-}
-
-/**
- * A class to encapsulate the "extras" fields (indexableExtras and unindexableExtras) at a node in the record (when
- * viewed as a tree).
- */
-class ExtraFieldsContainer {
-  private Map<String, Object> _indexableExtras = null;
-  private Map<String, Object> _unindexableExtras = null;
-  private final boolean _storeUnindexableExtras;
-
-  ExtraFieldsContainer(boolean storeUnindexableExtras) {
-    _storeUnindexableExtras = storeUnindexableExtras;
-  }
-
-  public Map<String, Object> getIndexableExtras() {
-    return _indexableExtras;
-  }
-
-  public Map<String, Object> getUnindexableExtras() {
-    return _unindexableExtras;
-  }
-
-  /**
-   * Adds the given kv-pair to the indexable extras field
-   */
-  public void addIndexableEntry(String key, Object value) {
-    if (null == _indexableExtras) {
-      _indexableExtras = new HashMap<>();
-    }
-    if (key == null && value instanceof Map) {
-      // If the key is null, it means that the value is a map that should be merged with the indexable extras
-      _indexableExtras.putAll((Map<String, Object>) value);
-    } else if (_indexableExtras.containsKey(key) && _indexableExtras.get(key) instanceof Map && value instanceof Map) {
-      // If the key already exists in the indexable extras and both the existing value and the new value are maps,
-      // merge the two maps
-      ((Map<String, Object>) _indexableExtras.get(key)).putAll((Map<String, Object>) value);
-    } else {
-      _indexableExtras.put(key, value);
-    }
-  }
-
-  /**
-   * Adds the given kv-pair to the unindexable extras field (if any)
-   */
-  public void addUnindexableEntry(String key, Object value) {
-    if (!_storeUnindexableExtras) {
-      return;
-    }
-    if (null == _unindexableExtras) {
-      _unindexableExtras = new HashMap<>();
-    }
-    if (key == null && value instanceof Map) {
-      // If the key is null, it means that the value is a map that should be merged with the unindexable extras
-      _unindexableExtras.putAll((Map<String, Object>) value);
-    } else if (_unindexableExtras.containsKey(key) && _unindexableExtras.get(key) instanceof Map
-        && value instanceof Map) {
-      // If the key already exists in the uindexable extras and both the existing value and the new value are maps,
-      // merge the two maps
-      ((Map<String, Object>) _unindexableExtras.get(key)).putAll((Map<String, Object>) value);
-    } else {
-      _unindexableExtras.put(key, value);
-    }
-  }
-
-  /**
-   * Given a container corresponding to a child node, attach the extras from the child node to the extras in this node
-   * at the given key.
-   */
-  public void addChild(String key, ExtraFieldsContainer child) {
-    Map<String, Object> childIndexableFields = child.getIndexableExtras();
-    if (null != childIndexableFields) {
-      addIndexableEntry(key, childIndexableFields);
-    }
-
-    Map<String, Object> childUnindexableFields = child.getUnindexableExtras();
-    if (null != childUnindexableFields) {
-      addUnindexableEntry(key, childUnindexableFields);
-    }
-  }
-
-  public void addChild(ExtraFieldsContainer child) {
-    addChild(null, child);
   }
 }

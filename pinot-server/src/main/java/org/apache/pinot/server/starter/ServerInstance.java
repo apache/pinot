@@ -98,6 +98,10 @@ public class ServerInstance {
     _serverMetrics.initializeGlobalMeters();
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
+    if (segmentOperationsThrottler != null) {
+      // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
+      segmentOperationsThrottler.initializeMetrics();
+    }
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);

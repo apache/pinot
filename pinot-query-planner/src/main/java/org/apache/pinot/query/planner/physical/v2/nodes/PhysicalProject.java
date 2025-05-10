@@ -90,4 +90,13 @@ public class PhysicalProject extends Project implements PRelNode {
     return new PhysicalProject(getCluster(), getTraitSet(), getHints(), getProjects(), getRowType(), getVariablesSet(),
         newNodeId, newInputs.get(0), newDistribution, _leafStage);
   }
+
+  @Override
+  public PRelNode asLeafStage() {
+    if (isLeafStage()) {
+      return this;
+    }
+    return new PhysicalProject(getCluster(), getTraitSet(), getHints(), getProjects(), getRowType(),
+        getVariablesSet(), _nodeId, _pRelInputs.get(0), _pinotDataDistribution, true);
+  }
 }

@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -35,7 +34,8 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
@@ -111,7 +111,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
-  private TransferableBlock _eosBlock;
+  private MseBlock.Eos _eosBlock;
 
   public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
       WindowNode node) {
@@ -199,7 +199,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     if (_hasReturnedWindowAggregateBlock) {
       return _eosBlock;
     }
@@ -209,10 +209,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
   /**
    * @return the final block, which must be either an end of stream or an error.
    */
-  private TransferableBlock computeBlocks() {
-    TransferableBlock block = _input.nextBlock();
-    while (block.isDataBlock()) {
-      List<Object[]> container = block.getContainer();
+  private MseBlock computeBlocks() {
+    MseBlock block = _input.nextBlock();
+    while (block.isData()) {
+      List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
@@ -237,12 +237,12 @@ public class WindowAggregateOperator extends MultiStageOperator {
       sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
+    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
+    _eosBlock = eosBlock;
     // Early termination if the block is an error block
-    if (block.isErrorBlock()) {
+    if (eosBlock.isError()) {
       return block;
     }
-    assert block.isSuccessfulEndOfStreamBlock();
-    _eosBlock = updateEosBlock(block, _statMap);
 
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
@@ -274,8 +274,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
     if (rows.isEmpty()) {
       return _eosBlock;
     } else {
-      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      return new RowHeapDataBlock(rows, _resultSchema);
     }
+  }
+
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   public enum StatKey implements StatMap.Key {

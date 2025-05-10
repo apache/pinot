@@ -22,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 
@@ -31,12 +32,12 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
  */
 public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
-  private final Map<Integer, List<TransferableBlock>> _resultMap;
-  private final TransferableBlock _errorBlock;
+  private final Map<Integer, List<MseBlock>> _resultMap;
+  private final ErrorMseBlock _errorBlock;
   private final MultiStageQueryStats _multiStageQueryStats;
 
-  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap,
-      @Nullable TransferableBlock errorBlock, @Nullable MultiStageQueryStats multiStageQueryStats) {
+  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<MseBlock>> resultMap,
+      @Nullable ErrorMseBlock errorBlock, @Nullable MultiStageQueryStats multiStageQueryStats) {
     _nodeIdMap = nodeIdMap;
     _resultMap = resultMap;
     _errorBlock = errorBlock;
@@ -47,12 +48,12 @@ public class PipelineBreakerResult {
     return _nodeIdMap;
   }
 
-  public Map<Integer, List<TransferableBlock>> getResultMap() {
+  public Map<Integer, List<MseBlock>> getResultMap() {
     return _resultMap;
   }
 
   @Nullable
-  public TransferableBlock getErrorBlock() {
+  public ErrorMseBlock getErrorBlock() {
     return _errorBlock;
   }
 

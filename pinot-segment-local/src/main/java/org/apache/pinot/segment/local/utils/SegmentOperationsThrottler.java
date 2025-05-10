@@ -66,6 +66,17 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
     return _segmentDownloadThrottler;
   }
 
+  /**
+   * The ServerMetrics may be created after these objects are created. In that case, the initialization that happens
+   * in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics are
+   * created and registered
+   */
+  public void initializeMetrics() {
+    _segmentAllIndexPreprocessThrottler.initializeMetrics();
+    _segmentStarTreePreprocessThrottler.initializeMetrics();
+    _segmentDownloadThrottler.initializeMetrics();
+  }
+
   public synchronized void startServingQueries() {
     _segmentAllIndexPreprocessThrottler.startServingQueries();
     _segmentStarTreePreprocessThrottler.startServingQueries();

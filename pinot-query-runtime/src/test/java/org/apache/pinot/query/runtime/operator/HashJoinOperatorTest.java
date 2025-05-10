@@ -29,9 +29,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -47,13 +46,13 @@ import static org.testng.Assert.assertTrue;
 
 public class HashJoinOperatorTest {
   private AutoCloseable _mocks;
-  @Mock
   private MultiStageOperator _leftInput;
-  @Mock
   private MultiStageOperator _rightInput;
   @Mock
   private VirtualServerAddress _serverAddress;
 
+  private static final DataSchema DEFAULT_CHILD_SCHEMA = new DataSchema(new String[]{"int_col", "string_col"},
+      new ColumnDataType[] {ColumnDataType.INT, ColumnDataType.STRING});
   @BeforeMethod
   public void setUp() {
     _mocks = openMocks(this);
@@ -68,25 +67,21 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleHashJoinKeyCollisionInnerJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
@@ -95,25 +90,19 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleInnerJoinOnInt() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2, "BB", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
@@ -121,25 +110,19 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleLeftJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "CC"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "CC")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "CC", null, null});
@@ -147,46 +130,35 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassLeftTableEOS() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "BB")
+        .addRow(1, "CC")
+        .addRow(3, "BB")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isEndOfStreamBlock());
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isEos());
   }
 
   @Test
   public void shouldHandleLeftJoinOneToN() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.LEFT, List.of(0), List.of(0), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "BB")
+        .addRow(1, "CC")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.LEFT, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1, "BB"});
     assertEquals(resultRows.get(1), new Object[]{1, "Aa", 1, "CC"});
@@ -194,202 +166,165 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassRightTableEOS() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "BB")
+        .addRow(1, "CC")
+        .addRow(3, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA).buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
   public void shouldHandleRightJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-    });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.RIGHT, List.of(0), List.of(0), List.of());
-    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.RIGHT, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows1.size(), 2);
     assertEquals(resultRows1.get(0), new Object[]{2, "BB", 2, "Aa"});
     assertEquals(resultRows1.get(1), new Object[]{2, "BB", 2, "BB"});
     // Second block should be non-matched broadcast rows
-    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows2.size(), 1);
     assertEquals(resultRows2.get(0), new Object[]{null, null, 3, "BB"});
     // Third block is EOS block.
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
   public void shouldHandleSemiJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "CC")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "BB"});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
   public void shouldHandleFullJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-    });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.FULL, List.of(0), List.of(0), List.of());
-    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "CC")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.FULL, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows1.size(), 4);
     assertEquals(resultRows1.get(0), new Object[]{1, "Aa", null, null});
     assertEquals(resultRows1.get(1), new Object[]{2, "BB", 2, "Aa"});
     assertEquals(resultRows1.get(2), new Object[]{2, "BB", 2, "BB"});
     assertEquals(resultRows1.get(3), new Object[]{4, "CC", null, null});
     // Second block should be non-matched broadcast rows
-    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows2.size(), 1);
     assertEquals(resultRows2.get(0), new Object[]{null, null, 3, "BB"});
     // Third block is EOS block.
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
   public void shouldHandleAntiJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "CC")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{4, "CC"});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test
   public void shouldPropagateRightTableError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinRightError")));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("testInnerJoinRightError"));
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "BB")
+        .addRow(1, "CC")
+        .addRow(3, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .buildWithError(ErrorMseBlock.fromException(new Exception("testInnerJoinRightError")));
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages()
+        .get(QueryErrorCode.UNKNOWN).contains("testInnerJoinRightError"));
   }
 
   @Test
   public void shouldPropagateLeftTableError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_leftInput.nextBlock()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinLeftError")));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("testInnerJoinLeftError"));
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "BB")
+        .addRow(1, "CC")
+        .addRow(3, "BB")
+        .buildWithEos();
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .buildWithError(ErrorMseBlock.fromException(new Exception("testInnerJoinLeftError")));
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages()
+        .get(QueryErrorCode.UNKNOWN).contains("testInnerJoinLeftError"));
   }
 
   @Test
   public void shouldPropagateRightInputJoinLimitError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
@@ -398,93 +333,91 @@ public class HashJoinOperatorTest {
         Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
             PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1")));
     HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
+        getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("Cannot build in memory hash table"));
   }
 
   @Test
   public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimitOnRightInput() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .spied()
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
     PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
         Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
             PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1")));
     HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
-    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+        getOperator(resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     Mockito.verify(_rightInput).earlyTerminate();
     assertEquals(resultRows1.size(), 1);
-    TransferableBlock block2 = operator.nextBlock();
-    assertTrue(block2.isSuccessfulEndOfStreamBlock());
-    StatMap<HashJoinOperator.StatKey> statMap = OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, block2);
+    MseBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccess());
+
+
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
         "Max rows in join should be reached");
   }
 
   @Test
   public void shouldPropagateLeftInputJoinLimitError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
     PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
         Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
             PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
     HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
+        getOperator(resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("Cannot process join"));
   }
 
   @Test
   public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimitOnLeftInput() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "Aa"}, new Object[]{3, "Aa"}))
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{4, "Aa"}, new Object[]{5, "Aa"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .spied()
+        .addRow(1, "Aa")
+        .addRow(2, "Aa")
+        .addRow(3, "Aa")
+        .finishBlock()
+        .addRow(4, "Aa")
+        .addRow(5, "Aa")
+        .buildWithEos();
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .spied()
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(3, "BB")
+        .buildWithEos();
+
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
@@ -493,13 +426,18 @@ public class HashJoinOperatorTest {
         Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
             PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
     HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+        getOperator(resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
+
+    // When
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then
     Mockito.verify(_leftInput).earlyTerminate();
     assertEquals(resultRows.size(), 2);
-    TransferableBlock block2 = operator.nextBlock();
-    assertTrue(block2.isSuccessfulEndOfStreamBlock());
-    StatMap<HashJoinOperator.StatKey> statMap = OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, block2);
+    MseBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccess());
+    StatMap<HashJoinOperator.StatKey> statMap =
+        OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, operator.calculateStats());
     assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
         "Max rows in join should be reached");
   }
@@ -512,9 +450,17 @@ public class HashJoinOperatorTest {
             JoinNode.JoinStrategy.HASH));
   }
 
-  private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
+  private HashJoinOperator getOperator(DataSchema resultSchema, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
+      PlanNode.NodeHint nodeHint) {
+    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, DEFAULT_CHILD_SCHEMA, _rightInput,
+        new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions,
+            JoinNode.JoinStrategy.HASH));
+  }
+
+  private HashJoinOperator getOperator(DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
-    return getOperator(leftSchema, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
+    return getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
         PlanNode.NodeHint.EMPTY);
   }
 }

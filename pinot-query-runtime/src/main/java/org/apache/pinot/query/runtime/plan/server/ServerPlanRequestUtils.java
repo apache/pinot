@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -50,10 +52,12 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -210,8 +214,8 @@ public class ServerPlanRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
-    IndexLoadingConfig indexLoadingConfig = tableDataManager.getIndexLoadingConfig();
-    QUERY_OPTIMIZER.optimize(pinotQuery, indexLoadingConfig.getTableConfig(), indexLoadingConfig.getSchema());
+    Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight());
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
@@ -357,8 +361,28 @@ public class ServerPlanRequestUtils {
           expressions.add(RequestUtils.getLiteralExpression(arrString[rowIdx]));
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] arrBigDecimal = new BigDecimal[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBigDecimal[rowIdx] = (BigDecimal) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBigDecimal);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBigDecimal[rowIdx]));
+        }
+        break;
+      case BYTES:
+        ByteArray[] arrBytes = new ByteArray[numRows];
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          arrBytes[rowIdx] = (ByteArray) dataContainer.get(rowIdx)[colIdx];
+        }
+        Arrays.sort(arrBytes);
+        for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
+          expressions.add(RequestUtils.getLiteralExpression(arrBytes[rowIdx].getBytes()));
+        }
+        break;
       default:
-        throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
+        throw new IllegalStateException("Illegal SV data type for IN filter: " + storedType);
     }
     return expressions;
   }

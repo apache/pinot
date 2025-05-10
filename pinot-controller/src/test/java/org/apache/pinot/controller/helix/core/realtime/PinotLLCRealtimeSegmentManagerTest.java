@@ -1516,8 +1516,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testGetCommittingSegments()
-      throws HttpErrorStatusException, IOException, URISyntaxException {
+  public void testGetCommittingSegments() {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager helixManager = mock(HelixManager.class);
@@ -1582,25 +1581,25 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> result = segmentManager.getCommittingSegments(realtimeTableName);
 
     // Verify results
-    assertNotNull(result);
-    assertEquals(2, result.size());
-    assertTrue(result.contains(testSegments.get(0))); // Should include COMMITTING segment
-    assertFalse(result.contains(testSegments.get(1))); // Should exclude null metadata segment
-    assertFalse(result.contains(testSegments.get(2))); // Should exclude DONE segment
-    assertTrue(result.contains(testSegments.get(3))); // Should include COMMITTING segment
+    assertEquals(result, List.of(testSegments.get(0), testSegments.get(3)));
+
+    // Test UPLOADED case
+    when(segmentZKMetadata0.getStatus()).thenReturn(Status.UPLOADED);
+    result = segmentManager.getCommittingSegments(realtimeTableName);
+    assertEquals(result, List.of(testSegments.get(3)));
 
     // Test null case
     when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
         .thenReturn(null);
     result = segmentManager.getCommittingSegments(realtimeTableName);
-    assertNull(result);
+    assertTrue(result.isEmpty());
 
     // Test empty COMMITTING_SEGMENTS field
     ZNRecord emptyRecord = new ZNRecord("CommittingSegments");
     when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
         .thenReturn(emptyRecord);
     result = segmentManager.getCommittingSegments(realtimeTableName);
-    assertNull(result);
+    assertTrue(result.isEmpty());
   }
 
   @Test
@@ -1831,6 +1830,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
         return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupMetadata(i, PARTITION_OFFSET))
             .collect(Collectors.toList());
       }
+    }
+
+    @Override
+    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+        boolean forceGetOffsetFromStream) {
+      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
     }
 
     @Override

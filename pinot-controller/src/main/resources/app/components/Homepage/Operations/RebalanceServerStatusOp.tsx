@@ -28,18 +28,7 @@ import {RebalanceServerResponseCard} from "./RebalanceServer/RebalanceServerResp
 import CustomizedTables from "../../Table";
 import Utils from "../../../utils/Utils";
 import PinotMethodUtils from "../../../utils/PinotMethodUtils";
-
-export type RebalanceTableSegmentJobs = {
-    [key: string]: {
-        jobId: string,
-        messageCount: number,
-        submissionTimeMs: number,
-        jobType: string,
-        tableName: string,
-        REBALANCE_PROGRESS_STATS: string,
-        REBALANCE_CONTEXT: string;
-    }
-}
+import {RebalanceTableSegmentJob} from "Models";
 
 type RebalanceServerStatusOpProps = {
     tableName: string;
@@ -49,7 +38,7 @@ type RebalanceServerStatusOpProps = {
 export const RebalanceServerStatusOp = (
     { tableName, hideModal } : RebalanceServerStatusOpProps
 ) => {
-    const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJobs>({})
+    const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJob[]>([])
     const [jobSelected, setJobSelected] = useState<string | null>(null);
     const [rebalanceContext, setRebalanceContext] = useState<{}>({});
     const [rebalanceProgressStats, setRebalanceProgressStats] = useState<{}>({});
@@ -58,12 +47,9 @@ export const RebalanceServerStatusOp = (
     useEffect(() => {
         setLoading(true);
         PinotMethodUtils
-            .fetchTableJobs(tableName, "TABLE_REBALANCE")
+            .fetchRebalanceTableJobs(tableName)
             .then(jobs => {
-                if (jobs.error) {
-                    return;
-                }
-                setRebalanceServerJobs(jobs as RebalanceTableSegmentJobs)
+                setRebalanceServerJobs(jobs)
             })
             .finally(() => setLoading(false));
     }, []);
@@ -82,21 +68,36 @@ export const RebalanceServerStatusOp = (
 
     useEffect(() => {
         try {
-            if (jobSelected !== null) {
-                setRebalanceContext(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_CONTEXT))
-                setRebalanceProgressStats(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_PROGRESS_STATS))
+            if (jobSelected !== null && rebalanceServerJobs.length > 0) {
+                const rebalanceServerJob = rebalanceServerJobs
+                    .find(job => job.jobId === jobSelected);
+
+                if (rebalanceServerJob) {
+                    setRebalanceContext(JSON.parse(rebalanceServerJob.REBALANCE_CONTEXT));
+                    setRebalanceProgressStats(JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS));
+                } else {
+                    setRebalanceContext(
+                        {
+                            message: 'Failed to load rebalance context'
+                        });
+                    setRebalanceProgressStats(
+                        {
+                            message: 'Failed to load rebalance progress stats'
+                        });
+                }
+
             }
         } catch (e) {
             setRebalanceContext(
                 {
-                    message: 'Failed to load rebalance context'
+                    message: 'Failed to load rebalance context' + e.toString()
                 });
             setRebalanceProgressStats(
                 {
-                    message: 'Failed to load rebalance progress stats'
+                    message: 'Failed to load rebalance progress stats' + e.toString()
                 });
         }
-    }, [jobSelected]);
+    }, [jobSelected, rebalanceServerJobs]);
 
     if (loading) {
         return (
@@ -137,13 +138,13 @@ export const RebalanceServerStatusOp = (
                                 setJobSelected(cell);
                             }}
                             data={{
-                                records: Object.keys(rebalanceServerJobs).map(jobId => {
-                                    const progressStats = JSON.parse(rebalanceServerJobs[jobId].REBALANCE_PROGRESS_STATS);
+                                records: rebalanceServerJobs.map(rebalanceServerJob => {
+                                    const progressStats = JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS);
                                     return [
-                                        rebalanceServerJobs[jobId].jobId,
-                                        rebalanceServerJobs[jobId].tableName,
+                                        rebalanceServerJob.jobId,
+                                        rebalanceServerJob.tableName,
                                         progressStats.status,
-                                        Utils.formatTime(+rebalanceServerJobs[jobId].submissionTimeMs)
+                                        Utils.formatTime(+rebalanceServerJob.submissionTimeMs)
                                     ];
                                 }),
                                 columns: ['Job id', 'Table name', 'Status', 'Started at']

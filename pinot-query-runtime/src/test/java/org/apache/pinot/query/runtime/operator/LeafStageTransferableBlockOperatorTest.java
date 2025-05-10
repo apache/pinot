@@ -35,10 +35,9 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -66,7 +65,7 @@ public class LeafStageTransferableBlockOperatorTest {
   @BeforeMethod
   public void setUpMethod() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+    when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
@@ -118,12 +117,13 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // When:
-    TransferableBlock resultBlock = operator.nextBlock();
+    MseBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    Assert.assertEquals(rows.get(0), new Object[]{"foo", 1});
+    Assert.assertEquals(rows.get(1), new Object[]{"", 2});
+    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -149,12 +149,13 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // When:
-    TransferableBlock resultBlock = operator.nextBlock();
+    MseBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1660000000000L, 1});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{0, 1600000000000L, 0});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    Assert.assertEquals(rows.get(0), new Object[]{1, 1660000000000L, 1});
+    Assert.assertEquals(rows.get(1), new Object[]{0, 1600000000000L, 0});
+    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -176,16 +177,18 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // When:
-    TransferableBlock resultBlock1 = operator.nextBlock();
-    TransferableBlock resultBlock2 = operator.nextBlock();
-    TransferableBlock resultBlock3 = operator.nextBlock();
+    MseBlock resultBlock1 = operator.nextBlock();
+    MseBlock resultBlock2 = operator.nextBlock();
+    MseBlock resultBlock3 = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock1.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(resultBlock1.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertEquals(resultBlock2.getContainer().get(0), new Object[]{"bar", 3});
-    Assert.assertEquals(resultBlock2.getContainer().get(1), new Object[]{"foo", 4});
-    Assert.assertTrue(resultBlock3.isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
+    List<Object[]> rows1 = ((MseBlock.Data) resultBlock1).asRowHeap().getRows();
+    List<Object[]> rows2 = ((MseBlock.Data) resultBlock2).asRowHeap().getRows();
+    Assert.assertEquals(rows1.get(0), new Object[]{"foo", 1});
+    Assert.assertEquals(rows1.get(1), new Object[]{"", 2});
+    Assert.assertEquals(rows2.get(0), new Object[]{"bar", 3});
+    Assert.assertEquals(rows2.get(1), new Object[]{"foo", 4});
+    Assert.assertTrue(resultBlock3.isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -207,11 +210,11 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // Then: the 5th block should be EOS
-    Assert.assertTrue(operator.nextBlock().isDataBlock());
-    Assert.assertTrue(operator.nextBlock().isDataBlock());
-    Assert.assertTrue(operator.nextBlock().isDataBlock());
-    Assert.assertTrue(operator.nextBlock().isDataBlock());
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 5 blocks");
+    Assert.assertTrue(operator.nextBlock().isData());
+    Assert.assertTrue(operator.nextBlock().isData());
+    Assert.assertTrue(operator.nextBlock().isData());
+    Assert.assertTrue(operator.nextBlock().isData());
+    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 5 blocks");
 
     operator.close();
   }
@@ -233,11 +236,11 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // When:
-    TransferableBlock resultBlock = operator.nextBlock();
+    MseBlock resultBlock = operator.nextBlock();
 
     // Then: error block can be returned as first or second block depending on the sequence of the execution
-    if (!resultBlock.isErrorBlock()) {
-      Assert.assertTrue(operator.nextBlock().isErrorBlock());
+    if (!resultBlock.isError()) {
+      Assert.assertTrue(operator.nextBlock().isError());
     }
 
     operator.close();
@@ -261,10 +264,10 @@ public class LeafStageTransferableBlockOperatorTest {
     _operatorRef.set(operator);
 
     // When:
-    TransferableBlock resultBlock = operator.nextBlock();
+    MseBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(resultBlock.isEndOfStreamBlock());
+    Assert.assertTrue(resultBlock.isEos());
 
     operator.close();
   }

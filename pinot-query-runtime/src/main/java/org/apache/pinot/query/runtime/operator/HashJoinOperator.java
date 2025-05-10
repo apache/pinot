@@ -28,8 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.join.DoubleLookupTable;
 import org.apache.pinot.query.runtime.operator.join.FloatLookupTable;
 import org.apache.pinot.query.runtime.operator.join.IntLookupTable;
@@ -98,9 +97,10 @@ public class HashJoinOperator extends BaseJoinOperator {
     LOGGER.trace("Building hash table for join operator");
     long startTime = System.currentTimeMillis();
     int numRows = 0;
-    TransferableBlock rightBlock = _rightInput.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
-      List<Object[]> rows = rightBlock.getContainer();
+    MseBlock rightBlock = _rightInput.nextBlock();
+    while (rightBlock.isData()) {
+      MseBlock.Data dataBlock = (MseBlock.Data) rightBlock;
+      List<Object[]> rows = dataBlock.asRowHeap().getRows();
       // Row based overflow check.
       if (rows.size() + numRows > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
@@ -122,20 +122,19 @@ public class HashJoinOperator extends BaseJoinOperator {
       sampleAndCheckInterruption();
       rightBlock = _rightInput.nextBlock();
     }
-    if (rightBlock.isErrorBlock()) {
-      _upstreamErrorBlock = rightBlock;
+    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
     } else {
       _rightTable.finish();
       _isRightTableBuilt = true;
-      _rightSideStats = rightBlock.getQueryStats();
-      assert _rightSideStats != null;
     }
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
     LOGGER.trace("Finished building hash table for join operator");
   }
 
   @Override
-  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
+  protected List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -151,8 +150,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockUniqueKeys(TransferableBlock leftBlock) {
-    List<Object[]> leftRows = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockUniqueKeys(MseBlock.Data leftBlock) {
+    List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     ArrayList<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
@@ -179,8 +178,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockDuplicateKeys(TransferableBlock leftBlock) {
-    List<Object[]> leftRows = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockDuplicateKeys(MseBlock.Data leftBlock) {
+    List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
@@ -227,8 +226,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
-    List<Object[]> leftRows = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
+    List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
@@ -242,8 +241,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) {
-    List<Object[]> leftRows = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
+    List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {

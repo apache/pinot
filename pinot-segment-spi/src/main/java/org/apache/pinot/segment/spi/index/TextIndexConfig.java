@@ -40,10 +40,22 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
   private static final int LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB = 0;
   private static final boolean LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES = false;
+  private static final boolean LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY = false;
+  private static final DocIdTranslatorMode LUCENE_TRANSLATOR_MODE = null;
+
+  // keep in sync with constructor!
+  private static final List<String> PROPERTY_NAMES = List.of(
+      "disabled", "fst", "rawValue", "queryCache", "useANDForMultiTermQueries", "stopWordsInclude", "stopWordsExclude",
+      "luceneUseCompoundFile", "luceneMaxBufferSizeMB", "luceneAnalyzerClass", "luceneAnalyzerClassArgs",
+      "luceneAnalyzerClassArgTypes", "luceneQueryParserClass", "enablePrefixSuffixMatchingInPhraseQueries",
+      "reuseMutableIndex", "luceneNRTCachingDirectoryMaxBufferSizeMB", "useLogByteSizeMergePolicy",
+      "docIdTranslatorMode"
+  );
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-         LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0);
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false,
+          null);
 
   private final FSTType _fstType;
   @Nullable
@@ -61,9 +73,34 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _enablePrefixSuffixMatchingInPhraseQueries;
   private final boolean _reuseMutableIndex;
   private final int _luceneNRTCachingDirectoryMaxBufferSizeMB;
+  private final boolean _useLogByteSizeMergePolicy;
+  private final DocIdTranslatorMode _docIdTranslatorMode;
+
+  public enum DocIdTranslatorMode {
+    // build and keep mapping
+    Default,
+    // build mapping and check if it can be dropped
+    TryOptimize,
+    // mapping is not necessary, use lucene ids
+    Skip;
+
+    static DocIdTranslatorMode of(String mode) {
+      if (mode == null) {
+        return null;
+      }
+      for (DocIdTranslatorMode value : values()) {
+        if (value.name().equalsIgnoreCase(mode)) {
+          return value;
+        }
+      }
+
+      return null;
+    }
+  }
 
   @JsonCreator
-  public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
+  public TextIndexConfig(@JsonProperty("disabled") Boolean disabled,
+      @JsonProperty("fst") FSTType fstType,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
@@ -77,7 +114,9 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneQueryParserClass") String luceneQueryParserClass,
       @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries,
       @JsonProperty("reuseMutableIndex") Boolean reuseMutableIndex,
-      @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB) {
+      @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB,
+      @JsonProperty("useLogByteSizeMergePolicy") Boolean useLogByteSizeMergePolicy,
+      @JsonProperty("docIdTranslatorMode") DocIdTranslatorMode docIdTranslatorMode) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -106,6 +145,9 @@ public class TextIndexConfig extends IndexConfig {
     _luceneNRTCachingDirectoryMaxBufferSizeMB =
         luceneNRTCachingDirectoryMaxBufferSizeMB == null ? LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB
             : luceneNRTCachingDirectoryMaxBufferSizeMB;
+    _useLogByteSizeMergePolicy = useLogByteSizeMergePolicy == null ? LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY
+        : useLogByteSizeMergePolicy;
+    _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
   }
 
   public FSTType getFstType() {
@@ -196,6 +238,14 @@ public class TextIndexConfig extends IndexConfig {
     return _reuseMutableIndex;
   }
 
+  public boolean isUseLogByteSizeMergePolicy() {
+    return _useLogByteSizeMergePolicy;
+  }
+
+  public DocIdTranslatorMode getDocIdTranslatorMode() {
+    return _docIdTranslatorMode;
+  }
+
   public int getLuceneNRTCachingDirectoryMaxBufferSizeMB() {
     return _luceneNRTCachingDirectoryMaxBufferSizeMB;
   }
@@ -219,6 +269,9 @@ public class TextIndexConfig extends IndexConfig {
         LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH;
     protected boolean _reuseMutableIndex = LUCENE_INDEX_REUSE_MUTABLE_INDEX;
     protected int _luceneNRTCachingDirectoryMaxBufferSizeMB = LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB;
+    protected boolean _useLogByteSizeMergePolicy = LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY;
+    @Nullable
+    protected DocIdTranslatorMode _docIdTranslatorMode = LUCENE_TRANSLATOR_MODE;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -241,6 +294,8 @@ public class TextIndexConfig extends IndexConfig {
       _enablePrefixSuffixMatchingInPhraseQueries = other._enablePrefixSuffixMatchingInPhraseQueries;
       _reuseMutableIndex = other._reuseMutableIndex;
       _luceneNRTCachingDirectoryMaxBufferSizeMB = other._luceneNRTCachingDirectoryMaxBufferSizeMB;
+      _useLogByteSizeMergePolicy = other._useLogByteSizeMergePolicy;
+      _docIdTranslatorMode = other._docIdTranslatorMode;
     }
 
     public TextIndexConfig build() {
@@ -249,7 +304,8 @@ public class TextIndexConfig extends IndexConfig {
           CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-          _luceneNRTCachingDirectoryMaxBufferSizeMB);
+          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy,
+          _docIdTranslatorMode);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -329,6 +385,16 @@ public class TextIndexConfig extends IndexConfig {
       _luceneNRTCachingDirectoryMaxBufferSizeMB = luceneNRTCachingDirectoryMaxBufferSizeMB;
       return this;
     }
+
+    public AbstractBuilder withUseLogByteSizeMergePolicy(boolean useLogByteSizeMergePolicy) {
+      _useLogByteSizeMergePolicy = useLogByteSizeMergePolicy;
+      return this;
+    }
+
+    public AbstractBuilder withDocIdTranslatorMode(String mode) {
+      _docIdTranslatorMode = DocIdTranslatorMode.of(mode);
+      return this;
+    }
   }
 
   @Override
@@ -349,6 +415,8 @@ public class TextIndexConfig extends IndexConfig {
         && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB
         && _enablePrefixSuffixMatchingInPhraseQueries == that._enablePrefixSuffixMatchingInPhraseQueries
         && _reuseMutableIndex == that._reuseMutableIndex
+        && _useLogByteSizeMergePolicy == that._useLogByteSizeMergePolicy
+        && _docIdTranslatorMode == that._docIdTranslatorMode
         && _luceneNRTCachingDirectoryMaxBufferSizeMB == that._luceneNRTCachingDirectoryMaxBufferSizeMB
         && _fstType == that._fstType
         && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
@@ -366,6 +434,10 @@ public class TextIndexConfig extends IndexConfig {
         _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-        _luceneNRTCachingDirectoryMaxBufferSizeMB);
+        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode);
+  }
+
+  public static boolean isProperty(String prop) {
+    return PROPERTY_NAMES.contains(prop);
   }
 }

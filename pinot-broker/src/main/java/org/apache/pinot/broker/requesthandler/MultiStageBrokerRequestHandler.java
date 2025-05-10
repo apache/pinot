@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -67,8 +68,6 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
@@ -91,7 +90,6 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,9 +123,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
 
     failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    long cancelMillis = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_CANCEL_TIMEOUT_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
+    Duration cancelTimeout = Duration.ofMillis(cancelMillis);
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
-            this.isQueryCancellationEnabled());
+            this.isQueryCancellationEnabled(), cancelTimeout);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -228,6 +230,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///     - A table not authorized to read is used
   ///     - An exception during function execution due to errors in the data
   ///       (ie a division by zero or casting an illegal string as int)
+  ///     - Query is too heavy and reaches the allowed timeout.
   ///   - The error message will be sent to the user and the error messages will be logged without stack trace.
   /// 3. With yellow error: The request failed in a way that is controlled but probably internal.
   ///   - The error message will be sent to the user and the error message will be logged with stack trace.
@@ -274,7 +277,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
-      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions);
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions, requestId);
       QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
       return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
@@ -303,7 +306,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions) {
+  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+      long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -314,10 +318,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
+    boolean caseSensitive = !_config.getProperty(
+        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
+        CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+    );
     return QueryEnvironment.configBuilder()
+        .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
         .workerManager(_workerManager)
+        .isCaseSensitive(caseSensitive)
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
@@ -423,13 +433,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
                 query.getOptions());
-      } catch (TimeoutException e) {
-        for (String table : tableNames) {
-          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
-        }
-        LOGGER.warn("Timed out executing request {}: {}", requestId, query);
-        requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
-        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -442,11 +445,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Tracing.ThreadAccountantOps.clear();
         onQueryFinish(requestId);
       }
-      long executionEndTimeNs = System.nanoTime();
-      updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
-          executionEndTimeNs - executionStartTimeNs);
 
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+
+      QueryProcessingException processingException = queryResults.getProcessingException();
+      if (processingException != null) {
+        brokerResponse.addException(processingException);
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
+        if (errorCode == QueryErrorCode.EXECUTION_TIMEOUT) {
+          for (String table : tableNames) {
+            _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+          }
+          LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+        }
+        requestContext.setErrorCode(errorCode);
+      } else {
+        brokerResponse.setResultTable(queryResults.getResultTable());
+        long executionEndTimeNs = System.nanoTime();
+        updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
+            executionEndTimeNs - executionStartTimeNs);
+      }
+
       brokerResponse.setClientRequestId(clientRequestId);
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setTablesQueried(tableNames);
@@ -572,68 +591,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  /**
-   * Validates whether the requester has access to all the tables.
-   */
-  private TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
-      RequestContext requestContext, HttpHeaders httpHeaders) {
-    final long startTimeNs = System.nanoTime();
-    AccessControl accessControl = _accessControlFactory.create();
-
-    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
-
-    Set<String> failedTables = tableNames.stream()
-        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
-        .collect(Collectors.toSet());
-
-    failedTables.addAll(tableAuthorizationResult.getFailedTables());
-
-    if (!failedTables.isEmpty()) {
-      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
-    } else {
-      tableAuthorizationResult = TableAuthorizationResult.success();
-    }
-
-    if (!tableAuthorizationResult.hasAccess()) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
-      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
-    }
-
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
-
-    return tableAuthorizationResult;
-  }
-
-  /**
-   * Returns true if the QPS quota of query tables, database or application has been exceeded.
-   */
-  private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
-      RequestContext requestContext) {
-    if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
-      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
-      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-      return true;
-    }
-    for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
-        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
-        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
-    for (String tableName : tableNames) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
-    }
-  }
-
   private BrokerResponse constructMultistageExplainPlan(String sql, String plan, Map<String, String> extraFields) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     int totalFieldCount = extraFields.size() + 2;
@@ -692,7 +649,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public static boolean isYellowError(QueryException e) {
     switch (e.getErrorCode()) {
       case QUERY_SCHEDULING_TIMEOUT:
-      case EXECUTION_TIMEOUT:
       case INTERNAL:
       case UNKNOWN:
       case MERGE_RESPONSE:

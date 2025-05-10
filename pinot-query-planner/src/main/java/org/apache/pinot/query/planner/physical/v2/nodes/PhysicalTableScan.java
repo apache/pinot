@@ -39,7 +39,7 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
   @Nullable
   private final TableScanMetadata _tableScanMetadata;
 
-  public PhysicalTableScan(TableScan tableScan, int nodeId, PinotDataDistribution pinotDataDistribution,
+  public PhysicalTableScan(TableScan tableScan, int nodeId, @Nullable PinotDataDistribution pinotDataDistribution,
       @Nullable TableScanMetadata tableScanMetadata) {
     this(tableScan.getCluster(), tableScan.getTraitSet(), tableScan.getHints(), tableScan.getTable(), nodeId,
         pinotDataDistribution, tableScanMetadata);
@@ -98,5 +98,15 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
         newInputs.size());
     return new PhysicalTableScan(getCluster(), getTraitSet(), getHints(), getTable(), newNodeId,
         newDistribution, _tableScanMetadata);
+  }
+
+  @Override
+  public PRelNode asLeafStage() {
+    return this;
+  }
+
+  public PhysicalTableScan with(PinotDataDistribution pinotDataDistribution, TableScanMetadata metadata) {
+    return new PhysicalTableScan(getCluster(), getTraitSet(), getHints(), getTable(), _nodeId,
+        pinotDataDistribution, metadata);
   }
 }

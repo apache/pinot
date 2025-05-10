@@ -618,7 +618,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
             .setIndex(Sets.newHashSet(LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.text(), textIndexConfig)
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.dictionary(), dictionaryIndexConfig)
-            .setFieldConfigList(fieldConfigList).setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
             .setOffHeap(true).setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
             .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());

@@ -56,7 +56,7 @@ public class FakeStreamConfigUtils {
   private static final LongMsgOffset SMALLEST_OFFSET = new LongMsgOffset(0);
   private static final LongMsgOffset LARGEST_OFFSET = new LongMsgOffset(Integer.MAX_VALUE);
   private static final String NUM_PARTITIONS_KEY = "num.partitions";
-  private static final int DEFAULT_NUM_PARTITIONS = 2;
+  public static final int DEFAULT_NUM_PARTITIONS = 2;
 
   private static final String STREAM_TYPE = "fakeStream";
   private static final String TOPIC_NAME = "fakeTopic";

@@ -23,7 +23,7 @@ package org.apache.pinot.query.runtime.operator.utils;
  *
  * These streams are designed to be consumed by a single thread and do not support null elements.
  *
- * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.TransferableBlock}
+ * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.MseBlock}
  */
 public interface BlockingStream<E> {
   /**

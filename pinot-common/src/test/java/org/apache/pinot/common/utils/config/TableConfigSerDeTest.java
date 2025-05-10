@@ -262,7 +262,8 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config - without metadata ttl and metadata time column
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5);
+      DedupConfig dedupConfig = new DedupConfig();
+      dedupConfig.setHashFunction(HashFunction.MD5);
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithoutTTL(
@@ -272,7 +273,10 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config - with metadata ttl and metadata time column
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn", false);
+      DedupConfig dedupConfig = new DedupConfig();
+      dedupConfig.setHashFunction(HashFunction.MD5);
+      dedupConfig.setMetadataTTL(10);
+      dedupConfig.setDedupTimeColumn("dedupTimeColumn");
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));

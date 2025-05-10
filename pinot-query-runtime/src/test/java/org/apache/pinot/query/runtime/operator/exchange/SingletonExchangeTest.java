@@ -19,12 +19,14 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.pinot.common.datablock.DataBlock;
+import java.util.Collections;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.GrpcSendingMailbox;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -45,12 +47,12 @@ public class SingletonExchangeTest {
   @Mock
   private InMemorySendingMailbox _mailbox3;
   @Mock
-  TransferableBlock _block;
+  RowHeapDataBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
+    _block = new RowHeapDataBlock(Collections.emptyList(), DataSchema.EXPLAIN_RESULT_SCHEMA);
   }
 
   @AfterMethod
@@ -66,23 +68,13 @@ public class SingletonExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     // When:
-    new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new SingletonExchange(destinations, BlockSplitter.NO_OP).route(destinations, _block);
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
     // Then:
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
     Assert.assertEquals(captor.getValue(), _block);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void shouldThrowWhenSingletonWithNonLocalMailbox()
-      throws Exception {
-    // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox2);
-
-    // When:
-    new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -92,6 +84,6 @@ public class SingletonExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox3);
 
     // When:
-    new SingletonExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new SingletonExchange(destinations, BlockSplitter.NO_OP).route(destinations, _block);
   }
 }

@@ -115,11 +115,13 @@ public class RexExpressionUtils {
       }
       case FLOAT: {
         assert value != null;
-        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((float) value));
+        return rexBuilder.makeApproxLiteral((double) value,
+            rexBuilder.getTypeFactory().createSqlType(SqlTypeName.REAL));
       }
       case DOUBLE: {
         assert value != null;
-        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((double) value));
+        return rexBuilder.makeApproxLiteral((double) value,
+            rexBuilder.getTypeFactory().createSqlType(SqlTypeName.DOUBLE));
       }
       case BIG_DECIMAL: {
         assert value != null;
@@ -244,10 +246,10 @@ public class RexExpressionUtils {
         value = ((BigDecimal) value).longValue();
         break;
       case FLOAT:
-        value = ((BigDecimal) value).floatValue();
+        value = ((Double) value).floatValue();
         break;
       case DOUBLE:
-        value = ((BigDecimal) value).doubleValue();
+        value = ((Number) value).doubleValue();
         break;
       case BIG_DECIMAL:
         break;

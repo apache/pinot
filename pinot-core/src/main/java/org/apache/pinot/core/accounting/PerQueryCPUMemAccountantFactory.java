@@ -63,8 +63,8 @@ import org.slf4j.LoggerFactory;
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
   @Override
-  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId) {
-    return new PerQueryCPUMemResourceUsageAccountant(config, instanceId);
+  public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+    return new PerQueryCPUMemResourceUsageAccountant(config, instanceId, instanceType);
   }
 
   public static class PerQueryCPUMemResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
@@ -135,7 +135,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // instance id of the current instance, for logging purpose
     private final String _instanceId;
 
-    public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId) {
+    private final InstanceType _instanceType;
+
+    public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
 
       LOGGER.info("Initializing PerQueryCPUMemResourceUsageAccountant");
       _config = config;
@@ -155,6 +158,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.info("cpuSamplingConfig: {}, memorySamplingConfig: {}",
           cpuSamplingConfig, memorySamplingConfig);
 
+      _instanceType = instanceType;
       _isThreadCPUSamplingEnabled = cpuSamplingConfig && threadCpuTimeMeasurementEnabled;
       _isThreadMemorySamplingEnabled = memorySamplingConfig && threadMemoryMeasurementEnabled;
       LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
@@ -643,10 +647,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private final boolean _isQueryKilledMetricEnabled =
           _config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
               CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
-
-      private final InstanceType _instanceType =
-          InstanceType.valueOf(_config.getProperty(CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE,
-          CommonConstants.Accounting.DEFAULT_CONFIG_OF_INSTANCE_TYPE.toString()));
 
       private long _usedBytes;
       private int _sleepTime;

@@ -550,7 +550,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         getExtraQueryProperties());
   }
 
-  static @NotNull String toResultStr(JsonNode mainNode) {
+  public static @NotNull String toResultStr(JsonNode mainNode) {
     if (mainNode == null) {
       return "null";
     }

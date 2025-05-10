@@ -30,7 +30,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
- * Aggregation function to compute the average of distinct values for an MV column
+ * Aggregation function to compute the count of distinct values for an MV column.
  */
 public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 

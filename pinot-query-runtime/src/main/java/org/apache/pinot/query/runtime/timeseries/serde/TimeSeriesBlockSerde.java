@@ -39,8 +39,9 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
@@ -48,9 +49,9 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 /**
  * Implements a simple Serde mechanism for the Time Series Block. This is used for transferring data between servers
- * and brokers. The approach is to use a {@link TransferableBlock} and rely on the existing serialization code to avoid
+ * and brokers. The approach is to use a {@link MseBlock} and rely on the existing serialization code to avoid
  * re-inventing the wheel. Once the time-series engine coalesces with the Multistage Engine, we will anyway use
- * TransferableBlock for data transfers.
+ * MseBlock for data transfers.
  * <p>
  *   The {@link TimeSeriesBlock} is converted to and from a table, where the first row contains information about the
  *   time-buckets. For each tag/label in the query, there's a dedicated column, and the Double values are stored in
@@ -89,11 +90,11 @@ public class TimeSeriesBlockSerde {
   public static TimeSeriesBlock deserializeTimeSeriesBlock(ByteBuffer readOnlyByteBuffer)
       throws IOException {
     DataBlock dataBlock = DataBlockUtils.readFrom(readOnlyByteBuffer);
-    TransferableBlock transferableBlock = TransferableBlockUtils.wrap(dataBlock);
-    List<String> tagNames = generateTagNames(Objects.requireNonNull(transferableBlock.getDataSchema(),
-        "Missing data schema in TransferableBlock"));
-    final DataSchema dataSchema = transferableBlock.getDataSchema();
-    List<Object[]> container = transferableBlock.getContainer();
+    SerializedDataBlock mseBlock = new SerializedDataBlock(dataBlock);
+    List<String> tagNames = generateTagNames(Objects.requireNonNull(mseBlock.getDataSchema(),
+        "Missing data schema in MseBlock"));
+    final DataSchema dataSchema = mseBlock.getDataSchema();
+    List<Object[]> container = mseBlock.asRowHeap().getRows();
     TimeBuckets timeBuckets = timeBucketsFromRow(container.get(0), dataSchema);
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
     for (int index = 1; index < container.size(); index++) {
@@ -116,8 +117,8 @@ public class TimeSeriesBlockSerde {
         container.add(timeSeriesToRow(timeSeries, dataSchema));
       }
     }
-    TransferableBlock transferableBlock = new TransferableBlock(container, dataSchema, DataBlock.Type.ROW);
-    return DataBlockUtils.toByteString(transferableBlock.getDataBlock());
+    RowHeapDataBlock transferableBlock = new RowHeapDataBlock(container, dataSchema);
+    return DataBlockUtils.toByteString(transferableBlock.asSerialized().getDataBlock());
   }
 
   /**

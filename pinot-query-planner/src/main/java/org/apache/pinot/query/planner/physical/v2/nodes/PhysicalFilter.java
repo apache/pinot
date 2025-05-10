@@ -92,4 +92,13 @@ public class PhysicalFilter extends Filter implements PRelNode {
     return new PhysicalFilter(getCluster(), getTraitSet(), getHints(), condition, newNodeId, newInputs.get(0),
         newDistribution, _leafStage);
   }
+
+  @Override
+  public PRelNode asLeafStage() {
+    if (isLeafStage()) {
+      return this;
+    }
+    return new PhysicalFilter(getCluster(), getTraitSet(), getHints(), condition, _nodeId, _pRelInputs.get(0),
+        _pinotDataDistribution, true);
+  }
 }

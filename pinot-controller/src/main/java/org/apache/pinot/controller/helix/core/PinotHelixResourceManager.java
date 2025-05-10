@@ -176,6 +176,7 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -533,18 +534,30 @@ public class PinotHelixResourceManager {
   }
 
   public List<InstanceConfig> getBrokerInstancesConfigsFor(String tableName) {
-    String brokerTenantName = null;
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-    if (offlineTableConfig != null) {
-      brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
-    } else {
-      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
-      }
-    }
+    String brokerTenantName = getBrokerTenantName(tableName);
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  @Nullable
+  private String getBrokerTenantName(String tableName) {
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    if (offlineTableConfig != null) {
+      return offlineTableConfig.getTenantConfig().getBroker();
+    }
+
+    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    if (realtimeTableConfig != null) {
+      return realtimeTableConfig.getTenantConfig().getBroker();
+    }
+
+    // If the table is not found, check if it is a logical table
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (logicalTableConfig != null) {
+      return logicalTableConfig.getBrokerTenant();
+    }
+
+    return null;
   }
 
   public List<String> getAllBrokerInstances() {
@@ -1803,6 +1816,36 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Adds a logical table.
+   * @param logicalTableConfig The logical table config to be added
+   * @throws TableAlreadyExistsException If the logical table already exists
+   */
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws TableAlreadyExistsException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Adding logical table {}: Start", tableName);
+
+    // Check if the logical table name is already used
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
+    }
+
+    // Check if the table name is already used by a physical table
+    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
+        .findFirst().ifPresent(tableNameWithType -> {
+          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+        });
+
+    LOGGER.info("Adding logical table {}: Creating logical table config in the property store", tableName);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    LOGGER.info("Adding logical table {}: Updating BrokerResource for table", tableName);
+    updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+
+    LOGGER.info("Added logical table {}: Successfully added table", tableName);
+  }
+
+  /**
    * Validates the tenant config for the table. In case of a single tenant cluster,
    * if the server and broker tenants are not specified in the config, they're
    * auto-populated with the default tenant name. In case of a multi-tenant cluster,
@@ -2050,6 +2093,40 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Update the logical table config.
+   * @param logicalTableConfig The logical table config to be updated
+   * @throws TableNotFoundException If the logical table does not exist
+   */
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws TableNotFoundException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Updating logical table {}: Start", tableName);
+
+    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
+    }
+
+    LOGGER.info("Updating logical table {}: Updating logical table config in the property store", tableName);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
+    updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+
+    LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
+  }
+
+  private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
+    List<String> brokers = HelixHelper.getInstancesWithTag(
+        _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields()
+          .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
+      return is;
+    });
+  }
+
+  /**
    * Sets the given table config into zookeeper with the expected version, which is the previous tableConfig znRecord
    * version. If the expected version is -1, the version check is ignored.
    */
@@ -2119,13 +2196,23 @@ public class PinotHelixResourceManager {
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(tableNameWithType, getSegmentsFromPropertyStore(tableNameWithType),
+    _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
+        getSegmentsFromPropertyStore(tableNameWithType),
         retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
     // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
+
+    // Remove COMMITTING segment list
+    if (TableNameBuilder.REALTIME.equals(tableType)) {
+      if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
+        LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+      } else {
+        LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+      }
+    }
 
     // Remove instance partitions
     if (tableType == TableType.OFFLINE) {
@@ -2157,6 +2244,33 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
 
     LOGGER.info("Deleting table {}: Finish", tableNameWithType);
+  }
+
+  /**
+   * Deletes the logical table.
+   * @param tableName The logical table name
+   * @return True if the logical table was deleted, false otherwise
+   */
+  public boolean deleteLogicalTableConfig(String tableName) {
+    LOGGER.info("Deleting logical table {}: Start", tableName);
+    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
+    }
+
+    LOGGER.info("Deleting logical table {}: Removing BrokerResource for logical table", tableName);
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields().remove(tableName);
+      return is;
+    });
+
+    LOGGER.info("Deleting logical table {}: Removing logical table config from the property store", tableName);
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
+    boolean result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+
+    LOGGER.info("Deleted logical table {}: Successfully deleted table", tableName);
+    return result;
   }
 
   /**
@@ -2193,6 +2307,15 @@ public class PinotHelixResourceManager {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  public LogicalTableConfig getLogicalTableConfig(String tableName) {
+    return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+  }
+
+  public List<String> getAllLogicalTableNames() {
+    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -2536,7 +2659,7 @@ public class PinotHelixResourceManager {
           InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixZkManager, tableConfig,
               InstancePartitionsType.OFFLINE));
     }
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+    if (tableConfig.isUpsertEnabled()) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
       return Collections.singletonMap(InstancePartitionsType.CONSUMING,

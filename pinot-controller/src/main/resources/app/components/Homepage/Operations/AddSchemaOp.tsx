@@ -156,7 +156,7 @@ export default function AddSchemaOp({
         const types = ["dimensionFieldSpecs","metricFieldSpecs","dateTimeFieldSpecs"];
         let notEmpty = true;
         types.map((t)=>{
-          if(schemaConfig[t].length)
+          if(schemaConfig[t] && schemaConfig[t].length > 0)
           {
             notEmpty = false
           }

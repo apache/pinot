@@ -1776,7 +1776,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "column1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "STRING");
+        "VARCHAR");
 
     pinotQuery = compileToPinotQuery("SELECT CAST(column1 AS varchar) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);

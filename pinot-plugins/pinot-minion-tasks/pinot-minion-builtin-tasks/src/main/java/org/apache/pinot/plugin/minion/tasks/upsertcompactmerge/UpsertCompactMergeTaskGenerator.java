@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -429,21 +430,20 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        String.format("%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
+        "%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check upsert enabled
     Preconditions.checkState(tableConfig.isUpsertEnabled(),
-        String.format("Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
+        "Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    // check snapshot enabled
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+    Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+        "'snapshot' from UpsertConfig must not be 'DISABLE' for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check no malformed period
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY)) {
       TimeUtils.convertPeriodToMillis(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY));
     }
-    // check enableSnapshot = true
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    Preconditions.checkNotNull(upsertConfig,
-        String.format("UpsertConfig must be provided for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
-    Preconditions.checkState(upsertConfig.isEnableSnapshot(),
-        String.format("'enableSnapshot' from UpsertConfig must be enabled for %s",
-            MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
     // check valid task config for maxOutputSegmentSize
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY)) {
       DataSizeUtils.toBytes(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY));

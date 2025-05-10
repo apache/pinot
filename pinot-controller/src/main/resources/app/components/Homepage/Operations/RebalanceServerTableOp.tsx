@@ -47,6 +47,14 @@ const DryRunAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disa
   );
 }
 
+const BackAction = ({ onClick }: { onClick: () => void }) => {
+  return (
+      <Button onClick={onClick} variant="outlined" color="primary">
+        Back
+      </Button>
+  );
+}
+
 export default function RebalanceServerTableOp({
   hideModal,
   tableName,
@@ -127,6 +135,10 @@ export default function RebalanceServerTableOp({
     )
   }
 
+  const handleBackBtnOnClick = () => {
+    setRebalanceResponse(null);
+  }
+
   return (
     <Dialog
       showTitleDivider
@@ -139,7 +151,11 @@ export default function RebalanceServerTableOp({
       handleSave={handleSave}
       btnOkText='Rebalance'
       showOkBtn={!rebalanceResponse}
-      moreActions={!rebalanceResponse ? <DryRunAction disabled={pending} handleOnRun={handleDryRun} /> : null}
+      moreActions={
+        !rebalanceResponse ?
+            <DryRunAction disabled={pending} handleOnRun={handleDryRun} /> :
+            <BackAction onClick={handleBackBtnOnClick} />
+      }
     >
         {!rebalanceResponse ?
           <Box flexDirection="column">
@@ -156,7 +172,7 @@ export default function RebalanceServerTableOp({
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
                     <Grid item xs={12} key={`basic-options-${option.name}`}>
-                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
+                      <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}
               </Grid>
@@ -166,7 +182,7 @@ export default function RebalanceServerTableOp({
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
                     <Grid item xs={12} key={`advanced-options-${option.name}`}>
-                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
+                      <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}
               </Grid>

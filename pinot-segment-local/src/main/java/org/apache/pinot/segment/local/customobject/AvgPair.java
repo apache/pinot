@@ -45,6 +45,11 @@ public class AvgPair implements Comparable<AvgPair> {
     _count += avgPair._count;
   }
 
+  public void apply(double value) {
+    _sum += value;
+    _count++;
+  }
+
   public double getSum() {
     return _sum;
   }

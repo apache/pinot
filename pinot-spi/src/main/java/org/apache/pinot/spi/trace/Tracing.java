@@ -32,6 +32,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -315,7 +316,8 @@ public class Tracing {
       Tracing.getThreadAccountant().clear();
     }
 
-    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId) {
+    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       if (factoryName == null) {
         LOGGER.warn("No thread accountant factory provided, using default implementation");
@@ -324,7 +326,7 @@ public class Tracing {
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId));
+          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId, instanceType));
           LOGGER.info("Using accountant provided by {}", factoryName);
           if (!registered) {
             LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);

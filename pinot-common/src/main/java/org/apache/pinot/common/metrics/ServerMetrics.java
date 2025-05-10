@@ -55,9 +55,7 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
    * should always call after registration
    */
   public static ServerMetrics get() {
-    ServerMetrics ret = SERVER_METRICS_INSTANCE.get();
-    assert ret != null;
-    return ret;
+    return SERVER_METRICS_INSTANCE.get();
   }
 
   public ServerMetrics(PinotMetricsRegistry metricsRegistry) {

@@ -129,12 +129,17 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
 
   /**
    * Test a complex with nested spools.
-   *
+   * <p>
    * Don't try to understand the query, just check that the spools are correct.
    * This query is an actual simplification of a query used in production.
    * It was the way we detected problems fixed in <a href="https://github.com/apache/pinot/pull/15135">#15135</a>.
+   * <p>
+   * This test was disabled after upgrading Calcite to 1.39.0 which introduces an optimization that removes some of the
+   * "nested spools" that this test expects. We should consider replacing the query in this test with a different one
+   * that doesn't get optimized similarly. In the long term, we should allow providing hints that disable such
+   * optimizations that would prevent spooling.
    */
-  @Test
+  @Test(enabled = false)
   public void testNestedSpools()
       throws Exception {
     JsonNode jsonNode = postQuery("SET useSpools = true;\n"

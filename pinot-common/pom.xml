@@ -31,6 +31,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <thrift.bin.path>/usr/local/bin/thrift</thrift.bin.path>
   </properties>
 
   <build>
@@ -302,7 +303,7 @@
       <id>profile-buildthrift</id>
       <activation>
         <file>
-          <exists>/usr/local/bin/thrift</exists>
+          <exists>${thrift.bin.path}</exists>
         </file>
         <property>
           <name>buildThrift</name>
@@ -321,21 +322,21 @@
                   <target>
                     <delete dir="target/generated-sources/gen-javabean" />
                     <mkdir dir="target/generated-sources" />
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
                       <arg value="target/generated-sources" />
                       <arg value="src/thrift/query.thrift" />
                     </exec>
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
                       <arg value="target/generated-sources" />
                       <arg value="src/thrift/request.thrift" />
                     </exec>
-                    <exec executable="/usr/local/bin/thrift">
+                    <exec executable="${thrift.bin.path}">
                       <arg value="--gen" />
                       <arg value="java:beans" />
                       <arg value="-o" />
@@ -419,7 +420,7 @@
               <dependency>
                 <groupId>net.sourceforge.fmpp</groupId>
                 <artifactId>fmpp</artifactId>
-                <version>0.9.16</version>
+                <version>${fmpp.version}</version>
               </dependency>
             </dependencies>
           </plugin>

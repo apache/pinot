@@ -22,14 +22,18 @@ import {RebalanceServerOption} from "../RebalanceServerOptions";
 import {
     RebalanceServerConfigurationOptionLabel
 } from "./RebalanceServerConfigurationOptionLabel/RebalanceServerConfigurationOptionLabel";
+import Utils from "../../../../../utils/Utils";
 
 type RebalanceServerConfigurationOptionSwitchProps = {
     option: RebalanceServerOption;
     handleConfigChange: (config: { [key: string]: string | number | boolean }) => void;
+    rebalanceConfig: { [optionName: string]: string | boolean | number };
 }
 export const RebalanceServerConfigurationOptionSwitch = (
-    { option, handleConfigChange }: RebalanceServerConfigurationOptionSwitchProps) => {
-    const [isChecked, setIsChecked] = useState<boolean>(option.defaultValue as boolean);
+    { option, handleConfigChange, rebalanceConfig }: RebalanceServerConfigurationOptionSwitchProps) => {
+    const [isChecked, setIsChecked] = useState<boolean>(
+        Utils.getRebalanceConfigValue(rebalanceConfig, option) as boolean
+    );
     return (
         <Box display='flex' flexDirection='column'>
             <FormControlLabel

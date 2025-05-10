@@ -29,9 +29,10 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfos;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -48,7 +49,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _distributionType;
   protected final List<String> _mailboxIds;
-  protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final BlockingMultiStreamConsumer.OfMseBlock _multiConsumer;
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
@@ -76,12 +77,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams);
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
       _receivingStats = List.of();
-      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, List.of());
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of());
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
@@ -115,11 +116,19 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
+  public MultiStageQueryStats calculateUpstreamStats() {
+    return _multiConsumer.calculateStats();
+  }
+
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  protected void onEos() {
     for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
       addReceivingStats(receivingStats);
     }
-    return super.updateEosBlock(upstreamEos, statMap);
   }
 
   @Override
@@ -137,7 +146,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _statMap.merge(StatKey.UPSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.WAIT_CPU_TIME_MS));
   }
 
-  private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
+  private static class ReadMailboxAsyncStream implements AsyncStream<ReceivingMailbox.MseBlockWithStats> {
     final ReceivingMailbox _mailbox;
     final BaseMailboxReceiveOperator _operator;
 
@@ -153,12 +162,18 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
     @Nullable
     @Override
-    public TransferableBlock poll() {
-      TransferableBlock block = _mailbox.poll();
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
-        _operator._mailboxService.releaseReceivingMailbox(_mailbox);
+    public ReceivingMailbox.MseBlockWithStats poll() {
+      ReceivingMailbox.MseBlockWithStats blockWithStats = _mailbox.poll();
+
+      if (blockWithStats != null) {
+        MseBlock block = blockWithStats.getBlock();
+
+        // TODO: Check if we should also release mailbox on not successful EOS.
+        if (block.isSuccess()) {
+          _operator._mailboxService.releaseReceivingMailbox(_mailbox);
+        }
       }
-      return block;
+      return blockWithStats;
     }
 
     @Override
