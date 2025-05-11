@@ -20,6 +20,7 @@ package org.apache.pinot.controller.workload.splitter;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
@@ -28,25 +29,23 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
 public class DefaultCostSplitter implements CostSplitter {
 
   @Override
-  public Map<String, InstanceCost> getInstanceCostMap(NodeConfig nodeConfig, InstancesInfo instancesInfo) {
-
-    InstanceCost cost = getInstanceCost(nodeConfig, instancesInfo, null);
+  public Map<String, InstanceCost> computeInstanceCostMap(NodeConfig nodeConfig, Set<String> instances) {
+    InstanceCost cost = computeInstanceCost(nodeConfig, instances, null);
     Map<String, InstanceCost> costMap = new HashMap<>();
-    for (String instance : instancesInfo.getInstances()) {
+    for (String instance : instances) {
       costMap.put(instance, cost);
     }
     return costMap;
   }
 
   @Override
-  public InstanceCost getInstanceCost(NodeConfig nodeConfig, InstancesInfo instancesInfo, String instance) {
-    long totalInstances = instancesInfo.getInstanceCount();
+  public InstanceCost computeInstanceCost(NodeConfig nodeConfig, Set<String> instances, String instance) {
+    long totalInstances = instances.size();
     EnforcementProfile enforcementProfile = nodeConfig.getEnforcementProfile();
 
-    long cpuCost = enforcementProfile.getCpuCost() / totalInstances;
-    long memoryCost = enforcementProfile.getMemoryCost() / totalInstances;
-    long periodMillis = enforcementProfile.getEnforcementPeriodMillis() / totalInstances;
+    long cpuCostNs = enforcementProfile.getCpuCostNs() / totalInstances;
+    long memoryCostBytes = enforcementProfile.getMemoryCostBytes() / totalInstances;
 
-    return new InstanceCost(cpuCost, memoryCost, periodMillis);
+    return new InstanceCost(cpuCostNs, memoryCostBytes);
   }
 }

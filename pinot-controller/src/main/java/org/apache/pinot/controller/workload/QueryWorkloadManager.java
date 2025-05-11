@@ -24,16 +24,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.workload.scheme.DefaultPropagationScheme;
-import org.apache.pinot.controller.workload.scheme.TablePropagationScheme;
-import org.apache.pinot.controller.workload.scheme.TenantPropagationScheme;
-import org.apache.pinot.controller.workload.scheme.WorkloadPropagationUtils;
+import org.apache.pinot.controller.workload.scheme.PropagationScheme;
+import org.apache.pinot.controller.workload.scheme.PropagationSchemeProvider;
+import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
 import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
-import org.apache.pinot.controller.workload.splitter.InstancesInfo;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
-import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,20 +44,16 @@ public class QueryWorkloadManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final TablePropagationScheme _tablePropagationScheme;
-  private final TenantPropagationScheme _tenantPropagationScheme;
-  private final DefaultPropagationScheme _defaultPropagationScheme;
+  private PropagationSchemeProvider _propagationSchemeProvider;
   private final CostSplitter _costSplitter;
   private final boolean _enabled;
 
   public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager, boolean enabled) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _enabled = enabled;
+    _propagationSchemeProvider.init(pinotHelixResourceManager);
     // TODO: To make this configurable once we have multiple cost splitters implementations
     _costSplitter = new DefaultCostSplitter();
-    _tablePropagationScheme = new TablePropagationScheme(pinotHelixResourceManager);
-    _tenantPropagationScheme = new TenantPropagationScheme(pinotHelixResourceManager);
-    _defaultPropagationScheme = new DefaultPropagationScheme(pinotHelixResourceManager);
   }
 
   /**
@@ -82,8 +75,7 @@ public class QueryWorkloadManager {
         return;
       }
       // Calculate the instance cost for each instance
-      Map<String, InstanceCost> instanceCostMap = _costSplitter.getInstanceCostMap(nodeConfig,
-              new InstancesInfo(instances));
+      Map<String, InstanceCost> instanceCostMap = _costSplitter.computeInstanceCostMap(nodeConfig, instances);
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
               .collect(Collectors.toMap(Map.Entry::getKey,
                       entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
@@ -106,10 +98,10 @@ public class QueryWorkloadManager {
     if (_enabled) {
       try {
         // Get the helixTags associated with the table
-        Set<String> helixTags = WorkloadPropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
+        Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
         // Find all workloads associated with the helix tags
         Set<QueryWorkloadConfig> queryWorkloadConfigsForTags
-                = WorkloadPropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
+                = PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
         // Propagate the workload for each QueryWorkloadConfig
         for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
           propagateWorkload(queryWorkloadConfig);
@@ -137,17 +129,17 @@ public class QueryWorkloadManager {
       Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
       // Find all the helix tags associated with the instance
       Map<String, Set<String>> instanceToHelixTags
-          = WorkloadPropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
+          = PropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
       Set<String> helixTags = instanceToHelixTags.get(instanceName);
       // Find all workloads associated with the helix tags
       Set<QueryWorkloadConfig> queryWorkloadConfigsForTags
-              = WorkloadPropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
+              = PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
       // Calculate the instance cost from each workload
       for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
         workloadToInstanceCostMap.computeIfAbsent(queryWorkloadConfig.getQueryWorkloadName(), k -> {
           Set<String> instances = resolveInstances(nodeType, queryWorkloadConfig.getNodeConfigs().get(nodeType));
           NodeConfig nodeConfig = queryWorkloadConfig.getNodeConfigs().get(nodeType);
-          return _costSplitter.getInstanceCost(nodeConfig, new InstancesInfo(instances), instanceName);
+          return _costSplitter.computeInstanceCost(nodeConfig, instances, instanceName);
         });
       }
       return workloadToInstanceCostMap;
@@ -160,19 +152,8 @@ public class QueryWorkloadManager {
   }
 
   private Set<String> resolveInstances(NodeConfig.Type nodeType, NodeConfig nodeConfig) {
-    PropagationScheme.Type propagationType = nodeConfig.getPropagationScheme().getPropagationType();
-    Set<String> instances;
-    switch (propagationType) {
-      case TABLE:
-        instances = _tablePropagationScheme.resolveInstances(nodeType, nodeConfig);
-        break;
-      case TENANT:
-        instances = _tenantPropagationScheme.resolveInstances(nodeType, nodeConfig);
-        break;
-      default:
-        instances = _defaultPropagationScheme.resolveInstances(nodeType, nodeConfig);
-        break;
-    }
-    return instances;
+    PropagationScheme propagationScheme =
+            _propagationSchemeProvider.getPropagationScheme(nodeConfig.getPropagationScheme().getPropagationType());
+    return propagationScheme.resolveInstances(nodeType, nodeConfig);
   }
 }

@@ -40,11 +40,11 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * WorkloadPropagationUtils provides utility methods for workload propagation.
+ * This class provides utility methods for workload propagation.
  */
-public class WorkloadPropagationUtils {
+public class PropagationUtils {
 
-  private WorkloadPropagationUtils() {
+  private PropagationUtils() {
   }
 
   /**

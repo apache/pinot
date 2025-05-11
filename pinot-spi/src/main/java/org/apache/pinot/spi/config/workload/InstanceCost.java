@@ -25,46 +25,26 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 public class InstanceCost {
 
-  private static final String CPU_COST = "cpuCost";
-  private static final String MEMORY_COST = "memoryCost";
-  private static final String ENFORCEMENT_PERIOD_MILLIS = "enforcementPeriodMillis";
+  private static final String CPU_COST_NS = "cpuCostNs";
+  private static final String MEMORY_COST_BYTES = "memoryCostBytes";
 
-  @JsonPropertyDescription("CPU cost of the instance")
-  private long _cpuCost;
-  @JsonPropertyDescription("Memory cost of the instance")
-  private long _memoryCost;
-  @JsonPropertyDescription("Enforcement period in milliseconds")
-  private long _enforcementPeriodMillis;
+  @JsonPropertyDescription("CPU cost of the instance in nanoseconds")
+  private long _cpuCostNs;
+  @JsonPropertyDescription("Memory cost of the instance in bytes")
+  private long _memoryCostBytes;
 
   @JsonCreator
-  public InstanceCost(@JsonProperty(CPU_COST) long cpuCost, @JsonProperty(MEMORY_COST) long memoryCost,
-      @JsonProperty(ENFORCEMENT_PERIOD_MILLIS) long enforcementPeriodMillis) {
-    _cpuCost = cpuCost;
-    _memoryCost = memoryCost;
-    _enforcementPeriodMillis = enforcementPeriodMillis;
+  public InstanceCost(@JsonProperty(CPU_COST_NS) long cpuCostNs,
+                      @JsonProperty(MEMORY_COST_BYTES) long memoryCostBytes) {
+    _cpuCostNs = cpuCostNs;
+    _memoryCostBytes = memoryCostBytes;
   }
 
-  public long getCpuCost() {
-    return _cpuCost;
+  public long getCpuCostNs() {
+    return _cpuCostNs;
   }
 
-  public long getMemoryCost() {
-    return _memoryCost;
-  }
-
-  public long getEnforcementPeriodMillis() {
-    return _enforcementPeriodMillis;
-  }
-
-  public void setCpuCost(long cpuCost) {
-    _cpuCost = cpuCost;
-  }
-
-  public void setMemoryCost(long memoryCost) {
-    _memoryCost = memoryCost;
-  }
-
-  public void setEnforcementPeriodMillis(long enforcementPeriodMillis) {
-    _enforcementPeriodMillis = enforcementPeriodMillis;
+  public long getMemoryCostBytes() {
+    return _memoryCostBytes;
   }
 }

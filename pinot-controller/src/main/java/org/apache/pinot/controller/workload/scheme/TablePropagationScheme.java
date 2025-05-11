@@ -45,9 +45,9 @@ public class TablePropagationScheme implements PropagationScheme {
     Set<String> instances = new HashSet<>();
     List<String> tableNames = nodeConfig.getPropagationScheme().getValues();
     Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags
-            = WorkloadPropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
+            = PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
     Map<String, Set<String>> helixTagToInstances
-            = WorkloadPropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
+            = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
     for (String tableName : tableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       List<String> tablesWithType = new ArrayList<>();

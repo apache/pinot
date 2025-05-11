@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.workload.scheme.WorkloadPropagationUtils;
+import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
@@ -58,7 +58,7 @@ public class WorkloadPropagationTest {
         Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
         // Call the method to get table to Helix tags
         Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags
-                = WorkloadPropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
+                = PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
         // Verify the results
         Map<String, Map<NodeConfig.Type, Set<String>>> expectedTags = new HashMap<>();
         expectedTags.put("table1_OFFLINE", new HashMap<>() {{
@@ -103,7 +103,7 @@ public class WorkloadPropagationTest {
             String tableName = entry.getKey();
             Set<String> expectedHelixTags = entry.getValue();
             // Call the method to get helix tags for the table
-            Set<String> helixTags = WorkloadPropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
+            Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
                     tableName);
             // Verify the results
             for (String helixTag : expectedHelixTags) {
@@ -125,7 +125,7 @@ public class WorkloadPropagationTest {
         Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
         // Call the method to get Helix tag to instances mapping
         Map<String, Set<String>> helixTagToInstances
-                = WorkloadPropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
+                = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
         // Verify the results
         Map<String, Set<String>> expected = new HashMap<>();
         expected.put("serverTag1_OFFLINE", Set.of("instance1", "instance2"));
@@ -156,7 +156,7 @@ public class WorkloadPropagationTest {
         Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
         // Call the method to get instance to Helix tags mapping
         Map<String, Set<String>> instanceToHelixTags
-                = WorkloadPropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
+                = PropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
         // Verify the results
         Map<String, Set<String>> expected = new HashMap<>();
         expected.put("instance1", Set.of("serverTag1_OFFLINE", "serverTag2_REALTIME"));
@@ -203,7 +203,7 @@ public class WorkloadPropagationTest {
         Set<String> helixTags = Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
                 "serverTag2_REALTIME", "brokerTenant2_BROKER");
         Set<QueryWorkloadConfig> workloadConfigsForTags
-                = WorkloadPropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
+                = PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
         // Verify the results
         Set<QueryWorkloadConfig> expectedWorkloadConfigs = Set.of(workloadConfig1, workloadConfig2, workloadConfig3);
         Assert.assertEquals(workloadConfigsForTags.size(), expectedWorkloadConfigs.size(),
@@ -237,7 +237,7 @@ public class WorkloadPropagationTest {
 
     private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme leafScheme,
                                                           PropagationScheme nonLeafScheme) {
-        EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10, 600L);
+        EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10);
         return new QueryWorkloadConfig(name, Map.of(
           NodeConfig.Type.LEAF_NODE, new NodeConfig(enforcementProfile, leafScheme),
           NodeConfig.Type.NON_LEAF_NODE, new NodeConfig(enforcementProfile, nonLeafScheme)

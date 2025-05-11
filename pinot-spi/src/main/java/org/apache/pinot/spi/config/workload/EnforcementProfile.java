@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -30,51 +29,25 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class EnforcementProfile extends BaseJsonConfig {
 
-  private static final String CPU_COST = "cpuCost";
-  private static final String MEMORY_COST = "memoryCost";
-  private static final String ENFORCEMENT_PERIOD_MILLIS = "enforcementPeriodMillis";
-
-  private static final long DEFAULT_ENFORCEMENT_PERIOD_MILLIS = 60000L;
+  private static final String CPU_COST_NS = "cpuCostNs";
+  private static final String MEMORY_COST_BYTES = "memoryCostBytes";
 
   @JsonPropertyDescription("Max CPU cost allowed for the workload")
-  private long _cpuCost;
-
+  private long _cpuCostNs;
   @JsonPropertyDescription("Max memory cost allowed for the workload")
-  private long _memoryCost;
+  private long _memoryCostBytes;
 
-  @JsonPropertyDescription("Enforcement period in milliseconds")
-  private long _enforcementPeriodMillis;
-
-  public EnforcementProfile(@JsonProperty(CPU_COST) long cpuCost, @JsonProperty(MEMORY_COST) long memoryCost,
-      @JsonProperty(ENFORCEMENT_PERIOD_MILLIS) @Nullable Long enforcementPeriodMillis) {
-    _cpuCost = cpuCost;
-    _memoryCost = memoryCost;
-    _enforcementPeriodMillis = enforcementPeriodMillis != null
-        ? enforcementPeriodMillis
-        : DEFAULT_ENFORCEMENT_PERIOD_MILLIS;
+  public EnforcementProfile(@JsonProperty(CPU_COST_NS) long cpuCostNs,
+                            @JsonProperty(MEMORY_COST_BYTES) long memoryCostBytes) {
+    _cpuCostNs = cpuCostNs;
+    _memoryCostBytes = memoryCostBytes;
   }
 
-  public long getCpuCost() {
-    return _cpuCost;
+  public long getCpuCostNs() {
+    return _cpuCostNs;
   }
 
-  public long getMemoryCost() {
-    return _memoryCost;
-  }
-
-  public long getEnforcementPeriodMillis() {
-    return _enforcementPeriodMillis;
-  }
-
-  public void setCpuCost(long cpuCost) {
-    _cpuCost = cpuCost;
-  }
-
-  public void setMemoryCost(long memoryCost) {
-    _memoryCost = memoryCost;
-  }
-
-  public void setEnforcementPeriodMillis(long enforcementPeriodMillis) {
-    _enforcementPeriodMillis = enforcementPeriodMillis;
+  public long getMemoryCostBytes() {
+    return _memoryCostBytes;
   }
 }

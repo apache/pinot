@@ -55,7 +55,7 @@ public class QueryWorkloadConfigUtilsTest {
     List<Object[]> data = new ArrayList<>();
 
     // Shared, valid configuration
-    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100L);
+    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
 
     // Leaf node
     PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
@@ -123,7 +123,7 @@ public class QueryWorkloadConfigUtilsTest {
   public Object[][] updateZNRecordDataProvider() throws JsonProcessingException {
     List<Object[]> data = new ArrayList<>();
 
-    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100L);
+    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
     // Leaf node
     PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         List.of("value1", "value2"));
