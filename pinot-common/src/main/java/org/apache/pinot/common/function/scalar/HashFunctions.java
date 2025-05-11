@@ -22,6 +22,7 @@ import com.google.common.hash.Hashing;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.hash.CityHashFunctions;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
@@ -245,5 +246,62 @@ public class HashFunctions {
   @ScalarFunction
   public static int crc32c(byte[] input) {
     return Hashing.crc32c().hashBytes(input).asInt();
+  }
+
+  /**
+   * Computes 32-bit CityHash of the given byte array
+   *
+   * @param input the byte array to hash
+   * @return 32-bit CityHash
+   */
+  @ScalarFunction
+  public static long cityHash32(byte[] input) {
+    return CityHashFunctions.cityHash32(input);
+  }
+
+  /**
+   * Computes 64-bit CityHash of the given byte array
+   *
+   * @param input the byte array to hash
+   * @return 64-bit CityHash
+   */
+  @ScalarFunction
+  public static long cityHash64(byte[] input) {
+    return CityHashFunctions.cityHash64(input);
+  }
+
+  /**
+   * Computes 64-bit CityHash of the given byte array and the seed
+   *
+   * @param input the byte array to hash
+   * @param seed the seed
+   * @return 64-bit CityHash
+   */
+  @ScalarFunction
+  public static long cityHash64(byte[] input, long seed) {
+    return CityHashFunctions.cityHash64WithSeed(input, seed);
+  }
+
+  /**
+   * Computes 64-bit CityHash of the given byte array and the two seeds
+   *
+   * @param input the byte array to hash
+   * @param seed1 the first seed value
+   * @param seed2 the second seed value
+   * @return 64-bit CityHash
+   */
+  @ScalarFunction
+  public static long cityHash64(byte[] input, long seed1, long seed2) {
+    return CityHashFunctions.cityHash64WithSeeds(input, seed1, seed2);
+  }
+  /**
+   * Computes 128-bit CityHash of the given byte array
+   *
+   * @param input the byte array to hash
+   * @return 128-bit CityHash represented in a 16-byte array
+   */
+  @ScalarFunction
+  public static byte[] cityHash128(byte[] input) {
+    return CityHashFunctions.cityHash128(input);
   }
 }

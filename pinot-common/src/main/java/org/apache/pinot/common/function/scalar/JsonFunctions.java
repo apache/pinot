@@ -267,6 +267,54 @@ public class JsonFunctions {
     return result;
   }
 
+  @Nullable
+  @ScalarFunction
+  public static List jsonStringToArray(String jsonString) {
+    String json = jsonString.trim();
+    try {
+      if (json.startsWith("[")) {
+        // JSON Array
+        return JsonUtils.stringToObject(json, List.class);
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
+    return null;
+  }
+
+  @Nullable
+  @ScalarFunction
+  public static Map jsonStringToMap(String jsonString) {
+    String json = jsonString.trim();
+    try {
+      if (json.startsWith("{")) {
+        return JsonUtils.stringToObject(json, Map.class);
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
+    return null;
+  }
+
+  @Nullable
+  @ScalarFunction
+  public static Object jsonStringToListOrMap(String jsonString) {
+    String json = jsonString.trim();
+    try {
+      if (json.startsWith("[")) {
+        // JSON Array
+        return JsonUtils.stringToObject(json, List.class);
+      }
+      if (json.startsWith("{")) {
+        // JSON Object
+        return JsonUtils.stringToObject(json, Map.class);
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
+    return null;
+  }
+
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
       Map<String, String> result) {
     if (obj instanceof Map) {

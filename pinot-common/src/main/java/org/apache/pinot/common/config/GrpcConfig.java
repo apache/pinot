@@ -49,6 +49,11 @@ public class GrpcConfig {
 
   public static final String CONFIG_QUERY_WORKER_THREADS = "queryWorkerThreads";
 
+  // memory usage threshold that triggers request throttling
+  public static final String REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES = "requestThrottlingMemoryThresholdBytes";
+  // Default threshold in bytes (16GB)
+  public static final long DEFAULT_REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES = 16 * 1024 * 1024 * 1024L;
+
   private final TlsConfig _tlsConfig;
   private final PinotConfiguration _pinotConfig;
 
@@ -110,6 +115,14 @@ public class GrpcConfig {
 
   public int getQueryWorkerThreads() {
     return _pinotConfig.getProperty(CONFIG_QUERY_WORKER_THREADS, Integer.class);
+  }
+
+  public long getRequestThrottlingMemoryThresholdBytes() {
+    return _pinotConfig.getProperty(REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES, Long.class);
+  }
+
+  public boolean isRequestThrottlingMemroyThresholdSet() {
+    return _pinotConfig.containsKey(REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES);
   }
 
   public boolean isQueryWorkerThreadsSet() {

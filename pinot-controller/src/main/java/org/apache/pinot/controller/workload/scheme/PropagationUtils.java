@@ -155,19 +155,13 @@ public class PropagationUtils {
    *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
    */
   public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
-      PinotHelixResourceManager pinotHelixResourceManager, Set<String> filterTags) {
+      PinotHelixResourceManager pinotHelixResourceManager, Set<String> filterTags,
+      List<QueryWorkloadConfig> queryWorkloadConfigs) {
     Set<QueryWorkloadConfig> matchedConfigs = new HashSet<>();
-    List<QueryWorkloadConfig> queryWorkloadConfigs = pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-    if (queryWorkloadConfigs == null) {
-      return matchedConfigs;
-    }
-
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = getTableToHelixTags(pinotHelixResourceManager);
 
     for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
-      for (Map.Entry<NodeConfig.Type, NodeConfig> entry : queryWorkloadConfig.getNodeConfigs().entrySet()) {
-        NodeConfig.Type nodeType = entry.getKey();
-        NodeConfig nodeConfig = entry.getValue();
+      for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
         PropagationScheme scheme = nodeConfig.getPropagationScheme();
 
         if (scheme.getPropagationType() == PropagationScheme.Type.TENANT) {
@@ -191,7 +185,7 @@ public class PropagationUtils {
             for (String tableWithType : tablesWithType) {
               Set<String> resolvedTags = tableToHelixTags
                   .getOrDefault(tableWithType, Collections.emptyMap())
-                  .getOrDefault(nodeType, Collections.emptySet());
+                  .getOrDefault(nodeConfig.getNodeType(), Collections.emptySet());
               if (!Collections.disjoint(resolvedTags, filterTags)) {
                 matchedConfigs.add(queryWorkloadConfig);
                 break;

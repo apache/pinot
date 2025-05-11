@@ -80,17 +80,7 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 21 ]
         distribution: [ "temurin" ]
-        skip_bytebuffer: [false]
-        include:
-          - java: 21
-            testset: 1
-            distribution: "temurin"
-            skip_bytebuffer: true
-          - java: 21
-            testset: 2
-            distribution: "temurin"
-            skip_bytebuffer: true
-    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
+    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -133,7 +123,6 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
-          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -156,9 +145,19 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}},skip-bytebuffers-${{matrix.skip_bytebuffer}}
+          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-unit-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        timeout-minutes: 5
+        with:
+          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-unit-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
 
@@ -172,17 +171,7 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 21 ]
         distribution: [ "temurin" ]
-        skip_bytebuffer: [false]
-        include:
-          - java: 21
-            testset: 1
-            distribution: "temurin"
-            skip_bytebuffer: true
-          - java: 21
-            testset: 2
-            distribution: "temurin"
-            skip_bytebuffer: true
-    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
+    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -219,7 +208,6 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
-          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -237,9 +225,20 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}},skip-bytebuffers-${{matrix.skip_bytebuffer}}
+          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
       - name: Custom Integration Test
@@ -267,7 +266,17 @@ jobs:
         with:
           flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-custom-integration-tests
-          token: 3cb787e5-09a8-4b23-8856-06410b11455f
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        timeout-minutes: 5
+        with:
+          flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-custom-integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
 
@@ -392,12 +401,7 @@ jobs:
       matrix:
         java: [ 11, 21 ]
         distribution: [ "temurin" ]
-        skip_bytebuffer: [false]
-        include:
-          - java: 21
-            distribution: "temurin"
-            skip_bytebuffer: true
-    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}
@@ -417,6 +421,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
-        env:
-          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
         run: .github/workflows/scripts/.pinot_quickstart.sh

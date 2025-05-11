@@ -59,7 +59,7 @@ public class DistMappingGenerator {
       PinotDistMapping mapping = new PinotDistMapping(source.getRowType().getFieldCount());
       List<Integer> groupSet = aggregate.getGroupSet().asList();
       for (int j = 0; j < groupSet.size(); j++) {
-        mapping.set(groupSet.get(j), j);
+        mapping.add(groupSet.get(j), j);
       }
       return mapping;
     } else if (destination instanceof Join) {
@@ -72,7 +72,7 @@ public class DistMappingGenerator {
       }
       PinotDistMapping mapping = new PinotDistMapping(source.getRowType().getFieldCount());
       for (int i = 0; i < mapping.getSourceCount(); i++) {
-        mapping.set(i, i + leftFieldCount);
+        mapping.add(i, i + leftFieldCount);
       }
       return mapping;
     } else if (destination instanceof Filter) {
@@ -100,7 +100,7 @@ public class DistMappingGenerator {
     for (RexNode rexNode : project.getProjects()) {
       if (rexNode instanceof RexInputRef) {
         RexInputRef rexInputRef = (RexInputRef) rexNode;
-        mapping.set(rexInputRef.getIndex(), indexInCurrentRelNode);
+        mapping.add(rexInputRef.getIndex(), indexInCurrentRelNode);
       }
       indexInCurrentRelNode++;
     }

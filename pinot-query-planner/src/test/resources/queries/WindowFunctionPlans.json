@@ -218,7 +218,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'bar', _UTF-8'foo']:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -457,7 +457,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -472,7 +472,7 @@
           "\n  LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject($0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -762,7 +762,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1099,7 +1099,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1113,7 +1113,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1605,7 +1605,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1619,7 +1619,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1633,7 +1633,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1922,7 +1922,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1936,7 +1936,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1950,7 +1950,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2270,7 +2270,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2284,7 +2284,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2571,7 +2571,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2584,7 +2584,7 @@
           "\nLogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0])",
-          "\n      LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n      LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2598,7 +2598,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2612,7 +2612,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK(), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2956,7 +2956,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2970,7 +2970,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -2984,7 +2984,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\"), >=($2, 42))])",
+          "\n        LogicalFilter(condition=[OR(SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\"), >=($2, 42))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3233,7 +3233,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3247,7 +3247,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3261,7 +3261,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\"]:VARCHAR(9) CHARACTER SET \"UTF-8\"))])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), SEARCH($0, Sarg[_UTF-8'chewbacca':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'vader':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'yoda':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\"))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3275,7 +3275,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2), MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3289,7 +3289,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
-          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar'), (_UTF-8'bar'.._UTF-8'baz'), (_UTF-8'baz'.._UTF-8'foo'), (_UTF-8'foo'..+∞)]:CHAR(3) CHARACTER SET \"UTF-8\")])",
+          "\n        LogicalFilter(condition=[SEARCH($1, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'baz':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3473,7 +3473,7 @@
           "\n                  PinotLogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col2=[$1])",
-          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR(17) CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR(17) CHARACTER SET \"UTF-8\"]:VARCHAR(17) CHARACTER SET \"UTF-8\")])",
+          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n                  PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
@@ -3495,7 +3495,7 @@
           "\n                  PinotLogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col2=[$1])",
-          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR(17) CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR(17) CHARACTER SET \"UTF-8\"]:VARCHAR(17) CHARACTER SET \"UTF-8\")])",
+          "\n                LogicalFilter(condition=[SEARCH($0, Sarg[_UTF-8'brandon sanderson':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'douglas adams':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
           "\n                  PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
@@ -3519,7 +3519,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject($0=[$3])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LEAD($1, 2)])])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LEAD($1, 2)])], constants=[[2]])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
@@ -3532,7 +3532,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[/(CAST(CASE(>($2, 0), $3, null:BIGINT)):DOUBLE, $2)])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [COUNT($1), $SUM0($1)])])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [COUNT($1), SUM($1)])], constants=[[5, 10]])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>=($2, 0)])",
@@ -3676,7 +3676,7 @@
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - even default frame cannot be specified",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
-        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER or PERCENTILE_CONT/DISC functions.*"
+        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       },
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - default frame for ROW_NUMBER is different from aggregation window functions, resulting in multiple window groups",
@@ -3686,12 +3686,12 @@
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - custom frames not allowed",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
-        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER or PERCENTILE_CONT/DISC functions.*"
+        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       },
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - custom frames not allowed",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 ROWS 2 PRECEDING) FROM a",
-        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER or PERCENTILE_CONT/DISC functions.*"
+        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       },
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - passing argument to ROW_NUMBER() should fail",
@@ -3731,12 +3731,12 @@
       {
         "description": "Apache Calcite failures with RANK() window functions - cannot take default frame specification, even though same as actual frame if no frame specified",
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
-        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER or PERCENTILE_CONT/DISC functions.*"
+        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       },
       {
         "description": "Apache Calcite failures with DENSE_RANK() window functions - cannot take default frame specification, even though same as actual frame if no frame specified",
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(ORDER BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a",
-        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER or PERCENTILE_CONT/DISC functions.*"
+        "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       }
     ]
   }

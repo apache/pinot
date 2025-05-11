@@ -22,9 +22,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 
 public class PropagationSchemeProvider {
 
-    private PinotHelixResourceManager _pinotHelixResourceManager;
+    private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-    public void init(PinotHelixResourceManager pinotHelixResourceManager) {
+    public PropagationSchemeProvider(PinotHelixResourceManager pinotHelixResourceManager) {
         _pinotHelixResourceManager = pinotHelixResourceManager;
     }
 

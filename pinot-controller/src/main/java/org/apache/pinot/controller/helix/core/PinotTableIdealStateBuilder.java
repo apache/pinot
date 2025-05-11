@@ -21,6 +21,8 @@ package org.apache.pinot.controller.helix.core;
 import java.util.List;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
@@ -85,19 +87,24 @@ public class PinotTableIdealStateBuilder {
    *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
+   * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
-    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
-        new PartitionGroupMetadataFetcher(streamConfigs, partitionGroupConsumptionStatusList);
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, boolean forceGetOffsetFromStream) {
+    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
+        streamConfigs, partitionGroupConsumptionStatusList, forceGetOffsetFromStream);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
       return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupMetadataFetcher.getException();
+      String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
       LOGGER.error("Could not get PartitionGroupMetadata for topic: {} of table: {}",
           streamConfigs.stream().map(streamConfig -> streamConfig.getTopicName()).reduce((a, b) -> a + "," + b),
-          streamConfigs.get(0).getTableNameWithType(), fetcherException);
+          tableNameWithType, fetcherException);
+      ControllerMetrics controllerMetrics = ControllerMetrics.get();
+      controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR,
+          1L);
       throw new RuntimeException(fetcherException);
     }
   }

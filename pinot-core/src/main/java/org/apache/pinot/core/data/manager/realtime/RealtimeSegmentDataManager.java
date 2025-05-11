@@ -437,8 +437,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _consecutiveErrorCount, e);
       throw e;
     } else {
-      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
-          _consecutiveErrorCount, e);
+      if (_shouldStop && (e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
+        _segmentLogger.debug("Interrupted to stop consumption", e);
+      } else {
+        _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
+            _consecutiveErrorCount, e);
+      }
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       recreateStreamConsumer("Too many transient errors");
     }
@@ -475,7 +479,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
               messageBatch.isEndOfPartitionGroup());
         }
-        _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
+        // We need to check for both endOfPartitionGroup and messageCount == 0, because
+        // endOfPartitionGroup can be true even if this is the last batch of messages (has been observed for kinesis)
+        // To process the last batch of messages, we need to set _endOfPartitionGroup to false in such a case
+        _endOfPartitionGroup = messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
@@ -1730,9 +1737,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
     } catch (Throwable t) {
-      // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
-      // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
-      // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
@@ -1743,18 +1747,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
       // invoke controller API mark it OFFLINE in the idealstate.
       new Thread(() -> {
-        ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset, _segmentNameStr, _instanceId,
-            _protocolHandler, "Consuming segment initialization error", _segmentLogger);
-        try {
-          // Allow 30s for Helix to mark currentstate and externalview to ERROR, because
-          // we are about to receive an ERROR->OFFLINE state transition once we call
-          // postSegmentStoppedConsuming() method.
-          Thread.sleep(30_000);
-          indicator.postSegmentStoppedConsuming();
-        } catch (InterruptedException ie) {
-          // We got interrupted trying to post stop-consumed message. Give up at this point
-          return;
-        }
+        // Allow 30s for Helix to mark currentstate and externalview to ERROR, because
+        // we are about to receive an ERROR->OFFLINE state transition once we call
+        // postSegmentStoppedConsuming() method.
+        Uninterruptibles.sleepUninterruptibly(30, TimeUnit.SECONDS);
+        postStopConsumedMsg("Consuming segment initialization error");
       }).start();
       throw t;
     }

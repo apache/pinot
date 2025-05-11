@@ -92,6 +92,7 @@ public class QueryEnvironmentTestBase {
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
         .addMetric("col6", FieldSpec.DataType.INT, 0)
+        .addMetric("col7", FieldSpec.DataType.LONG, 0)
         .setSchemaName(schemaName);
   }
 
@@ -262,7 +263,29 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1) FROM a"},
         new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3, 1024) FROM a"},
         new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3) FROM a"},
-        new Object[]{"SELECT DAY_OF_WEEK(ts_timestamp, 'UTC') FROM a"}
+        new Object[]{"SELECT DAY_OF_WEEK(ts_timestamp, 'UTC') FROM a"},
+        // Verify type coercion for TIMESTAMP types in binary arithmetic operators (NOW() returns TIMESTAMP)
+        new Object[]{"SELECT NOW() + 1000 FROM a"},
+        new Object[]{"SELECT NOW() - 1000 FROM a"},
+        new Object[]{"SELECT NOW() / 1000 FROM a"},
+        // Verify type coercion for TIMESTAMP types in binary comparison operators
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp > 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp < 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp <= 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp = 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp != 1746022135000"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 > ts_timestamp"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 < ts_timestamp"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 >= ts_timestamp"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 <= ts_timestamp"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 = ts_timestamp"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE 1746022135000 != ts_timestamp"},
+        new Object[]{"SELECT col7 FROM a WHERE col7 < NOW()"},
+        new Object[]{"SELECT col7 FROM a WHERE col7 > NOW() - 1000000"},
+        // Verify type coercion in standard functions
+        new Object[]{"SELECT DATEADD('DAY', 1, col7) FROM a"},
+        new Object[]{"SELECT TIMESTAMPADD(DAY, 10, NOW() - 100) FROM a"},
     };
   }
 

@@ -21,7 +21,7 @@ package org.apache.pinot.spi.config.workload;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.Map;
+import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
@@ -38,11 +38,11 @@ public class QueryWorkloadConfig extends BaseJsonConfig {
   private String _queryWorkloadName;
 
   @JsonPropertyDescription("Describes the node configs for the query workload")
-  private Map<NodeConfig.Type, NodeConfig> _nodeConfigs;
+  private List<NodeConfig> _nodeConfigs;
 
   @JsonCreator
   public QueryWorkloadConfig(@JsonProperty(QUERY_WORKLOAD_NAME) String queryWorkloadName,
-      @JsonProperty(NODE_CONFIGS) Map<NodeConfig.Type, NodeConfig> nodeConfigs) {
+      @JsonProperty(NODE_CONFIGS) List<NodeConfig> nodeConfigs) {
     _queryWorkloadName = queryWorkloadName;
     _nodeConfigs = nodeConfigs;
   }
@@ -51,7 +51,7 @@ public class QueryWorkloadConfig extends BaseJsonConfig {
     return _queryWorkloadName;
   }
 
-  public Map<NodeConfig.Type, NodeConfig> getNodeConfigs() {
+  public List<NodeConfig> getNodeConfigs() {
     return _nodeConfigs;
   }
 }

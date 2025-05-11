@@ -100,22 +100,22 @@ public class PinotQueryWorkloadConfigRestletResource {
    * {
    *   "queryWorkloadName" : "workload-foo1",
    *   "nodeConfigs" : {
-   *     "leafNode" : {
+   *   {
+   *       "nodeType" : "LeafNode",
    *       "enforcementProfile": {
-   *         "cpuCost": 500,
-   *         "memoryCost": 1000,
-   *         "enforcementPeriodMillis": 60000
+   *         "cpuCostNs": 500,
+   *         "memoryCostBytes": 1000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
    *         "values": ["airlineStats"]
    *       }
    *     },
-   *     "nonLeafNode" : {
+   *     {
+   *       "nodeType" : "NonLeafNode",
    *       "enforcementProfile": {
-   *         "cpuCost": 1500,
-   *         "memoryCost": 12000,
-   *         "enforcementPeriodMillis": 60000
+   *         "cpuCostNs": 1500,
+   *         "memoryCostBytes": 12000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",
@@ -165,12 +165,12 @@ public class PinotQueryWorkloadConfigRestletResource {
    * Example response:
    * {
    *  "workload1": {
-   *    "cpuCost": 100,
-   *    "memoryCost":100
+   *    "cpuCostNs": 100,
+   *    "memoryCostBytes":100
    *  },
    *  "workload2": {
-   *    "cpuCost": 50,
-   *    "memoryCost": 50
+   *    "cpuCostNs": 50,
+   *    "memoryCostBytes": 50
    *  }
    */
   @GET
@@ -209,22 +209,22 @@ public class PinotQueryWorkloadConfigRestletResource {
    * {
    *   "queryWorkloadName" : "workload-foo1",
    *   "nodeConfigs" : {
-   *     "leafNode" : {
+   *    {
+   *       "nodeType" : "LeafNode",
    *       "enforcementProfile": {
-   *         "cpuCost": 500,
-   *         "memoryCost": 1000,
-   *         "enforcementPeriodMillis": 60000
+   *         "cpuCostNs": 500,
+   *         "memoryCostBytes": 1000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
    *         "values": ["airlineStats"]
    *       }
    *     },
-   *     "nonLeafNode" : {
+   *     {
+   *       "nodeType" : "nonLeafNode",
    *       "enforcementProfile": {
-   *         "cpuCost": 1500,
-   *         "memoryCost": 12000,
-   *         "enforcementPeriodMillis": 60000
+   *         "cpuCostNs": 1500,
+   *         "memoryCostBytes": 12000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",

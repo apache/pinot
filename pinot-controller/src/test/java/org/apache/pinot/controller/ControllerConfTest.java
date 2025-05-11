@@ -88,9 +88,10 @@ public class ControllerConfTest {
    * are thrown when invalid new configurations are read (there is no fall-back to the corresponding
    * valid deprecated configuration). For all valid new configurations, they override the
    * corresponding deprecated configuration.
+   * Added fallback logic to use valid deprecated config when new config is invalid.
    */
   @Test
-  public void invalidNewConfigShouldThrowExceptionOnReadWithoutFallbackToCorrespondingValidDeprecatedConfig() {
+  public void invalidNewConfigShouldNotThrowExceptionOnReadWithFallbackToCorrespondingValidDeprecatedConfig() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     int durationInSeconds = getRandomDurationInSeconds();
@@ -99,9 +100,24 @@ public class ControllerConfTest {
     String randomPeriodInMinutes = getRandomPeriodInMinutes();
     NEW_CONFIGS.forEach(config -> controllerConfig.put(config, randomPeriodInMinutes));
     //put some invalid new configs
-    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, getRandomString());
+    String randomInvalidString = getRandomString();
+    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, randomInvalidString);
     ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertThrows(IllegalArgumentException.class, conf::getRetentionControllerFrequencyInSeconds);
+    Assert.assertEquals(
+        conf.getRetentionControllerFrequencyInSeconds(),
+        durationInSeconds, // expected fallback value
+        "Should fallback to deprecated config value"
+    );
+    //test to assert that invalid config is captured in the invalid config map value
+    Map<String, String> invalidConfigs = conf.getInvalidConfigs();
+    Assert.assertTrue(invalidConfigs.containsKey(RETENTION_MANAGER_FREQUENCY_PERIOD));
+    Assert.assertEquals(
+        conf.getInvalidConfigs().get(RETENTION_MANAGER_FREQUENCY_PERIOD),
+        String.format(
+            "Invalid time spec '%s' for config '%s'. Falling back to default config.",
+            randomInvalidString, RETENTION_MANAGER_FREQUENCY_PERIOD
+        )
+    );
   }
 
   /**

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
@@ -143,6 +144,11 @@ public class CompositeTransformer implements RecordTransformer {
         }
       }
     }
+  }
+
+  public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema, @Nullable
+      SegmentZKMetadata segmentZKMetadata) {
+    return new CompositeTransformer(getDefaultTransformers(tableConfig, schema));
   }
 
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {

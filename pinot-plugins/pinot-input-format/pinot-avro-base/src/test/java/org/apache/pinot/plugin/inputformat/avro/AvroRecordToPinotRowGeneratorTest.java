@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -66,8 +67,8 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericRow genericRow = new GenericRow();
 
     // List
-    genericRecord.put("intMV", List.of(1, 2, 3));
-    genericRecord.put("stringMV", List.of("value1", "value2", "value3"));
+    genericRecord.put("intMV", new ArrayList(List.of(1, 2, 3)));
+    genericRecord.put("stringMV", new ArrayList(List.of("value1", "value2", "value3")));
     avroRecordExtractor.extract(genericRecord, genericRow);
     assertEqualsDeep(genericRow.getFieldToValueMap(),
         Map.of("intMV", new Object[]{1, 2, 3}, "stringMV", new Object[]{"value1", "value2", "value3"}));
@@ -98,8 +99,8 @@ public class AvroRecordToPinotRowGeneratorTest {
 
     // Empty List
     genericRow.clear();
-    genericRecord.put("intMV", List.of());
-    genericRecord.put("stringMV", List.of());
+    genericRecord.put("intMV", new ArrayList<>());
+    genericRecord.put("stringMV", new ArrayList<>());
     avroRecordExtractor.extract(genericRecord, genericRow);
     assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMV", new Object[0], "stringMV", new Object[0]));
 
@@ -131,9 +132,9 @@ public class AvroRecordToPinotRowGeneratorTest {
     avroRecordExtractor.init(null, null);
     GenericRow genericRow = new GenericRow();
 
-    Map<String, Integer> intMap = Map.of("v1", 1, "v2", 2, "v3", 3);
+    Map<String, Integer> intMap = new HashMap(Map.of("v1", 1, "v2", 2, "v3", 3));
     genericRecord.put("intMap", intMap);
-    Map<String, String> stringMap = Map.of("v1", "value1", "v2", "value2", "v3", "value3");
+    Map<String, String> stringMap = new HashMap(Map.of("v1", "value1", "v2", "value2", "v3", "value3"));
     genericRecord.put("stringMap", stringMap);
     avroRecordExtractor.extract(genericRecord, genericRow);
     assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMap", intMap, "stringMap", stringMap));

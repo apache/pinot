@@ -80,13 +80,19 @@ public class TransformPipeline {
   }
 
   public Collection<String> getInputColumns() {
-    if (_complexTypeTransformer == null) {
+    if (_preComplexTypeTransformers == null && _complexTypeTransformer == null) {
       return _recordTransformer.getInputColumns();
-    } else {
-      Set<String> inputColumns = new HashSet<>(_recordTransformer.getInputColumns());
-      inputColumns.addAll(_complexTypeTransformer.getInputColumns());
-      return inputColumns;
     }
+    Set<String> inputColumns = new HashSet<>(_recordTransformer.getInputColumns());
+    if (_preComplexTypeTransformers != null) {
+      for (RecordTransformer preComplexTypeTransformer : _preComplexTypeTransformers) {
+        inputColumns.addAll(preComplexTypeTransformer.getInputColumns());
+      }
+    }
+    if (_complexTypeTransformer != null) {
+      inputColumns.addAll(_complexTypeTransformer.getInputColumns());
+    }
+    return inputColumns;
   }
 
   /**

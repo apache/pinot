@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import javax.annotation.Nullable;
+import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 
 
@@ -62,18 +65,19 @@ public class HashDistributionDesc {
    * Returns the hash distribution descriptor for the given target mapping, or {@code null} if we can't preserve
    * partitioning info.
    */
-  @Nullable
-  public HashDistributionDesc apply(PinotDistMapping mapping) {
+  public Set<HashDistributionDesc> apply(PinotDistMapping mapping) {
     for (Integer currentKey : _keys) {
-      if (currentKey >= mapping.getSourceCount() || mapping.getTarget(currentKey) == -1) {
-        return null;
+      if (currentKey >= mapping.getSourceCount() || CollectionUtils.isEmpty(mapping.getTargets(currentKey))) {
+        return Set.of();
       }
     }
-    List<Integer> newKey = new ArrayList<>();
-    for (int currentKey : _keys) {
-      newKey.add(mapping.getTarget(currentKey));
+    List<List<Integer>> newKeys = new ArrayList<>();
+    PinotDistMapping.computeAllMappings(0, _keys, mapping, new ArrayDeque<>(), newKeys);
+    Set<HashDistributionDesc> newDescs = new HashSet<>();
+    for (List<Integer> newKey : newKeys) {
+      newDescs.add(new HashDistributionDesc(newKey, _hashFunction, _numPartitions));
     }
-    return new HashDistributionDesc(newKey, _hashFunction, _numPartitions);
+    return newDescs;
   }
 
   @Override

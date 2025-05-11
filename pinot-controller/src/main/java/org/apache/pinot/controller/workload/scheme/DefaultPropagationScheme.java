@@ -33,8 +33,9 @@ public class DefaultPropagationScheme implements PropagationScheme {
   }
 
   @Override
-  public Set<String> resolveInstances(NodeConfig.Type nodeType, NodeConfig nodeConfig) {
+  public Set<String> resolveInstances(NodeConfig nodeConfig) {
     Set<String> instances;
+    NodeConfig.Type nodeType = nodeConfig.getNodeType();
     switch (nodeType) {
       case NON_LEAF_NODE:
         instances = new HashSet<>(_pinotHelixResourceManager.getAllBrokerInstances());

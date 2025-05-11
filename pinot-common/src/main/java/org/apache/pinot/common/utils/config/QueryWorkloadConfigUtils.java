@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -66,8 +65,7 @@ public class QueryWorkloadConfigUtils {
     String nodeConfigsJson = znRecord.getSimpleField(QueryWorkloadConfig.NODE_CONFIGS);
     Preconditions.checkNotNull(nodeConfigsJson, "nodeConfigs cannot be null");
     try {
-      Map<NodeConfig.Type, NodeConfig> nodeConfigs = JsonUtils.stringToObject(nodeConfigsJson, new TypeReference<>() {
-      });
+      List<NodeConfig> nodeConfigs = JsonUtils.stringToObject(nodeConfigsJson, new TypeReference<>() { });
       return new QueryWorkloadConfig(queryWorkloadName, nodeConfigs);
     } catch (Exception e) {
       String errorMessage = String.format("Failed to convert ZNRecord : %s to QueryWorkloadConfig", znRecord);

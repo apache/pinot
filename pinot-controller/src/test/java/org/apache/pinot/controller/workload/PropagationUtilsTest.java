@@ -39,7 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class WorkloadPropagationTest {
+public class PropagationUtilsTest {
 
     private PinotHelixResourceManager _pinotHelixResourceManager;
 
@@ -195,15 +195,14 @@ public class WorkloadPropagationTest {
                 createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE),
                 createTableConfig("table2", "serverTag2", "brokerTenant2", TableType.REALTIME)
         );
-        // Mock the behavior of getAllQueryWorkloadConfigs to return the list of query workload configurations
-        Mockito.when(_pinotHelixResourceManager.getAllQueryWorkloadConfigs()).thenReturn(queryWorkloadConfigs);
         // Mock the behavior of getAllTableConfigs to return the list of table configurations
         Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
 
         Set<String> helixTags = Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
                 "serverTag2_REALTIME", "brokerTenant2_BROKER");
-        Set<QueryWorkloadConfig> workloadConfigsForTags
-                = PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags);
+        Set<QueryWorkloadConfig> workloadConfigsForTags =
+                PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags,
+                        queryWorkloadConfigs);
         // Verify the results
         Set<QueryWorkloadConfig> expectedWorkloadConfigs = Set.of(workloadConfig1, workloadConfig2, workloadConfig3);
         Assert.assertEquals(workloadConfigsForTags.size(), expectedWorkloadConfigs.size(),
@@ -238,9 +237,9 @@ public class WorkloadPropagationTest {
     private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme leafScheme,
                                                           PropagationScheme nonLeafScheme) {
         EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10);
-        return new QueryWorkloadConfig(name, Map.of(
-          NodeConfig.Type.LEAF_NODE, new NodeConfig(enforcementProfile, leafScheme),
-          NodeConfig.Type.NON_LEAF_NODE, new NodeConfig(enforcementProfile, nonLeafScheme)
+        return new QueryWorkloadConfig(name, List.of(
+           new NodeConfig(NodeConfig.Type.LEAF_NODE, enforcementProfile, leafScheme),
+           new NodeConfig(NodeConfig.Type.NON_LEAF_NODE, enforcementProfile, nonLeafScheme)
       ));
     }
 }

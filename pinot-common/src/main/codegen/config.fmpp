@@ -17,7 +17,7 @@
 # under the License.
 #
 
-# Copied from Calcite 1.37.0 babel and modified for Pinot syntax. Update this file when upgrading Calcite version.
+# Copied from Calcite 1.39.0 babel and modified for Pinot syntax. Update this file when upgrading Calcite version.
 
 data: {
   default: tdd("../default_config.fmpp")
@@ -35,6 +35,7 @@ data: {
     # List of additional classes and packages to import.
     # Example: "org.apache.calcite.sql.*", "java.util.List".
     imports: [
+      "org.apache.calcite.sql.babel.postgres.SqlSetOptions",
       "org.apache.pinot.sql.parsers.parser.*"
     ]
 
@@ -43,6 +44,10 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
+      "BIG_DECIMAL"
+      "BYTES"
+      "LONG"
+      "STRING"
     ]
 
     # List of non-reserved keywords to add;
@@ -50,6 +55,10 @@ data: {
     nonReservedKeywordsToAdd: [
       "FILE"
       "ARCHIVE"
+      "BIG_DECIMAL"
+      "BYTES"
+      "LONG"
+      "STRING"
       # Pinot allows using DEFAULT as the catalog name
       "DEFAULT_"
       # Pinot allows using DATETIME as column name

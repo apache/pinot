@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical.v2.opt;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 
 
@@ -42,5 +43,10 @@ public abstract class PRelOptRule {
    */
   public PRelNode onDone(PRelNode currentNode) {
     return currentNode;
+  }
+
+  @Nullable
+  public PRelNode getParentNode(PRelOptRuleCall call) {
+    return call._parents.isEmpty() ? null : call._parents.getLast();
   }
 }

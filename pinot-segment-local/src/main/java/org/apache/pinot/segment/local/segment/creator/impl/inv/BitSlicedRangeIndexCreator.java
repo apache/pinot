@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.utils.FPOrdering;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RangeBitmap;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
@@ -40,10 +41,10 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   private final RangeBitmap.Appender _appender;
   private final File _rangeIndexFile;
   private final long _minValue;
-  private final FieldSpec.DataType _valueType;
+  private final DataType _valueType;
 
   private BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, long minValue, long maxValue,
-      FieldSpec.DataType valueType) {
+      DataType valueType) {
     Preconditions.checkArgument(fieldSpec.isSingleValueField(), "MV columns not supported");
     _rangeIndexFile = new File(indexDir, fieldSpec.getName() + BITMAP_RANGE_INDEX_FILE_EXTENSION);
     _appender = RangeBitmap.appender(maxValue);
@@ -58,7 +59,7 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
    * @param cardinality the cardinality of the dictionary
    */
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality) {
-    this(indexDir, fieldSpec, 0, cardinality - 1, fieldSpec.getDataType());
+    this(indexDir, fieldSpec, 0, cardinality - 1, fieldSpec.getDataType().getStoredType());
   }
 
   /**
@@ -71,11 +72,11 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, Comparable<?> minValue,
       Comparable<?> maxValue) {
     this(indexDir, fieldSpec, minValue(fieldSpec, minValue), maxValue(fieldSpec, minValue, maxValue),
-        fieldSpec.getDataType());
+        fieldSpec.getDataType().getStoredType());
   }
 
   @Override
-  public FieldSpec.DataType getDataType() {
+  public DataType getValueType() {
     return _valueType;
   }
 
@@ -140,7 +141,7 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   }
 
   private static long maxValue(FieldSpec fieldSpec, Comparable<?> minValue, Comparable<?> maxValue) {
-    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    DataType storedType = fieldSpec.getDataType().getStoredType();
     if (storedType == INT || storedType == LONG) {
       return ((Number) maxValue).longValue() - ((Number) minValue).longValue();
     }
@@ -154,7 +155,7 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
   }
 
   private static long minValue(FieldSpec fieldSpec, Comparable<?> minValue) {
-    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    DataType storedType = fieldSpec.getDataType().getStoredType();
     if (storedType == INT || storedType == LONG) {
       return ((Number) minValue).longValue();
     }

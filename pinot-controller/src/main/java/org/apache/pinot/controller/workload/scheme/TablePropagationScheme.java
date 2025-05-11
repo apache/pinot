@@ -41,7 +41,7 @@ public class TablePropagationScheme implements PropagationScheme {
   }
 
   @Override
-  public Set<String> resolveInstances(NodeConfig.Type nodeType, NodeConfig nodeConfig) {
+  public Set<String> resolveInstances(NodeConfig nodeConfig) {
     Set<String> instances = new HashSet<>();
     List<String> tableNames = nodeConfig.getPropagationScheme().getValues();
     Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags
@@ -61,7 +61,7 @@ public class TablePropagationScheme implements PropagationScheme {
       for (String tableWithType : tablesWithType) {
         Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableWithTypeToHelixTags.get(tableWithType);
         if (nodeToHelixTags != null) {
-          Set<String> helixTags = nodeToHelixTags.get(nodeType);
+          Set<String> helixTags = nodeToHelixTags.get(nodeConfig.getNodeType());
           if (helixTags != null) {
             for (String helixTag : helixTags) {
               Set<String> helixInstances = helixTagToInstances.get(helixTag);

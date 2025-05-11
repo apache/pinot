@@ -29,6 +29,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,4 +136,24 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   }
 
   protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
+
+  protected boolean isOffsetCaughtUp(String segmentName,
+      StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
+    if (currentOffset != null && latestOffset != null) {
+      // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
+      // current offset in the case we are caught up.
+      // TODO: implement a way to have this work correctly for kafka consumers
+      _logger.info("Null offset found for segment {} - current offset: {}, latest offset: {}. "
+          + "Will check consumption status later", segmentName, currentOffset, latestOffset);
+      try {
+        return currentOffset.compareTo(latestOffset) >= 0;
+      } catch (NullPointerException e) {
+        // This can happen if the offsets are not comparable,
+        // Eg: Sequence number missing for a kinesis shard
+        _logger.info("Unable to compare offsets for segment {} - current offset: {}, latest offset: {}. "
+            + "Will check consumption status later", segmentName, currentOffset, latestOffset);
+      }
+    }
+    return false;
+  }
 }

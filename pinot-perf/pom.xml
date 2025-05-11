@@ -167,10 +167,6 @@
               <name>pinot-BenchmarkQueryEngine</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.BenchmarkQueryWorkloadPerf</mainClass>
-              <name>pinot-BenchmarkQueryWorkloadPerf</name>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkRealtimeConsumptionSpeed</mainClass>
               <name>pinot-BenchmarkRealtimeConsumptionSpeed</name>
             </program>

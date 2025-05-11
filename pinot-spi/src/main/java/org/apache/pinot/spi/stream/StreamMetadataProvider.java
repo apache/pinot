@@ -21,6 +21,7 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,26 @@ public interface StreamMetadataProvider extends Closeable {
       }
     }
     return newPartitionGroupMetadataList;
+  }
+
+  /**
+   * @param forceGetOffsetFromStream - the flag is a workaround to not use partitionGroupConsumptionStatuses.
+   *                                  This is required because PinotLLCRealtimeSegmentManager.selectStartOffset()
+   *                                  actually requires the offsets from the stream, but was originally relying on
+   *                                  passing an empty partitionGroupConsumptionStatuses to the method.
+   *                                  The change for <a href="https://github.com/apache/pinot/issues/15608">...</a>
+   *                                  required to pass the actual partitionGroupConsumptionStatuses
+   *                                  TODO - Remove the flag and fix the clients calling computePartitionGroupMetadata()
+   */
+  default List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
+      boolean forceGetOffsetFromStream)
+      throws IOException, TimeoutException {
+    if (forceGetOffsetFromStream) {
+      return computePartitionGroupMetadata(clientId, streamConfig, Collections.emptyList(), timeoutMillis);
+    } else {
+      return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
+    }
   }
 
   default Map<String, PartitionLagState> getCurrentPartitionLagState(

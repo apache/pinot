@@ -37,6 +37,11 @@
         "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}"
       },
       {
+        "sql": "SELECT CAST(intCol AS LONG) * 2000000000, CAST(longCol AS STRING), CAST(doubleCol AS BIG_DECIMAL), CAST(x'ab' AS BYTES) FROM {tbl}",
+        "h2Sql": "SELECT CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS VARCHAR), CAST(doubleCol AS DECIMAL), CAST(x'ab' AS VARBINARY) FROM {tbl}",
+        "comments": "use aliases for types - LONG for BIGINT, STRING for VARCHAR, BIG_DECIMAL for DECIMAL, BYTES for VARBINARY"
+      },
+      {
         "sql": "SELECT CAST(a.floatCol AS DOUBLE) * 1e100, CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true"
       },
       {

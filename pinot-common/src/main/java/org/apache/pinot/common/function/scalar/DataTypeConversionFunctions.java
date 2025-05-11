@@ -26,10 +26,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
-import static org.apache.pinot.common.utils.PinotDataType.DOUBLE;
-import static org.apache.pinot.common.utils.PinotDataType.INTEGER;
-import static org.apache.pinot.common.utils.PinotDataType.LONG;
-import static org.apache.pinot.common.utils.PinotDataType.STRING;
+import static org.apache.pinot.common.utils.PinotDataType.*;
 
 
 /**
@@ -48,12 +45,25 @@ public class DataTypeConversionFunctions {
       PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
       String transformed = targetTypeLiteral.toUpperCase();
       PinotDataType targetDataType;
-      if ("INT".equals(transformed)) {
-        targetDataType = INTEGER;
-      } else if ("VARCHAR".equals(transformed)) {
-        targetDataType = STRING;
-      } else {
-        targetDataType = PinotDataType.valueOf(transformed);
+      switch (transformed) {
+        case "BIGINT":
+          targetDataType = LONG;
+          break;
+        case "DECIMAL":
+          targetDataType = BIG_DECIMAL;
+          break;
+        case "INT":
+          targetDataType = INTEGER;
+          break;
+        case "VARBINARY":
+          targetDataType = BYTES;
+          break;
+        case "VARCHAR":
+          targetDataType = STRING;
+          break;
+        default:
+          targetDataType = PinotDataType.valueOf(transformed);
+          break;
       }
       if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
         if (String.valueOf(value).contains(".")) {

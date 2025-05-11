@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,12 +33,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -66,7 +70,6 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -97,7 +100,6 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
@@ -164,6 +166,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
+  private ScheduledExecutorService _helixMessageCountScheduler;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -173,10 +176,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
+    applyCustomConfigs(_serverConf);
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
-        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     String tarCompressionCodecName =
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
@@ -261,6 +264,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     ContinuousJfrStarter.init(_serverConf);
+  }
+
+  /// Can be overridden to apply custom configs to the server conf.
+  protected void applyCustomConfigs(PinotConfiguration serverConf) {
   }
 
   /**
@@ -696,6 +703,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
 
+    // Start a background task to monitor Helix message count
+    int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
+        Server.DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS);
+    _helixMessageCountScheduler = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder().setNameFormat("message-count-scheduler-%d").setDaemon(true).build());
+    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, refreshIntervalSeconds,
+        TimeUnit.SECONDS);
+
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
     try {
       _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
@@ -809,14 +824,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } else {
       serverMetrics.addTimedValue(
           ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
-    }
-    boolean isQueryWorkloadEnabled =
-        _serverConf.getProperty(Server.QUERY_WORKLOAD_ENABLED, Server.DEFAULT_QUERY_WORKLOAD_ENABLED);
-    if (isQueryWorkloadEnabled) {
-      String controllerUrl = _serverConf.getProperty(Server.CONTROLLER_URL);
-      // TODO: This info would be used by the QueryWorkloadBudgetManager to fetch the query workload configs
-      QueryWorkloadConfigUtils.getQueryWorkloadConfigsFromController(controllerUrl, _instanceId,
-              NodeConfig.Type.LEAF_NODE);
     }
   }
 
@@ -1063,5 +1070,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
+  }
+
+  private void refreshMessageCount() {
+    try {
+      HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+      List<String> children = dataAccessor.getBaseDataAccessor()
+          .getChildNames(String.format("/%s/INSTANCES/%s/MESSAGES", _helixClusterName, _instanceId), 0);
+      int messageCount = children == null ? 0 : children.size();
+      ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.HELIX_MESSAGES_COUNT, messageCount);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to refresh Helix message count", e);
+    }
   }
 }
