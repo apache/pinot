@@ -198,6 +198,8 @@ public class QueryOptionsUtils {
     if (orderedPreferredReplicas == null) {
       return Collections.emptyList();
     }
+    // cannot use comma as the delimiter of replica group list
+    // because query option use comma as the delimiter of different options
     String[] replicas = orderedPreferredReplicas.split("\\|");
     List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
     for (String replica : replicas) {

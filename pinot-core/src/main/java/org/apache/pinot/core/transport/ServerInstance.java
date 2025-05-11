@@ -201,6 +201,8 @@ public final class ServerInstance {
       LOGGER.warn("Instance: {} belongs to multiple groups: {}", _instanceId, groups);
       return DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
     }
+    // The type of the field pools of org.apache.pinot.spi.config.instance.Instance uses Map<String, Integer>.
+    // Thus it is safe to directly use Integer.parseInt without checking the parsing exception
     return Integer.parseInt(groups.iterator().next());
   }
 }
