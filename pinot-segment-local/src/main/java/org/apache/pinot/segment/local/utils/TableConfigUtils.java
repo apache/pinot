@@ -819,6 +819,12 @@ public final class TableConfigUtils {
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
           "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
           comparisonColumnDataType);
+    } else {
+      String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {

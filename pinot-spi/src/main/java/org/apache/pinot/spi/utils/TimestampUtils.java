@@ -57,10 +57,6 @@ public class TimestampUtils {
       .optionalEnd()
       // Time zone handling, allows parsing of 'Z', '+hh:mm', '-hh:mm'
       .appendOptional(DateTimeFormatter.ofPattern("XXX"))
-      // e.g. +0000
-      .appendOptional(new DateTimeFormatterBuilder()
-          .appendOffset("+HHmm", "Z")
-          .toFormatter())
       // Default values for missing time components
       .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
       .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)

@@ -297,7 +297,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       return;
     }
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-      double comparisonValue = BasePartitionUpsertMetadataManager.toDouble(recordLocation.getComparisonValue());
+      double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       // We need to verify that the record belongs to only one segment. If a record is part of multiple segments,
       // an issue can arise where the upsert compaction might first process the segment containing the delete record
       // while the previous segment(s) are not compacted. Upon restart, this can inadvertently revive the key
