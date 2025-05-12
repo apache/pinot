@@ -117,9 +117,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of servers after rebalancing
-    int finalServer
-
-    s = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    int finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
     // Check that a server has been added
     assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
