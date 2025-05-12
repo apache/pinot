@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -798,6 +799,7 @@ public final class TableConfigUtils {
         "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
+    validateTTLForDedupConfig(tableConfig, schema);
   }
 
   /**
@@ -836,6 +838,30 @@ public final class TableConfigUtils {
     if (upsertConfig.getDeletedKeysTTL() > 0) {
       Preconditions.checkState(upsertConfig.getDeleteRecordColumn() != null,
           "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+    }
+  }
+
+  /**
+   * Validates the dedup config related to TTL.
+   */
+  @VisibleForTesting
+  static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    if (dedupConfig == null || (dedupConfig.getMetadataTTL() <= 0)) {
+      return;
+    }
+
+    String timeColumn = dedupConfig.getDedupTimeColumn();
+    if (timeColumn != null && !timeColumn.isEmpty()) {
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", timeColumn, comparisonColumnDataType);
+    } else {
+      String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL must have time column: timeColumn in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
   }
 

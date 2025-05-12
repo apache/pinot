@@ -1754,6 +1754,47 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateInvalidDedupConfigs() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+
+    Map<String, String> streamConfigs = getStreamConfigs();
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(10);
+    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setDedupConfig(dedupConfig)
+            .setRoutingConfig(
+                new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+            .setTimeColumnName(TIME_COLUMN).setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "MetadataTTL must have dedupTimeColumn: timeColumn in numeric type, found: STRING");
+    }
+
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setDedupConfig(dedupConfig)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "MetadataTTL must have dedupTimeColumn: timeColumn in numeric type, found: TIMESTAMP");
+    }
+  }
+
+  @Test
   public void testValidateUpsertConfig() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
