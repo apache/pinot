@@ -293,9 +293,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
     double deletedKeysThreshold =
         _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : Double.NEGATIVE_INFINITY;
-    if (_deletedKeysTTL <= 0) {
-      return;
-    }
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       // We need to verify that the record belongs to only one segment. If a record is part of multiple segments,
