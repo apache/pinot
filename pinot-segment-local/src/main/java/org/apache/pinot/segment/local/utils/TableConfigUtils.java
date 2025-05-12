@@ -860,7 +860,7 @@ public final class TableConfigUtils {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: timeColumn in numeric type, found: %s", comparisonColumn,
+          "MetadataTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
           comparisonColumnDataType);
     }
   }

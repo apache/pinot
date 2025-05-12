@@ -1755,6 +1755,7 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testValidateInvalidDedupConfigs() {
+    // Invalid String time column
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -1763,7 +1764,6 @@ public class TableConfigUtilsTest {
     Map<String, String> streamConfigs = getStreamConfigs();
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setMetadataTTL(10);
-    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setDedupConfig(dedupConfig)
             .setRoutingConfig(
@@ -1774,9 +1774,11 @@ public class TableConfigUtilsTest {
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "MetadataTTL must have dedupTimeColumn: timeColumn in numeric type, found: STRING");
+          "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
 
+    // Invalid TIMESTAMP timeColumn
+    dedupConfig.setDedupTimeColumn(TIME_COLUMN);
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
