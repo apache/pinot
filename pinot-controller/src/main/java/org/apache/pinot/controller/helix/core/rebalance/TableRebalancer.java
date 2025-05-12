@@ -1563,7 +1563,9 @@ public class TableRebalancer {
    * TODO: Ideally if strict replica group routing is enabled then StrictRealtimeSegmentAssignment should be used, but
    *       this is not enforced in the code today. Once enforcement is added, then the routing side and assignment side
    *       will be equivalent and all segments belonging to a given partitionId will be assigned to the same set of
-   *       instances. Special handling to check each group of assigned instances can be removed in that case.
+   *       instances. Special handling to check each group of assigned instances can be removed in that case. The
+   *       strict replica group routing can also be utilized for OFFLINE tables, thus StrictRealtimeSegmentAssignment
+   *       also needs to be made more generic for the OFFLINE case.
    */
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
@@ -1610,8 +1612,8 @@ public class TableRebalancer {
         // as a whole as not moveable.
         for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
           Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
-          // All segments should be assigned to the same set of servers so it is enough to check for whether any server
-          // for one segment is above the limit or not
+          // It is enough to check for whether any server for one segment is above the limit or not since all segments
+          // in curAssignment will have the same assigned instances list
           Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
           SingleSegmentAssignment firstAssignment =
               getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
@@ -1630,7 +1632,7 @@ public class TableRebalancer {
         }
       }
       for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
-        getNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
+        updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
             anyServerExhaustedBatchSize, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
             availableInstancesMap, serverToNumSegmentsAddedSoFar);
       }
@@ -1641,10 +1643,11 @@ public class TableRebalancer {
     return nextAssignment;
   }
 
-  private static void getNextAssignmentForPartitionIdStrictReplicaGroup(Map<String, Map<String, String>> curAssignment,
-      Map<String, Map<String, String>> targetAssignment, Map<String, Map<String, String>> nextAssignment,
-      boolean anyServerExhaustedBatchSize, int minAvailableReplicas, boolean lowDiskMode,
-      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
+  private static void updateNextAssignmentForPartitionIdStrictReplicaGroup(
+      Map<String, Map<String, String>> curAssignment, Map<String, Map<String, String>> targetAssignment,
+      Map<String, Map<String, String>> nextAssignment, boolean anyServerExhaustedBatchSize, int minAvailableReplicas,
+      boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
+      Map<Pair<Set<String>, Set<String>>,Set<String>> assignmentMap,
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
@@ -1692,10 +1695,7 @@ public class TableRebalancer {
         if (!nextAssignment.get(segmentName).equals(currentInstanceStateMap)) {
           Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
               nextAssignment.get(segmentName));
-          for (String server : serversAddedForSegment) {
-            int numSegmentsAdded = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
-            serverToNumSegmentsAddedSoFar.put(server, numSegmentsAdded + 1);
-          }
+          serversAddedForSegment.forEach(server -> serverToNumSegmentsAddedSoFar.merge(server, 1, Integer::sum));
         }
       }
     }
@@ -1708,7 +1708,8 @@ public class TableRebalancer {
     if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
         && maxSegmentsAddedToAnyServer > batchSizePerServer) {
       tableRebalanceLogger.warn("Found at least one server with {} segments added which is larger than "
-          + "batchSizePerServer: {}", maxSegmentsAddedToAnyServer, batchSizePerServer);
+          + "batchSizePerServer: {}. This is expected for strictReplicaGroup based assignment that needs to move a "
+          + "full partition to maintain consistency for queries.", maxSegmentsAddedToAnyServer, batchSizePerServer);
     }
   }
 
@@ -1736,8 +1737,7 @@ public class TableRebalancer {
       int partitionId =
           segmentPartitionIdMap.computeIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName));
       Set<String> assignedInstances = instanceStateMap.keySet();
-      partitionIdToAssignedInstancesToCurrentAssignmentMap.putIfAbsent(partitionId, new HashMap<>());
-      partitionIdToAssignedInstancesToCurrentAssignmentMap.get(partitionId)
+      partitionIdToAssignedInstancesToCurrentAssignmentMap.computeIfAbsent(partitionId, k -> new HashMap<>())
           .computeIfAbsent(assignedInstances, k -> new TreeMap<>()).put(segmentName, instanceStateMap);
     }
 
@@ -1787,7 +1787,7 @@ public class TableRebalancer {
             // rebalance without batching
             partitionId = 0;
           } else {
-            // This how partitionId is calculated for Offline tables
+            // This how partitionId is calculated for OFFLINE tables
             partitionId = SegmentAssignmentUtils.getOfflineSegmentPartitionId(segmentName, _tableNameWithType,
                 _helixManager, _partitionColumn);
           }
