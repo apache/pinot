@@ -1694,9 +1694,9 @@ public class TableConfigUtilsTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setDedupConfig(new DedupConfig())
-        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setDedupConfig(new DedupConfig()).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1970,8 +1970,8 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeletedKeysTTL(3600);
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(upsertConfig).setRoutingConfig(
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false)).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
