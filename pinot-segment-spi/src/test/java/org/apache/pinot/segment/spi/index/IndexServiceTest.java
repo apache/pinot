@@ -63,17 +63,17 @@ public class IndexServiceTest {
       }
     };
 
-    TreeSet<IndexPlugin<?>> _ascendingSet = new TreeSet<>(Comparator.comparingInt(IndexPlugin::getPriority));
-    _ascendingSet.add(plugin1);
-    _ascendingSet.add(plugin2);
-    IndexService indexService1 = new IndexService(_ascendingSet);
+    TreeSet<IndexPlugin<?>> ascendingSet = new TreeSet<>(Comparator.comparingInt(IndexPlugin::getPriority));
+    ascendingSet.add(plugin1);
+    ascendingSet.add(plugin2);
+    IndexService indexService1 = new IndexService(ascendingSet);
     assertSame(indexService1.get("test"), indexType2);
 
     // Verifies that the order in the test doesn't actually matter
-    TreeSet<IndexPlugin<?>> _descendingSet = new TreeSet<>((p1, p2) -> p2.getPriority() - p1.getPriority());
-    _descendingSet.add(plugin1);
-    _descendingSet.add(plugin2);
-    IndexService indexService2 = new IndexService(_descendingSet);
+    TreeSet<IndexPlugin<?>> descendingSet = new TreeSet<>((p1, p2) -> p2.getPriority() - p1.getPriority());
+    descendingSet.add(plugin1);
+    descendingSet.add(plugin2);
+    IndexService indexService2 = new IndexService(descendingSet);
     assertSame(indexService2.get("test"), indexType2);
   }
 
