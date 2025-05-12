@@ -205,11 +205,11 @@ public class MapFilterOperator extends BaseFilterOperator {
   }
 
   private String createJsonEqPredicateValue(String key, String value) {
-    return String.format("%s = %s", key, value);
+    return String.format("%s = '%s'", key, value);
   }
 
   private String createJsonNotEqPredicateValue(String key, String value) {
-    return String.format("%s != %s", key, value);
+    return String.format("%s != '%s'", key, value);
   }
 
   private String createJsonInPredicateValue(String key, List<String> values) {
@@ -218,9 +218,9 @@ public class MapFilterOperator extends BaseFilterOperator {
       if (i > 0) {
         valuesStr.append(", ");
       }
-      valuesStr.append(values.get(i));
+      valuesStr.append("'").append(values.get(i)).append("'");
     }
-    // Format: '"key" IN (value1, value2)'
+    // Format: '"key" IN ('value1', 'value2')'
     return String.format("%s IN (%s)", key, valuesStr);
   }
 
@@ -230,9 +230,9 @@ public class MapFilterOperator extends BaseFilterOperator {
       if (i > 0) {
         valuesStr.append(", ");
       }
-      valuesStr.append(values.get(i));
+      valuesStr.append("'").append(values.get(i)).append("'");
     }
-    // Format: '"key" NOT IN (value1, value2)'
+    // Format: '"key" NOT IN ('value1', 'value2')'
     return String.format("%s NOT IN (%s)", key, valuesStr);
   }
 
