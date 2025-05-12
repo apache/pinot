@@ -1647,7 +1647,7 @@ public class TableRebalancer {
       Map<String, Map<String, String>> curAssignment, Map<String, Map<String, String>> targetAssignment,
       Map<String, Map<String, String>> nextAssignment, boolean anyServerExhaustedBatchSize, int minAvailableReplicas,
       boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
-      Map<Pair<Set<String>, Set<String>>,Set<String>> assignmentMap,
+      Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
