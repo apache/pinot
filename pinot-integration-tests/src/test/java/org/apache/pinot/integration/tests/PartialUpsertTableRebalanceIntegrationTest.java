@@ -119,7 +119,6 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Check the number of servers after rebalancing
     int finalServer
 
-
     s = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
     // Check that a server has been added
