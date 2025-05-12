@@ -1755,7 +1755,7 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testValidateInvalidDedupConfigs() {
-    // Invalid String time column
+    // Invalid STRING time column
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -1777,7 +1777,7 @@ public class TableConfigUtilsTest {
           "MetadataTTL must have time column: timeColumn in numeric type, found: STRING");
     }
 
-    // Invalid TIMESTAMP timeColumn
+    // Invalid TIMESTAMP dedupTimeColumn
     dedupConfig.setDedupTimeColumn(TIME_COLUMN);
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -2495,7 +2495,7 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    // invalid STRING column time column
+    // Invalid STRING time column
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
@@ -2513,7 +2513,7 @@ public class TableConfigUtilsTest {
       // Expected
     }
 
-    // invalid TIMESTAMP column time column
+    // Invalid TIMESTAMP time column
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
