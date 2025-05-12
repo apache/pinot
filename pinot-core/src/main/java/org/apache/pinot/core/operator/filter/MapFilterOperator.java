@@ -42,8 +42,8 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
  * This operator converts map predicates to JSON predicates and delegates filtering operations
  * to JsonMatchFilterOperator.
  */
-public class MapIndexFilterOperator extends BaseFilterOperator {
-  private static final String EXPLAIN_NAME = "FILTER_MAP_INDEX";
+public class MapFilterOperator extends BaseFilterOperator {
+  private static final String EXPLAIN_NAME = "FILTER_MAP";
 
   private final JsonMatchFilterOperator _jsonMatchOperator;
   private final ExpressionFilterOperator _expressionFilterOperator;
@@ -51,7 +51,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   private final String _keyName;
   private final Predicate _predicate;
 
-  public MapIndexFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
+  public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
     super(numDocs, false);
     _predicate = predicate;
@@ -85,19 +85,19 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
    */
   private JsonMatchPredicate createJsonMatchPredicate() {
     // Convert predicate to JSON format based on type
-    String jsonValue;
+    String jsonFilterString;
     switch (_predicate.getType()) {
       case EQ:
-        jsonValue = createJsonEqPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
+        jsonFilterString = createJsonEqPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
         break;
       case NOT_EQ:
-        jsonValue = createJsonNotEqPredicateValue(_keyName, ((NotEqPredicate) _predicate).getValue());
+        jsonFilterString = createJsonNotEqPredicateValue(_keyName, ((NotEqPredicate) _predicate).getValue());
         break;
       case IN:
-        jsonValue = createJsonInPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
+        jsonFilterString = createJsonInPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
         break;
       case NOT_IN:
-        jsonValue = createJsonNotInPredicateValue(_keyName, ((NotInPredicate) _predicate).getValues());
+        jsonFilterString = createJsonNotInPredicateValue(_keyName, ((NotInPredicate) _predicate).getValues());
         break;
       default:
         throw new IllegalStateException(
@@ -105,8 +105,8 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     }
 
     // Create identifier expression for the JSON column
-    ExpressionContext jsonLhs = ExpressionContext.forIdentifier("json");
-    return new JsonMatchPredicate(jsonLhs, jsonValue, null);
+    ExpressionContext jsonLhs = ExpressionContext.forIdentifier(_columnName);
+    return new JsonMatchPredicate(jsonLhs, jsonFilterString, null);
   }
 
   @Override

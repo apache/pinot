@@ -43,7 +43,7 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
-import org.apache.pinot.core.operator.filter.MapIndexFilterOperator;
+import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
@@ -249,7 +249,7 @@ public class FilterPlanNode implements PlanNode {
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyMapFilter(predicate)) {
-            return new MapIndexFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
+            return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
