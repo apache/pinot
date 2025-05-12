@@ -2451,6 +2451,42 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // Expected
     }
+
+    // invalid STRING column time column
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.STRING, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+   tableConfigWithInvalidTTLConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+
+    // invalid TIMESTAMP column time column
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    tableConfigWithInvalidTTLConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
   }
 
   @Test
