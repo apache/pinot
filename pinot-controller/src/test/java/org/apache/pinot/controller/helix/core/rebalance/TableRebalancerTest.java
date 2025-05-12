@@ -1684,7 +1684,7 @@ public class TableRebalancerTest {
     //   },
     //   "segment__4__0__98347869999L": {
     //     "host2": "ONLINE",
-    //     "host3": "ONLINE",
+    //     "host4": "ONLINE",
     //     "host5": "ONLINE"
     //   }
     // }
@@ -1782,22 +1782,22 @@ public class TableRebalancerTest {
     // "segment4" to the target state because "host1" and "host4" might be unavailable for strict replica-group routing,
     // which breaks the minimum available replicas requirement:
     // {
-    //   "segment1": {
+    //   "segment__1__0__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
     //   },
-    //   "segment2": {
+    //   "segment__2__0__98347869999L": {
     //     "host2": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
     //   },
-    //   "segment3": {
+    //   "segment__3__0__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
     //   },
-    //   "segment4": {
+    //   "segment__4__0__98347869999L": {
     //     "host2": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
@@ -1828,15 +1828,15 @@ public class TableRebalancerTest {
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -1847,10 +1847,10 @@ public class TableRebalancerTest {
     currentAssignment = new TreeMap<>();
     currentAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
@@ -1861,15 +1861,15 @@ public class TableRebalancerTest {
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host4": "ONLINE",
-    //     "host6": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -1880,10 +1880,10 @@ public class TableRebalancerTest {
     targetAssignment = new TreeMap<>();
     targetAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
-    targetAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
 
@@ -1919,10 +1919,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
         nextAssignment =
@@ -1939,17 +1939,17 @@ public class TableRebalancerTest {
     //     "host4": "ONLINE",
     //     "host6": "ONLINE"
     //   },
+    //   "segment__1__1__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
     //   "segment__2__0__98347869999L": {
     //     "host1": "ONLINE",
     //     "host4": "ONLINE",
     //     "host5": "ONLINE"
     //   },
-    //   "segment__3__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host4": "ONLINE",
-    //     "host6": "ONLINE"
-    //   },
-    //   "segment__4__0__98347869999L": {
+    //   "segment__2__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host4": "ONLINE",
     //     "host5": "ONLINE"
@@ -1958,10 +1958,10 @@ public class TableRebalancerTest {
     targetAssignment = new TreeMap<>();
     targetAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
-    targetAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
     targetAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
+    targetAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
     targetAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host4", "host5"), ONLINE));
 
@@ -1985,8 +1985,8 @@ public class TableRebalancerTest {
     assertEquals((int) numSegmentsToOffloadMap.get("host6"), -2);
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
-    // assignment after two steps. With strict replica groups it should reach the target assignment immediately since
-    // the full partition must be selected for movement. Batch size = 2, unique partitionIds
+    // assignment after three steps. With strict replica groups it should reach the target assignment in two steps since
+    // the full partition must be selected for movement. Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -1997,10 +1997,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
         nextAssignment =
@@ -2009,10 +2009,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
@@ -2022,10 +2022,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
@@ -2045,15 +2045,15 @@ public class TableRebalancerTest {
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -2074,10 +2074,10 @@ public class TableRebalancerTest {
     currentAssignment = new TreeMap<>();
     currentAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
+    currentAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__3__0__98347869999L",
@@ -2092,15 +2092,15 @@ public class TableRebalancerTest {
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host4": "ONLINE",
-    //     "host6": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -2121,10 +2121,10 @@ public class TableRebalancerTest {
     targetAssignment = new TreeMap<>();
     targetAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
-    targetAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__3__0__98347869999L",
@@ -2163,10 +2163,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
         assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
@@ -2179,10 +2179,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
@@ -2195,10 +2195,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
@@ -2212,10 +2212,10 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
@@ -2239,11 +2239,6 @@ public class TableRebalancerTest {
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
@@ -2253,6 +2248,11 @@ public class TableRebalancerTest {
     //     "host1": "ONLINE",
     //     "host2": "ONLINE",
     //     "host3": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -2283,12 +2283,12 @@ public class TableRebalancerTest {
     currentAssignment = new TreeMap<>();
     currentAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
-    currentAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2", "host3"), ONLINE));
     currentAssignment.put("segment__1__2__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host6"), ONLINE));
+    currentAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
     currentAssignment.put("segment__2__2__98347869999L",
@@ -2307,11 +2307,6 @@ public class TableRebalancerTest {
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
     //   },
-    //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
-    //     "host4": "ONLINE",
-    //     "host6": "ONLINE"
-    //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
@@ -2321,6 +2316,11 @@ public class TableRebalancerTest {
     //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host5": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
@@ -2351,12 +2351,12 @@ public class TableRebalancerTest {
     targetAssignment = new TreeMap<>();
     targetAssignment.put("segment__1__0__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
-    targetAssignment.put("segment__2__0__98347869999L",
-        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__1__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
     targetAssignment.put("segment__1__2__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3", "host5"), ONLINE));
+    targetAssignment.put("segment__2__0__98347869999L",
+        SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__2__1__98347869999L",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host4", "host6"), ONLINE));
     targetAssignment.put("segment__2__2__98347869999L",
@@ -2391,9 +2391,8 @@ public class TableRebalancerTest {
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after three steps if strict replica group is disabled . With strict replica groups it should reach
-    // the target assignment in two steps since the full partition must be selected for movement. Only testing this
-    // assignment with isStrictRealtimeSegmentAssignment=false since the assignments usually don't differ for
-    // isStrictRealtimeSegmentAssignment=true. Batch size = 1, unique partitionIds
+    // the target assignment in two steps since the full partition must be selected for movement.
+    // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -2403,12 +2402,12 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
@@ -2425,12 +2424,12 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
@@ -2448,12 +2447,12 @@ public class TableRebalancerTest {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
-        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
         assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),

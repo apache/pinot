@@ -116,26 +116,29 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    int finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    int finalServer
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
+
+    s = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalReplicas);
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
 
     // Add a new server
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
@@ -184,26 +187,26 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    int finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    int finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalReplicas);
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
 
     // Add a new server
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);

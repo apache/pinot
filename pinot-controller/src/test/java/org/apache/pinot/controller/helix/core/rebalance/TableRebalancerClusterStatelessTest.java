@@ -684,15 +684,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       throws Exception {
     for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 3, 1)) {
       int numServers = 3;
-      // Mock disk usage
-      Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
 
       for (int i = 0; i < numServers; i++) {
         String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
         addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-        DiskUsageInfo diskUsageInfo1 =
-            new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
-        diskUsageInfoMap.put(instanceId, diskUsageInfo1);
       }
 
       ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -773,15 +768,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   public void testRebalanceBatchSizePerServerErrors()
       throws Exception {
     int numServers = 3;
-    // Mock disk usage
-    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
 
     for (int i = 0; i < numServers; i++) {
       String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-      DiskUsageInfo diskUsageInfo1 =
-          new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
-      diskUsageInfoMap.put(instanceId, diskUsageInfo1);
     }
 
     ExecutorService executorService = Executors.newFixedThreadPool(10);
