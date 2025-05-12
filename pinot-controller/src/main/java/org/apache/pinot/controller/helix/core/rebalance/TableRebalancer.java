@@ -1792,7 +1792,11 @@ public class TableRebalancer {
                 _helixManager, _partitionColumn);
           }
         } else {
-          // This how partitionId is calculated for RealtimeSegmentAssignment
+          // This how partitionId is calculated for CONSUMING segments in RealtimeSegmentAssignment
+          // TODO: Add handling for COMPLETED segments if in the future this is allowed for StrictReplicaGroup and
+          //       the partitionId calculation differs from the CONSUMING segments. For StrictRealtimeSegmentAssignment
+          //       the partitionId is mandated today. If this mandate is maintained then there may be no need to add
+          //       special handling for COMPLETED segments after all
           partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
               _helixManager, _partitionColumn);
         }
