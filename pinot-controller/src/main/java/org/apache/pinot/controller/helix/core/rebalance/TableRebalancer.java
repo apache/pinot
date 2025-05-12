@@ -1644,14 +1644,14 @@ public class TableRebalancer {
   }
 
   private static void updateNextAssignmentForPartitionIdStrictReplicaGroup(
-      Map<String, Map<String, String>> curAssignment, Map<String, Map<String, String>> targetAssignment,
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       Map<String, Map<String, String>> nextAssignment, boolean anyServerExhaustedBatchSize, int minAvailableReplicas,
       boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
       Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
-      for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
+      for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> currentInstanceStateMap = entry.getValue();
         nextAssignment.put(segmentName, currentInstanceStateMap);
@@ -1660,7 +1660,7 @@ public class TableRebalancer {
       // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSizePerServer
       // Can only do bestEfforts w.r.t. StrictReplicaGroup since a whole partition must be moved together for
       // maintaining consistency
-      for (Map.Entry<String, Map<String, String>> entry : curAssignment.entrySet()) {
+      for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> currentInstanceStateMap = entry.getValue();
         Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
