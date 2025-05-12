@@ -26,8 +26,10 @@ import org.apache.pinot.segment.spi.index.IndexPlugin;
 @AutoService(IndexPlugin.class)
 public class ForwardIndexPlugin implements IndexPlugin<ForwardIndexType> {
 
+  private static final ForwardIndexType INSTANCE = new ForwardIndexType();
+
   @Override
   public ForwardIndexType getIndexType() {
-    return ForwardIndexType.getInstance();
+    return INSTANCE;
   }
 }
