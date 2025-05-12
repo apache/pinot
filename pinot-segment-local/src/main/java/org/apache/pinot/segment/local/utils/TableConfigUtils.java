@@ -851,17 +851,17 @@ public final class TableConfigUtils {
       return;
     }
 
-    String timeColumn = dedupConfig.getDedupTimeColumn();
-    if (timeColumn != null && !timeColumn.isEmpty()) {
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
+          comparisonColumnDataType);
+    } else {
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType comparisonColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", timeColumn, comparisonColumnDataType);
-    } else {
-      String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
-      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, comparisonColumnDataType);
     }
   }
 
