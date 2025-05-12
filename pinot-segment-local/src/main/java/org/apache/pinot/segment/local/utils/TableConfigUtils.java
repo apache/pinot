@@ -821,12 +821,10 @@ public final class TableConfigUtils {
           comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
-      if (comparisonColumn != null && !comparisonColumn.isEmpty()) {
-        DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-        Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-            "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
-            comparisonColumnDataType);
-      }
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
