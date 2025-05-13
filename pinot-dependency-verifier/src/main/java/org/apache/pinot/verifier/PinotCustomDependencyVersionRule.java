@@ -141,7 +141,7 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
 
   @Override
   public String getCacheId() {
-    // Include skipRoot and skipModules in cache key
+    // Include skipModules in cache key
     return String.format("skipModuleList=%s", _skipModuleList);
   }
   @Override
