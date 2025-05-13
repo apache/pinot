@@ -278,7 +278,7 @@ public class TablesResource {
             }
 
             IndexService indexService = IndexService.getInstance();
-            for (int i = 0, n = columnMetadata.getIndexTypeSizesCount(); i < n; i++) {
+            for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
               long value = columnMetadata.getIndexSize(i);
 

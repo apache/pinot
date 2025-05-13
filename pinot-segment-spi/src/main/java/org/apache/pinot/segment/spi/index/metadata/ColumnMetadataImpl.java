@@ -179,7 +179,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   @Override
   public long getIndexSizeFor(IndexType type) {
     short indexId = IndexService.getInstance().getNumericId(type);
-    for (int i = 0, n = getIndexTypeSizesCount(); i < n; i++) {
+    for (int i = 0, n = getNumIndexes(); i < n; i++) {
       if (indexId == getIndexType(i)) {
         return getIndexSize(i);
       }
@@ -199,8 +199,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   }
 
   @Override
-  public short getIndexType(int i) {
-    return (short) ((_indexTypeSizeList.getLong(i) >> 48) & 0xffff);
+  public short getIndexType(int index) {
+    return (short) ((_indexTypeSizeList.getLong(index) >>> 48));
   }
 
   @Override
@@ -210,7 +210,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
   @JsonIgnore
   @Override
-  public int getIndexTypeSizesCount() {
+  public int getNumIndexes() {
     return _indexTypeSizeList.size();
   }
 
@@ -221,7 +221,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     ObjectNode node = JsonUtils.newObjectNode();
     IndexService service = IndexService.getInstance();
 
-    for (int i = 0, n = getIndexTypeSizesCount(); i < n; i++) {
+    for (int i = 0, n = getNumIndexes(); i < n; i++) {
       short type = getIndexType(i);
       long size = getIndexSize(i);
       node.put(service.get(type).getId(), size);

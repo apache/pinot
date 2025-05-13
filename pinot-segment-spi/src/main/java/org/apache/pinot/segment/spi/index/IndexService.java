@@ -55,11 +55,12 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public class IndexService {
 
+  public static final short UNKNOWN_INDEX = (short) -1;
   private static volatile IndexService _instance = fromServiceLoader();
 
   private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
-  private final Object2ShortOpenHashMap _allIndexPosById;
+  private final Object2ShortOpenHashMap<String> _allIndexPosById;
 
   private IndexService(Set<IndexPlugin<?>> allPlugins) {
     ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
@@ -76,7 +77,7 @@ public class IndexService {
     allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
 
     _allIndexPosById = new Object2ShortOpenHashMap(allIndexIds.size());
-    _allIndexPosById.defaultReturnValue((short) -1);
+    _allIndexPosById.defaultReturnValue(UNKNOWN_INDEX);
     for (short i = 0; i < _allIndexes.size(); i++) {
       _allIndexPosById.put(_allIndexes.get(i).getId(), i);
     }
@@ -162,7 +163,7 @@ public class IndexService {
 
   public short getNumericId(String indexId) {
     short id = _allIndexPosById.getShort(indexId.toLowerCase(Locale.US));
-    if (id == -1) {
+    if (id == UNKNOWN_INDEX) {
       throw new IllegalArgumentException("Unknown index id: " + indexId);
     }
     return id;
@@ -170,7 +171,7 @@ public class IndexService {
 
   public short getNumericId(IndexType indexType) {
     short id = _allIndexPosById.getShort(indexType.getId());
-    if (id == -1) {
+    if (id == UNKNOWN_INDEX) {
       throw new IllegalArgumentException("Unknown index type: " + indexType);
     }
     return id;

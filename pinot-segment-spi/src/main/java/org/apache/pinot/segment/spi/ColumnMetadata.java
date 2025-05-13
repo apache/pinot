@@ -35,6 +35,8 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 @InterfaceAudience.Private
 @SuppressWarnings("rawtypes")
 public interface ColumnMetadata {
+
+  /** Value returned by getIndexSizeFor() when given index type can't be found. */
   int INDEX_NOT_FOUND = -1;
 
   FieldSpec getFieldSpec();
@@ -90,21 +92,38 @@ public interface ColumnMetadata {
   @Nullable
   Set<Integer> getPartitions();
 
-  long getIndexSizeFor(IndexType type);
+  /**
+   * If exists, returns size of index for given index type; otherwise returns -1.
+   * @param type index type
+   */
+  default long getIndexSizeFor(IndexType type) {
+    return INDEX_NOT_FOUND;
+  }
 
   default void addIndexSize(short indexType, long size) {
     // do nothing
   }
 
-  default short getIndexType(int i) {
+  /**
+   * Returns type of index at `position`.
+   * @param position - position within collection of indexes
+   */
+  default short getIndexType(int position) {
     return (short) -1;
   }
 
-  default long getIndexSize(int i) {
+  /**
+   * Returns size of index at `position`.
+   * @param position - position within collection of indexes
+   */
+  default long getIndexSize(int position) {
     return -1;
   }
 
-  default int getIndexTypeSizesCount() {
+  /**
+   * Returns this column's number of indexes.
+   */
+  default int getNumIndexes() {
     return 0;
   }
 

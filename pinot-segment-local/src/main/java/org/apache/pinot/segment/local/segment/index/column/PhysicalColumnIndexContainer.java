@@ -124,8 +124,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       ShortArrayList indexIds = new ShortArrayList(indexTypes.size());
       IndexService indexService = IndexService.getInstance();
 
-      for (int i = 0, n = indexTypes.size(); i < n; i++) {
-        short indexId = indexService.getNumericId(indexTypes.get(i));
+      for (IndexType indexType : indexTypes) {
+        short indexId = indexService.getNumericId(indexType);
         indexIds.add(indexId);
         if (indexId < min) {
           min = indexId;

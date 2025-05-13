@@ -254,7 +254,7 @@ public class ColumnMetadataTest {
     meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.h3()), 0xffffffffffffL);
     meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.vector()), 0);
 
-    Assert.assertEquals(meta.getIndexTypeSizesCount(), 3);
+    Assert.assertEquals(meta.getNumIndexes(), 3);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.json()), 12345L);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.h3()), 0xffffffffffffL);
     Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.vector()), 0);
