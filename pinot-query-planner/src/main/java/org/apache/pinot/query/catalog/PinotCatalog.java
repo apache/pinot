@@ -94,16 +94,12 @@ public class PinotCatalog implements Schema {
     for (String tableName: _tableCache.getTableNameMap().keySet()) {
       if (DatabaseUtils.isPartOfDatabase(tableName, _databaseName)) {
         result.add(tableName);
-        // if table has no prefix the next add(n) will have no effect
-        result.add(DatabaseUtils.removeDatabasePrefix(tableName, _databaseName));
       }
     }
 
     for (String logicalTableName: _tableCache.getLogicalTableNameMap().keySet()) {
       if (DatabaseUtils.isPartOfDatabase(logicalTableName, _databaseName)) {
         result.add(logicalTableName);
-        // if table has no prefix the next add(n) will have no effect
-        result.add(DatabaseUtils.removeDatabasePrefix(logicalTableName, _databaseName));
       }
     }
 

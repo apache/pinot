@@ -528,7 +528,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.warn("Failed to find schema for logical table: {}, skipping", logicalTableName);
       return null;
     }
-    LogicalTableConfig logicalTableConfig =  ZKMetadataProvider.getLogicalTableConfig(getPropertyStore(), logicalTableName);
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(getPropertyStore(),
+        logicalTableName);
     if (logicalTableConfig == null) {
       LOGGER.warn("Failed to find logical table config for logical table: {}, skipping", logicalTableName);
       return null;

@@ -433,14 +433,16 @@ public class ServerPlanRequestUtils {
         Preconditions.checkNotNull(logicalTableManager.getOfflineTableConfig());
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(logicalTableName);
         return List.of(
-            compileLogicalTableInstanceRequest(executionContext, pinotQuery, offlineTableName, logicalTableManager.getOfflineTableConfig(),
-                logicalTableManager.getLogicalTableSchema(), null, TableType.OFFLINE, routeInfoList));
+            compileLogicalTableInstanceRequest(executionContext, pinotQuery, offlineTableName,
+                logicalTableManager.getOfflineTableConfig(), logicalTableManager.getLogicalTableSchema(), null,
+                TableType.OFFLINE, routeInfoList));
       } else {
         Preconditions.checkNotNull(logicalTableManager.getRealtimeTableConfig());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
         return List.of(
-            compileLogicalTableInstanceRequest(executionContext, pinotQuery, realtimeTableName, logicalTableManager.getRealtimeTableConfig(),
-                logicalTableManager.getLogicalTableSchema(), null, TableType.REALTIME, routeInfoList));
+            compileLogicalTableInstanceRequest(executionContext, pinotQuery, realtimeTableName,
+                logicalTableManager.getRealtimeTableConfig(), logicalTableManager.getLogicalTableSchema(), null,
+                TableType.REALTIME, routeInfoList));
       }
     } else {
       Preconditions.checkNotNull(logicalTableManager.getOfflineTableConfig());
@@ -452,10 +454,12 @@ public class ServerPlanRequestUtils {
       // TODO Calculate TimeBoundaryInfo for logical table
       TimeBoundaryInfo timeBoundaryInfo = null;
       return List.of(
-          compileLogicalTableInstanceRequest(executionContext, offlinePinotQuery, offlineTableName, logicalTableManager.getOfflineTableConfig(),
-              logicalTableManager.getLogicalTableSchema(), timeBoundaryInfo, TableType.OFFLINE, offlineTableRouteInfoList),
-          compileLogicalTableInstanceRequest(executionContext, realtimePinotQuery, realtimeTableName, logicalTableManager.getRealtimeTableConfig(),
-              logicalTableManager.getLogicalTableSchema(), timeBoundaryInfo, TableType.REALTIME, realtimeTableRouteInfoList));
+          compileLogicalTableInstanceRequest(executionContext, offlinePinotQuery, offlineTableName,
+              logicalTableManager.getOfflineTableConfig(), logicalTableManager.getLogicalTableSchema(),
+              timeBoundaryInfo, TableType.OFFLINE, offlineTableRouteInfoList),
+          compileLogicalTableInstanceRequest(executionContext, realtimePinotQuery, realtimeTableName,
+              logicalTableManager.getRealtimeTableConfig(), logicalTableManager.getLogicalTableSchema(),
+              timeBoundaryInfo, TableType.REALTIME, realtimeTableRouteInfoList));
     }
   }
 
