@@ -40,6 +40,7 @@ public class ResultsBlockUtils {
   private ResultsBlockUtils() {
   }
 
+  // TODO: Use schema to fill the correct data types for empty results.
   public static BaseResultsBlock buildEmptyQueryResults(QueryContext queryContext) {
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return buildEmptySelectionQueryResults(queryContext);

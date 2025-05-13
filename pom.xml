@@ -139,7 +139,7 @@
     <arrow.version>18.2.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.2</parquet.version>
-    <orc.version>1.9.5</orc.version>
+    <orc.version>1.9.6</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
@@ -163,7 +163,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.7-2</zstd-jni.version>
+    <zstd-jni.version>1.5.7-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.24.3</log4j.version>
@@ -176,7 +176,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.34</aws.sdk.version>
+    <aws.sdk.version>2.31.40</aws.sdk.version>
     <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -236,8 +236,8 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
-    <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.59.0</google.cloud.libraries.version>
+    <grpc.version>1.72.0</grpc.version>
+    <google.cloud.libraries.version>26.60.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.38.0</google.errorprone.version>
@@ -250,10 +250,10 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.29.0</jline.version>
+    <jline.version>3.30.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.2</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.3</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
@@ -276,7 +276,7 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
-    <checker-qual.version>3.49.2</checker-qual.version>
+    <checker-qual.version>3.49.3</checker-qual.version>
     <groovy-all.version>2.4.21</groovy-all.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.3.0</roaring-bitmap.version>
@@ -293,7 +293,7 @@
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
-    <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
+    <openhft.chronicle-core.version>2.27ea3</openhft.chronicle-core.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>

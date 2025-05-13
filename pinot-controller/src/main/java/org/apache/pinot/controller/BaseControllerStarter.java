@@ -607,7 +607,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApp.start(_listenerConfigs);
+    _adminApp.start(_listenerConfigs, _controllerMetrics);
 
     enforceTableConfigAndSchema();
 
