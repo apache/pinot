@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -93,6 +94,8 @@ public class VarLengthValueWriter implements Closeable {
   private final ByteBuffer _offsetBuffer;
   private final ByteBuffer _valueBuffer;
 
+  private long _totalLength;
+
   public VarLengthValueWriter(File outputFile, int numValues)
       throws IOException {
     _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
@@ -115,6 +118,9 @@ public class VarLengthValueWriter implements Closeable {
 
   public void add(byte[] value, int length)
       throws IOException {
+    _totalLength += length;
+    Preconditions.checkArgument(_totalLength < Integer.MAX_VALUE,
+        "2GB data limit exceeded. Try reducing segment size.");
     _offsetBuffer.putInt(_valueBuffer.position());
     _valueBuffer.put(value, 0, length);
   }
