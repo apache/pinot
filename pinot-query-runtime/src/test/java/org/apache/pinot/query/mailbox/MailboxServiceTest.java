@@ -514,7 +514,8 @@ public class MailboxServiceTest {
 
     assertTrue(block instanceof ErrorMseBlock);
     ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
-    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION), "Cancelled by sender with exception: CANCELLED: client cancelled");
+    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION),
+      "Cancelled by sender with exception: CANCELLED: client cancelled");
 
     mailboxService3.shutdown();
     mailboxService4.shutdown();
