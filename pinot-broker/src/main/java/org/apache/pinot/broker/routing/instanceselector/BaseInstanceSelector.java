@@ -54,7 +54,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
 
 
 /**
@@ -93,6 +93,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
+  // Will be null if and only if adaptiveServerSelector is null
   final PriorityGroupInstanceSelector _priorityGroupInstanceSelector;
   final Clock _clock;
   final boolean _useFixedReplica;
@@ -473,7 +474,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   @VisibleForTesting
   int getGroup(String instanceID) {
-    int group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+    int group = FALLBACK_REPLICA_GROUP_ID;
     ServerInstance server = _enabledServerStore.get(instanceID);
     if (server == null) {
       LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",

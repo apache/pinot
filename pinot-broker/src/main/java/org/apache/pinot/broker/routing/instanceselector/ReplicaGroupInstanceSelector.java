@@ -74,31 +74,31 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   @Override
   Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions);
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<SegmentInstanceCandidate> candidateServers = fetchCandidateServersForQuery(segments, segmentStates);
 
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-      List<String> serverRankList = _priorityGroupInstanceSelector.rank(new ServerSelectionContext(queryOptions),
-          candidateServers);
+      List<String> serverRankList = _priorityGroupInstanceSelector.rank(ctx, candidateServers);
       Map<String, Integer> serverRankMap = new HashMap<>();
       for (int idx = 0; idx < serverRankList.size(); idx++) {
         serverRankMap.put(serverRankList.get(idx), idx);
       }
-      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankMap, queryOptions);
+      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankMap, ctx);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions);
+      return selectServersUsingRoundRobin(segments, requestId, segmentStates, ctx);
     }
   }
 
   private Pair<Map<String, String>, Map<String, String>> selectServersUsingRoundRobin(List<String> segments,
-      int requestId, SegmentStates segmentStates, Map<String, String> queryOptions) {
+      int requestId, SegmentStates segmentStates, ServerSelectionContext ctx) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
+    Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
     int replicaOffset = 0;
     Map<Integer, Integer> replicaGroupToSegmentCount = new HashMap<>();
@@ -113,7 +113,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       int numCandidates = candidates.size();
       int instanceIdx;
 
-      if (isUseFixedReplica(queryOptions)) {
+      if (isUseFixedReplica(ctx.getQueryOptions())) {
         // candidates array is always sorted
         instanceIdx = _tableNameHashForFixedReplicaRouting % numCandidates;
       } else {
@@ -136,14 +136,14 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
     for (Map.Entry<Integer, Integer> entry : replicaGroupToSegmentCount.entrySet()) {
       _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(entry.getKey()));
+          BrokerMetrics.getTagForPreferredGroup(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private Pair<Map<String, String>, Map<String, String>> selectServersUsingAdaptiveServerSelector(List<String> segments,
       int requestId, SegmentStates segmentStates, Map<String, Integer> serverRankMap,
-      Map<String, String> queryOptions) {
+      ServerSelectionContext ctx) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -181,7 +181,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     }
     for (Map.Entry<Integer, Integer> entry : replicaGroupToSegmentCount.entrySet()) {
       _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(entry.getKey()));
+          BrokerMetrics.getTagForPreferredGroup(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

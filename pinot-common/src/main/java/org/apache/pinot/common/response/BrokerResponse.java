@@ -367,7 +367,7 @@ public interface BrokerResponse {
   void setReplicaGroups(Set<Integer> replicaGroups);
 
   /**
-   * Set the replica groups queried in the request
+   * Get the replica groups queried in the request
    * @return
    */
   Set<Integer> getReplicaGroups();

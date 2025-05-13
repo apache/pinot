@@ -460,9 +460,9 @@ public class CommonConstants {
             "pinot.broker.enable.dynamic.filtering.semijoin";
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
-    // When the server instance's pool field is null or the pool contains multi distinguished group value, set the group
-    // to -1.
-    public static final int DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW = -1;
+    // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
+    // would set the group to -1 in the routing table for that server.
+    public static final int FALLBACK_REPLICA_GROUP_ID = -1;
 
     public static class Request {
       public static final String SQL = "sql";

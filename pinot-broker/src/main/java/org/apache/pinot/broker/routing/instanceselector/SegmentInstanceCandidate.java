@@ -21,7 +21,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.concurrent.Immutable;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
 
 
 /**
@@ -38,7 +38,7 @@ public class SegmentInstanceCandidate {
     _instance = instance;
     _online = online;
     // no group
-    _group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+    _group = FALLBACK_REPLICA_GROUP_ID;
   }
 
   public SegmentInstanceCandidate(String instance, boolean online, int group) {
