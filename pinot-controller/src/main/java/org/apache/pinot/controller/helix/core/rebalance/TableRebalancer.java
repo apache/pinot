@@ -1607,11 +1607,16 @@ public class TableRebalancer {
         : partitionIdToAssignedInstancesToCurrentAssignmentMap.values()) {
       boolean anyServerExhaustedBatchSize = false;
       if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
+        // The number of segments for a given partition, accumulates as we iterate over the assigned instances
+        int numSegmentsForGivenPartition = 0;
+
         // Check if the servers of the first assignment for each unique set of assigned instances has any space left
         // to move this partition. If so, let's mark the partitions as to be moved, otherwise we mark the partition
         // as a whole as not moveable.
         for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
           Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
+          numSegmentsForGivenPartition += curAssignment.size();
+
           // It is enough to check for whether any server for one segment is above the limit or not since all segments
           // in curAssignment will have the same assigned instances list
           Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
@@ -1621,7 +1626,20 @@ public class TableRebalancer {
           Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
               firstAssignment._instanceStateMap);
           for (String server : serversAdded) {
-            if (serverToNumSegmentsAddedSoFar.getOrDefault(server, 0) >= batchSizePerServer) {
+            int segmentsAddedToServerSoFar = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
+            // Case I: We already exceeded the batchSizePerServer for this server, cannot add any more segments
+            if (segmentsAddedToServerSoFar >= batchSizePerServer) {
+              anyServerExhaustedBatchSize = true;
+              break;
+            }
+
+            // Case II: We have not yet exceeded the batchSizePerServer for this server, but we don't have sufficient
+            // space to host the segments for this assignment so far, and we have allocated some partitions so far. If
+            // the batchSizePerServer is less than the number of segments in a given partitionId, we must host at least
+            // 1 partition and exceed the batchSizePerServer to ensure progress is made. Thus, performing this check
+            // only if segmentsAddedToServerSoFar > 0 is necessary.
+            if (segmentsAddedToServerSoFar > 0
+                && (segmentsAddedToServerSoFar + numSegmentsForGivenPartition) > batchSizePerServer) {
               anyServerExhaustedBatchSize = true;
               break;
             }
@@ -1631,6 +1649,10 @@ public class TableRebalancer {
           }
         }
       }
+      // TODO: Consider whether we should process the nextAssignment for each unique assigned instances rather than the
+      //       full partition to get a more granular number of segment moves in each step. For now since we expect
+      //       strict replica groups to mostly be used for tables like upserts which require a full partition to be
+      //       moved, we move a full partition at a time.
       for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
         updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
             anyServerExhaustedBatchSize, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
@@ -1651,11 +1673,7 @@ public class TableRebalancer {
       Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
-      for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
-        String segmentName = entry.getKey();
-        Map<String, String> currentInstanceStateMap = entry.getValue();
-        nextAssignment.put(segmentName, currentInstanceStateMap);
-      }
+      nextAssignment.putAll(currentAssignment);
     } else {
       // Process all the partitionIds even if segmentsAddedSoFar becomes larger than batchSizePerServer
       // Can only do bestEfforts w.r.t. StrictReplicaGroup since a whole partition must be moved together for

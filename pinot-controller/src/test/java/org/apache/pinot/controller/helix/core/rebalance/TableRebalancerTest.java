@@ -2392,7 +2392,7 @@ public class TableRebalancerTest {
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after three steps if strict replica group is disabled . With strict replica groups it should reach
     // the target assignment in two steps since the full partition must be selected for movement.
-    // Batch size = 1, unique partitionIds
+    // Batch size = 2, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -2444,6 +2444,67 @@ public class TableRebalancerTest {
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
                 2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
       } else {
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
+      }
+      assertEquals(nextAssignment, targetAssignment);
+    }
+
+    // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
+    // assignment after two steps if strict replica group is disabled or enabled. Batch size = 5, unique partitionIds
+    for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
+      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
+      nextAssignment =
+          TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+              5, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
+      if (!enableStrictReplicaGroup) {
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        // host5 has reached batchSizePerServer due to which this segment didn't move in the first step
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
+      } else {
+        // This would have completed in a single step for batchSizePerServer = 5 if we did not have an additional check
+        // to only add segments that exceed the batchSizePerServer if no prior segments were already assigned to a
+        // given server
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
