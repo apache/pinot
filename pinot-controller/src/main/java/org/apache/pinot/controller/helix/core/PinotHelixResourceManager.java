@@ -1653,16 +1653,29 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
+  /**
+   * Get all schema names in the cluster across all databases.
+   * @return List of schema names
+   */
   public List<String> getAllSchemaNames() {
     return _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT
     );
   }
 
+  /**
+   * Get all schema names in the cluster for default database.
+   * @return List of schema names
+   */
   public List<String> getSchemaNames() {
     return getSchemaNames(null);
   }
 
+  /**
+   * Get all schema names in the cluster for a given database.
+   * @param databaseName Database name to filter schema names
+   * @return List of schema names
+   */
   public List<String> getSchemaNames(@Nullable String databaseName) {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
@@ -1841,18 +1854,7 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Adding logical table {}: Start", tableName);
 
-    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
-      logicalTableConfig.setBrokerTenant("DefaultTenant");
-    }
-
-    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
-        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
-    LogicalTableConfigUtils.validateLogicalTableConfig(
-        logicalTableConfig,
-        pinotHelixPropertyStoreZnRecordProvider::exist,
-        getAllBrokerTenantNames()::contains,
-        _propertyStore
-    );
+    validateLogicalTableConfig(logicalTableConfig);
 
     // Check if the logical table name is already used
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
@@ -1860,6 +1862,8 @@ public class PinotHelixResourceManager {
     }
 
     // Check if the table name is already used by a physical table
+    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
     if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
     || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
       throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
@@ -2131,16 +2135,7 @@ public class PinotHelixResourceManager {
     String tableName = logicalTableConfig.getTableName();
     LOGGER.info("Updating logical table {}: Start", tableName);
 
-    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
-      logicalTableConfig.setBrokerTenant("DefaultTenant");
-    }
-
-    LogicalTableConfigUtils.validateLogicalTableConfig(
-        logicalTableConfig,
-        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
-        getAllBrokerTenantNames()::contains,
-        _propertyStore
-    );
+    validateLogicalTableConfig(logicalTableConfig);
 
     LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
     if (oldLogicalTableConfig == null) {
@@ -2167,6 +2162,19 @@ public class PinotHelixResourceManager {
           .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
       return is;
     });
+  }
+
+  private void validateLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableConfigUtils.validateLogicalTableConfig(
+        logicalTableConfig,
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
+        _propertyStore
+    );
   }
 
   /**
