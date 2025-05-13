@@ -27,6 +27,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -509,6 +511,13 @@ public class MailboxServiceTest {
     MseBlock block = readBlock(receivingMailbox);
     assertNotNull(block);
     assertTrue(block.isError());
+
+    assertTrue(block instanceof ErrorMseBlock);
+    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
+    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION), "Cancelled by sender with exception: CANCELLED: client cancelled");
+
+    mailboxService3.shutdown();
+    mailboxService4.shutdown();
   }
 
   @Test
