@@ -476,6 +476,41 @@ public class MailboxServiceTest {
   }
 
   @Test
+  public void testRemoteCancelledBecauseResourceExhausted()
+    throws Exception {
+    PinotConfiguration config = new PinotConfiguration(
+      Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 1));
+    var _mailboxService3 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    _mailboxService3.start();
+    var _mailboxService4 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    _mailboxService4.start();
+
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    SendingMailbox sendingMailbox =
+      _mailboxService4.getSendingMailbox("localhost", _mailboxService3.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+    ReceivingMailbox receivingMailbox = _mailboxService3.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(1);
+    receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
+    });
+
+    // Send some large data
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"longer-amount-of-data-than-server-expects"}));
+
+    // Wait until cancellation is delivered
+    receiveMailLatch.await();
+    assertEquals(numCallbacks.get(), 1);
+
+    // Assert that error block is returned from server.
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+    MseBlock block = readBlock(receivingMailbox);
+    assertNotNull(block);
+    assertTrue(block.isError());
+  }
+
+  @Test
   public void testRemoteCancelledByReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);

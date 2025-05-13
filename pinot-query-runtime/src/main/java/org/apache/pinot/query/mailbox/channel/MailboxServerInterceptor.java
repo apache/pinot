@@ -26,6 +26,10 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 
 
+/**
+ * MailboxServerInterceptor is used in GrpcMailboxServer to intercept mailboxId from headers
+ * to inject into context.
+ */
 public class MailboxServerInterceptor implements ServerInterceptor {
   @Override
   public <T, R> ServerCall.Listener<T> interceptCall(

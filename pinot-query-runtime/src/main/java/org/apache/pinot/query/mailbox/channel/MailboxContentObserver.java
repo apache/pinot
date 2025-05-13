@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -49,24 +50,21 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private final StreamObserver<MailboxStatus> _responseObserver;
 
   private final List<ByteBuffer> _mailboxBuffers;
-  private transient String _mailboxId;
   private transient ReceivingMailbox _mailbox;
 
   public MailboxContentObserver(
     MailboxService mailboxService, String mailboxId, StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
-    _mailboxId = mailboxId;
+    _mailbox = StringUtils.isNotBlank(mailboxId) ? _mailboxService.getReceivingMailbox(mailboxId) : null;
     _responseObserver = responseObserver;
     _mailboxBuffers = new ArrayList<>();
   }
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
-    if (_mailboxId == null) {
-      _mailboxId = mailboxContent.getMailboxId();
-    }
+    String mailboxId = mailboxContent.getMailboxId();
     if (_mailbox == null) {
-      _mailbox = _mailboxService.getReceivingMailbox(_mailboxId);
+      _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
     }
     _mailboxBuffers.add(mailboxContent.getPayload().asReadOnlyByteBuffer());
     if (mailboxContent.getWaitForMore()) {
@@ -79,34 +77,34 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffers, timeoutMs);
       switch (status) {
         case SUCCESS:
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(_mailboxId)
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
         case CANCELLED:
-          LOGGER.warn("Mailbox: {} already cancelled from upstream", _mailboxId);
+          LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
           cancelStream();
           break;
         case FIRST_ERROR:
           return;
         case ERROR:
-          LOGGER.warn("Mailbox: {} already errored out (received error block before)", _mailboxId);
+          LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
           cancelStream();
           break;
         case TIMEOUT:
-          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", _mailboxId, timeoutMs);
+          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
           cancelStream();
           break;
         case EARLY_TERMINATED:
-          LOGGER.debug("Mailbox: {} has been early terminated", _mailboxId);
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(_mailboxId)
+          LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
           break;
         default:
           throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
     } catch (Exception e) {
-      String errorMessage = "Caught exception while processing blocks for mailbox: " + _mailboxId;
+      String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
       _mailbox.setErrorBlock(
           ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), Collections.emptyList());
@@ -127,9 +125,6 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   @Override
   public void onError(Throwable t) {
     LOGGER.warn("Error on receiver side", t);
-    if (_mailboxId != null) {
-      _mailbox = _mailboxService.getReceivingMailbox(_mailboxId);
-    }
     if (_mailbox != null) {
       String msg = t != null ? t.getMessage() : "Unknown";
       _mailbox.setErrorBlock(ErrorMseBlock.fromError(
