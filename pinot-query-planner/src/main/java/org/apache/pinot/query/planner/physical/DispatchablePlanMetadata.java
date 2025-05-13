@@ -84,11 +84,9 @@ public class DispatchablePlanMetadata implements Serializable {
   /**
    * Map from workerId -> {tableType -> {tableName -> segments}} is required for logical tables.
    * Raw definition of the map is:
-   * Map<String, Map<String, Map<String, List<String>>>>. Since this defintion is hard to understand - specifically
-   * what do each of the string keys store.
-   *
-   * Therefore, we define two classes:
-   * {@link TableTypeToSegmentsMap} and {@link TableTypeTableNameToSegmentsMap} to help read code easily.
+   * Map<String, Map<String, Map<String, List<String>>>>. Since this definition is hard to understand - specifically
+   * what do each of the string keys store, we define two classes:
+   * {@link TableTypeToSegmentsMap} and {@link TableTypeTableNameToSegmentsMap} to help read code more easily.
    */
   public static class TableTypeToSegmentsMap {
     public final Map<String, List<String>> _map = new HashMap<>();
