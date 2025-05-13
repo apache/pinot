@@ -65,7 +65,7 @@ jobs:
           -Drun.dependency.verifier=false
       - name: Full reactor build + dependency-verifier
         run: |
-          mvn clean verify \
+          mvn clean install \
           -Pbin-dist,dependency-verifier \
           -Drun.dependency.verifier=true \
           -DskipTests
