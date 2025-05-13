@@ -42,8 +42,8 @@ public class SegmentAssignmentFactory {
     } else {
       UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
       DedupConfig dedupConfig = tableConfig.getDedupConfig();
-      if ((upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) ||
-          (dedupConfig != null && dedupConfig.isDedupEnabled())) {
+      if ((upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) || (dedupConfig != null
+          && dedupConfig.isDedupEnabled())) {
         segmentAssignment = new StrictRealtimeSegmentAssignment();
       } else {
         segmentAssignment = new RealtimeSegmentAssignment();
