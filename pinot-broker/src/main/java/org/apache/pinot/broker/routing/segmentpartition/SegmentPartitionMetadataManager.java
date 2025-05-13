@@ -19,12 +19,14 @@
 package org.apache.pinot.broker.routing.segmentpartition;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -203,8 +205,8 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
               : segmentsReducingFullyReplicatedServers.subList(0, 10) + "...", _tableNameWithType);
     }
     // Process new segments
+    Map<Integer, List<String>> excludedNewSegments = new HashMap<>();
     if (!newSegmentInfoEntries.isEmpty()) {
-      List<String> excludedNewSegments = new ArrayList<>();
       for (Map.Entry<String, SegmentInfo> entry : newSegmentInfoEntries) {
         String segment = entry.getKey();
         SegmentInfo segmentInfo = entry.getValue();
@@ -221,7 +223,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfo = new PartitionInfo(fullyReplicatedServers, segments);
             partitionInfoMap[partitionId] = partitionInfo;
           } else {
-            excludedNewSegments.add(segment);
+            excludedNewSegments.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(segment);
           }
         } else {
           // If the new segment is not the first segment of a partition, add it only if it won't reduce the fully
@@ -232,19 +234,21 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
           if (onlineServers.containsAll(partitionInfo._fullyReplicatedServers)) {
             partitionInfo._segments.add(segment);
           } else {
-            excludedNewSegments.add(segment);
+            excludedNewSegments.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(segment);
           }
         }
       }
       if (!excludedNewSegments.isEmpty()) {
-        int numSegments = excludedNewSegments.size();
+        List<String> excludedSegmentsList = excludedNewSegments.values().stream().flatMap(Collection::stream)
+            .collect(Collectors.toList());
+        int numSegments = excludedSegmentsList.size();
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
-            numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
+            numSegments <= 10 ? excludedSegmentsList : excludedSegmentsList.subList(0, 10) + "...", _tableNameWithType);
       }
     }
     _tablePartitionInfo =
         new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
-            partitionInfoMap, segmentsWithInvalidPartition);
+            partitionInfoMap, segmentsWithInvalidPartition, Collections.unmodifiableMap(excludedNewSegments));
   }
 
   @Override

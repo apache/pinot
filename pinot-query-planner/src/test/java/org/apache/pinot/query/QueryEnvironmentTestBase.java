@@ -323,7 +323,7 @@ public class QueryEnvironmentTestBase {
         }
         TablePartitionInfo tablePartitionInfo =
             new TablePartitionInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions, partitionIdToInfoMap,
-                Collections.emptyList());
+                Collections.emptyList(), Map.of());
         partitionInfoMap.put(tableNameWithType, tablePartitionInfo);
       }
     }
