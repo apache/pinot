@@ -34,6 +34,7 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
@@ -397,8 +398,16 @@ public class BaseTableRouteTest {
       // Generate offline and realtime table names
       tableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(tableName), new PhysicalTableConfig());
       tableConfigMap.put(TableNameBuilder.REALTIME.tableNameWithType(tableName), new PhysicalTableConfig());
-    } else {
+      logicalTable.setRefOfflineTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      logicalTable.setRefRealtimeTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
       tableConfigMap.put(tableName, new PhysicalTableConfig());
+      logicalTable.setRefOfflineTableName(tableName);
+    } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
+      tableConfigMap.put(tableName, new PhysicalTableConfig());
+      logicalTable.setRefRealtimeTableName(tableName);
+    } else {
+      throw new IllegalArgumentException("Invalid table type");
     }
 
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);

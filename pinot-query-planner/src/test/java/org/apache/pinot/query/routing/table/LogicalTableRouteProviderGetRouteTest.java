@@ -141,6 +141,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
+    logicalTable.setRefOfflineTableName(physicalTableNames.get(0));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =
@@ -178,6 +179,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
+    logicalTable.setRefRealtimeTableName(physicalTableNames.get(0));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =
@@ -195,36 +197,22 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     assertNull(routeInfo.getTimeBoundaryInfo());
   }
 
-  @DataProvider(name = "hybridTableList")
-  public Object[][] hybridTableList() {
+  @DataProvider(name = "hybridTableName")
+  public Object[][] hybridTableName() {
     return new Object[][]{
-        {ImmutableList.of("e")},
+        {"e"},
     };
   }
 
-  @Test(dataProvider = "hybridTableList")
-  void testWithHybridTable(List<String> hybridTableNames) {
-    // Generate physical table names
-    Map<String, PhysicalTableConfig> tableConfigMap = new HashMap<>();
-    for (String tableName : hybridTableNames) {
-      tableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(tableName), new PhysicalTableConfig());
-      tableConfigMap.put(TableNameBuilder.REALTIME.tableNameWithType(tableName), new PhysicalTableConfig());
-    }
-    String logicalTableName = "testWithHybridTables";
-    LogicalTableConfig logicalTable = new LogicalTableConfig();
-    logicalTable.setTableName(logicalTableName);
-    logicalTable.setPhysicalTableConfigMap(tableConfigMap);
-    logicalTable.setBrokerTenant("brokerTenant");
-    when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
-
-    TableRouteInfo routeInfo =
-        _logicalTableRouteProvider.getTableRouteInfo(logicalTable.getTableName(), _tableCache, _routingManager);
+  @Test(dataProvider = "hybridTableName")
+  void testWithHybridTable(String hybridTableName) {
+    TableRouteInfo routeInfo = getLogicalTableRouteInfo(hybridTableName, "testWithHybridTable");
     assertNotNull(routeInfo.getOfflineTableConfig());
     assertNotNull(routeInfo.getRealtimeTableConfig());
     assertTrue(routeInfo.isExists());
     assertTrue(routeInfo.isHybrid());
-    assertEquals(routeInfo.getOfflineTableName(), "testWithHybridTables_OFFLINE");
-    assertEquals(routeInfo.getRealtimeTableName(), "testWithHybridTables_REALTIME");
+    assertEquals(routeInfo.getOfflineTableName(), "testWithHybridTable_OFFLINE");
+    assertEquals(routeInfo.getRealtimeTableName(), "testWithHybridTable_REALTIME");
     assertTrue(routeInfo.isRouteExists());
     assertFalse(routeInfo.isDisabled());
     assertNull(routeInfo.getDisabledTableNames());
@@ -232,27 +220,15 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "disabledTableProvider")
   void testWithDisabledPhysicalTable(String tableName) {
-    Map<String, PhysicalTableConfig> tableConfigMap = new HashMap<>();
-    if (TableNameBuilder.getTableTypeFromTableName(tableName) == null) {
-      // Generate offline and realtime table names
-      tableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(tableName), new PhysicalTableConfig());
-      tableConfigMap.put(TableNameBuilder.REALTIME.tableNameWithType(tableName), new PhysicalTableConfig());
-    } else {
-      tableConfigMap.put(tableName, new PhysicalTableConfig());
-    }
-    String logicalTableName = "testWithDisabledPhysicalTable";
-    LogicalTableConfig logicalTable = new LogicalTableConfig();
-    logicalTable.setTableName(logicalTableName);
-    logicalTable.setPhysicalTableConfigMap(tableConfigMap);
-    logicalTable.setBrokerTenant("brokerTenant");
-    when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
-
-    TableRouteInfo routeInfo =
-        _logicalTableRouteProvider.getTableRouteInfo(logicalTable.getTableName(), _tableCache, _routingManager);
+    TableRouteInfo routeInfo = getLogicalTableRouteInfo(tableName, "testWithDisabledPhysicalTable");
+    LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig("testWithDisabledPhysicalTable");
+    assertNotNull(logicalTableConfig);
+    assertNotNull(logicalTableConfig.getPhysicalTableConfigMap());
     assertTrue(routeInfo.isExists());
     assertTrue(routeInfo.isDisabled());
     assertNotNull(routeInfo.getDisabledTableNames());
-    assertEquals(new HashSet<>(routeInfo.getDisabledTableNames()), tableConfigMap.keySet());
+    assertEquals(new HashSet<>(routeInfo.getDisabledTableNames()),
+        logicalTableConfig.getPhysicalTableConfigMap().keySet());
   }
 
   @DataProvider(name = "offlineTableWithOtherTables")
@@ -274,6 +250,12 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     Map<String, PhysicalTableConfig> tableConfigMap = new HashMap<>();
     for (String tableName : physicalTableNames) {
       tableConfigMap.put(tableName, new PhysicalTableConfig());
+      if (logicalTable.getRefOfflineTableName() == null && TableNameBuilder.isOfflineTableResource(tableName)) {
+        logicalTable.setRefOfflineTableName(tableName);
+      } else if (logicalTable.getRefRealtimeTableName() == null && TableNameBuilder.isRealtimeTableResource(
+          tableName)) {
+        logicalTable.setRefRealtimeTableName(tableName);
+      }
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
@@ -306,6 +288,12 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     Map<String, PhysicalTableConfig> tableConfigMap = new HashMap<>();
     for (String tableName : physicalTableNames) {
       tableConfigMap.put(tableName, new PhysicalTableConfig());
+      if (logicalTable.getRefOfflineTableName() == null && TableNameBuilder.isOfflineTableResource(tableName)) {
+        logicalTable.setRefOfflineTableName(tableName);
+      } else if (logicalTable.getRefRealtimeTableName() == null && TableNameBuilder.isRealtimeTableResource(
+          tableName)) {
+        logicalTable.setRefRealtimeTableName(tableName);
+      }
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
