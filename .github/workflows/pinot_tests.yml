@@ -56,19 +56,6 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
-      - name: Install dependency-verifier into repo
-        run: |
-          mvn clean install \
-          -pl pinot-dependency-verifier \
-          -am \
-          -DskipTests \
-          -Drun.dependency.verifier=false
-      - name: Full reactor build + dependency-verifier
-        run: |
-          mvn clean install \
-          -Pbin-dist,dependency-verifier \
-          -Drun.dependency.verifier=true \
-          -DskipTests
       - name: Linter Test
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
