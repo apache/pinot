@@ -56,6 +56,7 @@ public class PhysicalPlannerContext {
    * Instance ID of the instance corresponding to this process.
    */
   private final String _instanceId;
+  private final Map<String, String> _queryOptions;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -67,15 +68,17 @@ public class PhysicalPlannerContext {
     _port = 0;
     _requestId = 0;
     _instanceId = "";
+    _queryOptions = Map.of();
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
-      String instanceId) {
+      String instanceId, Map<String, String> queryOptions) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
     _requestId = requestId;
     _instanceId = instanceId;
+    _queryOptions = queryOptions == null ? Map.of() : queryOptions;
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -105,6 +108,10 @@ public class PhysicalPlannerContext {
 
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public Map<String, String> getQueryOptions() {
+    return _queryOptions;
   }
 
   public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {

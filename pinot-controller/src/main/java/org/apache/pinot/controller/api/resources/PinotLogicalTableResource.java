@@ -43,11 +43,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.arrow.util.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.LogicalTableUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -82,7 +80,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotLogicalTableResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLogicalTableResource.class);
-  private static final String DEFAULT_BROKER_TENANT = "DefaultTenant";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -172,7 +169,7 @@ public class PinotLogicalTableResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     logicalTableConfig.setTableName(tableName);
 
-    SuccessResponse successResponse = updateLogicalTable(tableName, logicalTableConfig);
+    SuccessResponse successResponse = updateLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }
 
@@ -190,7 +187,7 @@ public class PinotLogicalTableResource {
       @ApiParam(value = "Logical table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    if (_pinotHelixResourceManager.deleteLogicalTable(tableName)) {
+    if (_pinotHelixResourceManager.deleteLogicalTableConfig(tableName)) {
       return new SuccessResponse(tableName + " logical table successfully deleted.");
     } else {
       throw new ControllerApplicationException(LOGGER, "Failed to delete logical table",
@@ -214,16 +211,7 @@ public class PinotLogicalTableResource {
   private SuccessResponse addLogicalTable(LogicalTableConfig logicalTableConfig) {
     String tableName = logicalTableConfig.getTableName();
     try {
-      if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
-        logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
-      }
-
-      LogicalTableUtils.validateLogicalTableName(
-          logicalTableConfig,
-          _pinotHelixResourceManager.getAllTables(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames()
-      );
-      _pinotHelixResourceManager.addLogicalTable(logicalTableConfig);
+      _pinotHelixResourceManager.addLogicalTableConfig(logicalTableConfig);
       return new SuccessResponse(tableName + " logical table successfully added.");
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -236,18 +224,10 @@ public class PinotLogicalTableResource {
     }
   }
 
-  private SuccessResponse updateLogicalTable(String tableName, LogicalTableConfig logicalTableConfig) {
+  private SuccessResponse updateLogicalTable(LogicalTableConfig logicalTableConfig) {
+    String tableName = logicalTableConfig.getTableName();
     try {
-      if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
-        logicalTableConfig.setBrokerTenant(DEFAULT_BROKER_TENANT);
-      }
-
-      LogicalTableUtils.validateLogicalTableName(
-          logicalTableConfig,
-          _pinotHelixResourceManager.getAllTables(),
-          _pinotHelixResourceManager.getAllBrokerTenantNames()
-      );
-      _pinotHelixResourceManager.updateLogicalTable(logicalTableConfig);
+      _pinotHelixResourceManager.updateLogicalTableConfig(logicalTableConfig);
       return new SuccessResponse(logicalTableConfig.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find logical table " + tableName,

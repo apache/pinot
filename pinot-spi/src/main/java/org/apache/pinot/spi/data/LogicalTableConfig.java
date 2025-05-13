@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.spi.data;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class LogicalTableConfig extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -37,10 +38,20 @@ public class LogicalTableConfig extends BaseJsonConfig {
   public static final String LOGICAL_TABLE_NAME_KEY = "tableName";
   public static final String PHYSICAL_TABLE_CONFIG_KEY = "physicalTableConfigMap";
   public static final String BROKER_TENANT_KEY = "brokerTenant";
+  public static final String QUERY_CONFIG_KEY = "query";
+  public static final String QUOTA_CONFIG_KEY = "quota";
+  public static final String REF_OFFLINE_TABLE_NAME_KEY = "refOfflineTableName";
+  public static final String REF_REALTIME_TABLE_NAME_KEY = "refRealtimeTableName";
 
   private String _tableName;
   private String _brokerTenant;
   private Map<String, PhysicalTableConfig> _physicalTableConfigMap;
+  @JsonProperty(QUERY_CONFIG_KEY)
+  private QueryConfig _queryConfig;
+  @JsonProperty(QUOTA_CONFIG_KEY)
+  private QuotaConfig _quotaConfig;
+  private String _refOfflineTableName;
+  private String _refRealtimeTableName;
 
   public static LogicalTableConfig fromString(String logicalTableString)
       throws IOException {
@@ -72,6 +83,42 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _brokerTenant = brokerTenant;
   }
 
+  @JsonProperty(QUERY_CONFIG_KEY)
+  @Nullable
+  public QueryConfig getQueryConfig() {
+    return _queryConfig;
+  }
+
+  public void setQueryConfig(QueryConfig queryConfig) {
+    _queryConfig = queryConfig;
+  }
+
+  @JsonProperty(QUOTA_CONFIG_KEY)
+  @Nullable
+  public QuotaConfig getQuotaConfig() {
+    return _quotaConfig;
+  }
+
+  public void setQuotaConfig(QuotaConfig quotaConfig) {
+    _quotaConfig = quotaConfig;
+  }
+
+  public String getRefOfflineTableName() {
+    return _refOfflineTableName;
+  }
+
+  public void setRefOfflineTableName(String refOfflineTableName) {
+    _refOfflineTableName = refOfflineTableName;
+  }
+
+  public String getRefRealtimeTableName() {
+    return _refRealtimeTableName;
+  }
+
+  public void setRefRealtimeTableName(String refRealtimeTableName) {
+    _refRealtimeTableName = refRealtimeTableName;
+  }
+
   private JsonNode toJsonObject() {
     return DEFAULT_MAPPER.valueToTree(this);
   }
@@ -92,23 +139,6 @@ public class LogicalTableConfig extends BaseJsonConfig {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  public boolean equals(Object object) {
-    if (this == object) {
-      return true;
-    }
-    if (object == null || getClass() != object.getClass()) {
-      return false;
-    }
-    LogicalTableConfig that = (LogicalTableConfig) object;
-    return Objects.equals(getTableName(), that.getTableName());
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(getTableName());
   }
 
   @Override

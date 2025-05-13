@@ -75,6 +75,8 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
     _controllerRequestURLBuilder = getControllerRequestURLBuilder();
+    // create schema for logical table
+    addDummySchema(LOGICAL_TABLE_NAME);
   }
 
   @AfterMethod
@@ -86,6 +88,7 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     } catch (Exception e) {
       // ignore
     }
+    stopFakeInstances();
     stopController();
     stopZk();
   }

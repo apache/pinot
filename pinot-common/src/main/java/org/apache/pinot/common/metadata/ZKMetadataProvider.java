@@ -40,7 +40,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.LogicalTableUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -643,6 +643,17 @@ public class ZKMetadataProvider {
   }
 
   /**
+   * Check if the schema exists in the property store.
+   *
+   * @param propertyStore Helix property store
+   * @param schemaName Schema name
+   * @return true if the schema exists, false otherwise
+   */
+  public static boolean isSchemaExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String schemaName) {
+    return propertyStore.exists(constructPropertyStorePathForSchema(schemaName), AccessOption.PERSISTENT);
+  }
+
+  /**
    * Get the schema associated with the given table name.
    *
    * @param propertyStore Helix property store
@@ -826,7 +837,7 @@ public class ZKMetadataProvider {
   public static void setLogicalTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       LogicalTableConfig logicalTableConfig) {
     try {
-      ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTableConfig);
+      ZNRecord znRecord = LogicalTableConfigUtils.toZNRecord(logicalTableConfig);
       String path = constructPropertyStorePathForLogical(logicalTableConfig.getTableName());
       propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
     } catch (JsonProcessingException e) {
@@ -840,7 +851,7 @@ public class ZKMetadataProvider {
     if (znRecords != null) {
       return znRecords.stream().map(znRecord -> {
         try {
-          return LogicalTableUtils.fromZNRecord(znRecord);
+          return LogicalTableConfigUtils.fromZNRecord(znRecord);
         } catch (IOException e) {
           LOGGER.error("Caught exception while converting ZNRecord to LogicalTable: {}", znRecord.getId(), e);
           return null;
@@ -859,10 +870,14 @@ public class ZKMetadataProvider {
       if (logicalTableZNRecord == null) {
         return null;
       }
-      return LogicalTableUtils.fromZNRecord(logicalTableZNRecord);
+      return LogicalTableConfigUtils.fromZNRecord(logicalTableZNRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting logical table: {}", tableName, e);
       return null;
     }
+  }
+
+  public static boolean isLogicalTableExists(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    return propertyStore.exists(constructPropertyStorePathForLogical(tableName), AccessOption.PERSISTENT);
   }
 }

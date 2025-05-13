@@ -62,6 +62,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
+import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
@@ -78,6 +79,8 @@ import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.PRelNodeTreeValidator;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -91,8 +94,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.immutables.value.Value;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -115,7 +116,19 @@ import org.slf4j.LoggerFactory;
 // make sure there is a worker manager when executing queries.
 @Value.Enclosing
 public class QueryEnvironment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
+  private static final CalciteConnectionConfig CONNECTION_CONFIG;
+
+  static {
+    // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
+    // This is because Calcite is way too invasive when configured as case-insensitive and doing so leads to all
+    // identifiers being transformed to lower-case after the compilation and validation stage, which is cumbersome for
+    // further processing of the query.
+    // Instead of configuring Calcite as case-insensitive, we force the case-insensitive behavior in specific places
+    // such as [DispatchablePlanVisitor.visitTableScan] and [PinotNameMatcher] used by [PinotCatalogReader].
+    Properties connectionConfigProperties = new Properties();
+    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
+    CONNECTION_CONFIG = new CalciteConnectionConfigImpl(connectionConfigProperties);
+  }
 
   private final TypeFactory _typeFactory = new TypeFactory();
   private final FrameworkConfig _config;
@@ -129,15 +142,10 @@ public class QueryEnvironment {
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
-    Properties connectionConfigProperties = new Properties();
-    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
-        config.getTableCache() == null
-            ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
-            : !config.getTableCache().isIgnoreCase()));
-    CalciteConnectionConfig connectionConfig = new CalciteConnectionConfigImpl(connectionConfigProperties);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
-    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, connectionConfig);
+    _catalogReader = new PinotCatalogReader(
+        rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _optProgram = getOptProgram();
   }
 
@@ -169,7 +177,7 @@ public class QueryEnvironment {
       workerManager = _envConfig.getWorkerManager();
       physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
-          workerManager.getInstanceId());
+          workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -327,6 +335,7 @@ public class QueryEnvironment {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
       optimized = RelToPRelConverter.toPRelNode(optimized, plannerContext.getPhysicalPlannerContext(),
           _envConfig.getTableCache()).unwrap();
+      PRelNodeTreeValidator.validate((PRelNode) optimized);
     }
     return relation.withRel(optimized);
   }
@@ -448,8 +457,7 @@ public class QueryEnvironment {
           _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
       return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());
     }
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
-        _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, useSpools(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), _envConfig.getRequestId(),
             _envConfig.getTableCache());
@@ -553,6 +561,14 @@ public class QueryEnvironment {
      */
     @Nullable
     TableCache getTableCache();
+
+    /**
+     * Whether the schema should be considered case-insensitive.
+     */
+    @Value.Default
+    default boolean isCaseSensitive() {
+      return !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE;
+    }
 
     /**
      * Whether to apply partition hint by default or not.

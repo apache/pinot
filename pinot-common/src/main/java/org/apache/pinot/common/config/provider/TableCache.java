@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +38,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.utils.LogicalTableUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
@@ -227,12 +226,17 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * Returns the expression override map for the given table, or {@code null} if no override is configured.
+   * Returns the expression override map for the given logical or physical table, or {@code null} if no override is
+   * configured.
    */
   @Nullable
-  public Map<Expression, Expression> getExpressionOverrideMap(String tableNameWithType) {
-    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
-    return tableConfigInfo != null ? tableConfigInfo._expressionOverrideMap : null;
+  public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
+    if (tableConfigInfo != null) {
+      return tableConfigInfo._expressionOverrideMap;
+    }
+    LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(physicalOrLogicalTableName);
+    return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
   /**
@@ -257,7 +261,6 @@ public class TableCache implements PinotConfigProvider {
   @Nullable
   @Override
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName) {
-    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(logicalTableName);
     return logicalTableConfigInfo != null ? logicalTableConfigInfo._logicalTableConfig : null;
   }
@@ -279,26 +282,8 @@ public class TableCache implements PinotConfigProvider {
   @Nullable
   @Override
   public Schema getSchema(String rawTableName) {
-    if (_schemaInfoMap.containsKey(rawTableName)) {
-      return getPhysicalTableSchema(rawTableName);
-    } else {
-      return getLogicalTableSchema(rawTableName);
-    }
-  }
-
-  private Schema getPhysicalTableSchema(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._schema : null;
-  }
-
-  @Nullable
-  private Schema getLogicalTableSchema(String logicalTableName) {
-    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(logicalTableName);
-    if (logicalTableConfig == null) {
-      return null;
-    }
-    Optional<String> physicalTableName = logicalTableConfig.getPhysicalTableConfigMap().keySet().stream().findFirst();
-    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(physicalTableName.orElse(null)));
   }
 
   @Override
@@ -363,14 +348,13 @@ public class TableCache implements PinotConfigProvider {
 
   private void putLogicalTableConfig(ZNRecord znRecord)
       throws IOException {
-    LogicalTableConfig logicalTableConfig = LogicalTableUtils.fromZNRecord(znRecord);
+    LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
+    _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
     if (_ignoreCase) {
       _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
-      _logicalTableConfigInfoMap.put(logicalTableName.toLowerCase(), new LogicalTableConfigInfo(logicalTableConfig));
     } else {
       _logicalTableNameMap.put(logicalTableName, logicalTableName);
-      _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
     }
   }
 
@@ -408,8 +392,8 @@ public class TableCache implements PinotConfigProvider {
   private void removeLogicalTableConfig(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkLogicalTableConfigChangeListener);
     String logicalTableName = path.substring(LOGICAL_TABLE_PATH_PREFIX.length());
-    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     _logicalTableConfigInfoMap.remove(logicalTableName);
+    logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     _logicalTableNameMap.remove(logicalTableName);
   }
 
@@ -663,6 +647,31 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
+  private static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
+      QueryConfig queryConfig) {
+    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
+    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
+      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
+        try {
+          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
+          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
+          expressionOverrideMap.put(srcExp, destExp);
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
+              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
+        }
+      }
+      int mapSize = expressionOverrideMap.size();
+      if (mapSize == 1) {
+        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
+        return Collections.singletonMap(entry.getKey(), entry.getValue());
+      } else if (mapSize > 1) {
+        return expressionOverrideMap;
+      }
+    }
+    return null;
+  }
+
   private static class TableConfigInfo {
     final TableConfig _tableConfig;
     final Map<Expression, Expression> _expressionOverrideMap;
@@ -671,31 +680,7 @@ public class TableCache implements PinotConfigProvider {
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
-      QueryConfig queryConfig = tableConfig.getQueryConfig();
-      if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-        Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-        for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-          try {
-            Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-            Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-            expressionOverrideMap.put(srcExp, destExp);
-          } catch (Exception e) {
-            LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-                entry.getKey(), entry.getValue(), tableConfig.getTableName());
-          }
-        }
-        int mapSize = expressionOverrideMap.size();
-        if (mapSize == 0) {
-          _expressionOverrideMap = null;
-        } else if (mapSize == 1) {
-          Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-          _expressionOverrideMap = Collections.singletonMap(entry.getKey(), entry.getValue());
-        } else {
-          _expressionOverrideMap = expressionOverrideMap;
-        }
-      } else {
-        _expressionOverrideMap = null;
-      }
+      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
@@ -712,10 +697,12 @@ public class TableCache implements PinotConfigProvider {
 
   private static class LogicalTableConfigInfo {
     final LogicalTableConfig _logicalTableConfig;
-    // TODO : Add expression override map for logical table, issue #15607
+    final Map<Expression, Expression> _expressionOverrideMap;
 
     private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
       _logicalTableConfig = logicalTableConfig;
+      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
+          logicalTableConfig.getQueryConfig());
     }
   }
 }

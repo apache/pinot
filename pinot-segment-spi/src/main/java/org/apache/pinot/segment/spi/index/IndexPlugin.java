@@ -31,5 +31,20 @@ package org.apache.pinot.segment.spi.index;
  * these services is by using Google AutoService. BloomIndexPlugin can be used as example.
  */
 public interface IndexPlugin<T extends IndexType<?, ?, ?>> {
+  int DEFAULT_PRIORITY = 0;
   T getIndexType();
+
+  /**
+   * Returns the priority of this plugin.
+   *
+   * Two plugins with the same id and different priorities will be loaded in the order of their priority. Higher
+   * priority values are loaded first. This is useful when two plugins implement the same index type, but one of them
+   * is a more optimized version of the other. In that case, the more optimized version should have a higher priority.
+   *
+   * Default priority is 0, which means that custom plugins that want to override default plugins need to use a
+   * positive priority.
+   */
+  default int getPriority() {
+    return DEFAULT_PRIORITY;
+  }
 }
