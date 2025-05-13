@@ -150,6 +150,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
       Map<ServerInstance, ServerRouteInfo> tmp = routingTable.getServerInstanceToSegmentsMap();
       for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : tmp.entrySet()) {
+        // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,
             "Entry for server %s and table type: %s already exist!", serverEntry.getKey(), tableType);
@@ -294,12 +295,14 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     for (int partitionNum = 0; partitionNum < numPartitions; partitionNum++) {
       TablePartitionInfo.PartitionInfo info = partitionInfos[partitionNum];
       List<String> selectedSegments = new ArrayList<>();
-      if (info != null) {
+      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsInPartition(partitionNum);
+      if (!segmentsForPartition.isEmpty()) {
         String chosenServer;
-        for (String segment : info._segments) {
+        for (String segment : segmentsForPartition) {
           chosenServer = segmentToServer.get(segment);
           // segmentToServer may return null if TPI has a segment not present in instanceIdToSegmentsMap.
-          // This can happen when the segment was not selected for the query (due to pruning for instance).
+          // This can happen when the segment was not selected for the query, which may be because of pruning,
+          // or because the segment is optional because it is new.
           if (chosenServer != null) {
             selectedSegments.add(segment);
             if (partitionToServerMap[partitionNum] == null) {

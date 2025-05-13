@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.routing;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -29,15 +32,22 @@ public class TablePartitionInfo {
   private final int _numPartitions;
   private final PartitionInfo[] _partitionInfoMap;
   private final List<String> _segmentsWithInvalidPartition;
+  /**
+   * New segments may not have all replicas available soon after creation, and hence they can potentially reduce
+   * the fullyReplicatedServers in PartitionInfo. To prevent that, we store such segments separately in this map.
+   */
+  private final Map<Integer, List<String>> _excludedNewSegments;
 
   public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions, PartitionInfo[] partitionInfoMap, List<String> segmentsWithInvalidPartition) {
+      int numPartitions, PartitionInfo[] partitionInfoMap, List<String> segmentsWithInvalidPartition,
+      Map<Integer, List<String>> excludedNewSegments) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
     _partitionInfoMap = partitionInfoMap;
     _segmentsWithInvalidPartition = segmentsWithInvalidPartition;
+    _excludedNewSegments = excludedNewSegments;
   }
 
   public String getTableNameWithType() {
@@ -62,6 +72,30 @@ public class TablePartitionInfo {
 
   public List<String> getSegmentsWithInvalidPartition() {
     return _segmentsWithInvalidPartition;
+  }
+
+  public Map<Integer, List<String>> getExcludedNewSegments() {
+    return _excludedNewSegments;
+  }
+
+  /**
+   * TablePartitionInfo stores segments for a partition in two places: the PartitionInfo map, and the excluded new
+   * segments. We get segments from both of those places and return the concatenation of the two lists.
+   */
+  public List<String> getSegmentsInPartition(int partition) {
+    Preconditions.checkState(partition < _partitionInfoMap.length, "Attempted to fetch partition=%s, but only have %s",
+        partition, _partitionInfoMap.length);
+    TablePartitionInfo.PartitionInfo info = _partitionInfoMap[partition];
+    List<String> excludedNewSegments = _excludedNewSegments.get(partition);
+    // Collect all segments and return.
+    List<String> result = new ArrayList<>();
+    if (info != null) {
+      result.addAll(info._segments);
+    }
+    if (excludedNewSegments != null) {
+      result.addAll(excludedNewSegments);
+    }
+    return result;
   }
 
   public static class PartitionInfo {
