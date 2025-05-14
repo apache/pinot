@@ -43,7 +43,7 @@ public class LiteModeWorkerAssignmentRuleTest {
 
   @Test
   public void testSampleWorker() {
-    Set<String> workers = Set.of("worker-0", "worker-1", "worker-2");
+    List<String> workers = List.of("worker-0", "worker-1", "worker-2");
     Set<String> selectionCandidates = Set.of("0@worker-0", "0@worker-1", "0@worker-2");
     Set<String> selectedWorkers = new HashSet<>();
     for (int iteration = 0; iteration < 1000; iteration++) {

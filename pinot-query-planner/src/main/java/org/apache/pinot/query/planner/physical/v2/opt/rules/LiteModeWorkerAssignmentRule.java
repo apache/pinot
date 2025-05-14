@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -54,7 +55,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   public PRelNode execute(PRelNode currentNode) {
     Set<String> workerSet = new HashSet<>();
     accumulateWorkers(currentNode, workerSet);
-    List<String> workers = List.of(sampleWorker(workerSet));
+    List<String> workers = List.of(sampleWorker(new ArrayList<>(workerSet)));
     PinotDataDistribution pdd = new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(),
         null, null);
     return addExchangeAndWorkers(currentNode, null, pdd);
@@ -83,7 +84,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   static void accumulateWorkers(PRelNode currentNode, Set<String> workerSink) {
     if (currentNode.isLeafStage()) {
       workerSink.addAll(currentNode.getPinotDataDistributionOrThrow().getWorkers().stream()
-          .map(LiteModeWorkerAssignmentRule::stripIdPrefixFromWorker).collect(Collectors.toSet()));
+          .map(LiteModeWorkerAssignmentRule::stripIdPrefixFromWorker).collect(Collectors.toList()));
       return;
     }
     for (PRelNode input : currentNode.getPRelInputs()) {
@@ -92,19 +93,12 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   }
 
   /**
-   * Samples a worker from the given set.
+   * Samples a worker from the given list.
    */
   @VisibleForTesting
-  static String sampleWorker(Set<String> workers) {
-    final int chosenIndex = RANDOM.nextInt(workers.size());
-    int index = 0;
-    for (String worker : workers) {
-      if (index == chosenIndex) {
-        return String.format("0@%s", worker);
-      }
-      index++;
-    }
-    throw new IllegalStateException(String.format("Could not sample worker. Set: %s. idx: %d", workers, chosenIndex));
+  static String sampleWorker(List<String> instanceIds) {
+    Preconditions.checkState(!instanceIds.isEmpty(), "No workers in leaf stage");
+    return String.format("0@%s", instanceIds.get(RANDOM.nextInt(instanceIds.size())));
   }
 
   @VisibleForTesting
