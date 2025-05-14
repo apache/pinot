@@ -1608,7 +1608,7 @@ public class TableRebalancer {
       boolean anyServerExhaustedBatchSize = false;
       if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
         // The number of segments for a given partition, accumulates as we iterate over the assigned instances
-        Map<String, Integer> servertoNumSegmentsToBeAddedForPartitionMap = new HashMap<>();
+        Map<String, Integer> serverToNumSegmentsToBeAddedForPartitionMap = new HashMap<>();
 
         // Check if the servers of the first assignment for each unique set of assigned instances has any space left
         // to move this partition. If so, let's mark the partitions as to be moved, otherwise we mark the partition
@@ -1632,8 +1632,8 @@ public class TableRebalancer {
 
             // All segments assigned to the current instances will be moved, so track segments to be added for the given
             // server based on this
-            servertoNumSegmentsToBeAddedForPartitionMap.put(server,
-                servertoNumSegmentsToBeAddedForPartitionMap.getOrDefault(server, 0) + curAssignment.size());
+            serverToNumSegmentsToBeAddedForPartitionMap.put(server,
+                serverToNumSegmentsToBeAddedForPartitionMap.getOrDefault(server, 0) + curAssignment.size());
           }
           if (anyServerExhaustedBatchSize) {
             break;
@@ -1647,7 +1647,7 @@ public class TableRebalancer {
         // check only if segmentsAddedToServerSoFar > 0 is necessary.
         if (!anyServerExhaustedBatchSize) {
           for (Map.Entry<String, Integer> serverToNumSegmentsToAdd
-              : servertoNumSegmentsToBeAddedForPartitionMap.entrySet()) {
+              : serverToNumSegmentsToBeAddedForPartitionMap.entrySet()) {
             int segmentsAddedToServerSoFar =
                 serverToNumSegmentsAddedSoFar.getOrDefault(serverToNumSegmentsToAdd.getKey(), 0);
             if (segmentsAddedToServerSoFar > 0
