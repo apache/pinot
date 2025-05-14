@@ -75,6 +75,10 @@ public class StreamConfig {
 
   private final double _topicConsumptionRateLimit;
 
+  private final int _offsetAutoResetOffsetThreshold;
+  private final long _offsetAutoResetTimeSecThreshold;
+  private final Boolean _ephemeralBackfillTopic;
+
   private final Map<String, String> _streamConfigMap = new HashMap<>();
 
   // Allow overriding it to use different offset criteria
@@ -198,6 +202,14 @@ public class StreamConfig {
 
     String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
+
+    String offsetThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY);
+    _offsetAutoResetOffsetThreshold = offsetThreshold != null ? Integer.valueOf(offsetThreshold) : -1;
+    String timeSecThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY);
+    _offsetAutoResetTimeSecThreshold = timeSecThreshold != null ? Integer.valueOf(timeSecThreshold) : -1;
+    _ephemeralBackfillTopic = streamConfigMap.containsKey(StreamConfigProperties.EPHEMERAL_BACKFILL_TOPIC)
+        ? Boolean.valueOf(streamConfigMap.get(StreamConfigProperties.EPHEMERAL_BACKFILL_TOPIC))
+        : null;
 
     _streamConfigMap.putAll(streamConfigMap);
   }
@@ -383,6 +395,18 @@ public class StreamConfig {
         : Optional.of(_topicConsumptionRateLimit);
   }
 
+  public int getOffsetAutoResetOffsetThreshold() {
+    return _offsetAutoResetOffsetThreshold;
+  }
+
+  public long getOffsetAutoResetTimeSecThreshold() {
+    return _offsetAutoResetTimeSecThreshold;
+  }
+
+  public Boolean isEphemeralBackfillTopic() {
+    return Boolean.TRUE.equals(_ephemeralBackfillTopic);
+  }
+
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
@@ -402,7 +426,11 @@ public class StreamConfig {
         + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
         + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
-        + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap=" + _streamConfigMap
+        + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
+        + ", _offsetAutoResetOffsetThreshold" + _offsetAutoResetOffsetThreshold
+        + ", _offSetAutoResetTimeSecThreshold" + _offsetAutoResetTimeSecThreshold
+        + ", _ephemeralBackfillTopic" + _ephemeralBackfillTopic
+        + ", _streamConfigMap=" + _streamConfigMap
         + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
   }
 
@@ -427,7 +455,10 @@ public class StreamConfig {
         && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
         that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
-        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction);
+        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
+        && _offsetAutoResetOffsetThreshold == that._offsetAutoResetOffsetThreshold
+        && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold && Objects.equals(
+        _ephemeralBackfillTopic, that._ephemeralBackfillTopic);
   }
 
   @Override
@@ -436,6 +467,7 @@ public class StreamConfig {
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
-        _serverUploadToDeepStore, _flushThresholdVarianceFraction);
+        _serverUploadToDeepStore, _flushThresholdVarianceFraction, _offsetAutoResetOffsetThreshold,
+        _offsetAutoResetTimeSecThreshold, _ephemeralBackfillTopic);
   }
 }
