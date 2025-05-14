@@ -109,6 +109,7 @@ public class VarLengthValueWriter implements Closeable {
 
     _valueBuffer = _offsetBuffer.duplicate();
     _valueBuffer.position(HEADER_LENGTH + (numValues + 1) * Integer.BYTES);
+    _totalLength += HEADER_LENGTH;
   }
 
   public void add(byte[] value)
