@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -391,27 +392,28 @@ public class BaseTableRouteTest {
   }
 
   protected TableRouteInfo getLogicalTableRouteInfo(String tableName, String logicalTableName) {
-    LogicalTableConfig logicalTable = new LogicalTableConfig();
-    logicalTable.setTableName(logicalTableName);
+    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder();
+    builder.setTableName(logicalTableName);
     Map<String, PhysicalTableConfig> tableConfigMap = new HashMap<>();
     if (TableNameBuilder.getTableTypeFromTableName(tableName) == null) {
       // Generate offline and realtime table names
       tableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(tableName), new PhysicalTableConfig());
       tableConfigMap.put(TableNameBuilder.REALTIME.tableNameWithType(tableName), new PhysicalTableConfig());
-      logicalTable.setRefOfflineTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-      logicalTable.setRefRealtimeTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      builder.setRefOfflineTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      builder.setRefRealtimeTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
     } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
       tableConfigMap.put(tableName, new PhysicalTableConfig());
-      logicalTable.setRefOfflineTableName(tableName);
+      builder.setRefOfflineTableName(tableName);
     } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
       tableConfigMap.put(tableName, new PhysicalTableConfig());
-      logicalTable.setRefRealtimeTableName(tableName);
+      builder.setRefRealtimeTableName(tableName);
     } else {
       throw new IllegalArgumentException("Invalid table type");
     }
 
-    logicalTable.setPhysicalTableConfigMap(tableConfigMap);
-    logicalTable.setBrokerTenant("brokerTenant");
+    builder.setPhysicalTableConfigMap(tableConfigMap);
+    builder.setBrokerTenant("brokerTenant");
+    LogicalTableConfig logicalTable = builder.build();
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     return _logicalTableRouteProvider.getTableRouteInfo(logicalTableName, _tableCache, _routingManager);

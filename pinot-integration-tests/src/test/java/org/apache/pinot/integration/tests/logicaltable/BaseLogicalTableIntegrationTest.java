@@ -110,6 +110,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     if (_sharedClusterTestSuite != this) {
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
+      _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
     }
 
     List<File> avroFiles = getAllAvroFiles();
@@ -154,25 +155,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @AfterClass
   public void tearDown()
       throws Exception {
-    // Try deleting the tables and check that they have no routing table
-    for (String tableName : getOfflineTableNames()) {
-      dropOfflineTable(tableName);
-    }
-
-    for (String tableName : getOfflineTableNames()) {
-      // Routing should be removed after deleting all tables
-      TestUtils.waitForCondition(aVoid -> {
-        try {
-          getDebugInfo("debug/routingTable/" + tableName);
-          return false;
-        } catch (Exception e) {
-          // only return true if 404 not found error is thrown.
-          return e.getMessage().contains("Got error status code: 404");
-        }
-      }, 60_000L, "Routing table is not empty after dropping all tables");
-    }
-
-    deleteLogicalTable();
+    cleanup();
   }
 
   protected abstract List<String> getOfflineTableNames();
@@ -192,13 +175,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   protected String getBrokerTenant() {
     return DEFAULT_TENANT;
-  }
-
-  @Override
-  protected void setUpH2Connection(List<File> avroFiles)
-      throws Exception {
-    setUpH2Connection();
-    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
   /**
@@ -485,7 +461,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   public void testQueryTimeOut()
       throws Exception {
     String starQuery = "SELECT * from mytable";
-    QueryConfig queryConfig = new QueryConfig(5L, null, null, null, null, null);
+    QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
     updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
