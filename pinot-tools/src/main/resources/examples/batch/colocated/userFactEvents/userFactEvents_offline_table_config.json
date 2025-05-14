@@ -3,7 +3,11 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "replication": 2
+    "replication": 2,
+    "replicaGroupStrategyConfig": {
+      "partitionColumn": "userUUID",
+      "numInstancesPerPartition": 2
+    }
   },
   "tenants": {
     "broker": "DefaultTenant",
@@ -22,20 +26,8 @@
       }
     }
   },
-  "instanceAssignmentConfigMap": {
-    "OFFLINE": {
-      "tagPoolConfig": {
-        "tag": "DefaultTenant_OFFLINE"
-      },
-      "replicaGroupPartitionConfig": {
-        "replicaGroupBased": true,
-        "numReplicaGroups": 2,
-        "numInstancesPerReplicaGroup": 2,
-        "numPartitions": 2,
-        "numInstancesPerPartition": 1,
-        "partitionColumn": "userUUID"
-      }
-    }
+  "instancePartitionsMap": {
+    "OFFLINE": "userAttributes_OFFLINE"
   },
   "routing": {
     "instanceSelectorType": "multiStageReplicaGroup"
