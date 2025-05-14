@@ -562,89 +562,108 @@ public class WorkerManager {
     // verifies that the partition table obtained from routing manager is compatible with the hint options
     checkPartitionInfoMap(partitionTableInfo, tableName, partitionKey, partitionFunction, numWorkers);
 
-    // NOTE: Pick worker based on the request id so that the same worker is picked across different table scan when the
-    //       segments for the same partition is colocated
-    long indexToPick = context.getRequestId();
     PartitionInfo[] partitionInfoMap = partitionTableInfo._partitionInfoMap;
     int numPartitions = partitionInfoMap.length;
     assert numPartitions % numWorkers == 0;
     int numPartitionsPerWorker = numPartitions / numWorkers;
-    int workerId = 0;
     Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
     if (numPartitionsPerWorker == 1) {
-      // Pick one worker per partition
-      for (int i = 0; i < numWorkers; i++) {
-        PartitionInfo partitionInfo = partitionInfoMap[i];
-        // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that
-        //       the leaf stage won't be able to directly return empty response.
-        Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
-            tableName, i);
-        ServerInstance serverInstance =
-            pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
-        Preconditions.checkState(serverInstance != null,
-            "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
-        workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-        workerIdToSegmentsMap.put(workerId,
-            getSegmentsMap(partitionInfo._offlineSegments, partitionInfo._realtimeSegments));
-        workerId++;
-      }
+      assignOnePartitionPerWorker(tableName, context.getRequestId(), partitionInfoMap,
+          _routingManager.getEnabledServerInstanceMap(), workedIdToServerInstanceMap, workerIdToSegmentsMap);
     } else {
-      // Round-robin partitions to workers, where each worker gets numPartitionsPerWorker partitions. This setup works
-      // only if all segments for these partitions are assigned to the same group of servers. This is useful when user
-      // wants to colocate tables with different partition count, but same partition function.
-      // E.g. when there are 16 partitions for table A and 4 partitions for table B, we may assign 16 partitions for
-      // table A to 4 workers, where partition 0, 4, 8, 12 goes to worker 0, partition 1, 5, 9, 13 goes to worker 1,
-      // etc.
-      for (int i = 0; i < numWorkers; i++) {
-        Set<String> fullyReplicatedServers = null;
-        List<String> offlineSegments = null;
-        List<String> realtimeSegments = null;
-        for (int j = i; j < numPartitions; j += numWorkers) {
-          PartitionInfo partitionInfo = partitionInfoMap[j];
-          if (partitionInfo == null) {
-            continue;
-          }
-          if (fullyReplicatedServers == null) {
-            fullyReplicatedServers = new HashSet<>(partitionInfo._fullyReplicatedServers);
-          } else {
-            fullyReplicatedServers.retainAll(partitionInfo._fullyReplicatedServers);
-          }
-          if (partitionInfo._offlineSegments != null) {
-            if (offlineSegments == null) {
-              offlineSegments = new ArrayList<>(partitionInfo._offlineSegments);
-            } else {
-              offlineSegments.addAll(partitionInfo._offlineSegments);
-            }
-          }
-          if (partitionInfo._realtimeSegments != null) {
-            if (realtimeSegments == null) {
-              realtimeSegments = new ArrayList<>(partitionInfo._realtimeSegments);
-            } else {
-              realtimeSegments.addAll(partitionInfo._realtimeSegments);
-            }
-          }
-        }
-        // TODO: Currently we don't support the case when all partitions for a worker don't contain any segment. The
-        //       reason is that the leaf stage won't be able to directly return empty response.
-        Preconditions.checkState(fullyReplicatedServers != null,
-            "Failed to find any segment for table: %s, worker: %s, partitions per worker: %s", tableName, i,
-            numPartitionsPerWorker);
-        ServerInstance serverInstance =
-            pickEnabledServer(fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
-        Preconditions.checkState(serverInstance != null,
-            "Failed to find enabled fully replicated server for table: %s, worker: %s, partitions per worker: %s",
-            tableName, i, numPartitionsPerWorker);
-        workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-        workerIdToSegmentsMap.put(workerId, getSegmentsMap(offlineSegments, realtimeSegments));
-        workerId++;
-      }
+      assignMultiplePartitionsPerWorker(tableName, context.getRequestId(), numPartitionsPerWorker, partitionInfoMap,
+          _routingManager.getEnabledServerInstanceMap(), workedIdToServerInstanceMap, workerIdToSegmentsMap);
     }
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
     metadata.setTimeBoundaryInfo(partitionTableInfo._timeBoundaryInfo);
     metadata.setPartitionFunction(partitionFunction);
+  }
+
+  /// Pick one worker per partition for partitioned leaf stage.
+  private void assignOnePartitionPerWorker(String tableName, long requestId, PartitionInfo[] partitionInfoMap,
+      Map<String, ServerInstance> enabledServerInstanceMap,
+      Map<Integer, QueryServerInstance> workedIdToServerInstanceMap,
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+    int numPartitions = partitionInfoMap.length;
+    int workerId = 0;
+    for (int i = 0; i < numPartitions; i++) {
+      PartitionInfo partitionInfo = partitionInfoMap[i];
+      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that
+      //       the leaf stage won't be able to directly return empty response.
+      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
+          tableName, i);
+      // NOTE: Pick worker based on the request id so that the same worker is picked across different table scan when
+      //       the segments for the same partition is colocated
+      ServerInstance serverInstance =
+          pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, requestId++);
+      Preconditions.checkState(serverInstance != null,
+          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId,
+          getSegmentsMap(partitionInfo._offlineSegments, partitionInfo._realtimeSegments));
+      workerId++;
+    }
+  }
+
+  /// Round-robin partitions to workers, where each worker gets numPartitionsPerWorker partitions. This setup works only
+  /// if all segments for these partitions are assigned to the same group of servers. This is useful when user wants to
+  /// colocate tables with different partition count, but same partition function.
+  /// E.g. when there are 16 partitions for table A and 4 partitions for table B, we may assign 16 partitions for table
+  /// A to 4 workers, where partition 0, 4, 8, 12 goes to worker 0, partition 1, 5, 9, 13 goes to worker 1, etc.
+  private void assignMultiplePartitionsPerWorker(String tableName, long requestId, int numPartitionsPerWorker,
+      PartitionInfo[] partitionInfoMap, Map<String, ServerInstance> enabledServerInstanceMap,
+      Map<Integer, QueryServerInstance> workedIdToServerInstanceMap,
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+    int numPartitions = partitionInfoMap.length;
+    assert numPartitions % numPartitionsPerWorker == 0;
+    int numWorkers = numPartitions / numPartitionsPerWorker;
+    int workerId = 0;
+    for (int i = 0; i < numWorkers; i++) {
+      Set<String> fullyReplicatedServers = null;
+      List<String> offlineSegments = null;
+      List<String> realtimeSegments = null;
+      for (int j = i; j < numPartitions; j += numWorkers) {
+        PartitionInfo partitionInfo = partitionInfoMap[j];
+        if (partitionInfo == null) {
+          continue;
+        }
+        if (fullyReplicatedServers == null) {
+          fullyReplicatedServers = new HashSet<>(partitionInfo._fullyReplicatedServers);
+        } else {
+          fullyReplicatedServers.retainAll(partitionInfo._fullyReplicatedServers);
+        }
+        if (partitionInfo._offlineSegments != null) {
+          if (offlineSegments == null) {
+            offlineSegments = new ArrayList<>(partitionInfo._offlineSegments);
+          } else {
+            offlineSegments.addAll(partitionInfo._offlineSegments);
+          }
+        }
+        if (partitionInfo._realtimeSegments != null) {
+          if (realtimeSegments == null) {
+            realtimeSegments = new ArrayList<>(partitionInfo._realtimeSegments);
+          } else {
+            realtimeSegments.addAll(partitionInfo._realtimeSegments);
+          }
+        }
+      }
+      // TODO: Currently we don't support the case when all partitions for a worker don't contain any segment. The
+      //       reason is that the leaf stage won't be able to directly return empty response.
+      Preconditions.checkState(fullyReplicatedServers != null,
+          "Failed to find any segment for table: %s, worker: %s, partitions per worker: %s", tableName, i,
+          numPartitionsPerWorker);
+      // NOTE: Pick worker based on the request id so that the same worker is picked across different table scan when
+      //       the segments for the same partition is colocated
+      ServerInstance serverInstance = pickEnabledServer(fullyReplicatedServers, enabledServerInstanceMap, requestId++);
+      Preconditions.checkState(serverInstance != null,
+          "Failed to find enabled fully replicated server for table: %s, worker: %s, partitions per worker: %s",
+          tableName, i, numPartitionsPerWorker);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId, getSegmentsMap(offlineSegments, realtimeSegments));
+      workerId++;
+    }
   }
 
   @Nullable
