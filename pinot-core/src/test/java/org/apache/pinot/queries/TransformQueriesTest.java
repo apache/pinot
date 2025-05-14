@@ -130,19 +130,22 @@ public class TransformQueriesTest extends BaseQueriesTest {
     row.putValue(TIME, new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis());
     rows.add(row);
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME)
-        .setIngestionConfig(new IngestionConfig(null, null, null, null,
-            Arrays.asList(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
-                + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")),
-            null, null, null))
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
+        + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME)
+        .setIngestionConfig(ingestionConfig)
         .build();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
-            .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(M1_V2, FieldSpec.DataType.INT)
-            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(M1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(M2, FieldSpec.DataType.INT)
+        .addSingleValueDimension(M3, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(M4, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(M1_V2, FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null)
+        .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);

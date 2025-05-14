@@ -23,18 +23,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
+import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
-import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
-import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -43,7 +44,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class TableCacheTest {
@@ -77,20 +82,10 @@ public class TableCacheTest {
     assertNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME));
 
     // Add a schema
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
-            .build();
-    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
-    // Wait for at most 10 seconds for the callback to add the schema to the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(RAW_TABLE_NAME) != null, 10_000L,
-        "Failed to add the schema to the cache");
+    Schema schema = addSchema(RAW_TABLE_NAME, tableCache);
     // Schema can be accessed by the schema name, but not by the table name because table config is not added yet
     Schema expectedSchema = getExpectedSchema(RAW_TABLE_NAME);
-    Map<String, String> expectedColumnMap = new HashMap<>();
-    expectedColumnMap.put(isCaseInsensitive ? "testcolumn" : "testColumn", "testColumn");
-    expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
-    expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
-    expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
+    Map<String, String> expectedColumnMap = getExpectedColumnMap(isCaseInsensitive);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
     // Case-insensitive table name are handled based on the table config instead of the schema
@@ -114,7 +109,9 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
     // Add logical table
-    LogicalTableConfig logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME));
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME), "DefaultTenant");
+    addSchema(LOGICAL_TABLE_NAME, tableCache);
     TEST_INSTANCE.getHelixResourceManager().addLogicalTableConfig(logicalTableConfig);
     // Wait for at most 10 seconds for the callback to add the logical table to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME) != null, 10_000L,
@@ -122,13 +119,12 @@ public class TableCacheTest {
     // Logical table can be accessed by the logical table name
     if (isCaseInsensitive) {
       assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
-      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
-      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), expectedSchema);
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
     assertEquals(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME), logicalTableConfig);
-    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), getExpectedSchema(LOGICAL_TABLE_NAME));
+    assertNull(tableCache.getExpressionOverrideMap(LOGICAL_TABLE_NAME));
 
     // Register the change listeners
     TestTableConfigChangeListener tableConfigChangeListener = new TestTableConfigChangeListener();
@@ -138,8 +134,9 @@ public class TableCacheTest {
 
     TestSchemaChangeListener schemaChangeListener = new TestSchemaChangeListener();
     assertTrue(tableCache.registerSchemaChangeListener(schemaChangeListener));
-    assertEquals(schemaChangeListener._schemaList.size(), 1);
-    assertEquals(schemaChangeListener._schemaList.get(0), expectedSchema);
+    assertEquals(schemaChangeListener._schemaList.size(), 2);
+    assertTrue(schemaChangeListener._schemaList.get(0).equals(expectedSchema)
+    || schemaChangeListener._schemaList.get(1).equals(expectedSchema));
 
     TestLogicalTableConfigChangeListener logicalTableConfigChangeListener = new TestLogicalTableConfigChangeListener();
     assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableConfigChangeListener));
@@ -164,8 +161,9 @@ public class TableCacheTest {
     expectedColumnMap.put(isCaseInsensitive ? "newcolumn" : "newColumn", "newColumn");
     TestUtils.waitForCondition(aVoid -> {
       assertNotNull(tableCache.getSchema(RAW_TABLE_NAME));
-      assertEquals(schemaChangeListener._schemaList.size(), 1);
-      return schemaChangeListener._schemaList.get(0).equals(expectedSchema);
+      assertEquals(schemaChangeListener._schemaList.size(), 2);
+      return schemaChangeListener._schemaList.get(0).equals(expectedSchema)
+          || schemaChangeListener._schemaList.get(1).equals(expectedSchema);
     }, 10_000L, "Failed to update the schema in the cache");
     // Schema can be accessed by both the schema name and the raw table name
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
@@ -206,12 +204,9 @@ public class TableCacheTest {
     TEST_INSTANCE.waitForEVToAppear(OFFLINE_TABLE_NAME);
 
     // Update logical table config (create schema and table config for anotherTable)
-    Schema anotherTableSchema =
-        new Schema.SchemaBuilder().setSchemaName(ANOTHER_TABLE).addSingleValueDimension("testColumn", DataType.INT)
-            .build();
+    addSchema(ANOTHER_TABLE, tableCache);
     TableConfig anotherTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(ANOTHER_TABLE_OFFLINE).build();
-    TEST_INSTANCE.getHelixResourceManager().addSchema(anotherTableSchema, false, false);
     TEST_INSTANCE.getHelixResourceManager().addTable(anotherTableConfig);
     TEST_INSTANCE.waitForEVToAppear(ANOTHER_TABLE_OFFLINE);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
@@ -219,22 +214,25 @@ public class TableCacheTest {
         aVoid -> anotherTableConfig.equals(tableCache.getTableConfig(ANOTHER_TABLE_OFFLINE)), 10_000L,
         "Failed to add the table config to the cache");
     // update the logical table
-    logicalTableConfig = getLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE));
+    logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(LOGICAL_TABLE_NAME,
+        List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE), "DefaultTenant");
+    logicalTableConfig.setQueryConfig(new QueryConfig(
+        1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L
+    ));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTableConfig(logicalTableConfig);
-    // Wait for at most 10 seconds for the callback to update the logical table in the cache
     TestUtils.waitForCondition(
         aVoid -> Objects.requireNonNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME))
             .getPhysicalTableConfigMap().size() == 2, 10_000L,
-        "Failed to update the logical table in the cache");
-
+        "Failed to update the logical table in the cache"
+    );
     if (isCaseInsensitive) {
-      assertEquals(tableCache.getLogicalTableConfig(MANGLED_LOGICAL_TABLE_NAME), logicalTableConfig);
-      assertEquals(tableCache.getSchema(MANGLED_LOGICAL_TABLE_NAME), getExpectedSchema(ANOTHER_TABLE));
+      assertEquals(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME), LOGICAL_TABLE_NAME);
     } else {
       assertNull(tableCache.getActualLogicalTableName(MANGLED_LOGICAL_TABLE_NAME));
     }
     assertEquals(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME), logicalTableConfig);
-    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), getExpectedSchema(ANOTHER_TABLE));
+    assertEquals(tableCache.getSchema(LOGICAL_TABLE_NAME), getExpectedSchema(LOGICAL_TABLE_NAME));
+    assertNotNull(tableCache.getExpressionOverrideMap(LOGICAL_TABLE_NAME));
 
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
@@ -251,16 +249,6 @@ public class TableCacheTest {
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
-    // Remove the schema
-    TEST_INSTANCE.getHelixResourceManager().deleteSchema(RAW_TABLE_NAME);
-    TEST_INSTANCE.getHelixResourceManager().deleteSchema(ANOTHER_TABLE);
-    // Wait for at most 10 seconds for the callback to remove the schema from the cache
-    // NOTE:
-    // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
-    //   callback handling
-    TestUtils.waitForCondition(aVoid -> schemaChangeListener._schemaList.isEmpty(), 10_000L,
-        "Failed to remove the schema from the cache");
-
     // Remove logical table
     TEST_INSTANCE.getHelixResourceManager().deleteLogicalTableConfig(LOGICAL_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the logical table from the cache
@@ -269,6 +257,17 @@ public class TableCacheTest {
     //   the callback handling
     TestUtils.waitForCondition(aVoid -> logicalTableConfigChangeListener._logicalTableConfigList.isEmpty(), 10_000L,
         "Failed to remove the logical table from the cache");
+
+    // Remove the schema
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(RAW_TABLE_NAME);
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(ANOTHER_TABLE);
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(LOGICAL_TABLE_NAME);
+    // Wait for at most 10 seconds for the callback to remove the schema from the cache
+    // NOTE:
+    // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
+    //   callback handling
+    TestUtils.waitForCondition(aVoid -> schemaChangeListener._schemaList.isEmpty(), 10_000L,
+        "Failed to remove the schema from the cache");
 
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getSchema(ANOTHER_TABLE));
@@ -285,23 +284,32 @@ public class TableCacheTest {
     TEST_INSTANCE.waitForEVToDisappear(ANOTHER_TABLE_OFFLINE);
   }
 
+  private static Schema addSchema(String rawTableName, TableCache tableCache)
+      throws SchemaAlreadyExistsException, SchemaBackwardIncompatibleException {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(rawTableName).addSingleValueDimension("testColumn", DataType.INT)
+            .build();
+    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
+    // Wait for at most 10 seconds for the callback to add the schema to the cache
+    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(rawTableName) != null,
+        10_000L, "Failed to add the schema to the cache");
+    return schema;
+  }
+
+  private static Map<String, String> getExpectedColumnMap(boolean isCaseInsensitive) {
+    Map<String, String> expectedColumnMap = new HashMap<>();
+    expectedColumnMap.put(isCaseInsensitive ? "testcolumn" : "testColumn", "testColumn");
+    expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
+    expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
+    expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
+    return expectedColumnMap;
+  }
+
   private static Schema getExpectedSchema(String tableName) {
     return new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("testColumn", DataType.INT)
         .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
         .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
         .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
-  }
-
-  private static LogicalTableConfig getLogicalTableConfig(String tableName, List<String> physicalTableNames) {
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (String physicalTableName : physicalTableNames) {
-      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
-    }
-    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
-        .setTableName(tableName)
-        .setBrokerTenant("DefaultTenant")
-        .setPhysicalTableConfigMap(physicalTableConfigMap);
-    return builder.build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

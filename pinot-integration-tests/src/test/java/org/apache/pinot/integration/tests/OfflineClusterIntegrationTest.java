@@ -141,6 +141,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(List.of("DestState"), null, List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null,
           100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
+      new StarTreeIndexConfig(List.of("Carrier", "NewInt", "DerivedAirTime"), null,
+          List.of(AggregationFunctionColumnPair.COUNT_STAR_NAME), null, 1);
+  private static final String TEST_STAR_TREE_QUERY_3 =
+      "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA' AND NewInt = 1 AND DerivedAirTime >= 2";
+  private static final String TEST_STAR_TREE_QUERY_3_REFERENCE =
+      "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA' AND AirTime >= 120";
+  private static final int EXPECTED_NUM_DOCS_SCANNED_STAR_TREE_QUERY_3 = 87;
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -1676,9 +1684,73 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_1), firstQueryResult, numTotalDocs, firstQueryResult);
     verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_2), secondQueryResult, numTotalDocs, secondQueryResult);
 
+    // Add one default column, one derived column and a star-tree on new added columns without enabling dynamic
+    // star-tree creation and trigger reload. New columns should be added, but not the star-tree.
+    Schema schema = createSchema();
+    schema.addField(new DimensionFieldSpec("NewInt", DataType.INT, true, 1));
+    schema.addField(new DimensionFieldSpec("DerivedAirTime", DataType.INT, true));
+    updateSchema(schema);
+    indexingConfig.setStarTreeIndexConfigs(List.of(STAR_TREE_INDEX_CONFIG_3));
+    indexingConfig.setEnableDynamicStarTreeCreation(false);
+    List<TransformConfig> transformConfigs = List.of(new TransformConfig("DerivedAirTime", "AirTime / 60"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    tableConfig.setIngestionConfig(ingestionConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    int thirdQueryResult =
+        postQuery(TEST_STAR_TREE_QUERY_3_REFERENCE).get("resultTable").get("rows").get(0).get(0).asInt();
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs, thirdQueryResult);
+
+    // Reload again should have no effect
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs, thirdQueryResult);
+
+    // Set enableDynamicStarTreeCreation to true and trigger reload
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs,
+        EXPECTED_NUM_DOCS_SCANNED_STAR_TREE_QUERY_3);
+
+    // Reload again should have no effect
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs,
+        EXPECTED_NUM_DOCS_SCANNED_STAR_TREE_QUERY_3);
+
+    // Remove the added columns and star-tree index. Need to force update the schema to remove the added columns.
+    indexingConfig.setStarTreeIndexConfigs(null);
+    tableConfig.setIngestionConfig(null);
+    updateTableConfig(tableConfig);
+    forceUpdateSchema(_schema);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
+
+    // Add new columns and star-tree index with dynamic star-tree creation enabled and trigger reload
+    updateSchema(schema);
+    indexingConfig.setStarTreeIndexConfigs(List.of(STAR_TREE_INDEX_CONFIG_3));
+    tableConfig.setIngestionConfig(ingestionConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs,
+        EXPECTED_NUM_DOCS_SCANNED_STAR_TREE_QUERY_3);
+
+    // Reload again should have no effect
+    reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
+    verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_3), thirdQueryResult, numTotalDocs,
+        EXPECTED_NUM_DOCS_SCANNED_STAR_TREE_QUERY_3);
+
+    // Remove the added columns and star-tree index. Need to force update the schema to remove the added columns.
+    indexingConfig.setStarTreeIndexConfigs(null);
+    tableConfig.setIngestionConfig(null);
+    updateTableConfig(tableConfig);
+    forceUpdateSchema(_schema);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
+
     // Reset the table config and reload, should have no effect
     updateTableConfig(_tableConfig);
-    reloadAllSegments(TEST_STAR_TREE_QUERY_2, false, numTotalDocs);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_1), firstQueryResult, numTotalDocs, firstQueryResult);
     verifySingleValueResponse(postQuery(TEST_STAR_TREE_QUERY_2), secondQueryResult, numTotalDocs, secondQueryResult);
   }
