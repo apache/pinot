@@ -2282,6 +2282,13 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-dependency-verifier</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
           <executions>
             <execution>
               <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
@@ -2313,6 +2320,10 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                     </excludes>
                   </bannedDependencies>
+                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
+                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                      pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                  </pinotCustomDependencyVersionRule>
                 </rules>
               </configuration>
             </execution>
