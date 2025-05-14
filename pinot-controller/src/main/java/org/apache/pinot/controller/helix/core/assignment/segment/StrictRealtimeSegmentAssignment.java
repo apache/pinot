@@ -37,7 +37,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 
 
 /**
- * Segment assignment for LLC real-time table using upsert. The assignSegment() of RealtimeSegmentAssignment is
+ * Segment assignment for LLC real-time table using upsert or dedup. The assignSegment() of RealtimeSegmentAssignment is
  * overridden to add new segment for a table partition in a way that's consistent with the assignment in idealState to
  * make sure that at any time the segments from the same table partition is hosted by the same server.
  * <ul>
@@ -47,12 +47,13 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  *     InstancePartition and the one in idealState are different, the one in idealState must be used so that segments
  *     from the same table partition are always hosted on the same server as set in current idealState. If the
  *     idealState is not honored, segments from the same table partition may be assigned to different servers,
- *     breaking the key assumption for queries to be correct for the table using upsert.
+ *     breaking the key assumption for queries to be correct for the table using upsert or dedup.
  *   </li>
  *   <li>
- *     There is no need to handle COMPLETED segments for tables using upsert, because their completed segments should
- *     not be relocated to servers tagged to host COMPLETED segments. Basically, upsert-enabled tables can only use
- *     servers tagged for CONSUMING segments to host both consuming and completed segments from a table partition.
+ *     There is no need to handle COMPLETED segments for tables using upsert or dedup, because their completed
+ *     segments should not be relocated to servers tagged to host COMPLETED segments. Basically, tables using upsert
+ *     or dedup can only use servers tagged for CONSUMING segments to host both consuming and completed segments from
+ *     a table partition.
  *   </li>
  * </ul>
  */
@@ -63,9 +64,9 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
   // 1. This cache is used for table rebalance only, but not segment assignment. During rebalance, rebalanceTable() can
   //    be invoked multiple times when the ideal state changes during the rebalance process.
   // 2. The cache won't be refreshed when an existing segment is replaced with a segment from a different partition.
-  //    Replacing a segment with a segment from a different partition should not be allowed for upsert table because it
-  //    will cause the segment being served by the wrong servers. If this happens during the table rebalance, another
-  //    rebalance might be needed to fix the assignment.
+  //    Replacing a segment with a segment from a different partition should not be allowed for upsert/dedup table
+  //    because it will cause the segment being served by the wrong servers. If this happens during the table
+  //    rebalance, another rebalance might be needed to fix the assignment.
   private final Object2IntOpenHashMap<String> _segmentPartitionIdMap = new Object2IntOpenHashMap<>();
 
   @Override
@@ -163,8 +164,10 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
     Preconditions.checkState(instancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",
         _tableNameWithType);
     Preconditions.checkArgument(config.isIncludeConsuming(),
-        "Consuming segment must be included when rebalancing upsert table: %s", _tableNameWithType);
-    Preconditions.checkState(sortedTiers == null, "Tiers must not be specified for upsert table: %s",
+        "Consuming segment must be included when rebalancing upsert/dedup table: %s", _tableNameWithType);
+    // TODO: consider to support tiers for segments out of metadata TTL for upsert/dedup table, as those segments
+    //       won't be included in the upsert/dedup metadata as kept on CONSUMING tier.
+    Preconditions.checkState(sortedTiers == null, "Tiers must not be specified for upsert/dedup table: %s",
         _tableNameWithType);
     _logger.info("Rebalancing table: {} with instance partitions: {}", _tableNameWithType, instancePartitions);
 
