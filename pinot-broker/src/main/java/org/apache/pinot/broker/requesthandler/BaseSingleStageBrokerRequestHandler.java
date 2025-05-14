@@ -519,8 +519,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
-      requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
-      requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
+      requestContext.setOfflineServerTenant(getServerTenant(offlineTableConfig));
+      requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableConfig));
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
@@ -530,7 +530,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
-      requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
+      requestContext.setOfflineServerTenant(getServerTenant(offlineTableConfig));
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
@@ -540,7 +540,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
-      requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
+      requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableConfig));
     }
 
     // Check if response can be sent without server query evaluation.
@@ -1076,10 +1076,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return TRUE.equals(pinotQuery.getFilterExpression());
   }
 
-  private String getServerTenant(String tableNameWithType) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+  private String getServerTenant(TableConfig tableConfig) {
     if (tableConfig == null) {
-      LOGGER.debug("Table config is not available for table {}", tableNameWithType);
       return "unknownTenant";
     }
     return tableConfig.getTenantConfig().getServer();
