@@ -1608,15 +1608,13 @@ public class TableRebalancer {
       boolean anyServerExhaustedBatchSize = false;
       if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
         // The number of segments for a given partition, accumulates as we iterate over the assigned instances
-        int numSegmentsForGivenPartition = 0;
+        Map<String, Integer> servertoNumSegmentsToBeAddedForPartitionMap = new HashMap<>();
 
         // Check if the servers of the first assignment for each unique set of assigned instances has any space left
         // to move this partition. If so, let's mark the partitions as to be moved, otherwise we mark the partition
         // as a whole as not moveable.
         for (Map<String, Map<String, String>> curAssignment : assignedInstancesToCurrentAssignment.values()) {
           Map.Entry<String, Map<String, String>> firstEntry = curAssignment.entrySet().iterator().next();
-          numSegmentsForGivenPartition += curAssignment.size();
-
           // It is enough to check for whether any server for one segment is above the limit or not since all segments
           // in curAssignment will have the same assigned instances list
           Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
@@ -1626,26 +1624,37 @@ public class TableRebalancer {
           Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
               firstAssignment._instanceStateMap);
           for (String server : serversAdded) {
-            int segmentsAddedToServerSoFar = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
             // Case I: We already exceeded the batchSizePerServer for this server, cannot add any more segments
-            if (segmentsAddedToServerSoFar >= batchSizePerServer) {
+            if (serverToNumSegmentsAddedSoFar.getOrDefault(server, 0) >= batchSizePerServer) {
               anyServerExhaustedBatchSize = true;
               break;
             }
 
-            // Case II: We have not yet exceeded the batchSizePerServer for this server, but we don't have sufficient
-            // space to host the segments for this assignment so far, and we have allocated some partitions so far. If
-            // the batchSizePerServer is less than the number of segments in a given partitionId, we must host at least
-            // 1 partition and exceed the batchSizePerServer to ensure progress is made. Thus, performing this check
-            // only if segmentsAddedToServerSoFar > 0 is necessary.
-            if (segmentsAddedToServerSoFar > 0
-                && (segmentsAddedToServerSoFar + numSegmentsForGivenPartition) > batchSizePerServer) {
-              anyServerExhaustedBatchSize = true;
-              break;
-            }
+            // All segments assigned to the current instances will be moved, so track segments to be added for the given
+            // server based on this
+            servertoNumSegmentsToBeAddedForPartitionMap.put(server,
+                servertoNumSegmentsToBeAddedForPartitionMap.getOrDefault(server, 0) + curAssignment.size());
           }
           if (anyServerExhaustedBatchSize) {
             break;
+          }
+        }
+
+        // Case II: We have not yet exceeded the batchSizePerServer for any server, but we don't have sufficient
+        // space to host the segments for this assignment on some server, and we have allocated some partitions so
+        // far. If the batchSizePerServer is less than the number of segments in a given partitionId, we must host
+        // at least 1 partition and exceed the batchSizePerServer to ensure progress is made. Thus, performing this
+        // check only if segmentsAddedToServerSoFar > 0 is necessary.
+        if (!anyServerExhaustedBatchSize) {
+          for (Map.Entry<String, Integer> serverToNumSegmentsToAdd
+              : servertoNumSegmentsToBeAddedForPartitionMap.entrySet()) {
+            int segmentsAddedToServerSoFar =
+                serverToNumSegmentsAddedSoFar.getOrDefault(serverToNumSegmentsToAdd.getKey(), 0);
+            if (segmentsAddedToServerSoFar > 0
+                && (segmentsAddedToServerSoFar + serverToNumSegmentsToAdd.getValue()) > batchSizePerServer) {
+              anyServerExhaustedBatchSize = true;
+              break;
+            }
           }
         }
       }

@@ -2241,13 +2241,13 @@ public class TableRebalancerTest {
     //   },
     //   "segment__1__1__98347869999L": {
     //     "host1": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host6": "ONLINE"
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
     //   },
     //   "segment__1__2__98347869999L": {
     //     "host1": "ONLINE",
-    //     "host2": "ONLINE",
-    //     "host3": "ONLINE"
+    //     "host3": "ONLINE",
+    //     "host6": "ONLINE"
     //   },
     //   "segment__2__0__98347869999L": {
     //     "host2": "ONLINE",
@@ -2256,13 +2256,13 @@ public class TableRebalancerTest {
     //   },
     //   "segment__2__1__98347869999L": {
     //     "host2": "ONLINE",
-    //     "host4": "ONLINE",
-    //     "host7": "ONLINE"
+    //     "host3": "ONLINE",
+    //     "host4": "ONLINE"
     //   },
     //   "segment__2__2__98347869999L": {
     //     "host2": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
+    //     "host4": "ONLINE",
+    //     "host7": "ONLINE"
     //   },
     //   "segment__3__0__98347869999L": {
     //     "host1": "ONLINE",
