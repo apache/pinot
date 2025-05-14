@@ -13,8 +13,8 @@
       },
       {
         "description": "hint table with partition on wrong size should throw exception",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='2') */ LIMIT 10",
-        "expectedException": ".*Partition size mismatch \\(hint: 2, table: 4\\).*"
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='3') */ LIMIT 10",
+        "expectedException": ".*Partition size mismatch \\(hint: 3, table: 4\\).*"
       },
       {
         "description": "hint table with partition on wrong function should throw exception",
