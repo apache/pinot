@@ -780,7 +780,7 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -804,7 +804,7 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -828,7 +828,7 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -852,7 +852,7 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -880,7 +880,7 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableViewExternal, tableViewIdeal);
+    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
