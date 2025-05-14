@@ -29,7 +29,7 @@ import org.joda.time.format.DateTimeFormatter;
 
 
 public class LLCSegmentName implements Comparable<LLCSegmentName> {
-  private static final String SEPARATOR = "__";
+  public static final String SEPARATOR = "__";
   private static final String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
 
@@ -38,25 +38,59 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
+  private final String _topicName;
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
+    Preconditions.checkArgument(
+        parts.length >= 4 && parts.length <= 5, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
-    _partitionGroupId = Integer.parseInt(parts[1]);
-    _sequenceNumber = Integer.parseInt(parts[2]);
-    _creationTime = parts[3];
+    if (parts.length == 4) {
+      _topicName = "";
+      _partitionGroupId = Integer.parseInt(parts[1]);
+      _sequenceNumber = Integer.parseInt(parts[2]);
+      _creationTime = parts[3];
+    } else {
+      _topicName = parts[1];
+      _partitionGroupId = Integer.parseInt(parts[2]);
+      _sequenceNumber = Integer.parseInt(parts[3]);
+      _creationTime = parts[4];
+    }
     _segmentName = segmentName;
   }
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
+    this(tableName, "", partitionGroupId, sequenceNumber, msSinceEpoch);
+  }
+
+  public LLCSegmentName(
+      String tableName, String topicName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
+    Preconditions.checkArgument(topicName == null || !topicName.contains(SEPARATOR),
+        "Illegal topic name: %s", tableName);
     _tableName = tableName;
+    _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
-    _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+    if ("".equals(topicName)) {
+      _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+    } else {
+      _segmentName =
+          tableName + SEPARATOR + topicName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR
+              + _creationTime;
+    }
+  }
+
+  private LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, String creationTime,
+      String segmentName) {
+    _tableName = tableName;
+    _topicName = "";
+    _partitionGroupId = partitionGroupId;
+    _sequenceNumber = sequenceNumber;
+    _creationTime = creationTime;
+    _segmentName = segmentName;
   }
 
   /**
@@ -65,6 +99,10 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
    */
   @Nullable
   public static LLCSegmentName of(String segmentName) {
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    if (parts.length < 4 || parts.length > 5) {
+      return null;
+    }
     try {
       return new LLCSegmentName(segmentName);
     } catch (Exception e) {
@@ -76,13 +114,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
    * Returns whether the given segment name represents an LLC segment.
    */
   public static boolean isLLCSegment(String segmentName) {
-    int numSeparators = 0;
-    int index = 0;
-    while ((index = segmentName.indexOf(SEPARATOR, index)) != -1) {
-      numSeparators++;
-      index += 2; // SEPARATOR.length()
-    }
-    return numSeparators == 3;
+    return of(segmentName) != null;
   }
 
   @Deprecated
@@ -94,15 +126,32 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
    * Returns the sequence number of the given segment name.
    */
   public static int getSequenceNumber(String segmentName) {
-    return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    if (parts.length == 4) {
+      return Integer.parseInt(parts[2]);
+    } else {
+      return Integer.parseInt(parts[3]);
+    }
   }
 
   public String getTableName() {
     return _tableName;
   }
 
+  public String getTopicName() {
+    return _topicName;
+  }
+
   public int getPartitionGroupId() {
     return _partitionGroupId;
+  }
+
+  public String getPartitionGroupInfo() {
+    if (_topicName.isEmpty()) {
+      return String.valueOf(_partitionGroupId);
+    } else {
+      return _topicName + SEPARATOR + _partitionGroupId;
+    }
   }
 
   public int getSequenceNumber() {
@@ -127,6 +176,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public int compareTo(LLCSegmentName other) {
     Preconditions.checkArgument(_tableName.equals(other._tableName),
         "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
+    if (!_topicName.equals(other._topicName)) {
+      return StringUtils.compare(_topicName, other._topicName);
+    }
     if (_partitionGroupId != other._partitionGroupId) {
       return Integer.compare(_partitionGroupId, other._partitionGroupId);
     }
