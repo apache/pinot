@@ -379,6 +379,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
 
+
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
   public ControllerConf() {
