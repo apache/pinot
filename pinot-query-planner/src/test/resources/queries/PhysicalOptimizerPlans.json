@@ -421,5 +421,104 @@
         ]
       }
     ]
+  },
+  "physical_opt_lite_mode_single_rel_queries": {
+    "queries": [
+      {
+        "description": "Simple SELECT with WHERE query.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(fetch=[100000])",
+          "\n  PhysicalProject(col2=[$1], col3=[$2])",
+          "\n    PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Auto elimination of partial aggregate when group-by on partitioning column. There's no sort because the limit is added to Agg.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT col2, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{1}], agg#0=[COUNT()])",
+          "\n  PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n    PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Sub-queries with chained transformations",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3) SELECT * FROM (SELECT ROW_NUMBER() OVER (PARTITION BY col2 ORDER BY col3) as rnk, col1 FROM tmp) WHERE rnk = 1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(rnk=[$3], col1=[$0])",
+          "\n  PhysicalFilter(condition=[=($3, 1)])",
+          "\n    PhysicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      PhysicalAggregate(group=[{0, 1, 2}])",
+          "\n        PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n          PhysicalAggregate(group=[{0, 1, 2}])",
+          "\n            PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Pagination on group-by results",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3 ORDER BY col2) SELECT * FROM tmp LIMIT 100,400",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(offset=[100], fetch=[400])",
+          "\n  PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n      PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_lite_mode_bi_rel_queries": {
+    "queries": [
+      {
+        "description": "Query with single semi join",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(fetch=[100000])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n    PhysicalSort(fetch=[100000])",
+          "\n      PhysicalProject(col1=[$0])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Query with single semi join and aggregation",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT COUNT(*), col2 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(EXPR$0=[$1], col2=[$0])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[COUNT()])",
+          "\n    PhysicalJoin(condition=[=($0, $1)], joinType=[semi])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n        PhysicalSort(fetch=[100000])",
+          "\n          PhysicalProject(col2=[$1])",
+          "\n            PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], distKeys=[[]], execStrategy=[STREAMING], collation=[[]])",
+          "\n        PhysicalSort(fetch=[100000])",
+          "\n          PhysicalProject(col1=[$0])",
+          "\n            PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
   }
 }
