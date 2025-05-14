@@ -116,26 +116,94 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    int finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    int finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalReplicas);
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
 
     // Add a new server
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
-    // Check the number of replicas after rebalancing
-    finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+    // Check the number of servers after rebalancing
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
 
-    // Check that a replica has been added
-    assertEquals(finalReplicas, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
+
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+    waitForAllDocsLoaded(600_000L);
+
+    // number of instances assigned can't be more than number of partitions for rf = 1
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, getNumKafkaPartitions());
+
+    _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
+    _resourceManager.updateInstanceTags(serverStarter2.getInstanceId(), "", false);
+
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setDowntime(true);
+
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
+
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+    waitForAllDocsLoaded(600_000L);
+
+    serverStarter1.stop();
+    serverStarter2.stop();
+    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
+            && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
+        "Failed to drop servers");
+  }
+
+  @Test
+  public void testRebalanceWithBatching()
+      throws Exception {
+    populateTables();
+
+    verifyIdealState(5, NUM_SERVERS);
+
+    // setup the rebalance config
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(false);
+    rebalanceConfig.setMinAvailableReplicas(0);
+    rebalanceConfig.setIncludeConsuming(true);
+    rebalanceConfig.setBatchSizePerServer(1);
+
+    // Add a new server
+    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+
+    // Now we trigger a rebalance operation
+    TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
+    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    // Check the number of servers after rebalancing
+    int finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
+
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+    waitForAllDocsLoaded(600_000L);
+
+    verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
+
+    // Add a new server
+    BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    // Check the number of servers after rebalancing
+    finalServers = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
+
+    // Check that a server has been added
+    assertEquals(finalServers, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);

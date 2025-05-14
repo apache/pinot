@@ -78,6 +78,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final long _externalViewStabilizationTimeoutInMs;
   private final boolean _includeConsuming;
   private final Enablement _minimizeDataMovement;
+  private final int _batchSizePerServer;
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
@@ -99,14 +100,15 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _downtime = config.getSegmentRelocatorDowntime();
     _minAvailableReplicas = config.getSegmentRelocatorMinAvailableReplicas();
     _bestEfforts = config.getSegmentRelocatorBestEfforts();
-    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
-    _minimizeDataMovement = config.getSegmentRelocatorRebalanceMinimizeDataMovement();
     // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
     long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
     _externalViewCheckIntervalInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
+    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
+    _minimizeDataMovement = config.getSegmentRelocatorMinimizeDataMovement();
+    _batchSizePerServer = config.getSegmentRelocatorBatchSizePerServer();
 
     if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
       _waitingTables = ConcurrentHashMap.newKeySet();
@@ -203,6 +205,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
     rebalanceConfig.setIncludeConsuming(_includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
+    rebalanceConfig.setBatchSizePerServer(_batchSizePerServer);
 
     if (_tablesUndergoingRebalance != null) {
       LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
