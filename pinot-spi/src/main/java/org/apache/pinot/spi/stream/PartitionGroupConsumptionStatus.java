@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  */
 public class PartitionGroupConsumptionStatus {
 
+  private final String _topicName;
   private final int _partitionGroupId;
   private final int _streamPartitionGroupId;
   private int _sequenceNumber;
@@ -47,12 +48,22 @@ public class PartitionGroupConsumptionStatus {
 
   public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset,
       StreamPartitionMsgOffset endOffset, String status) {
+    this("", partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public PartitionGroupConsumptionStatus(String topicName, int partitionGroupId, int sequenceNumber,
+      StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _streamPartitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionGroupId);
     _sequenceNumber = sequenceNumber;
     _startOffset = startOffset;
     _endOffset = endOffset;
     _status = status;
+  }
+
+  public String getTopicName() {
+    return _topicName;
   }
 
   public int getPartitionGroupId() {
