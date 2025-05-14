@@ -1089,11 +1089,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
+  @Nullable
   SegmentBuildDescriptor getSegmentBuildDescriptor() {
     return _segmentBuildDescriptor;
   }
 
   @VisibleForTesting
+  @Nullable
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
       closeStreamConsumer();
@@ -1460,7 +1462,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               } else if (_currentOffset.compareTo(endOffset) == 0) {
                 _segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                buildSegmentAndReplace();
+                boolean result = buildSegmentAndReplace();
+                if (!result) {
+                  throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                }
               } else {
                 boolean success = false;
                 // Since online helix transition for a segment can arrive before segment's consumer acquires the
@@ -1477,7 +1482,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  buildSegmentAndReplace();
+                  boolean result = buildSegmentAndReplace();
+                  if (!result) {
+                    throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                  }
                 } else {
                   _segmentLogger
                       .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
