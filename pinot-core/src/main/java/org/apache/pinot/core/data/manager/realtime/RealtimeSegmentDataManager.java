@@ -1458,9 +1458,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                         endOffset);
                 downloadSegmentAndReplace(segmentZKMetadata);
               } else if (_currentOffset.compareTo(endOffset) == 0) {
-                _segmentLogger
-                    .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                buildSegmentAndReplace();
+                _segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
+                    endOffset);
+                if (!buildSegmentAndReplace()) {
+                  _segmentLogger.info("Local build failed for segment {}. Downloading to replace", _segmentNameStr);
+                  downloadSegmentAndReplace(segmentZKMetadata);
+                }
               } else {
                 boolean success = false;
                 // Since online helix transition for a segment can arrive before segment's consumer acquires the
@@ -1477,7 +1480,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  buildSegmentAndReplace();
+                  if (!buildSegmentAndReplace()) {
+                    _segmentLogger.info("Local build failed after catchup for segment {}. Downloading to replace",
+                        _segmentNameStr);
+                    downloadSegmentAndReplace(segmentZKMetadata);
+                  }
                 } else {
                   _segmentLogger
                       .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
