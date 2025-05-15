@@ -116,7 +116,7 @@ public class PlanFragmentAndMailboxAssignment {
       int senderFragmentId = context._planFragmentMap.size();
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
-      RelDistribution.Type distributionType = PhysicalExchange.getRelDistribution(
+      RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
           physicalExchange.getExchangeStrategy(), physicalExchange.getDistributionKeys()).getType();
       List<PlanNode> inputs = new ArrayList<>();
       MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, inputs, currentFragmentId,

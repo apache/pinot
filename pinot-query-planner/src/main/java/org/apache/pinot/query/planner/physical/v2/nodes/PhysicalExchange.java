@@ -26,7 +26,6 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
@@ -82,7 +81,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
       List<Integer> distributionKeys, ExchangeStrategy exchangeStrategy, @Nullable RelCollation relCollation,
       PinotExecStrategyTrait execStrategyTrait) {
     super(input.unwrap().getCluster(), EMPTY_TRAIT_SET.plus(execStrategyTrait), input.unwrap(),
-        getRelDistribution(exchangeStrategy, distributionKeys));
+        ExchangeStrategy.getRelDistribution(exchangeStrategy, distributionKeys));
     _nodeId = nodeId;
     _pRelInputs = Collections.singletonList(input);
     _pinotDataDistribution = pinotDataDistribution;
@@ -166,25 +165,5 @@ public class PhysicalExchange extends Exchange implements PRelNode {
         .itemIf("execStrategy", getRelExchangeType(),
             getRelExchangeType() != PinotRelExchangeType.getDefaultExchangeType())
         .itemIf("collation", _relCollation, CollectionUtils.isNotEmpty(_relCollation.getFieldCollations()));
-  }
-
-  public static RelDistribution getRelDistribution(ExchangeStrategy exchangeStrategy, List<Integer> keys) {
-    switch (exchangeStrategy) {
-      case IDENTITY_EXCHANGE:
-      case PARTITIONING_EXCHANGE:
-      case SUB_PARTITIONING_HASH_EXCHANGE:
-      case COALESCING_PARTITIONING_EXCHANGE:
-        return RelDistributions.hash(keys);
-      case BROADCAST_EXCHANGE:
-        return RelDistributions.BROADCAST_DISTRIBUTED;
-      case SINGLETON_EXCHANGE:
-        return RelDistributions.SINGLETON;
-      case SUB_PARTITIONING_RR_EXCHANGE:
-        return RelDistributions.ROUND_ROBIN_DISTRIBUTED;
-      case RANDOM_EXCHANGE:
-        return RelDistributions.RANDOM_DISTRIBUTED;
-      default:
-        throw new IllegalStateException(String.format("Unexpected exchange strategy: %s", exchangeStrategy));
-    }
   }
 }
