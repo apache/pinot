@@ -248,7 +248,8 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
   }
 
-  private Map<String, List<String>> getServerToSegmentsMap(final String tableNameWithType, final Boolean showReplacedSegments) {
+  private Map<String, List<String>> getServerToSegmentsMap(final String tableNameWithType,
+      final Boolean showReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType);
 
     Set<String> segments = new HashSet<>();
@@ -294,7 +295,10 @@ public class TableSizeReader {
     // TODO: here we assume server contains all segments in ideal state, which might not be the case
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
-      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server).stream().filter(segmentSizeInfo -> entry.getValue().contains(segmentSizeInfo.getSegmentName())).collect(Collectors.toList());
+      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server)
+          .stream()
+          .filter(segmentSizeInfo -> entry.getValue().contains(segmentSizeInfo.getSegmentName()))
+          .collect(Collectors.toList());
       if (!segmentSizeInfoList.isEmpty()) {
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
           SegmentSizeDetails segmentSizeDetails =
