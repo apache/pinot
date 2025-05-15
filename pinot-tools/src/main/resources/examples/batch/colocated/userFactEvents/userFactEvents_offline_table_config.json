@@ -1,0 +1,39 @@
+{
+  "tableName": "userFactEvents",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "replication": 2,
+    "replicaGroupStrategyConfig": {
+      "partitionColumn": "userUUID",
+      "numInstancesPerPartition": 2
+    }
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+    "invertedIndexColumns": [
+      "userUUID"
+    ],
+    "segmentPartitionConfig": {
+      "columnPartitionMap": {
+        "userUUID": {
+          "functionName": "Murmur",
+          "numPartitions": 8
+        }
+      }
+    }
+  },
+  "instancePartitionsMap": {
+    "OFFLINE": "userAttributes_OFFLINE"
+  },
+  "routing": {
+    "instanceSelectorType": "multiStageReplicaGroup"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}
