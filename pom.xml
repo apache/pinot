@@ -2116,7 +2116,7 @@
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-utils</artifactId>
-        <version>${plexus-utils.version}</version>
+        <version>3.5.1</version>
         <scope>compile</scope>
       </dependency>
     </dependencies>
