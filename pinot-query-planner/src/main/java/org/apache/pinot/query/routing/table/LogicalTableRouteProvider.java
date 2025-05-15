@@ -83,8 +83,9 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     TimeBoundaryInfo timeBoundaryInfo;
     if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
       TimeBoundaryStrategy timeBoundaryStrategy =
-          TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(logicalTable.getTimeBoundaryConfig().getBoundaryStrategy());
+          TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
       timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(logicalTable, tableCache, routingManager);
       if (timeBoundaryInfo == null) {
         LOGGER.info("No time boundary info found for logical hybrid table: ");

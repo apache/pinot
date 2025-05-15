@@ -25,10 +25,10 @@ import java.util.ServiceLoader;
 public class TimeBoundaryStrategyService {
 
   private static volatile TimeBoundaryStrategyService _instance = fromServiceLoader();
-  private final Map<String, TimeBoundaryStrategy> strategyMap;
+  private final Map<String, TimeBoundaryStrategy> _strategyMap;
 
   private TimeBoundaryStrategyService(Map<String, TimeBoundaryStrategy> strategyMap) {
-    this.strategyMap = strategyMap;
+    this._strategyMap = strategyMap;
   }
 
   public static TimeBoundaryStrategyService fromServiceLoader() {
@@ -62,7 +62,7 @@ public class TimeBoundaryStrategyService {
   }
 
   public TimeBoundaryStrategy getTimeBoundaryStrategy(String name) {
-    TimeBoundaryStrategy strategy = _instance.strategyMap.get(name);
+    TimeBoundaryStrategy strategy = _instance._strategyMap.get(name);
     if (strategy == null) {
       throw new IllegalArgumentException("No TimeBoundaryStrategy found for name: " + name);
     }

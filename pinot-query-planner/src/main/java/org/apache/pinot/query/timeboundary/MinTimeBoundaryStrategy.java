@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+
 @AutoService(TimeBoundaryStrategy.class)
 public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
 
@@ -46,7 +47,8 @@ public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
     TimeBoundaryInfo minTimeBoundaryInfo = null;
     long minTimeBoundary = Long.MAX_VALUE;
     Map<String, Object> parameters = logicalTableConfig.getTimeBoundaryConfig().getParameters();
-    List<String> includedTables = parameters != null ? (List) parameters.getOrDefault("includedTables", List.of()) : List.of();
+    List<String> includedTables =
+        parameters != null ? (List) parameters.getOrDefault("includedTables", List.of()) : List.of();
     for (String physicalTableName : includedTables) {
       TimeBoundaryInfo current = routingManager.getTimeBoundaryInfo(physicalTableName);
       if (current != null) {
