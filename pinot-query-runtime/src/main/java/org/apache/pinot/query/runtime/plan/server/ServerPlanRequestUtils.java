@@ -401,7 +401,7 @@ public class ServerPlanRequestUtils {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
     String logicalTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
     LogicalTableManager logicalTableManager = instanceDataManager.getLogicalTableManager(logicalTableName);
-    Preconditions.checkNotNull(logicalTableManager, 
+    Preconditions.checkNotNull(logicalTableManager,
         "LogicalTableManager is null for logical table name: " + logicalTableName);
 
     DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap =
