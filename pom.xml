@@ -2122,6 +2122,15 @@
     </dependencies>
   </dependencyManagement>
 
+  <dependencies>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-utils</artifactId>
+      <version>${plexus-utils.version}</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+
   <build>
     <defaultGoal>clean install</defaultGoal>
 
