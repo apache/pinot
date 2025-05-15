@@ -145,7 +145,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
   private class RefreshLogicalTableConfigMessageHandler extends MessageHandler {
     final String _logicalTableName;
 
-    RefreshLogicalTableConfigMessageHandler(LogicalTableConfigRefreshMessage refreshMessage, NotificationContext context) {
+    RefreshLogicalTableConfigMessageHandler(LogicalTableConfigRefreshMessage refreshMessage,
+        NotificationContext context) {
       super(refreshMessage, context);
       _logicalTableName = refreshMessage.getLogicalTableName();
     }

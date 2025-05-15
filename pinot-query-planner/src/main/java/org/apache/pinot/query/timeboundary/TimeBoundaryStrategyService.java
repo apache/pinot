@@ -28,7 +28,7 @@ public class TimeBoundaryStrategyService {
   private final Map<String, TimeBoundaryStrategy> _strategyMap;
 
   private TimeBoundaryStrategyService(Map<String, TimeBoundaryStrategy> strategyMap) {
-    this._strategyMap = strategyMap;
+    _strategyMap = strategyMap;
   }
 
   public static TimeBoundaryStrategyService fromServiceLoader() {
