@@ -54,6 +54,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Policy to determine the behaviour of parallel consumption.")
   private ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
+  @JsonPropertyDescription("Class to handle realtime offset auto reset")
+  private String _realtimeOffsetAutoResetHandlerClass;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -110,5 +113,14 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy) {
     _parallelSegmentConsumptionPolicy = parallelSegmentConsumptionPolicy;
+  }
+
+  @Nullable
+  public String getRealtimeOffsetAutoResetHandlerClass() {
+    return _realtimeOffsetAutoResetHandlerClass;
+  }
+
+  public void setRealtimeOffsetAutoResetHandlerClass(String realtimeOffsetAutoResetHandlerClass) {
+    _realtimeOffsetAutoResetHandlerClass = realtimeOffsetAutoResetHandlerClass;
   }
 }
