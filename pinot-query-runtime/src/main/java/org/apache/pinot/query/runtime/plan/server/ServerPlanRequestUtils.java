@@ -452,7 +452,7 @@ public class ServerPlanRequestUtils {
       String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
       PinotQuery offlinePinotQuery = pinotQuery.deepCopy();
       PinotQuery realtimePinotQuery = pinotQuery.deepCopy();
-      // TODO Calculate TimeBoundaryInfo for logical table
+      // TODO Calculate TimeBoundaryInfo for logical table https://github.com/apache/pinot/issues/15640
       TimeBoundaryInfo timeBoundaryInfo = null;
       return List.of(
           compileLogicalTableInstanceRequest(executionContext, offlinePinotQuery, offlineTableName,

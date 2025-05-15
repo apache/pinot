@@ -573,6 +573,8 @@ public class WorkerManager {
         realtimeBrokerRequest, context.getRequestId());
 
     assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
+
+    // TODO: Set Time Boundary Info if applicable. https://github.com/apache/pinot/issues/15640
   }
 
   private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
