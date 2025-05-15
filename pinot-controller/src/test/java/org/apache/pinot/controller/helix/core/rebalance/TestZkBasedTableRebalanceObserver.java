@@ -113,7 +113,7 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
     checkProgressPercentMetrics(controllerMetrics, observer);
     // This simulates the first step of rebalance, where the IS is set to the intermediate assignment
-    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, source, targetIntermediate,
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, source, targetIntermediate,
         rebalanceContext);
     overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
     currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
@@ -167,7 +167,7 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
     checkProgressPercentMetrics(controllerMetrics, observer);
     // Next assignment calculated based on the IS, IS should be same as the previous targetAssignment
-    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, targetIntermediate, target,
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, targetIntermediate, target,
         rebalanceContext);
     overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
     currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
@@ -314,7 +314,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     // Triggers to initialize the overall or step level progress stats - they should provide similar results
     List<TableRebalanceObserver.Trigger> triggers = Arrays.asList(TableRebalanceObserver.Trigger.START_TRIGGER,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER);
     for (TableRebalanceObserver.Trigger trigger : triggers) {
       Map<String, Map<String, String>> current = new TreeMap<>();
       current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ONLINE));
@@ -586,7 +586,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -753,7 +753,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 4);
@@ -885,7 +885,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -1098,7 +1098,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -1192,7 +1192,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, oldNextAssignment,
-        rebalanceContextIS, TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
+        rebalanceContextIS, TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
         tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -1366,7 +1366,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);

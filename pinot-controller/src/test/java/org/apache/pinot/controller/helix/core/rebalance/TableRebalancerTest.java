@@ -1292,8 +1292,9 @@ public class TableRebalancerTest {
     // Empty segment states should match
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertTrue(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
       }
     }
 
@@ -1303,8 +1304,9 @@ public class TableRebalancerTest {
     externalViewSegmentStates.put("segment1", instanceStateMap);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertTrue(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
       }
     }
 
@@ -1314,8 +1316,9 @@ public class TableRebalancerTest {
     idealStateSegmentStates.put("segment2", instanceStateMap);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertTrue(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
       }
     }
 
@@ -1323,22 +1326,24 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance2", CONSUMING);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 1);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 1);
       }
     }
 
     instanceStateMap.put("instance3", CONSUMING);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1347,11 +1352,12 @@ public class TableRebalancerTest {
     externalViewSegmentStates.put("segment2", instanceStateMap);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1359,11 +1365,12 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance2", OFFLINE);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1372,11 +1379,12 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance3", OFFLINE);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 2);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 2);
       }
     }
 
@@ -1385,11 +1393,12 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance3", OFFLINE);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertFalse(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 1);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 1);
       }
     }
 
@@ -1398,11 +1407,12 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance3", CONSUMING);
     for (boolean lowDiskMode : falseAndTrue) {
       for (boolean bestEfforts : falseAndTrue) {
-        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+        assertTrue(
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                bestEfforts, null));
         assertEquals(
-            TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, lowDiskMode, bestEfforts, null), 0);
+            TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+                lowDiskMode, bestEfforts, null), 0);
       }
     }
 
@@ -1411,16 +1421,17 @@ public class TableRebalancerTest {
     instanceStateMap.put("instance5", CONSUMING);
     instanceStateMap.put("instance6", CONSUMING);
     for (boolean bestEfforts : falseAndTrue) {
-      assertTrue(
-          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-              false, bestEfforts, null));
-      assertEquals(TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, false, bestEfforts, null), 0);
+      assertTrue(TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, false,
+          bestEfforts, null));
+      assertEquals(
+          TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+              false, bestEfforts, null), 0);
       assertFalse(
-          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-              true, bestEfforts, null));
-      assertEquals(TableRebalancer.getNumRemainingSegmentReplicasToProcess(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, true, bestEfforts, null), 3);
+          TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, true, bestEfforts,
+              null));
+      assertEquals(
+          TableRebalancer.getNumRemainingSegmentReplicasToProcess(externalViewSegmentStates, idealStateSegmentStates,
+              true, bestEfforts, null), 3);
     }
 
     // When instance state is ERROR in ExternalView, should fail in regular mode but pass in best-efforts mode
@@ -1430,15 +1441,15 @@ public class TableRebalancerTest {
     instanceStateMap.remove("instance6");
     for (boolean lowDiskMode : falseAndTrue) {
       try {
-        TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-            lowDiskMode, false, null);
+        TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode, false,
+            null);
         fail();
       } catch (Exception e) {
         // Expected
       }
       assertTrue(
-          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-              lowDiskMode, true, null));
+          TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode, true,
+              null));
     }
 
     // When the extra instance is in ERROR state, should throw exception in low disk mode when best-efforts is disabled
@@ -1451,15 +1462,16 @@ public class TableRebalancerTest {
       for (boolean bestEfforts : falseAndTrue) {
         if (lowDiskMode && !bestEfforts) {
           try {
-            TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-                idealStateSegmentStates, true, false, null);
+            TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, true, false,
+                null);
             fail();
           } catch (Exception e) {
             // Expected
           }
         } else {
-          assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-              idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+          assertTrue(
+              TableRebalancer.isExternalViewConverged(externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
+                  bestEfforts, null));
         }
       }
     }
