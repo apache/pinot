@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -95,6 +96,12 @@ public class LogicalTableRouteProviderCalculateRouteTest extends BaseTableRouteT
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());
     }
+
+    if (routeInfo.isHybrid()) {
+      assertNotNull(routeInfo.getTimeBoundaryInfo(), "Time boundary info should not be null for hybrid table");
+    } else {
+      assertNull(routeInfo.getTimeBoundaryInfo(), "Time boundary info should be null for non-hybrid table");
+    }
   }
 
   @Test(dataProvider = "offlineTableAndRouteProvider")
@@ -105,6 +112,13 @@ public class LogicalTableRouteProviderCalculateRouteTest extends BaseTableRouteT
   @Test(dataProvider = "realtimeTableAndRouteProvider")
   void testRealtimeTableRoute(String tableName, Map<String, Set<String>> expectedRoutingTable) {
     assertTableRoute(tableName, "realtimeTableAndRouteProvider", null, expectedRoutingTable, false, true);
+  }
+
+  @Test(dataProvider = "hybridTableAndRouteProvider")
+  void testHybridTableRoute(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
+      Map<String, Set<String>> expectedRealtimeRoutingTable) {
+    assertTableRoute(tableName, "hybridTableAndRouteProvider", expectedOfflineRoutingTable,
+        expectedRealtimeRoutingTable, expectedOfflineRoutingTable != null, expectedRealtimeRoutingTable != null);
   }
 
   @Test(dataProvider = "routeNotExistsProvider")

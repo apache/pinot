@@ -31,22 +31,31 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.mockito.MockedStatic;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -125,6 +134,8 @@ public class BaseTableRouteTest {
   TableCache _tableCache;
   ImplicitHybridTableRouteProvider _hybridTableRouteProvider;
   LogicalTableRouteProvider _logicalTableRouteProvider;
+  TimeBoundaryStrategy _timeBoundaryStrategy;
+  MockedStatic<TimeBoundaryStrategyService> _timeBoundaryStrategyFactoryMockedStatic;
 
 
   @BeforeClass
@@ -154,6 +165,17 @@ public class BaseTableRouteTest {
     _tableCache = factory.buildTableCache();
     _hybridTableRouteProvider = new ImplicitHybridTableRouteProvider();
     _logicalTableRouteProvider = new LogicalTableRouteProvider();
+    _timeBoundaryStrategyFactoryMockedStatic = mockStatic(TimeBoundaryStrategyService.class);
+    _timeBoundaryStrategy = mock(TimeBoundaryStrategy.class);
+    TimeBoundaryStrategyService mockService = mock(TimeBoundaryStrategyService.class);
+    when(TimeBoundaryStrategyService.getInstance()).thenReturn(mockService);
+    when(mockService.getTimeBoundaryStrategy(any())).thenReturn(_timeBoundaryStrategy);
+    when(_timeBoundaryStrategy.computeTimeBoundary(any(), any(), any())).thenReturn(mock(TimeBoundaryInfo.class));
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _timeBoundaryStrategyFactoryMockedStatic.close();
   }
 
   @DataProvider(name = "offlineTableProvider")
@@ -413,6 +435,7 @@ public class BaseTableRouteTest {
 
     builder.setPhysicalTableConfigMap(tableConfigMap);
     builder.setBrokerTenant("brokerTenant");
+    builder.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
     LogicalTableConfig logicalTable = builder.build();
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 

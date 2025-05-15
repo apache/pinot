@@ -70,6 +70,8 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -418,17 +420,70 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
-   * Builds/rebuilds the routing for the physical table, for logical tables it is skipped.
+   * Builds/rebuilds the routing for the physical or logical table
    * @param physicalOrLogicalTable a physical table with type or logical table name
    */
   public synchronized void buildRouting(String physicalOrLogicalTable) {
-    // skip route building for logical tables
     if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
-      LOGGER.info("Skipping route building for logical table: {}", physicalOrLogicalTable);
+      buildRoutingForLogicalTable(physicalOrLogicalTable);
+    } else {
+      buildRoutingForPhysicalTable(physicalOrLogicalTable);
+    }
+  }
+
+  private synchronized void buildRoutingForLogicalTable(String logicalTableName) {
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
+    if (!logicalTableConfig.isHybridLogicalTable()) {
+      LOGGER.info("Skip building routing for hybrid logical table: {}", logicalTableName);
       return;
     }
 
-    String tableNameWithType = physicalOrLogicalTable;
+    LOGGER.info("Building routing for logical table: {}", logicalTableName);
+    // Build the time boundary for offline table from time boundary config
+    TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    List<String> includedTables =
+        (List<String>) timeBoundaryConfig.getParameters().getOrDefault("includedTables", List.of());
+
+    for (String physicalTableName : includedTables) {
+      if (!_routingEntryMap.containsKey(physicalTableName)) {
+        buildRoutingForPhysicalTable(physicalTableName);
+      }
+
+      // skip hybrid tables, time boundary for such offline table already exists
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(
+          TableNameBuilder.extractRawTableName(physicalTableName));
+      if (ZKMetadataProvider.isTableConfigExists(_propertyStore, realtimeTableName)) {
+        continue;
+      }
+
+      // build time boundary for offline table
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalTableName);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", physicalTableName);
+
+      String idealStatePath = getIdealStatePath(physicalTableName);
+      IdealState idealState = getIdealState(idealStatePath);
+      Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", physicalTableName);
+
+      String externalViewPath = getExternalViewPath(physicalTableName);
+      ExternalView externalView = getExternalView(externalViewPath);
+
+      Set<String> onlineSegments = getOnlineSegments(idealState);
+
+      SegmentPreSelector segmentPreSelector =
+          SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+      Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
+
+      TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
+      timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
+
+      _routingEntryMap.get(physicalTableName).setTimeBoundaryManager(timeBoundaryManager);
+    }
+  }
+  /**
+   * Builds/rebuilds the routing for the logical table
+   * @param tableNameWithType logical table name
+   */
+  private synchronized void buildRoutingForPhysicalTable(String tableNameWithType) {
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
