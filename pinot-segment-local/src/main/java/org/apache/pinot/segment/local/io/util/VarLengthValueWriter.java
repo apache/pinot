@@ -94,8 +94,6 @@ public class VarLengthValueWriter implements Closeable {
   private final ByteBuffer _offsetBuffer;
   private final ByteBuffer _valueBuffer;
 
-  private long _totalLength;
-
   public VarLengthValueWriter(File outputFile, int numValues)
       throws IOException {
     _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
@@ -109,7 +107,6 @@ public class VarLengthValueWriter implements Closeable {
 
     _valueBuffer = _offsetBuffer.duplicate();
     _valueBuffer.position(HEADER_LENGTH + (numValues + 1) * Integer.BYTES);
-    _totalLength += HEADER_LENGTH;
   }
 
   public void add(byte[] value)
@@ -119,8 +116,7 @@ public class VarLengthValueWriter implements Closeable {
 
   public void add(byte[] value, int length)
       throws IOException {
-    _totalLength += length;
-    Preconditions.checkArgument(_totalLength < Integer.MAX_VALUE,
+    Preconditions.checkArgument((long) _valueBuffer.position() + length < Integer.MAX_VALUE,
         "2GB data limit exceeded. Try reducing segment size.");
     _offsetBuffer.putInt(_valueBuffer.position());
     _valueBuffer.put(value, 0, length);
