@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
@@ -161,12 +162,13 @@ public class PhysicalExchange extends Exchange implements PRelNode {
   @Override public RelWriter explainTerms(RelWriter pw) {
     return pw.item("input", input)
         .item("exchangeStrategy", _exchangeStrategy)
-        .item("distKeys", _distributionKeys)
-        .item("execStrategy", getRelExchangeType())
-        .item("collation", _relCollation);
+        .itemIf("distKeys", _distributionKeys, CollectionUtils.isNotEmpty(_distributionKeys))
+        .itemIf("execStrategy", getRelExchangeType(),
+            getRelExchangeType() != PinotRelExchangeType.getDefaultExchangeType())
+        .itemIf("collation", _relCollation, CollectionUtils.isNotEmpty(_relCollation.getFieldCollations()));
   }
 
-  private static RelDistribution getRelDistribution(ExchangeStrategy exchangeStrategy, List<Integer> keys) {
+  public static RelDistribution getRelDistribution(ExchangeStrategy exchangeStrategy, List<Integer> keys) {
     switch (exchangeStrategy) {
       case IDENTITY_EXCHANGE:
       case PARTITIONING_EXCHANGE:
@@ -179,6 +181,8 @@ public class PhysicalExchange extends Exchange implements PRelNode {
         return RelDistributions.SINGLETON;
       case SUB_PARTITIONING_RR_EXCHANGE:
         return RelDistributions.ROUND_ROBIN_DISTRIBUTED;
+      case RANDOM_EXCHANGE:
+        return RelDistributions.RANDOM_DISTRIBUTED;
       default:
         throw new IllegalStateException(String.format("Unexpected exchange strategy: %s", exchangeStrategy));
     }
