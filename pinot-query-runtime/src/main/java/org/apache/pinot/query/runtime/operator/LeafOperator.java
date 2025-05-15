@@ -70,13 +70,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Leaf-stage operator processes the leaf stage of a multi-stage query with single-stage engine on the server.
+/// Leaf operator processes the leaf stage of a multi-stage query with single-stage engine on the server.
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
-public class LeafStageOperator extends MultiStageOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageOperator.class);
-  private static final String EXPLAIN_NAME = "LEAF_STAGE";
+public class LeafOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
+  private static final String EXPLAIN_NAME = "LEAF";
 
   // Use a special results block to indicate that this is the last results block
   private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
@@ -94,7 +94,7 @@ public class LeafStageOperator extends MultiStageOperator {
   private volatile Map<Integer, String> _exceptions;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public LeafStageOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
+  public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
       QueryExecutor queryExecutor, ExecutorService executorService) {
     super(context);
     int numRequests = requests.size();
