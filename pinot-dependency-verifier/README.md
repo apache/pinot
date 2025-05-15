@@ -38,42 +38,44 @@ To avoid circular resolution and redundant checks, the enforcer rule is skipped 
 
 That means when you run the full project build, those modules will be excluded from dependency‐verifier validation.
 
-## Two-Phase Build Workflow for Changes in `pinot-dependency-verifier`
+## Two-Phase Build Workflow
 
-Maven resolves plugin dependencies before building reactor modules. This means it cannot build the verifier JAR and
-simultaneously use it in the same build. Therefore, any changes to the `pinot-dependency-verifier` module must follow a
-two-phase (two-PR) process:
-### PR #1 – Build & Install the Verifier Module
+Maven resolves plugin dependencies before building reactor modules. This means it cannot build the verifier JAR and 
+use it in the same build cycle. Therefore, any changes to the `pinot-dependency-verifier` module must follow a
+two-phase process:
 
-1. In the root POM, locate the `<plugin>` entry for `maven-enforcer-plugin` under `<build><plugins>`.
-2. Temporarily comment out the `<dependency>` block that pulls in `org.apache.pinot:pinot-dependency-verifier`.
-3. Commit and open the first PR.
+### Phase 1 - Build & Install the Verifier Module
 
-To test locally:
-```
+From the repo root, build and install only `pinot-dependency-verifier` without triggering verification.
+This ensures the artifact is available in the local Maven repository:
+
+```bash
 mvn clean install \
-    -pl pinot-dependency-verifier \
-    -DskipTests \
-    -Denforcer.skip=true
-```
+  -pl pinot-dependency-verifier \
+  -am \
+  -DskipTests \
+  -Drun.dependency.verifier=false
+   ```
 
-This installs the verifier module into the local Maven repository without triggering enforcement.
+### Phase 2 – Full Reactor Build + Dependency Verifier
 
-### PR #2 – Re-enable the Enforcer Dependency & Full Build
+Run the full Pinot build with the Enforcer Plugin enabled to execute the custom rule:
 
-1. Uncomment the `<dependency>` block from PR #1.
-2. Commit and open PR #2.
-
-To test locally:
-```
-mvn clean install
-```
-The Enforcer plugin can now resolve and load freshly installed verifier JAR and execute the custom rule.
+```bash
+   mvn clean verify \
+      -Pbin-dist,dependency-verifier \
+      -Drun.dependency.verifier=true \
+      -DskipTests
+   ``````
 
 ## Running the Plugin
 
 To manually run the enforcer plugin across the entire Pinot codebase:
-
 ```bash
 mvn enforcer:enforce
+```
+
+To manually run it with the custom rule activated:
+```bash
+mvn enforcer:enforce -Pdependency-verifier -Drun.dependency.verifier=true
 ```

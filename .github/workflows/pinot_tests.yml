@@ -56,7 +56,7 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
-      - name: Install dependency-verifier into repo
+      - name: Install pinot-dependency-verifier into repo
         run: |
           mvn clean install \
           -pl pinot-dependency-verifier \
