@@ -61,8 +61,7 @@ jobs:
           mvn clean install \
           -pl pinot-dependency-verifier \
           -am \
-          -DskipTests \
-          -Drun.dependency.verifier=false
+          -DskipTests
       - name: Linter Test
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}

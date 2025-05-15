@@ -53,8 +53,7 @@ This ensures the artifact is available in the local Maven repository:
 mvn clean install \
   -pl pinot-dependency-verifier \
   -am \
-  -DskipTests \
-  -Drun.dependency.verifier=false
+  -DskipTests
    ```
 
 ### Phase 2 – Full Reactor Build + Dependency Verifier
@@ -63,8 +62,7 @@ Run the full Pinot build with the Enforcer Plugin enabled to execute the custom 
 
 ```bash
    mvn clean verify \
-      -Pbin-dist,dependency-verifier \
-      -Drun.dependency.verifier=true \
+      -Pbin-dist,dependency-verifier
       -DskipTests
    ``````
 
@@ -77,5 +75,5 @@ mvn enforcer:enforce
 
 To manually run it with the custom rule activated:
 ```bash
-mvn enforcer:enforce -Pdependency-verifier -Drun.dependency.verifier=true
+mvn enforcer:enforce -Pdependency-verifier
 ```
