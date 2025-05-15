@@ -310,7 +310,7 @@
   "physical_opt_group_trim_enabled": {
     "queries": [
       {
-        "description": "Group trim simple",
+        "description": "SQL hint based group by optimization with partitioned aggregated values and group trim enabled",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_leaf_return_final_result='true', is_enable_group_trim='true') */ col1, COUNT(DISTINCT col2) AS cnt FROM a WHERE col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10",
         "output": [
           "Execution Plan",
@@ -320,6 +320,39 @@
           "\n      PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true], limit=[10])",
           "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n          PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
+          "\n            PhysicalFilter(condition=[>=($2, 0)])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SQL hint based group by optimization with group trim enabled without returning group key",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(DISTINCT col2) AS cnt FROM a WHERE a.col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      PhysicalProject(cnt=[$1])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], limit=[10])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], collations=[[1 DESC]], limit=[10])",
+          "\n              PhysicalFilter(condition=[>=($2, 0)])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SQL hint based distinct optimization with group trim enabled",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ DISTINCT col1, col2 FROM a WHERE col3 >= 0 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(fetch=[10])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalSort(fetch=[10])",
+          "\n      PhysicalAggregate(group=[{0, 1}], aggType=[FINAL], limit=[10])",
+          "\n        PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 1]])",
+          "\n          PhysicalAggregate(group=[{0, 1}], aggType=[LEAF], limit=[10])",
           "\n            PhysicalFilter(condition=[>=($2, 0)])",
           "\n              PhysicalTableScan(table=[[default, a]])",
           "\n"
