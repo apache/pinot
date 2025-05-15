@@ -70,7 +70,7 @@ Run the full Pinot build with the Enforcer Plugin enabled to execute the custom 
 
 ## Running the Plugin
 
-To manually run the enforcer plugin across the entire Pinot codebase:
+To manually run the enforcer plugin without the customized rule:
 ```bash
 mvn enforcer:enforce
 ```
