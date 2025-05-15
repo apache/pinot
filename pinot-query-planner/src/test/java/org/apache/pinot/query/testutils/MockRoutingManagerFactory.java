@@ -204,6 +204,12 @@ public class MockRoutingManagerFactory {
 
     @Nullable
     @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+      return _routingTableMap.get(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
     public List<String> getSegments(BrokerRequest brokerRequest) {
       String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
       return _segmentsMap.get(tableNameWithType);
