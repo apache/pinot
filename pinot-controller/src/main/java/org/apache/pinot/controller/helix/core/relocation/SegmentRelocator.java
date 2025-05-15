@@ -55,9 +55,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Periodic task to run rebalancer in background to
- * 1. relocate COMPLETED segments to tag overrides
- * 2. relocate ONLINE segments to tiers if tier configs are set
+ * Periodic task to run rebalancer in background to:
+ * <ol>
+ * <li> Relocate COMPLETED segments to tag overrides
+ * <li> Relocate ONLINE segments to tiers if tier configs are set
+ * </ol>
  * Allow at most one replica unavailable during rebalance. Not applicable for HLC tables.
  */
 public class SegmentRelocator extends ControllerPeriodicTask<Void> {
@@ -82,7 +84,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
-  @Nullable private final Set<String> _tablesUndergoingRebalance;
+  @Nullable
+  private final Set<String> _tablesUndergoingRebalance;
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -294,7 +297,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         }
       }
     }
-    if (serverToSegmentsToMigrate.size() > 0) {
+    if (!serverToSegmentsToMigrate.isEmpty()) {
       LOGGER.info("Notify servers: {} to move segments to new tiers locally", serverToSegmentsToMigrate.keySet());
       reloadSegmentsForLocalTierMigration(tableNameWithType, serverToSegmentsToMigrate, messagingService);
     } else {
