@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 
 
 /**
@@ -50,8 +51,9 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
         MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
             new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
         int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+        ForwardIndexReaderContext readerContext = reader.createContext();
         for (int row = 0; row < numDocs; row++) {
-          mapColumnPreIndexStatsCollector.collect(reader.getMap(row, reader.createContext()));
+          mapColumnPreIndexStatsCollector.collect(reader.getMap(row, readerContext));
         }
         mapColumnPreIndexStatsCollector.seal();
         _columnStatisticsMap.put(columnName, mapColumnPreIndexStatsCollector);
