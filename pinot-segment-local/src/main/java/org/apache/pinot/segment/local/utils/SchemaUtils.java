@@ -75,7 +75,7 @@ public class SchemaUtils {
     validate(schema, tableConfigs, false);
   }
 
-  public static void validate(Schema schema, List<TableConfig> tableConfigs, @Nullable boolean isIgnoreCase) {
+  public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase) {
     for (TableConfig tableConfig : tableConfigs) {
       validateCompatibilityWithTableConfig(schema, tableConfig);
     }
