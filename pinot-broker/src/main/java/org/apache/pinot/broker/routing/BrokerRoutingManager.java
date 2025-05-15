@@ -642,6 +642,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    return getRoutingTable(brokerRequest, tableNameWithType, requestId);
+  }
+
+  @Nullable
+  @Override
+  public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;

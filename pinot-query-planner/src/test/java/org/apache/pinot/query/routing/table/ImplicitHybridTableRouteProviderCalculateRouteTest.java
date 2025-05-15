@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.query.routing.table;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
@@ -35,11 +33,8 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -49,7 +44,6 @@ import static org.testng.Assert.*;
  * Test class for {@link ImplicitHybridTableRouteProvider} to test the routing table calculation (calculateRoutes)
  */
 public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTableRouteTest {
-  private static final String QUERY_FORMAT = "SELECT col1, col2 FROM %s LIMIT 10";
   private QueryThreadContext.CloseableContext _closeableContext;
 
   @BeforeMethod
@@ -63,91 +57,6 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
       _closeableContext.close();
       _closeableContext = null;
     }
-  }
-
-  @DataProvider(name = "offlineTableAndRouteProvider")
-  public static Object[][] offlineTableAndRouteProvider() {
-    //@formatter:off
-    return new Object[][] {
-        {"b_OFFLINE", Map.of("Server_localhost_2", ImmutableSet.of("b2"))},
-        {"c_OFFLINE", Map.of("Server_localhost_1", ImmutableSet.of("c1"),
-            "Server_localhost_2", ImmutableSet.of("c2", "c3"))},
-        {"d_OFFLINE", Map.of("Server_localhost_1", ImmutableSet.of("d1"),
-            "Server_localhost_2", ImmutableSet.of("d3"))},
-        {"e_OFFLINE", Map.of("Server_localhost_1", ImmutableSet.of("e1"),
-            "Server_localhost_2", ImmutableSet.of("e3"))},
-    };
-    //@formatter:on
-  }
-
-  @DataProvider(name = "realtimeTableAndRouteProvider")
-  public static Object[][] realtimeTableAndRouteProvider() {
-    //@formatter:off
-    return new Object[][] {
-        {"a_REALTIME", Map.of("Server_localhost_1", ImmutableSet.of("a1", "a2"),
-            "Server_localhost_2", ImmutableSet.of("a3"))},
-        {"b_REALTIME", Map.of("Server_localhost_1", ImmutableSet.of("b1"))},
-        {"e_REALTIME", Map.of("Server_localhost_2", ImmutableSet.of("e2"))},
-    };
-    //@formatter:on
-  }
-
-  @DataProvider(name = "hybridTableAndRouteProvider")
-  public static Object[][] hybridTableAndRouteProvider() {
-    //@formatter:off
-    return new Object[][] {
-        {"d", Map.of("Server_localhost_1", ImmutableSet.of("d1"),
-            "Server_localhost_2", ImmutableSet.of("d3")), null},
-        {"e", Map.of("Server_localhost_1", ImmutableSet.of("e1"),
-            "Server_localhost_2", ImmutableSet.of("e3")),
-            Map.of("Server_localhost_2", ImmutableSet.of("e2"))},
-    };
-    //@formatter:on
-  }
-
-  @DataProvider(name = "partiallyDisabledTableAndRouteProvider")
-  public static Object[][] partiallyDisabledTableAndRouteProvider() {
-    //@formatter:off
-    return new Object[][] {
-        {"hybrid_o_disabled", null, Map.of("Server_localhost_1", ImmutableSet.of("hor1"),
-            "Server_localhost_2", ImmutableSet.of("hor2"))},
-        {"hybrid_r_disabled", Map.of("Server_localhost_1", ImmutableSet.of("hro1"),
-            "Server_localhost_2", ImmutableSet.of("hro2")), null},
-    };
-    //@formatter:on
-  }
-
-  static class BrokerRequestPair {
-    public final BrokerRequest _offlineBrokerRequest;
-    public final BrokerRequest _realtimeBrokerRequest;
-
-    public BrokerRequestPair(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest) {
-      _offlineBrokerRequest = offlineBrokerRequest;
-      _realtimeBrokerRequest = realtimeBrokerRequest;
-    }
-  }
-
-  private static BrokerRequestPair getBrokerRequestPair(String tableName, boolean hasOffline, boolean hasRealtime,
-      String offlineTableName, String realtimeTableName) {
-    String query = String.format(QUERY_FORMAT, tableName);
-    BrokerRequest brokerRequest =
-        CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
-    BrokerRequest offlineBrokerRequest = null;
-    BrokerRequest realtimeBrokerRequest = null;
-
-    if (hasOffline) {
-      PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
-      offlinePinotQuery.getDataSource().setTableName(offlineTableName);
-      offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
-    }
-
-    if (hasRealtime) {
-      PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
-      realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
-      realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
-    }
-
-    return new BrokerRequestPair(offlineBrokerRequest, realtimeBrokerRequest);
   }
 
   private ImplicitHybridTableRouteInfo getImplicitHybridTableRouteInfo(String tableName) {
@@ -198,17 +107,6 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
       Map<ServerRoutingInstance, InstanceRequest> requestMap = routeInfo.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());
-    }
-  }
-
-  private static void assertRoutingTableEqual(Map<ServerInstance, ServerRouteInfo> routeComputer,
-      Map<String, Set<String>> expectedRealtimeRoutingTable) {
-    for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeComputer.entrySet()) {
-      ServerInstance serverInstance = entry.getKey();
-      ServerRouteInfo serverRouteInfo = entry.getValue();
-      Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
-      assertTrue(expectedRealtimeRoutingTable.containsKey(serverInstance.toString()));
-      assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
     }
   }
 

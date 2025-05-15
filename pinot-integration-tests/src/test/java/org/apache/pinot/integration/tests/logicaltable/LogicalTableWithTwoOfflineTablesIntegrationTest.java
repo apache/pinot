@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.integration.tests.logicaltable;
 
-public class RebalanceJobConstants {
-  private RebalanceJobConstants() {
+import java.util.List;
+
+
+public class LogicalTableWithTwoOfflineTablesIntegrationTest extends BaseLogicalTableIntegrationTest {
+  @Override
+  protected List<String> getOfflineTableNames() {
+    return List.of("physicalTable_0", "physicalTable_1");
   }
-
-  // Progress status of the rebalance operation
-  public static final String JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS = "REBALANCE_PROGRESS_STATS";
-  // Configs to retry the rebalance operation
-  public static final String JOB_METADATA_KEY_REBALANCE_CONTEXT = "REBALANCE_CONTEXT";
 }

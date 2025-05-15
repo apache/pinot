@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -51,8 +52,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private final List<ByteBuffer> _mailboxBuffers;
   private transient ReceivingMailbox _mailbox;
 
-  public MailboxContentObserver(MailboxService mailboxService, StreamObserver<MailboxStatus> responseObserver) {
+  public MailboxContentObserver(
+    MailboxService mailboxService, String mailboxId, StreamObserver<MailboxStatus> responseObserver) {
     _mailboxService = mailboxService;
+    _mailbox = StringUtils.isNotBlank(mailboxId) ? _mailboxService.getReceivingMailbox(mailboxId) : null;
     _responseObserver = responseObserver;
     _mailboxBuffers = new ArrayList<>();
   }
