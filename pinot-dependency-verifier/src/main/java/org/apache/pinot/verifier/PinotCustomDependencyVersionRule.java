@@ -111,6 +111,20 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
       return;
     }
 
+    // Check if any submodule POM has hardcoded versions
+    List<Dependency> deps = originalModel.getDependencies();
+    for (Dependency d : deps) {
+      String version = d.getVersion();
+      if (version != null && !version.trim().startsWith("${")) {
+        throw new EnforcerRuleException(String.format(
+            "Module '%s' has hardcoded version '%s' for %s:%s. "
+                + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
+                + "/dependency-management for the best practice",
+            project.getArtifactId(), d.getVersion(), d.getGroupId(), d.getArtifactId()
+        ));
+      }
+    }
+
     // Skip configured modules
     if (_skipModuleList != null && !_skipModuleList.isEmpty()) {
       Path rootPath = session.getTopLevelProject().getBasedir().toPath().toAbsolutePath().normalize();
@@ -126,7 +140,6 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     }
 
     // Any dependencies listed under <dependencies> in any submodule POM should not include <version> tags
-    List<Dependency> deps = originalModel.getDependencies();
     for (Dependency d : deps) {
       if (d.getVersion() != null) {
         throw new EnforcerRuleException(
