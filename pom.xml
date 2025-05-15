@@ -312,9 +312,55 @@
     <assertj.version>3.27.3</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
+
+    <!-- Enables custom dependency verification during build -->
+    <run.dependency.verifier>true</run.dependency.verifier>
   </properties>
 
   <profiles>
+    <profile>
+      <id>dependency-verifier</id>
+      <activation>
+        <property>
+          <name>run.dependency.verifier</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <extensions>true</extensions>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.pinot</groupId>
+                <artifactId>pinot-dependency-verifier</artifactId>
+                <version>${project.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <phase>validate</phase>
+                <configuration>
+                  <rules>
+                    <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
+                      <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                    </pinotCustomDependencyVersionRule>
+                  </rules>
+                  <fail>true</fail>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>pinot-fastdev</id>
       <!-- disable verifying plugins that can be easily fixed after a successful implementation -->
@@ -2282,13 +2328,6 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.pinot</groupId>
-              <artifactId>pinot-dependency-verifier</artifactId>
-              <version>${project.version}</version>
-            </dependency>
-          </dependencies>
           <executions>
             <execution>
               <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
@@ -2320,10 +2359,6 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                     </excludes>
                   </bannedDependencies>
-                  <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
-                    <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
-                      pinot-tools,contrib,pinot-dependency-verifier</skipModules>
-                  </pinotCustomDependencyVersionRule>
                 </rules>
               </configuration>
             </execution>
