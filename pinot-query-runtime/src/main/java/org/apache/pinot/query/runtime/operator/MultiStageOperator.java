@@ -261,15 +261,15 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafStageOperator.StatKey.class) {
+    LEAF(LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
-        StatMap<LeafStageOperator.StatKey> stats = (StatMap<LeafStageOperator.StatKey>) map;
-        response.mergeMaxRowsInOperator(stats.getLong(LeafStageOperator.StatKey.EMITTED_ROWS));
+        StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
-        for (LeafStageOperator.StatKey statKey : stats.keySet()) {
+        for (LeafOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
         response.addBrokerStats(brokerStats);
