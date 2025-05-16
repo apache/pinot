@@ -409,7 +409,7 @@ public class ControllerTest {
         .setRefRealtimeTableName(realtimeTableName)
         .setQuotaConfig(new QuotaConfig(null, "999"))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
-        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", null))
+        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }

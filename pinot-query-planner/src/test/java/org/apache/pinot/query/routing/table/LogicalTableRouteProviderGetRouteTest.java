@@ -264,7 +264,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
-    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of()));
+    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =
@@ -303,7 +303,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
-    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of()));
+    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =

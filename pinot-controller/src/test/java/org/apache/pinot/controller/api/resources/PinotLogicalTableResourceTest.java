@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -330,6 +331,59 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     });
     assertTrue(throwable.getMessage()
             .contains("Reason: Schema with same name as logical table 'db." + LOGICAL_TABLE_NAME + "' does not exist"),
+        throwable.getMessage());
+  }
+
+  public void testLogicalTableTimeBoundaryConfigValidation()
+      throws IOException {
+    // Test logical table time boundary strategy validation
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_8"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+
+    // Test logical table with no time boundary config
+    logicalTableConfig.setTimeBoundaryConfig(null);
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig' should not be null for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig(null, null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.strategy' should not be null or empty for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.strategy' should not be null or empty for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of()));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty for hybrid logical tables"),
         throwable.getMessage());
   }
 

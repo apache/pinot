@@ -433,8 +433,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private synchronized void buildRoutingForLogicalTable(String logicalTableName) {
     LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
+    Preconditions.checkState(logicalTableConfig != null, "Failed to find logical table config for: %s",
+        logicalTableConfig);
     if (!logicalTableConfig.isHybridLogicalTable()) {
-      LOGGER.info("Skip building routing for hybrid logical table: {}", logicalTableName);
+      LOGGER.info("Skip building routing for non hybrid logical table: {}", logicalTableName);
       return;
     }
 
@@ -444,31 +446,31 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     List<String> includedTables =
         (List<String>) timeBoundaryConfig.getParameters().getOrDefault("includedTables", List.of());
 
-    for (String physicalTableName : includedTables) {
-      if (!_routingEntryMap.containsKey(physicalTableName)) {
-        buildRoutingForPhysicalTable(physicalTableName);
-      }
-
+    for (String tableNameWithType : includedTables) {
       // skip hybrid tables, time boundary for such offline table already exists
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(
-          TableNameBuilder.extractRawTableName(physicalTableName));
+          TableNameBuilder.extractRawTableName(tableNameWithType));
       if (ZKMetadataProvider.isTableConfigExists(_propertyStore, realtimeTableName)) {
+        LOGGER.info("Skip building routing for hybrid table: {}", tableNameWithType);
         continue;
       }
+      // build routing if it does not exist for the physical table
+      if (!_routingEntryMap.containsKey(tableNameWithType)) {
+        buildRoutingForPhysicalTable(tableNameWithType);
+      }
 
-      // build time boundary for offline table
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalTableName);
-      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", physicalTableName);
+      // init time boundary manager for the table
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
-      String idealStatePath = getIdealStatePath(physicalTableName);
+      String idealStatePath = getIdealStatePath(tableNameWithType);
       IdealState idealState = getIdealState(idealStatePath);
-      Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", physicalTableName);
+      Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
 
-      String externalViewPath = getExternalViewPath(physicalTableName);
+      String externalViewPath = getExternalViewPath(tableNameWithType);
       ExternalView externalView = getExternalView(externalViewPath);
 
       Set<String> onlineSegments = getOnlineSegments(idealState);
-
       SegmentPreSelector segmentPreSelector =
           SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
       Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
@@ -476,9 +478,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
       timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
 
-      _routingEntryMap.get(physicalTableName).setTimeBoundaryManager(timeBoundaryManager);
+      _routingEntryMap.get(tableNameWithType).setTimeBoundaryManager(timeBoundaryManager);
     }
   }
+
   /**
    * Builds/rebuilds the routing for the logical table
    * @param tableNameWithType logical table name

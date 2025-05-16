@@ -90,6 +90,7 @@ public class BaseTableRouteTest {
 
   public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
   private static final Set<String> DISABLED_TABLES = new HashSet<>();
+
   static {
     TABLE_SCHEMAS.put("a_REALTIME", getSchemaBuilder("a").build());
     TABLE_SCHEMAS.put("b_OFFLINE", getSchemaBuilder("b").build());
@@ -136,7 +137,6 @@ public class BaseTableRouteTest {
   LogicalTableRouteProvider _logicalTableRouteProvider;
   TimeBoundaryStrategy _timeBoundaryStrategy;
   MockedStatic<TimeBoundaryStrategyService> _timeBoundaryStrategyFactoryMockedStatic;
-
 
   @BeforeClass
   public void setUp() {
@@ -435,7 +435,8 @@ public class BaseTableRouteTest {
 
     builder.setPhysicalTableConfigMap(tableConfigMap);
     builder.setBrokerTenant("brokerTenant");
-    builder.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
+    builder.setTimeBoundaryConfig(
+        new TimeBoundaryConfig("min", Map.of("includedTables", List.of("randomTable_OFFLINE"))));
     LogicalTableConfig logicalTable = builder.build();
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 

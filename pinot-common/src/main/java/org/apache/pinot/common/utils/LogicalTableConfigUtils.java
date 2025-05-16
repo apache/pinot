@@ -209,11 +209,24 @@ public class LogicalTableConfigUtils {
           "Invalid logical table. Reason: Schema with same name as logical table '" + tableName + "' does not exist");
     }
 
-    // logical table time boundary strategy validation
+    // validate time boundary config is not null for hybrid tables
     TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    if (logicalTableConfig.isHybridLogicalTable() && timeBoundaryConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'timeBoundaryConfig' should not be null for hybrid logical tables");
+    }
+
+    // time boundary strategy should not be null or empty
     if (timeBoundaryConfig != null && StringUtils.isEmpty(timeBoundaryConfig.getBoundaryStrategy())) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty");
+    }
+
+    // validate time boundary config parameters
+    if (timeBoundaryConfig != null
+        && (timeBoundaryConfig.getParameters() == null || timeBoundaryConfig.getParameters().isEmpty())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'timeBoundaryConfig.parameters' should not be null or empty");
     }
   }
 }

@@ -180,7 +180,6 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -2173,10 +2172,6 @@ public class PinotHelixResourceManager {
   private void validateLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
     if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
       logicalTableConfig.setBrokerTenant("DefaultTenant");
-    }
-
-    if (logicalTableConfig.getTimeBoundaryConfig() == null) {
-      logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
     }
 
     LogicalTableConfigUtils.validateLogicalTableConfig(
