@@ -120,6 +120,7 @@
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
       <artifactId>jmx_prometheus_javaagent</artifactId>
+      <version>${prometheus.jmx-exporter-javaagent.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
