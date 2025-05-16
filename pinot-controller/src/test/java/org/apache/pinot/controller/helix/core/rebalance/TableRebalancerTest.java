@@ -44,8 +44,8 @@ import static org.testng.Assert.fail;
 
 public class TableRebalancerTest {
 
-  private static final TableRebalancer.PartitionIdFetcher DUMMY_PARTITION_FETCHER = segmentName -> 0;
-  private static final TableRebalancer.PartitionIdFetcher SIMPLE_PARTITION_FETCHER = segmentName -> {
+  private static final TableRebalancer.PartitionIdFetcher DUMMY_PARTITION_FETCHER = (segmentName, isConsuming) -> 0;
+  private static final TableRebalancer.PartitionIdFetcher SIMPLE_PARTITION_FETCHER = (segmentName, isConsuming) -> {
     LLCSegmentName name = LLCSegmentName.of(segmentName);
     return name == null ? -1 : name.getPartitionGroupId();
   };
