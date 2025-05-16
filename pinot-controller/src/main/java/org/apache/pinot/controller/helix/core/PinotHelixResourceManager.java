@@ -1865,7 +1865,7 @@ public class PinotHelixResourceManager {
     PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
         PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
     if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
-    || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+        || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
       throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
     }
 
@@ -3516,7 +3516,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getOfflineTableConfig(String tableName) {
-    return getOfflineTableConfig(tableName, true);
+    return getOfflineTableConfig(tableName, true, true);
   }
 
   /**
@@ -3524,11 +3524,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**
@@ -3540,7 +3541,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getRealtimeTableConfig(String tableName) {
-    return getRealtimeTableConfig(tableName, true);
+    return getRealtimeTableConfig(tableName, true, true);
   }
 
   /**
@@ -3548,11 +3549,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**
