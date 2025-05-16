@@ -153,7 +153,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
     @Override
     public HelixTaskResult handleMessage() {
-      _routingManager.buildRouting(_logicalTableName);
+      _routingManager.buildRoutingForLogicalTable(_logicalTableName);
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
       return result;

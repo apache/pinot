@@ -431,7 +431,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
   }
 
-  private synchronized void buildRoutingForLogicalTable(String logicalTableName) {
+  public synchronized void buildRoutingForLogicalTable(String logicalTableName) {
     LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
     Preconditions.checkState(logicalTableConfig != null, "Failed to find logical table config for: %s",
         logicalTableConfig);

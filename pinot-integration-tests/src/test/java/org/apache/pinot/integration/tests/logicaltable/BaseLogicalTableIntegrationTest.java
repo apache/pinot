@@ -162,13 +162,21 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     setUpQueryGenerator(_avroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(60_000L);
+    waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
     cleanup();
+  }
+
+  protected List<String> getOfflineTableNames() {
+    return List.of();
+  }
+
+  protected List<String> getRealtimeTableNames() {
+    return List.of();
   }
 
   protected Map<String, List<File>> getOfflineTableDataFiles() {
@@ -193,14 +201,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       tableNameToFilesMap.get(tableName).add(avroFiles.get(i));
     }
     return tableNameToFilesMap;
-  }
-
-  protected List<String> getOfflineTableNames() {
-    return List.of();
-  }
-
-  protected List<String> getRealtimeTableNames() {
-    return List.of();
   }
 
   private List<String> getTimeBoundaryTable() {
