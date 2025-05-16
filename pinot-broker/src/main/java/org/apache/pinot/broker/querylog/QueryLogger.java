@@ -308,6 +308,22 @@ public class QueryLogger {
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._queryEngine.getName());
       }
+    },
+    OFFLINE_THREAD_MEM_ALLOCATED_BYTES("offlineThreadMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getOfflineTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineResponseSerMemAllocatedBytes()).append('/');
+      }
+    },
+    REALTIME_THREAD_MEM_ALLOCATED_BYTES("realtimeThreadMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRealtimeTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeResponseSerMemAllocatedBytes()).append('/');
+      }
     };
 
     public final String _entryName;

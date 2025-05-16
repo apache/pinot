@@ -224,6 +224,22 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testMemoryAllocationStats(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
+    JsonNode queryResponse = postQuery(COUNT_STAR_QUERY);
+    long offlineThreadMemAllocatedBytes = queryResponse.get("offlineThreadMemAllocatedBytes").asLong();
+    long offlineResponseSerMemAllocatedBytes = queryResponse.get("offlineResponseSerMemAllocatedBytes").asLong();
+    long offlineTotalMemAllocatedBytes = queryResponse.get("offlineTotalMemAllocatedBytes").asLong();
+
+    Assert.assertTrue(offlineThreadMemAllocatedBytes > 0);
+    Assert.assertTrue(offlineResponseSerMemAllocatedBytes > 0);
+    Assert.assertEquals(offlineTotalMemAllocatedBytes,
+        offlineThreadMemAllocatedBytes + offlineResponseSerMemAllocatedBytes);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testSelectionOnlyOOM(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

@@ -53,7 +53,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
+    "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -100,6 +102,12 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _realtimeSystemActivitiesCpuTimeNs = 0L;
   private long _offlineResponseSerializationCpuTimeNs = 0L;
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
+  private long _offlineThreadMemAllocatedBytes = 0L;
+  private long _realtimeThreadMemAllocatedBytes = 0L;
+  private long _offlineResponseSerMemAllocatedBytes = 0L;
+  private long _realtimeResponseSerMemAllocatedBytes = 0L;
+  private long _offlineTotalMemAllocatedBytes = 0L;
+  private long _realtimeTotalMemAllocatedBytes = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private Map<String, String> _traceInfo = new HashMap<>();
@@ -523,5 +531,38 @@ public class BrokerResponseNative implements BrokerResponse {
   @NotNull
   public Set<String> getTablesQueried() {
     return _tablesQueried;
+  }
+
+  @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return _offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return _realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return _offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
+    return _realtimeResponseSerMemAllocatedBytes;
+  }
+
+  public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
+    _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
+  }
+  public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
+    _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
+  }
+  public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
+    _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
+  }
+  public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
+    _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
   }
 }
