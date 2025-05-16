@@ -145,6 +145,7 @@
           </newVersion>
           <parameter>
             <includes>org.apache.pinot.spi</includes>
+            <excludes>org.apache.pinot.spi.config</excludes>
             <onlyModified>true</onlyModified>
             <skipXmlReport>true</skipXmlReport>
             <skipHtmlReport>true</skipHtmlReport>
