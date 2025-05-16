@@ -203,7 +203,7 @@ public class QueryOptionsUtils {
     String[] replicas = orderedPreferredReplicas.split("\\|");
     List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
     for (String replica : replicas) {
-      preferredReplicas.add(Integer.parseInt(replica));
+      preferredReplicas.add(Integer.parseInt(replica.trim()));
     }
     return preferredReplicas;
   }

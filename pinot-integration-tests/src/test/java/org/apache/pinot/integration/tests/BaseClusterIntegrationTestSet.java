@@ -300,7 +300,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredReplicas=0|1)";
     h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     testQuery(query, h2Query);
-    query = "SET orderedPreferredReplicas='0|1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    query = "SET orderedPreferredReplicas='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     testQuery(query, h2Query);
   }
