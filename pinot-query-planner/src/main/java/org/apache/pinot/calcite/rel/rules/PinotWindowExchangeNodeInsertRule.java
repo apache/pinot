@@ -207,7 +207,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     }
 
     return windowChanged ? new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, lowerBound, upperBound,
-        oldWindowGroup.exclude, oldWindowGroup.orderKeys, newAggCallWindow) : oldWindowGroup;
+        oldWindowGroup.orderKeys, newAggCallWindow) : oldWindowGroup;
   }
 
   @Nullable

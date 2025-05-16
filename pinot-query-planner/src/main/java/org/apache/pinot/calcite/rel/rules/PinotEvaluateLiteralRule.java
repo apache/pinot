@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -177,9 +176,6 @@ public class PinotEvaluateLiteralRule {
       return rexCall;
     }
     RelDataType rexNodeType = rexCall.getType();
-    if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
-      rexNodeType = convertDecimalType(rexNodeType, rexBuilder);
-    }
     Object resultValue;
     try {
       QueryFunctionInvoker invoker = new QueryFunctionInvoker(functionInfo);
@@ -216,16 +212,8 @@ public class PinotEvaluateLiteralRule {
     try {
       if (rexNodeType instanceof ArraySqlType) {
         List<Object> resultValues = new ArrayList<>();
-
-        // SQL FLOAT and DOUBLE literals are represented as Java double
-        if (resultValue instanceof double[]) {
-          for (double value: (double[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
-        } else {
-          for (Object value : (Object[]) resultValue) {
-            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
-          }
+        for (Object value : (Object[]) resultValue) {
+          resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -234,11 +222,6 @@ public class PinotEvaluateLiteralRule {
       throw new SqlCompilationException(
           "Caught exception while making literal with value: " + resultValue + " and type: " + rexNodeType, e);
     }
-  }
-
-  private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
-    Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
-    return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
   }
 
   @Nullable
@@ -275,17 +258,12 @@ public class PinotEvaluateLiteralRule {
         return TimestampUtils.toMillisSinceEpoch(resultValue.toString());
       }
     }
-    // Use BigDecimal for INTEGER / BIGINT / DECIMAL literals
-    if (relDataType.getSqlTypeName() == SqlTypeName.INTEGER || relDataType.getSqlTypeName() == SqlTypeName.BIGINT) {
+    // Return BigDecimal for numbers
+    if (resultValue instanceof Integer || resultValue instanceof Long) {
       return new BigDecimal(((Number) resultValue).longValue());
     }
-    if (relDataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+    if (resultValue instanceof Float || resultValue instanceof Double) {
       return new BigDecimal(resultValue.toString());
-    }
-    // Use double for FLOAT / DOUBLE literals
-    if (relDataType.getSqlTypeName() == SqlTypeName.FLOAT || relDataType.getSqlTypeName() == SqlTypeName.DOUBLE
-        || relDataType.getSqlTypeName() == SqlTypeName.REAL) {
-      return ((Number) resultValue).doubleValue();
     }
     // Return ByteString for byte[]
     if (resultValue instanceof byte[]) {
