@@ -154,7 +154,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, true));
+          candidates.add(new SegmentInstanceCandidate(instance, true, getGroup(instance)));
         }
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
@@ -169,7 +169,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
         if (!unavailableInstances.contains(instance)) {
-          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
+          candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance),
+              getGroup(instance)));
         }
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
