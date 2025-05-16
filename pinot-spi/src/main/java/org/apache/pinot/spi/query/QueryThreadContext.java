@@ -85,6 +85,7 @@ public class QueryThreadContext {
     String mode = conf.getProperty(CommonConstants.Query.CONFIG_OF_QUERY_CONTEXT_MODE);
     if ("strict".equalsIgnoreCase(mode)) {
       _strictMode = true;
+      return;
     }
     if (mode != null && !mode.isEmpty()) {
       throw new IllegalArgumentException("Invalid value '" + mode + "' for "
