@@ -43,6 +43,7 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
@@ -50,6 +51,7 @@ import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
@@ -192,6 +194,14 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
+  private boolean canApplyMapFilter(Predicate predicate) {
+    // Get column name and key name from function arguments
+    FunctionContext function = predicate.getLhs().getFunction();
+
+    // Check if the function is an ItemTransformFunction
+    return function.getFunctionName().equals(ItemTransformFunction.FUNCTION_NAME);
+  }
+
   /**
    * Helper method to build the operator tree from the filter.
    */
@@ -238,6 +248,8 @@ public class FilterPlanNode implements PlanNode {
             return new H3IndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
+          } else if (canApplyMapFilter(predicate)) {
+            return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);

@@ -128,6 +128,7 @@ public interface DataSource {
   /**
    * Returns the map index for the column if exists, or {@code null} if not.
    */
+  @Deprecated
   @Nullable
   MapIndexReader getMapIndex();
 }

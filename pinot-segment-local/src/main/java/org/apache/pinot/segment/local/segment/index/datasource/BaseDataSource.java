@@ -127,6 +127,7 @@ public abstract class BaseDataSource implements DataSource {
     return getIndex(StandardIndexes.vector());
   }
 
+  @Deprecated
   @Nullable
   @Override
   public MapIndexReader getMapIndex() {

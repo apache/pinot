@@ -81,6 +81,7 @@ public class StandardIndexes {
   public static final String TEXT_ID = "text_index";
   public static final String H3_ID = "h3_index";
   public static final String VECTOR_ID = "vector_index";
+  @Deprecated
   public static final String MAP_ID = "map_index";
 
   private StandardIndexes() {
@@ -141,8 +142,8 @@ public class StandardIndexes {
         IndexService.getInstance().get(VECTOR_ID);
   }
 
+  @Deprecated
   public static IndexType<MapIndexConfig, MapIndexReader, MapIndexCreator> map() {
-    return (IndexType<MapIndexConfig, MapIndexReader, MapIndexCreator>)
-        IndexService.getInstance().get(MAP_ID);
+    return (IndexType<MapIndexConfig, MapIndexReader, MapIndexCreator>) IndexService.getInstance().get(MAP_ID);
   }
 }

@@ -400,7 +400,7 @@ STRING;map;raw;bloom_filter;true;
 STRING;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 STRING;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 STRING;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-STRING;map;raw;json_index;false;Json index is currently only supported on STRING columns
+STRING;map;raw;json_index;true;
 STRING;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 STRING;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 STRING;map;raw;range_index;false;Unsupported data type: MAP
@@ -411,7 +411,7 @@ STRING;map;dict;bloom_filter;true;
 STRING;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 STRING;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
 STRING;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
-STRING;map;dict;json_index;false;Json index is currently only supported on STRING columns
+STRING;map;dict;json_index;true;
 STRING;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 STRING;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 STRING;map;dict;range_index;false;Unsupported data type: MAP
@@ -422,7 +422,7 @@ INT;map;raw;bloom_filter;true;
 INT;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 INT;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 INT;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-INT;map;raw;json_index;false;Json index is currently only supported on STRING columns
+INT;map;raw;json_index;true;
 INT;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 INT;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 INT;map;raw;range_index;false;Unsupported data type: MAP
@@ -433,7 +433,7 @@ INT;map;dict;bloom_filter;true;
 INT;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 INT;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
 INT;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
-INT;map;dict;json_index;false;Json index is currently only supported on STRING columns
+INT;map;dict;json_index;true;
 INT;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 INT;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 INT;map;dict;range_index;false;Unsupported data type: MAP
@@ -444,7 +444,7 @@ LONG;map;raw;bloom_filter;true;
 LONG;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 LONG;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 LONG;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-LONG;map;raw;json_index;false;Json index is currently only supported on STRING columns
+LONG;map;raw;json_index;true;
 LONG;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 LONG;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 LONG;map;raw;range_index;false;Unsupported data type: MAP
@@ -455,7 +455,7 @@ LONG;map;dict;bloom_filter;true;
 LONG;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 LONG;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
 LONG;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
-LONG;map;dict;json_index;false;Json index is currently only supported on STRING columns
+LONG;map;dict;json_index;true;
 LONG;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 LONG;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 LONG;map;dict;range_index;false;Unsupported data type: MAP
@@ -466,7 +466,7 @@ FLOAT;map;raw;bloom_filter;true;
 FLOAT;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 FLOAT;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 FLOAT;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-FLOAT;map;raw;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;map;raw;json_index;true;
 FLOAT;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 FLOAT;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 FLOAT;map;raw;range_index;false;Unsupported data type: MAP
@@ -477,7 +477,7 @@ FLOAT;map;dict;bloom_filter;true;
 FLOAT;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 FLOAT;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
 FLOAT;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
-FLOAT;map;dict;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;map;dict;json_index;true;
 FLOAT;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 FLOAT;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 FLOAT;map;dict;range_index;false;Unsupported data type: MAP
@@ -488,7 +488,7 @@ DOUBLE;map;raw;bloom_filter;true;
 DOUBLE;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 DOUBLE;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 DOUBLE;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
-DOUBLE;map;raw;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;map;raw;json_index;true;
 DOUBLE;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 DOUBLE;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 DOUBLE;map;raw;range_index;false;Unsupported data type: MAP
@@ -499,7 +499,7 @@ DOUBLE;map;dict;bloom_filter;true;
 DOUBLE;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 DOUBLE;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
 DOUBLE;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
-DOUBLE;map;dict;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;map;dict;json_index;true;
 DOUBLE;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 DOUBLE;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
 DOUBLE;map;dict;range_index;false;Unsupported data type: MAP
