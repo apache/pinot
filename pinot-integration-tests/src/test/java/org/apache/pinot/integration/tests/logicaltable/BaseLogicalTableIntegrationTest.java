@@ -177,6 +177,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return DEFAULT_TENANT;
   }
 
+  // Setup H2 table with the same name as the logical table.
+  protected void setUpH2Connection(List<File> avroFiles)
+      throws Exception {
+    setUpH2Connection();
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
+  }
+
   /**
    * Creates a new OFFLINE table config.
    */

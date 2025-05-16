@@ -172,16 +172,20 @@ public class ServerPlanRequestUtils {
         TableDataManager tableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
         Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: %s",
             offlineTableName);
-        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.OFFLINE, segments,
-            tableDataManager));
+        Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.OFFLINE,
+            tableDataManager.getTableName(), tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight(), segments,
+            null));
       } else {
         assert tableType.equals(TableType.REALTIME.name());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
         TableDataManager tableDataManager = instanceDataManager.getTableDataManager(realtimeTableName);
         Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: %s",
             realtimeTableName);
-        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME, segments,
-            tableDataManager));
+        Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+        return List.of(compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME,
+            tableDataManager.getTableName(), tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight(), segments,
+            null));
       }
     } else {
       assert numRequests == 2;
@@ -192,16 +196,21 @@ public class ServerPlanRequestUtils {
       TableDataManager offlineTableDataManager = instanceDataManager.getTableDataManager(offlineTableName);
       Preconditions.checkState(offlineTableDataManager != null, "Failed to find data manager for table: %s",
           offlineTableName);
+      Pair<TableConfig, Schema> offlineTableConfigAndSchema = offlineTableDataManager.getCachedTableConfigAndSchema();
       String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
       TableDataManager realtimeTableDataManager = instanceDataManager.getTableDataManager(realtimeTableName);
       Preconditions.checkState(realtimeTableDataManager != null, "Failed to find data manager for table: %s",
           realtimeTableName);
+      Pair<TableConfig, Schema> realtimeTableConfigAndSchema =
+          realtimeTableDataManager.getCachedTableConfigAndSchema();
       // NOTE: Make a deep copy of PinotQuery for OFFLINE request.
       return List.of(
           compileInstanceRequest(executionContext, new PinotQuery(pinotQuery), timeBoundary, TableType.OFFLINE,
-              offlineSegments, offlineTableDataManager),
-          compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME, realtimeSegments,
-              realtimeTableDataManager));
+              offlineTableDataManager.getTableName(), offlineTableConfigAndSchema.getLeft(),
+              offlineTableConfigAndSchema.getRight(), offlineSegments, null),
+          compileInstanceRequest(executionContext, pinotQuery, timeBoundary, TableType.REALTIME,
+              realtimeTableDataManager.getTableName(), realtimeTableConfigAndSchema.getLeft(),
+              realtimeTableConfigAndSchema.getRight(), realtimeSegments, null));
     }
   }
 
@@ -209,13 +218,15 @@ public class ServerPlanRequestUtils {
    * Convert {@link PinotQuery} into an {@link InstanceRequest}.
    */
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
-      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList,
-      TableDataManager tableDataManager) {
+      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
+      String tableNameWithType, TableConfig tableConfig, Schema schema, @Nullable List<String> segmentList, @Nullable List<TableSegmentsInfo> tableRouteInfoList) {
+    Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
+        "Either segmentList OR tableRouteInfoList should be set");
+
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
     long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
     // 1. Modify the PinotQuery
-    String tableNameWithType = tableDataManager.getTableName();
     pinotQuery.getDataSource().setTableName(tableNameWithType);
     if (timeBoundaryInfo != null) {
       attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
@@ -223,8 +234,7 @@ public class ServerPlanRequestUtils {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
-    Pair<TableConfig, Schema> tableConfigAndSchema = tableDataManager.getCachedTableConfigAndSchema();
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight());
+    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
 
     // 2. Update query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
@@ -242,7 +252,11 @@ public class ServerPlanRequestUtils {
     instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
-    instanceRequest.setSearchSegments(segmentList);
+    if (segmentList != null) {
+      instanceRequest.setSearchSegments(segmentList);
+    } else {
+      instanceRequest.setTableSegmentsInfoList(tableRouteInfoList);
+    }
     instanceRequest.setQuery(brokerRequest);
 
     return instanceRequest;
@@ -426,6 +440,8 @@ public class ServerPlanRequestUtils {
       }
     }
 
+    TimeBoundaryInfo timeBoundaryInfo = stageMetadata.getTimeBoundary();
+
     if (offlineTableRouteInfoList.isEmpty() || realtimeTableRouteInfoList.isEmpty()) {
       List<TableSegmentsInfo> routeInfoList =
           offlineTableRouteInfoList.isEmpty() ? realtimeTableRouteInfoList : offlineTableRouteInfoList;
@@ -434,16 +450,16 @@ public class ServerPlanRequestUtils {
         Preconditions.checkNotNull(logicalTableManager.getOfflineTableConfig());
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(logicalTableName);
         return List.of(
-            compileLogicalTableInstanceRequest(executionContext, pinotQuery, offlineTableName,
+            compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.OFFLINE, offlineTableName,
                 logicalTableManager.getOfflineTableConfig(), logicalTableManager.getLogicalTableSchema(), null,
-                TableType.OFFLINE, routeInfoList));
+                routeInfoList));
       } else {
         Preconditions.checkNotNull(logicalTableManager.getRealtimeTableConfig());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
         return List.of(
-            compileLogicalTableInstanceRequest(executionContext, pinotQuery, realtimeTableName,
-                logicalTableManager.getRealtimeTableConfig(), logicalTableManager.getLogicalTableSchema(), null,
-                TableType.REALTIME, routeInfoList));
+            compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.REALTIME,
+                realtimeTableName, logicalTableManager.getRealtimeTableConfig(),
+                logicalTableManager.getLogicalTableSchema(), null, routeInfoList));
       }
     } else {
       Preconditions.checkNotNull(logicalTableManager.getOfflineTableConfig());
@@ -452,53 +468,13 @@ public class ServerPlanRequestUtils {
       String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
       PinotQuery offlinePinotQuery = pinotQuery.deepCopy();
       PinotQuery realtimePinotQuery = pinotQuery.deepCopy();
-      // TODO Calculate TimeBoundaryInfo for logical table https://github.com/apache/pinot/issues/15640
-      TimeBoundaryInfo timeBoundaryInfo = null;
       return List.of(
-          compileLogicalTableInstanceRequest(executionContext, offlinePinotQuery, offlineTableName,
-              logicalTableManager.getOfflineTableConfig(), logicalTableManager.getLogicalTableSchema(),
-              timeBoundaryInfo, TableType.OFFLINE, offlineTableRouteInfoList),
-          compileLogicalTableInstanceRequest(executionContext, realtimePinotQuery, realtimeTableName,
-              logicalTableManager.getRealtimeTableConfig(), logicalTableManager.getLogicalTableSchema(),
-              timeBoundaryInfo, TableType.REALTIME, realtimeTableRouteInfoList));
+          compileInstanceRequest(executionContext, offlinePinotQuery, timeBoundaryInfo, TableType.OFFLINE,
+              offlineTableName, logicalTableManager.getOfflineTableConfig(),
+              logicalTableManager.getLogicalTableSchema(), null, offlineTableRouteInfoList),
+          compileInstanceRequest(executionContext, realtimePinotQuery, timeBoundaryInfo, TableType.REALTIME,
+              realtimeTableName, logicalTableManager.getRealtimeTableConfig(),
+              logicalTableManager.getLogicalTableSchema(), null, realtimeTableRouteInfoList));
     }
-  }
-
-  private static InstanceRequest compileLogicalTableInstanceRequest(OpChainExecutionContext executionContext,
-      PinotQuery pinotQuery, String tableNameWithType, @Nullable TableConfig tableConfig, @Nullable Schema schema,
-      @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<TableSegmentsInfo> tableRouteInfoList) {
-    // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    long requestId = (executionContext.getRequestId() << 16) + ((long) executionContext.getStageId() << 8) + (
-        tableType == TableType.REALTIME ? 1 : 0);
-    // 1. Modify the PinotQuery
-    pinotQuery.getDataSource().setTableName(tableNameWithType);
-    if (timeBoundaryInfo != null) {
-      attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
-    }
-    for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
-      pinotQuery = queryRewriter.rewrite(pinotQuery);
-    }
-    QUERY_OPTIMIZER.optimize(pinotQuery, tableConfig, schema);
-
-    // 2. Update query options according to requestMetadataMap
-    updateQueryOptions(pinotQuery, executionContext);
-
-    // 3. Wrap PinotQuery into BrokerRequest
-    BrokerRequest brokerRequest = new BrokerRequest();
-    brokerRequest.setPinotQuery(pinotQuery);
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName(tableNameWithType);
-    brokerRequest.setQuerySource(querySource);
-
-    // 4. Create InstanceRequest with segmentList
-    InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setBrokerId("unknown");
-    instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
-    instanceRequest.setTableSegmentsInfoList(tableRouteInfoList);
-    instanceRequest.setQuery(brokerRequest);
-
-    return instanceRequest;
   }
 }
