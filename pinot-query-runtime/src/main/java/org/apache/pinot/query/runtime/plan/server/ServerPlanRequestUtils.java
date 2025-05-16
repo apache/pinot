@@ -219,7 +219,8 @@ public class ServerPlanRequestUtils {
    */
   private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
       @Nullable TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
-      String tableNameWithType, TableConfig tableConfig, Schema schema, @Nullable List<String> segmentList, @Nullable List<TableSegmentsInfo> tableRouteInfoList) {
+      String tableNameWithType, TableConfig tableConfig, Schema schema, @Nullable List<String> segmentList,
+      @Nullable List<TableSegmentsInfo> tableRouteInfoList) {
     Preconditions.checkArgument(segmentList == null || tableRouteInfoList == null,
         "Either segmentList OR tableRouteInfoList should be set");
 
