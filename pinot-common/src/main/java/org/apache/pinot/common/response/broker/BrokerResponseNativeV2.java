@@ -48,7 +48,9 @@ import org.apache.pinot.common.response.ProcessingException;
     "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
+    "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -331,6 +333,26 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getRealtimeThreadCpuTimeNs() {
+    return 0;
+  }
+
+  @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
     return 0;
   }
 

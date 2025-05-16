@@ -69,6 +69,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   protected final AtomicReference<Throwable> _processingException = new AtomicReference<>();
 
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
+  protected final AtomicLong _totalWorkerThreadMemAllocatedBytes = new AtomicLong(0);
 
   protected BaseCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {
@@ -136,6 +137,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           }
 
           _totalWorkerThreadCpuTimeNs.getAndAdd(threadResourceUsageProvider.getThreadTimeNs());
+          _totalWorkerThreadMemAllocatedBytes.getAndAdd(threadResourceUsageProvider.getThreadAllocatedBytes());
         }
       });
     }

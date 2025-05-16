@@ -80,7 +80,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
      */
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
-        numServerThreads);
+        numServerThreads, _totalWorkerThreadMemAllocatedBytes.get());
     return mergedBlock;
   }
 
