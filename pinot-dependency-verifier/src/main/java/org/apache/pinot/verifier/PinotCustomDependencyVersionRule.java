@@ -152,21 +152,12 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     for (Dependency d : deps) {
       String version = d.getVersion();
       if (version != null && !version.trim().startsWith("${")) {
-        if (project.isExecutionRoot()) {
-          throw new EnforcerRuleException(String.format(
-              "Root POM has hardcoded version '%s' in <dependencyManagement> for %s:%s. "
-                  + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
-                  + "/dependency-management for the best practice",
-              d.getVersion(), d.getGroupId(), d.getArtifactId()
-          ));
-        } else {
-          throw new EnforcerRuleException(String.format(
-              "Module '%s' has hardcoded version '%s' for %s:%s. "
-                  + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
-                  + "/dependency-management for the best practice",
-              project.getArtifactId(), d.getVersion(), d.getGroupId(), d.getArtifactId()
-          ));
-        }
+        throw new EnforcerRuleException(String.format(
+          "Module '%s' has hardcoded version '%s' for %s:%s. "
+              + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
+              + "/dependency-management for the best practice",
+          project.getArtifactId(), d.getVersion(), d.getGroupId(), d.getArtifactId()
+        ));
       }
     }
   }
