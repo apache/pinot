@@ -168,7 +168,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       long requestId = QueryThreadContext.getRequestId();
       QueryThreadContext.setQueryEngine("mse");
 
-      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
+      String workloadName = reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.WORKLOAD_NAME);
+      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE,
+          workloadName);
       ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       try {
         forEachStage(request,

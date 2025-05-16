@@ -32,6 +32,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -203,18 +204,20 @@ public class Tracing {
     }
 
     @Override
-    public void updateQueryUsageConcurrently(String queryId) {
+    public void updateResourceUsageConcurrently(String identifier, TrackingScope trackingScope) {
     }
 
     @Override
     public final void createExecutionContext(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext,
+        @Nullable String workloadName) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
-      createExecutionContextInner(queryId, taskId, taskType, parentContext);
+      createExecutionContextInner(queryId, taskId, taskType, parentContext, workloadName);
     }
 
     public void createExecutionContextInner(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext,
+        @Nullable String workloadName) {
     }
 
     @Override
@@ -233,6 +236,12 @@ public class Tracing {
         @Override
         public TaskType getTaskType() {
           return TaskType.UNKNOWN;
+        }
+
+        @Override
+        public String getWorkloadName() {
+          // Return default workload name.
+          return CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
         }
       };
     }
@@ -267,14 +276,15 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
-    public static void setupRunner(@Nonnull String queryId) {
-      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+    public static void setupRunner(@Nonnull String queryId, @Nullable String workloadName) {
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, workloadName);
     }
 
-    public static void setupRunner(@Nonnull String queryId, ThreadExecutionContext.TaskType taskType) {
+    public static void setupRunner(@Nonnull String queryId, ThreadExecutionContext.TaskType taskType,
+        @Nullable String workloadName) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       Tracing.getThreadAccountant()
-          .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
+          .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null, workloadName);
     }
 
     /**
@@ -295,13 +305,15 @@ public class Tracing {
         ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       String queryId = null;
+      String workloadName = null;
       if (threadExecutionContext != null) {
         queryId = threadExecutionContext.getQueryId();
+        workloadName = threadExecutionContext.getWorkloadName();
       } else {
         LOGGER.warn("Request ID not available. ParentContext not set for query worker thread.");
       }
       Tracing.getThreadAccountant()
-          .createExecutionContext(queryId, taskId, taskType, threadExecutionContext);
+          .createExecutionContext(queryId, taskId, taskType, threadExecutionContext, workloadName);
     }
 
     public static void sample() {
@@ -350,8 +362,8 @@ public class Tracing {
       sample();
     }
 
-    public static void updateQueryUsageConcurrently(String queryId) {
-      Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId);
+    public static void updateResourceUsageConcurrently(String resourceName, TrackingScope trackingScope) {
+      Tracing.getThreadAccountant().updateResourceUsageConcurrently(resourceName, trackingScope);
     }
 
     public static void setThreadResourceUsageProvider() {

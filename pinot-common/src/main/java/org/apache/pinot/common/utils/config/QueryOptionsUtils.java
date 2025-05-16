@@ -454,4 +454,10 @@ public class QueryOptionsUtils {
     return new IllegalArgumentException(
         String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
   }
+
+  @Nullable
+  public static String getWorkloadName(Map<String, String> queryOptions) {
+    return queryOptions.get(QueryOptionKey.WORKLOAD_NAME) != null ? queryOptions.get(QueryOptionKey.WORKLOAD_NAME)
+        : CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
+  }
 }
