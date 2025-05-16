@@ -1053,7 +1053,7 @@ public class MutableSegmentImpl implements MutableSegment {
       return indexContainer.toDataSource();
     } else {
       // Virtual column
-      return SegmentPreloadUtils.getVirtualDataSource(_schema.getSchemaName(), column, _numDocsIndexed);
+      return SegmentPreloadUtils.getVirtualDataSource(_realtimeTableName, column, _numDocsIndexed);
     }
   }
 

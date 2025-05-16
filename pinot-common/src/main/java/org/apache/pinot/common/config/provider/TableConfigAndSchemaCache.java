@@ -27,6 +27,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+/**
+ * This class caches the table config and schema for all tables in the server instance.
+ * It fetches the latest table config and schema from ZK if not available in the cache.
+ */
 public class TableConfigAndSchemaCache {
 
     private static TableConfigAndSchemaCache _instance;
@@ -106,7 +110,8 @@ public class TableConfigAndSchemaCache {
         _tableConfigCache.put(tableConfig.getTableName(), tableConfig);
     }
 
-    public void setSchema(Schema schema) {
-        _tableSchemaCache.put(schema.getSchemaName(), schema);
+    public void setSchema(String tableName, Schema schema) {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        _tableSchemaCache.put(rawTableName, schema);
     }
 }

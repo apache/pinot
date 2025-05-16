@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -41,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
@@ -4017,8 +4019,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testQueryOnNewColumnAdditionWithPartialReload() throws Exception {
-    String testColumn = "TestColumn";
+  public void testVirtualColumnWithPartialReload() throws Exception {
     Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     // Pick any existing INT column name for the “valid” cases
     String validColumnName = oldSchema.getAllFieldSpecs().stream()
@@ -4026,17 +4027,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             .findFirst()
             .get()
             .getName();
-
-    // Pair each query with whether it should succeed (true) or fail (false) before full reload
+    //  New column name that is not in the schema
+    String newColumn = "newColumn";
+    DataType newdataType = DataType.INT;
+    // Test queries
     List<String> queries = List.of(
-      SELECT_STAR_QUERY,
-      SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
-      SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
-      SELECT_STAR_QUERY + " WHERE " + testColumn + " > 0 LIMIT 10000",
-      SELECT_STAR_QUERY + " ORDER BY " + testColumn + " LIMIT 10000",
-      "SELECT " + testColumn + " FROM " + DEFAULT_TABLE_NAME + "_OFFLINE"
+            SELECT_STAR_QUERY,
+            SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
+            SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
+            SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
+            "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
     );
-
     for (String query: queries) {
       try {
         // Build new schema with the extra column
@@ -4045,22 +4046,85 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         for (FieldSpec fs : oldSchema.getAllFieldSpecs()) {
           newSchema.addField(fs);
         }
-        newSchema.addField(new DimensionFieldSpec(testColumn, FieldSpec.DataType.INT, true));
+        FieldSpec newFieldSpec = new DimensionFieldSpec(newColumn, newdataType, true);
+        newSchema.addField(newFieldSpec);
         updateSchema(newSchema);
 
         // Partially reload one segment
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
                 listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
-        // Column still not present until full reload
-        runQueryAndAssert(query, testColumn);
+        // Column should show up even
+        runQueryAndAssert(query, newColumn, newFieldSpec);
         // Now do a full reload and assert the column shows up
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
-        runQueryAndAssert(query, testColumn);
+        runQueryAndAssert(query, newColumn, newFieldSpec);
       } finally {
         // Reset back to the original schema for the next iteration
         forceUpdateSchema(oldSchema);
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
       }
+    }
+  }
+
+  @Test
+  public void testVirtualColumnAfterReloadForDifferentDataTypes() throws Exception {
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    try {
+      // Build a new schema: copy everything, then add one virtual column per DataType.
+      Schema newSchema = new Schema();
+      oldSchema.getAllFieldSpecs().forEach(newSchema::addField);
+      // Keep insertion order – helps when debugging.
+      Map<String, FieldSpec> newCols = new LinkedHashMap<>();
+      List<DataType> newDataTypes = List.of(
+              DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE,
+              DataType.STRING, DataType.BOOLEAN, DataType.BYTES);
+      for (DataType dt : newDataTypes) {
+        String col = "col_" + dt.name().toLowerCase();
+        FieldSpec fs = new DimensionFieldSpec(col, dt, true);
+        newCols.put(col, fs);
+        newSchema.addField(fs);
+      }
+      newSchema.setSchemaName(oldSchema.getSchemaName());
+      updateSchema(newSchema);
+
+      // Reload segment.
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+
+      // Grab a handful of rows with all columns.
+      JsonNode res = postQuery("SELECT * FROM " + DEFAULT_TABLE_NAME + " LIMIT 10");
+      assertNoError(res);
+      JsonNode rows = res.get("resultTable").get("rows");
+      DataSchema resultSchema =
+              JsonUtils.jsonNodeToObject(res.get("resultTable").get("dataSchema"), DataSchema.class);
+
+      // Verify each new column.
+      for (Map.Entry<String, FieldSpec> e : newCols.entrySet()) {
+        String col = e.getKey();
+        FieldSpec fs = e.getValue();
+
+        int idx = IntStream.range(0, resultSchema.size())
+                .filter(i -> resultSchema.getColumnName(i).equals(col))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Column " + col + " missing"));
+
+        assertEquals(resultSchema.getColumnDataType(idx).name(), fs.getDataType().name(),
+                "Mismatch in reported type for " + col);
+
+        for (JsonNode row : rows) {
+          String expectedDefault;
+          if (fs.getDataType() == DataType.BOOLEAN) {
+            // Pinot surfaces boolean default nulls as literal "false"
+            expectedDefault = "false";
+          } else {
+            expectedDefault = fs.getDefaultNullValueString();
+          }
+          assertEquals(row.get(idx).asText(), expectedDefault, "Unexpected default value for " + col);
+        }
+      }
+    } finally {
+      // Clean up the schema to the original state
+      forceUpdateSchema(oldSchema);
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
     }
   }
 
@@ -4094,7 +4158,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Reload job did not complete in 10 minutes");
   }
 
-  private void runQueryAndAssert(String query, String newAddedColumn) throws Exception {
+  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec) throws Exception {
     JsonNode response = postQuery(query);
     assertNoError(response);
     JsonNode rows = response.get("resultTable").get("rows");
@@ -4103,10 +4167,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     assert !rows.isEmpty();
     boolean columnPresent = false;
-    for (String columnName : resultSchema.getColumnNames()) {
-      if (columnName.equals(newAddedColumn)) {
-          columnPresent = true;
-          break;
+    String[] columnNames = resultSchema.getColumnNames();
+    for (int columnIndex = 0; columnIndex < columnNames.length; columnIndex++) {
+      if (columnNames[columnIndex].equals(newAddedColumn)) {
+        columnPresent = true;
+        // Check the data type of the new column
+        assertEquals(resultSchema.getColumnDataType(columnIndex).name(), fieldSpec.getDataType().name());
+        // Check the value of the new column
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+          assertEquals(rows.get(rowIndex).get(columnIndex).asText(), String.valueOf(fieldSpec.getDefaultNullValue()));
+        }
       }
     }
     assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");

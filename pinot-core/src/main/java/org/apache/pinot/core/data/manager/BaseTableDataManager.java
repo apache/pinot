@@ -192,7 +192,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .build();
     _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
     _tableConfigAndSchemaCache.setTableConfig(tableConfig);
-    _tableConfigAndSchemaCache.setSchema(schema);
+    _tableConfigAndSchemaCache.setSchema(_tableNameWithType, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
