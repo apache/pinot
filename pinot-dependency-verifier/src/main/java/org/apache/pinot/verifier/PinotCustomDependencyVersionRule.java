@@ -130,7 +130,8 @@ public class PinotCustomDependencyVersionRule implements EnforcerRule {
     for (Dependency d : deps) {
       if (d.getVersion() != null) {
         throw new EnforcerRuleException(
-            String.format("Module '%s' declares version '%s' for dependency %s:%s. "
+            String.format("Module '%s' declares version '%s' for dependency %s:%s. Version tag is not allowed in a "
+                    + "non-root POM unless the module is declared in \"skipModules\". "
                     + "Please refer to https://docs.pinot.apache.org/developers/developers-and-contributors"
                     + "/dependency-management for the best practice",
                 project.getArtifactId(), d.getVersion(), d.getGroupId(), d.getArtifactId())

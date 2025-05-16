@@ -149,7 +149,7 @@
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.15</swagger.version>
+    <swagger.version>1.6.16</swagger.version>
     <swagger-ui.version>5.21.0</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.42</aws.sdk.version>
+    <aws.sdk.version>2.31.43</aws.sdk.version>
     <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -315,6 +315,43 @@
   </properties>
 
   <profiles>
+    <profile>
+      <id>dependency-verifier</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <extensions>true</extensions>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.pinot</groupId>
+                <artifactId>pinot-dependency-verifier</artifactId>
+                <version>${project.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <phase>validate</phase>
+                <configuration>
+                  <rules>
+                    <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
+                      <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                    </pinotCustomDependencyVersionRule>
+                  </rules>
+                  <fail>true</fail>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>pinot-fastdev</id>
       <!-- disable verifying plugins that can be easily fixed after a successful implementation -->
