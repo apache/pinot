@@ -420,43 +420,44 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
-   * Builds/rebuilds the routing for the physical or logical table
-   * @param physicalOrLogicalTable a physical table with type or logical table name
+   * Builds the routing for a logical table. This method is called when a logical table is created or updated.
+   * @param logicalTableName the name of the logical table
    */
-  public synchronized void buildRouting(String physicalOrLogicalTable) {
-    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
-      buildRoutingForLogicalTable(physicalOrLogicalTable);
-    } else {
-      buildRoutingForPhysicalTable(physicalOrLogicalTable);
-    }
-  }
-
   public synchronized void buildRoutingForLogicalTable(String logicalTableName) {
     LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
     Preconditions.checkState(logicalTableConfig != null, "Failed to find logical table config for: %s",
         logicalTableConfig);
     if (!logicalTableConfig.isHybridLogicalTable()) {
-      LOGGER.info("Skip building routing for non hybrid logical table: {}", logicalTableName);
+      LOGGER.info("Skip time boundary manager setting for non hybrid logical table: {}", logicalTableName);
       return;
     }
 
-    LOGGER.info("Building routing for logical table: {}", logicalTableName);
-    // Build the time boundary for offline table from time boundary config
+    LOGGER.info("Setting time boundary manager for logical table: {}", logicalTableName);
+
     TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    Preconditions.checkArgument(timeBoundaryConfig.getBoundaryStrategy().equals("min"),
+        "Invalid time boundary strategy: %s", timeBoundaryConfig.getBoundaryStrategy());
     List<String> includedTables =
         (List<String>) timeBoundaryConfig.getParameters().getOrDefault("includedTables", List.of());
 
     for (String tableNameWithType : includedTables) {
+      // skip time boundary manager init for realtime table
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        LOGGER.info("Skip time boundary manager init for realtime table: {}", tableNameWithType);
+        continue;
+      }
+
       // skip hybrid tables, time boundary for such offline table already exists
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(
           TableNameBuilder.extractRawTableName(tableNameWithType));
       if (ZKMetadataProvider.isTableConfigExists(_propertyStore, realtimeTableName)) {
-        LOGGER.info("Skip building routing for hybrid table: {}", tableNameWithType);
+        LOGGER.info("Skip time boundary manager init for for hybrid table: {}", tableNameWithType);
         continue;
       }
-      // build routing if it does not exist for the physical table
+
+      // build routing if it does not exist for the offline table
       if (!_routingEntryMap.containsKey(tableNameWithType)) {
-        buildRoutingForPhysicalTable(tableNameWithType);
+        buildRouting(tableNameWithType);
       }
 
       // init time boundary manager for the table
@@ -483,10 +484,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
-   * Builds/rebuilds the routing for the logical table
-   * @param tableNameWithType logical table name
+   * Builds the routing for a table.
+   * @param tableNameWithType the name of the table
    */
-  private synchronized void buildRoutingForPhysicalTable(String tableNameWithType) {
+  public synchronized void buildRouting(String tableNameWithType) {
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
