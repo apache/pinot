@@ -1816,11 +1816,20 @@ public class TableRebalancer {
             segmentName, _tableNameWithType);
       } else {
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
-        int numPartitions = getNumPartitionsFromInstancePartitions(tableType, isConsumingSegment,
-            _instancePartitionsMap);
-        // This is how partitionId is calculated for non-StrictRealtimeSegmentAssignment replica group based tables
-        partitionId = SegmentAssignmentUtils.getPartitionId(segmentName, _tableNameWithType, tableType, _helixManager,
-            numPartitions, _partitionColumn);
+        if (tableType == TableType.REALTIME
+            && (isConsumingSegment || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED))) {
+          // This is how partitionId is calculated for RealtimeSegmentAssignment for CONSUMING segments and ONLINE
+          // segments that aren't relocated to a separate COMPLETED instance partitions
+          partitionId =
+              SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
+                  _partitionColumn);
+        } else {
+          // This is how partitionId is calculated for OFFLINE and COMPLETED replica group based tables
+          int numPartitions = getNumPartitionsFromInstancePartitions(tableType, isConsumingSegment,
+              _instancePartitionsMap);
+          partitionId = SegmentAssignmentUtils.getPartitionId(segmentName, _tableNameWithType, tableType, _helixManager,
+              numPartitions, _partitionColumn);
+        }
       }
       return partitionId;
     }
