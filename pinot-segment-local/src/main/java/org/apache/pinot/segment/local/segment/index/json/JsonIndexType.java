@@ -170,6 +170,6 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     if (!context.getFieldSpec().isSingleValueField()) {
       return null;
     }
-    return new MutableJsonIndexImpl(config);
+    return new MutableJsonIndexImpl(config, context.getSegmentName(), context.getFieldSpec().getName());
   }
 }
