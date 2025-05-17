@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.text;
 
 import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.StopFilter;
 import org.apache.lucene.analysis.StopwordAnalyzerBase;
 import org.apache.lucene.analysis.TokenStream;
@@ -26,36 +27,55 @@ import org.apache.lucene.analysis.standard.StandardTokenizer;
 
 
 /**
- * A {@link org.apache.lucene.analysis.Analyzer} for case-sensitive text.
+ * A {@link org.apache.lucene.analysis.Analyzer} for standard text that is case-aware.
+ * This analyzer supports both case-sensitive and case-insensitive modes, making it
+ * suitable for use cases where case sensitivity is configurable.
+ * <p>
  * It's directly copied from {@link org.apache.lucene.analysis.standard.StandardAnalyzer} but
- * removes the lowercase filter.
+ * allows case-sensitive tokenization.
+ * <p>
+ * The analyzer applies lowercasing to tokens only when the {@code caseSensitive} flag is set to
+ * {@code false} (the default behavior, same as {@link org.apache.lucene.analysis.standard.StandardAnalyzer}).
+ * When {@code caseSensitive} is {@code true}, tokens preserve their original case.
  */
-public class CaseSensitiveAnalyzer extends StopwordAnalyzerBase {
+public class CaseAwareStandardAnalyzer extends StopwordAnalyzerBase {
 
   /** Default maximum allowed token length */
   public static final int DEFAULT_MAX_TOKEN_LENGTH = 255;
 
   private int _maxTokenLength = DEFAULT_MAX_TOKEN_LENGTH;
 
+  private final boolean _caseSensitive;
+
   /**
    * Builds an analyzer with the given stop words.
    *
    * @param stopWords stop words
    */
-  public CaseSensitiveAnalyzer(CharArraySet stopWords) {
-    super(stopWords);
+  public CaseAwareStandardAnalyzer(CharArraySet stopWords) {
+    this(stopWords, false);
   }
 
   /** Builds an analyzer with no stop words. */
-  public CaseSensitiveAnalyzer() {
-    this(CharArraySet.EMPTY_SET);
+  public CaseAwareStandardAnalyzer() {
+    this(CharArraySet.EMPTY_SET, false);
+  }
+
+  /**
+   * Builds an analyzer with the given stop words.
+   *
+   * @param stopWords stop words
+   */
+  public CaseAwareStandardAnalyzer(CharArraySet stopWords, boolean caseSensitive) {
+    super(stopWords);
+    _caseSensitive = caseSensitive;
   }
 
   /**
    * Set the max allowed token length. Tokens larger than this will be chopped up at this token
    * length and emitted as multiple tokens. If you need to skip such large tokens, you could
    * increase this max length, and then use {@code LengthFilter} to remove long tokens. The default
-   * is {@link org.apache.pinot.segment.local.segment.index.text.CaseSensitiveAnalyzer#DEFAULT_MAX_TOKEN_LENGTH}.
+   * is {@link CaseAwareStandardAnalyzer#DEFAULT_MAX_TOKEN_LENGTH}.
    */
   public void setMaxTokenLength(int length) {
     _maxTokenLength = length;
@@ -70,16 +90,37 @@ public class CaseSensitiveAnalyzer extends StopwordAnalyzerBase {
     return _maxTokenLength;
   }
 
+  /**
+   * Returns true if the analyzer is case sensitive
+   */
+  public boolean isCaseSensitive() {
+    return _caseSensitive;
+  }
+
   @Override
   protected TokenStreamComponents createComponents(final String fieldName) {
     final StandardTokenizer tokenizer = new StandardTokenizer();
     tokenizer.setMaxTokenLength(_maxTokenLength);
-    TokenStream tok = new StopFilter(tokenizer, stopwords);
+    TokenStream tok;
+    if (_caseSensitive) {
+      tok = tokenizer;
+    } else {
+      tok = new LowerCaseFilter(tokenizer);
+    }
+    tok = new StopFilter(tok, stopwords);
     return new TokenStreamComponents(
         r -> {
           tokenizer.setMaxTokenLength(_maxTokenLength);
           tokenizer.setReader(r);
         },
         tok);
+  }
+
+  @Override
+  protected TokenStream normalize(String fieldName, TokenStream in) {
+    if (_caseSensitive) {
+      return in;
+    }
+    return new LowerCaseFilter(in);
   }
 }
