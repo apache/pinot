@@ -26,6 +26,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -78,6 +80,20 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       routeInfo.setRealtimeTableConfig(realtimeTableConfig);
     }
     routeInfo.setQueryConfig(logicalTable.getQueryConfig());
+
+    TimeBoundaryInfo timeBoundaryInfo;
+    if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
+      TimeBoundaryStrategy timeBoundaryStrategy =
+          TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
+      timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(logicalTable, tableCache, routingManager);
+      if (timeBoundaryInfo == null) {
+        LOGGER.info("No time boundary info found for logical hybrid table: ");
+        routeInfo.setOfflineTables(null);
+      } else {
+        routeInfo.setTimeBoundaryInfo(timeBoundaryInfo);
+      }
+    }
     return routeInfo;
   }
 
@@ -108,17 +124,6 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
         if (physicalTableInfo.getUnavailableSegments() != null) {
           unavailableSegments.addAll(physicalTableInfo.getUnavailableSegments());
         }
-      }
-    }
-
-    TimeBoundaryInfo timeBoundaryInfo = null;
-    if (routeInfo.hasRealtime() && routeInfo.hasOffline()) {
-      timeBoundaryInfo = routingManager.getTimeBoundaryInfo(routeInfo.getOfflineTables().get(0).getOfflineTableName());
-      if (timeBoundaryInfo == null) {
-        LOGGER.debug("No time boundary info found for hybrid table: ");
-        routeInfo.setOfflineTables(null);
-      } else {
-        routeInfo.setTimeBoundaryInfo(timeBoundaryInfo);
       }
     }
 

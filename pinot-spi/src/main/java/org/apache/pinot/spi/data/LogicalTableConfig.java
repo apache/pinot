@@ -42,6 +42,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String REF_OFFLINE_TABLE_NAME_KEY = "refOfflineTableName";
   public static final String REF_REALTIME_TABLE_NAME_KEY = "refRealtimeTableName";
+  public static final String TIME_BOUNDARY_CONFIG_KEY = "timeBoundaryConfig";
 
   private String _tableName;
   private String _brokerTenant;
@@ -52,6 +53,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
   private QuotaConfig _quotaConfig;
   private String _refOfflineTableName;
   private String _refRealtimeTableName;
+  private TimeBoundaryConfig _timeBoundaryConfig;
 
   public static LogicalTableConfig fromString(String logicalTableString)
       throws IOException {
@@ -119,6 +121,14 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _refRealtimeTableName = refRealtimeTableName;
   }
 
+  public TimeBoundaryConfig getTimeBoundaryConfig() {
+    return _timeBoundaryConfig;
+  }
+
+  public void setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
+    _timeBoundaryConfig = timeBoundaryConfig;
+  }
+
   private JsonNode toJsonObject() {
     return DEFAULT_MAPPER.valueToTree(this);
   }
@@ -139,6 +149,10 @@ public class LogicalTableConfig extends BaseJsonConfig {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public boolean isHybridLogicalTable() {
+    return _refOfflineTableName != null && _refRealtimeTableName != null;
   }
 
   @Override

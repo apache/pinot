@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -63,6 +64,10 @@ public class LogicalTableConfigUtils {
     }
     if (record.getSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY) != null) {
       builder.setRefRealtimeTableName(record.getSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY));
+    }
+    String timeBoundaryConfigJson = record.getSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY);
+    if (timeBoundaryConfigJson != null) {
+      builder.setTimeBoundaryConfig(JsonUtils.stringToObject(timeBoundaryConfigJson, TimeBoundaryConfig.class));
     }
 
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
@@ -104,6 +109,10 @@ public class LogicalTableConfigUtils {
     if (logicalTableConfig.getRefRealtimeTableName() != null) {
       record.setSimpleField(LogicalTableConfig.REF_REALTIME_TABLE_NAME_KEY,
           logicalTableConfig.getRefRealtimeTableName());
+    }
+    if (logicalTableConfig.getTimeBoundaryConfig() != null) {
+      record.setSimpleField(LogicalTableConfig.TIME_BOUNDARY_CONFIG_KEY,
+          logicalTableConfig.getTimeBoundaryConfig().toJsonString());
     }
     return record;
   }
@@ -198,6 +207,26 @@ public class LogicalTableConfigUtils {
     if (!ZKMetadataProvider.isSchemaExists(propertyStore, tableName)) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: Schema with same name as logical table '" + tableName + "' does not exist");
+    }
+
+    // validate time boundary config is not null for hybrid tables
+    TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    if (logicalTableConfig.isHybridLogicalTable() && timeBoundaryConfig == null) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'timeBoundaryConfig' should not be null for hybrid logical tables");
+    }
+
+    // time boundary strategy should not be null or empty
+    if (timeBoundaryConfig != null && StringUtils.isEmpty(timeBoundaryConfig.getBoundaryStrategy())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty");
+    }
+
+    // validate time boundary config parameters
+    if (timeBoundaryConfig != null
+        && (timeBoundaryConfig.getParameters() == null || timeBoundaryConfig.getParameters().isEmpty())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'timeBoundaryConfig.parameters' should not be null or empty");
     }
   }
 }
