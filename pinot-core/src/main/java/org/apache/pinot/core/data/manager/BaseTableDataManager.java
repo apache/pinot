@@ -191,7 +191,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
     _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
-    _tableConfigAndSchemaCache.setTableConfig(tableConfig);
+    _tableConfigAndSchemaCache.setTableConfig(_tableNameWithType, tableConfig);
     _tableConfigAndSchemaCache.setSchema(_tableNameWithType, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
