@@ -1654,7 +1654,8 @@ public class TableRebalancerTest {
     // with batching with batchSizePerServer = 1:
     //
     // The first assignment will move "segment1" and "segment2" by one host at a time, and since the other segments
-    // if added will go beyond batchSizePerServer, they'll be picked up on the next two assignments (host4 and host2):
+    // if added will go beyond batchSizePerServer, they'll be picked up on the next two-three assignments
+    // (host4 and host2):
     // {
     //   "segment__1__0__98347869999L": {
     //     "host1": "ONLINE",
@@ -1677,7 +1678,7 @@ public class TableRebalancerTest {
     //     "host4": "ONLINE"
     //   }
     // }
-    // Second Assignment (host6, host1, host4, and host5 get 1 segment each):
+    // Second Assignment (host6, host1, host4, and host5 get 1 segment each) - non-strictReplicaGroup:
     // {
     //   "segment__1__0__98347869999L": {
     //     "host2": "ONLINE",
@@ -1700,8 +1701,55 @@ public class TableRebalancerTest {
     //     "host5": "ONLINE"
     //   }
     // }
+    // Second Assignment (host1, host6, and host5 get 1 segment each) - strictReplicaGroup:
+    // {
+    //   "segment__1__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__3__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__4__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   }
+    // }
     //
-    // The third assignment should reach the target assignment
+    // The third assignment should reach the target assignment for non-strictReplicaGroup, and the fourth for
+    // strictReplicaGroup
+    // Third Assignment (host1 and host4 gets 1 segment each) - strictReplicaGroup:
+    // {
+    //   "segment__1__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE"
+    //   },
+    //   "segment__2__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   },
+    //   "segment__3__0__98347869999L": {
+    //     "host2": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host6": "ONLINE"
+    //   },
+    //   "segment__4__0__98347869999L": {
+    //     "host1": "ONLINE",
+    //     "host4": "ONLINE",
+    //     "host5": "ONLINE"
+    //   }
+    // }
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
@@ -1718,18 +1766,42 @@ public class TableRebalancerTest {
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
               1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
-      assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
-          new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
-      assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-          new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
-      assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
-          new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
-      assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
-          new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
-
-      nextAssignment =
-          TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
+      if (!enableStrictReplicaGroup) {
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+        assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
+      } else {
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host6")));
+        assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
+      }
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1790,27 +1862,27 @@ public class TableRebalancerTest {
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 2 steps even with
     // batchSizePerServer = 2:
     //
-    // The first assignment will bring "segment1" and "segment3" to the target state. It cannot bring "segment2" and
-    // "segment4" to the target state because "host1" and "host4" might be unavailable for strict replica-group routing,
+    // The first assignment will bring "segment2" and "segment4" to the target state. It cannot bring "segment1" and
+    // "segment3" to the target state because "host1" and "host4" might be unavailable for strict replica-group routing,
     // which breaks the minimum available replicas requirement:
     // {
     //   "segment__1__0__98347869999L": {
     //     "host1": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
     //   },
     //   "segment__2__0__98347869999L": {
-    //     "host2": "ONLINE",
+    //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
     //   },
     //   "segment__3__0__98347869999L": {
     //     "host1": "ONLINE",
-    //     "host3": "ONLINE",
-    //     "host4": "ONLINE"
+    //     "host2": "ONLINE",
+    //     "host3": "ONLINE"
     //   },
     //   "segment__4__0__98347869999L": {
-    //     "host2": "ONLINE",
+    //     "host1": "ONLINE",
     //     "host3": "ONLINE",
     //     "host4": "ONLINE"
     //   }
@@ -1820,13 +1892,13 @@ public class TableRebalancerTest {
     nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, false,
         2, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
     assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
-        new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
+        new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
     assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
-        new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
-    assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
         new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
+    assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+        new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
     assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
-        new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
+        new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, false,
         2, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER);
     assertEquals(nextAssignment, targetAssignment);
@@ -1920,7 +1992,8 @@ public class TableRebalancerTest {
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after two steps. With strict replica groups it should reach the target assignment immediately since
-    // the full partition must be selected for movement. Batch size = 1, unique partitionIds
+    // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
+    // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -1998,7 +2071,8 @@ public class TableRebalancerTest {
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after three steps. With strict replica groups it should reach the target assignment in two steps since
-    // the full partition must be selected for movement. Batch size = 1, unique partitionIds
+    // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
+    // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -2165,7 +2239,8 @@ public class TableRebalancerTest {
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after four steps. With strict replica groups it should reach the target assignment in two steps since
-    // the full partition must be selected for movement. Batch size = 1, unique partitionIds
+    // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
+    // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -2402,9 +2477,9 @@ public class TableRebalancerTest {
     assertEquals((int) numSegmentsToOffloadMap.get("host7"), 1);
 
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
-    // assignment after three steps if strict replica group is disabled . With strict replica groups it should reach
-    // the target assignment in two steps since the full partition must be selected for movement.
-    // Batch size = 2, unique partitionIds
+    // assignment after three steps if strict replica group is enabled or disabled. Even for strictReplicaGroup,
+    // though the full Pair(currentAssignment, targetAssignment) + partitionId moves as a block, it can take longer
+    // to move since this can be a smaller granularity. Batch size = 2, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
@@ -2458,6 +2533,28 @@ public class TableRebalancerTest {
       } else {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__1__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
+        assertEquals(nextAssignment.get("segment__2__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
+        assertEquals(nextAssignment.get("segment__2__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
+        assertEquals(nextAssignment.get("segment__3__0__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
+        assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
+        nextAssignment =
+            TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
+                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
+        assertNotEquals(nextAssignment, targetAssignment);
+        assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         assertEquals(nextAssignment.get("segment__1__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -2474,7 +2571,7 @@ public class TableRebalancerTest {
         assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
                 2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
@@ -2535,7 +2632,7 @@ public class TableRebalancerTest {
         assertEquals(nextAssignment.get("segment__3__1__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         assertEquals(nextAssignment.get("segment__3__2__98347869999L").keySet(),
-            new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
+            new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
                 2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER);
