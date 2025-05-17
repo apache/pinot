@@ -4053,9 +4053,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         // Partially reload one segment
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
                 listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
-        // Column should show up even
+        // Column should show up
         runQueryAndAssert(query, newColumn, newFieldSpec);
-        // Now do a full reload and assert the column shows up
+        // Now do a full reload and the column shows up
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
         runQueryAndAssert(query, newColumn, newFieldSpec);
       } finally {

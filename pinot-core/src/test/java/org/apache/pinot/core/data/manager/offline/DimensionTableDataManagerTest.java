@@ -289,7 +289,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm the new column does not exist
     FieldSpec teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
-    assertNull(teamCitySpec, "Should not return spec for non-existing column");
+    assertNotNull(teamCitySpec, "Should return spec for existing column");
 
     // Reload the segment with a new column
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();

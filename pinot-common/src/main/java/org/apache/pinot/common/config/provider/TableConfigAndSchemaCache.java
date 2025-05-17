@@ -35,8 +35,8 @@ public class TableConfigAndSchemaCache {
 
     private static TableConfigAndSchemaCache _instance;
 
-    private final ConcurrentHashMap<String, TableConfig> _tableConfigCache;
-    private final ConcurrentHashMap<String, Schema> _tableSchemaCache;
+    private static ConcurrentHashMap<String, TableConfig> _tableConfigCache;
+    private static ConcurrentHashMap<String, Schema> _tableSchemaCache;
 
     private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
@@ -46,13 +46,15 @@ public class TableConfigAndSchemaCache {
         _tableSchemaCache = new ConcurrentHashMap<>();
     }
 
-    public static void init(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-        _instance = new TableConfigAndSchemaCache(propertyStore);
+    public static synchronized void init(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+       if (_instance == null) {
+            _instance = new TableConfigAndSchemaCache(propertyStore);
+        }
     }
 
     public static TableConfigAndSchemaCache getInstance() {
         if (_instance == null) {
-            // This is a fallback for cases where init() is not called used in tests
+            // This is a fallback for cases where init() is not called, used in tests
             _instance = new TableConfigAndSchemaCache(null);
         }
         return _instance;
@@ -113,5 +115,16 @@ public class TableConfigAndSchemaCache {
     public void setSchema(String tableName, Schema schema) {
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
         _tableSchemaCache.put(rawTableName, schema);
+    }
+
+    /**
+     * Shutdown and clear the singleton instance.
+     * This allows safe re-initialization for tests or controlled reuse.
+     */
+    public static synchronized void shutdown() {
+        _instance = null;
+        // Clear the caches
+        _tableSchemaCache.clear();
+        _tableConfigCache.clear();
     }
 }

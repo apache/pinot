@@ -873,6 +873,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     _adminApiApplication.stop();
+    TableConfigAndSchemaCache.shutdown();
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 

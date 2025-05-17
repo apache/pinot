@@ -51,7 +51,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -207,21 +206,38 @@ public class SegmentPreloadUtils {
     /**
      * Get a virtual data source for the given column in the table.
      *
+     * @param segmentSchema Segment schema for the table has virtual columns like docId, segmentName, hostname
      * @param tableName Table name could be with or without type suffix
      * @param column Column name for which the data source is needed
      * @param totalDocCount Total document count for the column
      * @return DataSource for the column
      */
-  public static DataSource getVirtualDataSource(String tableName, String column, int totalDocCount) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    Schema schema = TABLE_CONFIG_AND_SCHEMA_CACHE.getSchema(rawTableName);
-    assert schema != null : "Schema should not be null";
-    if (!schema.hasColumn(column)) {
-      // Get the latest schema and see if the column is present in the latest schema
-      schema = TABLE_CONFIG_AND_SCHEMA_CACHE.getLatestSchema(tableName);
+  public static DataSource getVirtualDataSource(Schema segmentSchema, String tableName, String column,
+                                                int totalDocCount) {
+    assert segmentSchema != null : "Segment Schema should not be null";
+    FieldSpec fieldSpec;
+    Schema tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getSchema(tableName);
+    // First check if the column is present in the segment schema
+    // If not, check if the column is present in the table schema
+    if (segmentSchema.hasColumn(column)) {
+      fieldSpec = segmentSchema.getFieldSpecFor(column);
+    } else {
+      if (!tableSchema.hasColumn(column)) {
+        // Fetch the latest schema from ZK if the column is not present in the table schema
+        tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getLatestSchema(tableName);
+      }
+      // Make a copy of the field spec from the table schema to avoid modifying the original field spec
+      // This is important because the field spec in the table schema is used in different places to infer physical
+      // column and also during segment creation/updates
+      FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
+      fieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
+              originalFieldSpec.isSingleValueField()) {
+        @Override
+        public FieldType getFieldType() {
+          return originalFieldSpec.getFieldType();
+        }
+      };
     }
-    assert schema != null;
-    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
     if (!fieldSpec.isVirtualColumn()) {
       // Set the default virtual column provider if it is not set
       fieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
