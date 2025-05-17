@@ -100,8 +100,8 @@ public class IngestionDelayTracker {
     volatile StreamPartitionMsgOffset _latestOffset;
     volatile Long _offsetLag;
 
-    IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs, StreamPartitionMsgOffset currentOffset, Long offsetLag,
-        StreamMetadataProvider streamMetadataProvider) {
+    IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs, StreamPartitionMsgOffset currentOffset,
+        Long offsetLag, StreamMetadataProvider streamMetadataProvider) {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _streamMetadataProvider = streamMetadataProvider;
@@ -213,8 +213,9 @@ public class IngestionDelayTracker {
 
     // Handle negative timer values
     if (scheduledExecutorThreadTickIntervalMs <= 0) {
-      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got="
-          + scheduledExecutorThreadTickIntervalMs + " for table=" + _tableNameWithType);
+      throw new RuntimeException(
+          "Illegal timer timeout argument, expected > 0, got=" + scheduledExecutorThreadTickIntervalMs + " for table="
+              + _tableNameWithType);
     }
 
     // ThreadFactory to set the thread's name
@@ -362,11 +363,10 @@ public class IngestionDelayTracker {
         long offsetLag = 0L;
         StreamPartitionMsgOffset latestOffset = null;
         if (streamMetadataProvider != null && _enableOffsetLagMetric) {
-          latestOffset =
-              fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS, streamMetadataProvider);
+          latestOffset = fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS,
+              streamMetadataProvider);
           offsetLag = calculateOffsetLag(partitionId, currentOffset, latestOffset);
         }
-
 
         if (currentOffset != null) {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
@@ -377,7 +377,8 @@ public class IngestionDelayTracker {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
               ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getPartitionIngestionUpstreamOffset(partitionId));
         }
-        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, offsetLag, streamMetadataProvider);
+        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, offsetLag,
+            streamMetadataProvider);
       } else {
         v.updateCurrentOffset(currentOffset);
         v.updateIngestionTime(ingestionTimeMs, firstStreamIngestionTimeMs);
@@ -518,7 +519,6 @@ public class IngestionDelayTracker {
     return _streamConsumerFactory.createPartitionMetadataProvider(clientId, partitionGroupId);
   }
 
-
   private void updateOffsetLagForAllPartitions() {
     for (Map.Entry<Integer, IngestionInfo> entry : _ingestionInfoMap.entrySet()) {
       int partitionId = entry.getKey();
@@ -527,7 +527,8 @@ public class IngestionDelayTracker {
       StreamMetadataProvider streamMetadataProvider = ingestionInfo._streamMetadataProvider;
       // fetch latest offset
       StreamPartitionMsgOffset latestOffset =
-          fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS, streamMetadataProvider);
+          fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS,
+              streamMetadataProvider);
       long offsetLag = calculateOffsetLag(partitionId, currentOffset, latestOffset);
       ingestionInfo.updateOffsetLag(offsetLag, latestOffset);
     }
