@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
 
 
 /**
@@ -79,6 +80,24 @@ public class DispatchablePlanMetadata implements Serializable {
   // Calculated in {@link MailboxAssignmentVisitor}
   // Map from workerId -> {planFragmentId -> mailboxes}
   private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
+
+  /**
+   * Map from workerId -> {tableType -> {tableName -> segments}} is required for logical tables.
+   * Raw definition of the map is:
+   * Map<String, Map<String, Map<String, List<String>>>>. Since this definition is hard to understand - specifically
+   * what do each of the string keys store, we define two classes:
+   * {@link TableTypeToSegmentsMap} and {@link TableTypeTableNameToSegmentsMap} to help read code more easily.
+   */
+  public static class TableTypeToSegmentsMap {
+    public final Map<String, List<String>> _map = new HashMap<>();
+  }
+
+  public static class TableTypeTableNameToSegmentsMap {
+    public final Map<String, TableTypeToSegmentsMap> _map = new HashMap<>();
+  }
+
+  private LogicalTableRouteInfo _logicalTableRouteInfo;
+  private Map<Integer, TableTypeTableNameToSegmentsMap> _workerIdToTableSegmentsMap;
 
   public List<String> getScannedTables() {
     return _scannedTables;
@@ -177,5 +196,24 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
     _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
+  }
+
+  @Nullable
+  public LogicalTableRouteInfo getLogicalTableRouteInfo() {
+    return _logicalTableRouteInfo;
+  }
+
+  public void setLogicalTableRouteInfo(LogicalTableRouteInfo logicalTableRouteInfo) {
+    _logicalTableRouteInfo = logicalTableRouteInfo;
+  }
+
+  @Nullable
+  public Map<Integer, TableTypeTableNameToSegmentsMap> getWorkerIdToTableSegmentsMap() {
+    return _workerIdToTableSegmentsMap;
+  }
+
+  public void setWorkerIdToTableSegmentsMap(
+      Map<Integer, TableTypeTableNameToSegmentsMap> workerIdToTableSegmentsMap) {
+    _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
 }
