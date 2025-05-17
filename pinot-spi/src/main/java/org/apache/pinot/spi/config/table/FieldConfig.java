@@ -56,6 +56,8 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS = "luceneQueryParserClass";
   public static final String TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE = "luceneDocIdTranslatorMode";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS =
+      "org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer";
+  public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_BACKUP_CLASS =
       "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS =
       "org.apache.lucene.queryparser.classic.QueryParser";

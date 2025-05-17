@@ -147,7 +147,7 @@ public class TextIndexConfig extends IndexConfig {
     _luceneMaxBufferSizeMB =
         luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
     _luceneAnalyzerClass = (luceneAnalyzerClass == null || luceneAnalyzerClass.isEmpty())
-        ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
+        ? getDefaultLuceneAnalyzerClass() : luceneAnalyzerClass;
 
     // Note that we cannot depend on jackson's default behavior to automatically coerce the comma delimited args to
     // List<String>. This is because the args may contain comma and other special characters such as space. Therefore,
@@ -167,6 +167,21 @@ public class TextIndexConfig extends IndexConfig {
         : useLogByteSizeMergePolicy;
     _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
     _caseSensitive = caseSensitive == null ? LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX : caseSensitive;
+  }
+
+  /**
+   *  Get default lucene analyzer class name.
+   *  Fallback to default lucene StandardAnalyzer when the analyzer class is not available in the classpath.
+   */
+  private String getDefaultLuceneAnalyzerClass() {
+    try {
+      Class.forName(FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS);
+      return FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS;
+    } catch (ClassNotFoundException e) {
+      // This is a fallback for the case where the analyzer class is not available in the classpath.
+      // In this case, we can use the default analyzer.
+      return FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_BACKUP_CLASS;
+    }
   }
 
   public FSTType getFstType() {

@@ -33,10 +33,9 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.text.CaseSensitiveAnalyzer;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -141,7 +140,7 @@ public class TextIndexUtils {
     List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
 
     if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
-            || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
+            || (luceneAnalyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
                     && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
@@ -280,10 +279,7 @@ public class TextIndexUtils {
     if (stopWordsExclude != null) {
       stopWordsExclude.forEach(stopWordSet::remove);
     }
-    if (isCaseSensitive) {
-      return new CaseSensitiveAnalyzer(new CharArraySet(stopWordSet, false));
-    }
-    return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
+    return new CaseAwareStandardAnalyzer(new CharArraySet(stopWordSet, !isCaseSensitive), isCaseSensitive);
   }
 
   public static Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(
