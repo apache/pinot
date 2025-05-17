@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -95,6 +96,7 @@ public class MutableSegmentImplTest {
         _lastIndexedTs = System.currentTimeMillis();
       }
     }
+    TableConfigAndSchemaCache.getInstance().setSchema("testTable", _schema);
   }
 
   @Test

@@ -56,15 +56,11 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableD
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
-import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
@@ -72,6 +68,7 @@ import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -1056,13 +1053,7 @@ public class MutableSegmentImpl implements MutableSegment {
       return indexContainer.toDataSource();
     } else {
       // Virtual column
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-      Preconditions.checkState(fieldSpec != null && fieldSpec.isVirtualColumn(), "Failed to find column: %s", column);
-      // TODO: Refactor virtual column provider to directly generate data source
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
-      return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
-          virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
+      return SegmentPreloadUtils.getVirtualDataSource(_realtimeTableName, column, _numDocsIndexed);
     }
   }
 

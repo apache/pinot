@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -116,6 +117,7 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
         _lastIndexedTs = System.currentTimeMillis();
       }
     }
+    TableConfigAndSchemaCache.getInstance().setSchema("testTable", _schema);
   }
 
   @Test

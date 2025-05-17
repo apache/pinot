@@ -508,7 +508,12 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
         60_000L, "Failed to drop added server");
 
     // Add a schema change. Notice that this may affect other following tests
-    Schema schema = getSchema(getTableName());
+    Schema originalSchema = getSchema(getTableName());
+    Schema schema = new Schema();
+    schema.setSchemaName(getTableName());
+    for (FieldSpec fieldSpec : originalSchema.getAllFieldSpecs()) {
+      schema.addField(fieldSpec);
+    }
     schema.addField(new MetricFieldSpec("NewAddedIntMetricB", FieldSpec.DataType.INT, 1));
     updateSchema(schema);
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -608,6 +613,7 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
         aVoid -> getHelixResourceManager().dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
         60_000L, "Failed to drop added server");
     updateTableConfig(originalTableConfig);
+    forceUpdateSchema(originalSchema);
   }
 
   @Test

@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -236,10 +237,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public DataSource getDataSource(String column) {
-    DataSource result = _dataSources.get(column);
-    Preconditions.checkNotNull(result,
-        "DataSource for %s should not be null. Potentially invalid column name specified.", column);
-    return result;
+    DataSource dataSource = _dataSources.get(column);
+    if (dataSource == null) {
+      // Populate a virtual data source
+      dataSource = SegmentPreloadUtils.getVirtualDataSource(_segmentMetadata.getTableName(),
+              column, _segmentMetadata.getTotalDocs());
+      _dataSources.put(column, dataSource);
+    }
+      return dataSource;
   }
 
   @Override
