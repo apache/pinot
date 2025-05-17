@@ -585,7 +585,8 @@ public class ZKOperator {
     }
 
     try {
-      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName(), enableParallelPushProtection);
+      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName(),
+          enableParallelPushProtection);
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
