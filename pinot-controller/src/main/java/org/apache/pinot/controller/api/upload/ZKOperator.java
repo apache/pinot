@@ -585,7 +585,7 @@ public class ZKOperator {
     }
 
     try {
-      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
+      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName(), enableParallelPushProtection);
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
@@ -676,7 +676,7 @@ public class ZKOperator {
     }
 
     try {
-      _pinotHelixResourceManager.assignTableSegments(tableNameWithType, segmentNames);
+      _pinotHelixResourceManager.assignTableSegments(tableNameWithType, segmentNames, enableParallelPushProtection);
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.

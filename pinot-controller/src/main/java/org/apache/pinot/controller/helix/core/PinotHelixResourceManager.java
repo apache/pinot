@@ -2560,10 +2560,10 @@ public class PinotHelixResourceManager {
         "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
-    assignTableSegment(tableNameWithType, segmentName);
+    assignTableSegment(tableNameWithType, segmentName, false);
   }
 
-  public void assignTableSegment(String tableNameWithType, String segmentName) {
+  public void assignTableSegment(String tableNameWithType, String segmentName, Boolean enableParallelPushProtection) {
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
 
@@ -2581,7 +2581,7 @@ public class PinotHelixResourceManager {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
 
         // Update segment tier to support direct assignment for multiple data directories
-        updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+        updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, enableParallelPushProtection);
 
         InstancePartitions tierInstancePartitions =
             TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
@@ -2629,7 +2629,8 @@ public class PinotHelixResourceManager {
   }
 
   // Assign a list of segments in batch mode
-  public void assignTableSegments(String tableNameWithType, List<String> segmentNames) {
+  public void assignTableSegments(String tableNameWithType, List<String> segmentNames,
+      Boolean enableParallelPushProtection) {
     Map<String, String> segmentZKMetadataPathMap = new HashMap<>();
     for (String segmentName : segmentNames) {
       String segmentZKMetadataPath =
@@ -2650,7 +2651,7 @@ public class PinotHelixResourceManager {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
         for (String segmentName : segmentNames) {
           // Update segment tier to support direct assignment for multiple data directories
-          updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+          updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, enableParallelPushProtection);
           InstancePartitions tierInstancePartitions =
               TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                   _helixZkManager);
@@ -3819,7 +3820,7 @@ public class PinotHelixResourceManager {
         rebalanceJobId, tableNameWithType, sortedTiers);
     Map<String, Set<String>> tierToSegmentsMap = new HashMap<>();
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
-      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, false);
       if (tier != null) {
         tierToSegmentsMap.computeIfAbsent(tier, t -> new HashSet<>()).add(segmentName);
       }
@@ -3827,7 +3828,8 @@ public class PinotHelixResourceManager {
     return tierToSegmentsMap;
   }
 
-  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers,
+      Boolean enableParallelPushProtection) {
     ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     if (segmentMetadataZNRecord == null) {
       LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
@@ -3860,7 +3862,9 @@ public class PinotHelixResourceManager {
     }
     // Update the tier in segment ZK metadata and write it back to ZK.
     segmentZKMetadata.setTier(targetTierName);
-    updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
+    if (!enableParallelPushProtection) {
+      updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
+    }
     return targetTierName;
   }
 
