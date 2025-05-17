@@ -38,6 +38,7 @@
   <url>https://pinot.apache.org/</url>
 
   <modules>
+    <module>pinot-dependency-verifier</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
@@ -136,7 +137,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
-    <arrow.version>18.2.0</arrow.version>
+    <arrow.version>18.3.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.2</parquet.version>
     <orc.version>1.9.6</orc.version>
@@ -148,7 +149,7 @@
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.15</swagger.version>
+    <swagger.version>1.6.16</swagger.version>
     <swagger-ui.version>5.21.0</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
@@ -176,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.39</aws.sdk.version>
+    <aws.sdk.version>2.31.43</aws.sdk.version>
     <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -189,6 +190,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
+    <enforcer-api.version>3.5.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
@@ -236,8 +238,8 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
-    <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.59.0</google.cloud.libraries.version>
+    <grpc.version>1.72.0</grpc.version>
+    <google.cloud.libraries.version>26.60.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.38.0</google.errorprone.version>
@@ -246,11 +248,12 @@
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.20</scala.version>
+    <scala-2.13.version>2.13.16</scala-2.13.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.29.0</jline.version>
+    <jline.version>3.30.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.3</nimbus-jose-jwt.version>
@@ -294,6 +297,9 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
     <openhft.chronicle-core.version>2.27ea3</openhft.chronicle-core.version>
+    <jdom2.version>2.0.6.1</jdom2.version>
+    <maven.version>3.9.9</maven.version>
+    <plexus-utils.version>4.0.2</plexus-utils.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -309,6 +315,43 @@
   </properties>
 
   <profiles>
+    <profile>
+      <id>dependency-verifier</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <extensions>true</extensions>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.pinot</groupId>
+                <artifactId>pinot-dependency-verifier</artifactId>
+                <version>${project.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <phase>validate</phase>
+                <configuration>
+                  <rules>
+                    <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
+                      <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
+                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                    </pinotCustomDependencyVersionRule>
+                  </rules>
+                  <fail>true</fail>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>pinot-fastdev</id>
       <!-- disable verifying plugins that can be easily fixed after a successful implementation -->
@@ -2086,6 +2129,33 @@
         <version>${assertj.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.maven.enforcer</groupId>
+        <artifactId>enforcer-api</artifactId>
+        <version>${enforcer-api.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-plugin-api</artifactId>
+        <version>${maven.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jdom</groupId>
+        <artifactId>jdom2</artifactId>
+        <version>${jdom2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-utils</artifactId>
+        <version>${plexus-utils.version}</version>
+        <scope>compile</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2466,6 +2536,18 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.5.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.sisu</groupId>
+          <artifactId>sisu-maven-plugin</artifactId>
+          <version>0.9.0.M3</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>main-index</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
