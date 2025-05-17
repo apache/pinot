@@ -236,6 +236,10 @@ public class IngestionDelayTracker {
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, scheduledExecutorThreadTickIntervalMs, TimeUnit.MILLISECONDS);
 
     if (_enableOffsetLagMetric) {
+      // the updateIngestionMetrics is called in the consumer thread, so if consumer thread is not running
+      // the lag metrics will not be updated
+      // Hence, using a seperate periodic task to update offset lag so that we can get the offset lag for a partition
+      // even when the consumer thread in RealtimeSegmentDataManager is not running
       _scheduledExecutor.scheduleWithFixedDelay(this::updateOffsetLagForAllPartitions,
           INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, _offsetLagUpdateIntervalMs, TimeUnit.MILLISECONDS);
     }
@@ -535,9 +539,10 @@ public class IngestionDelayTracker {
   }
 
   private void updateOffsetLagForAllPartitions() {
-    for (Map.Entry<Integer, IngestionInfo> entry : _ingestionInfoMap.entrySet()) {
+    List<Map.Entry<Integer, IngestionInfo>> entries = new ArrayList<>(_ingestionInfoMap.entrySet());
+    for (Map.Entry<Integer, IngestionInfo> entry : entries) {
       int partitionId = entry.getKey();
-      IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+      IngestionInfo ingestionInfo = entry.getValue();
       StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
       StreamMetadataProvider streamMetadataProvider = ingestionInfo._streamMetadataProvider;
       // fetch latest offset
