@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -145,8 +146,8 @@ public class TableViews {
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @ApiParam(value = "Show segments being replaced or deleted: true|false", required = false)
-      @QueryParam("showDeletingSegments") Boolean showDeletingSegments,
+      @ApiParam(value = "Show segments being replaced: true|false", required = false)
+      @QueryParam("showReplacedSegments") @DefaultValue("true") boolean showReplacedSegments,
       @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -158,10 +159,13 @@ public class TableViews {
     Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
     Set<String> segments = idealStateMap.keySet();
 
-    SegmentLineage segmentLineage = SegmentLineageAccessHelper
-        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableName);
-    SegmentLineageUtils
-        .filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    if (!showReplacedSegments) {
+      SegmentLineage segmentLineage = SegmentLineageAccessHelper
+          .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableName);
+      SegmentLineageUtils
+          .filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
     Map<String, Map<String, String>> filteredIdealStateMap = idealStateMap.entrySet().stream()
         .filter(entry -> segments.contains(entry.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
