@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -798,6 +799,7 @@ public final class TableConfigUtils {
         "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
+    validateTTLForDedupConfig(tableConfig, schema);
   }
 
   /**
@@ -819,6 +821,12 @@ public final class TableConfigUtils {
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
           "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
           comparisonColumnDataType);
+    } else {
+      String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -830,6 +838,30 @@ public final class TableConfigUtils {
     if (upsertConfig.getDeletedKeysTTL() > 0) {
       Preconditions.checkState(upsertConfig.getDeleteRecordColumn() != null,
           "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+    }
+  }
+
+  /**
+   * Validates the dedup config related to TTL.
+   */
+  @VisibleForTesting
+  static void validateTTLForDedupConfig(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    if (dedupConfig == null || (dedupConfig.getMetadataTTL() <= 0)) {
+      return;
+    }
+
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(dedupTimeColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "MetadataTTL must have dedupTimeColumn: %s in numeric type, found: %s", dedupTimeColumn,
+          comparisonColumnDataType);
+    } else {
+      String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
+      Preconditions.checkState(timeColumnDataType.isNumeric(),
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
     }
   }
 

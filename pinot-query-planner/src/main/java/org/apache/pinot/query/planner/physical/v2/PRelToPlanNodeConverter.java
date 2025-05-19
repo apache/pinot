@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -44,14 +43,12 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
@@ -75,14 +72,7 @@ public class PRelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(PRelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
 
-  private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
-  private boolean _joinFound;
-  private boolean _windowFunctionFound;
-  @Nullable
-  private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
-
-  public PRelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    _tracker = tracker;
+  private PRelToPlanNodeConverter() {
   }
 
   /**
@@ -105,18 +95,8 @@ public class PRelToPlanNodeConverter {
     } else if (node instanceof Exchange) {
       result = convertPhysicalExchange((PhysicalExchange) node);
     } else if (node instanceof PhysicalJoin) {
-      /* _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
-      if (!_joinFound) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
-        _joinFound = true;
-      } */
       result = convertJoin((PhysicalJoin) node);
     } else if (node instanceof Window) {
-      /* _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
-      if (!_windowFunctionFound) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
-        _windowFunctionFound = true;
-      } */
       result = convertWindow((Window) node);
     } else if (node instanceof Values) {
       result = convertValues((Values) node);
@@ -126,9 +106,6 @@ public class PRelToPlanNodeConverter {
       throw new IllegalStateException("Unsupported RelNode: " + node);
     }
     result.setStageId(stageId);
-    /* if (_tracker != null) {
-      _tracker.trackCreation(node, result);
-    } */
     return result;
   }
 

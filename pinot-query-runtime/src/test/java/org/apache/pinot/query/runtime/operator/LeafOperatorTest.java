@@ -53,9 +53,9 @@ import static org.mockito.Mockito.when;
 
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
-public class LeafStageTransferableBlockOperatorTest {
+public class LeafOperatorTest {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
-  private final AtomicReference<LeafStageTransferableBlockOperator> _operatorRef = new AtomicReference<>();
+  private final AtomicReference<LeafOperator> _operatorRef = new AtomicReference<>();
 
   private AutoCloseable _mocks;
 
@@ -82,7 +82,7 @@ public class LeafStageTransferableBlockOperatorTest {
   private QueryExecutor mockQueryExecutor(List<BaseResultsBlock> dataBlocks, InstanceResponseBlock metadataBlock) {
     QueryExecutor queryExecutor = mock(QueryExecutor.class);
     when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
-      LeafStageTransferableBlockOperator operator = _operatorRef.get();
+      LeafOperator operator = _operatorRef.get();
       for (BaseResultsBlock dataBlock : dataBlocks) {
         operator.addResultsBlock(dataBlock);
       }
@@ -111,9 +111,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-            queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // When:
@@ -143,9 +143,9 @@ public class LeafStageTransferableBlockOperatorTest {
         Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1),
-            desiredSchema, queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // When:
@@ -171,9 +171,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-            queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // When:
@@ -204,9 +204,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(2), schema,
-            queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(2), schema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // Then: the 5th block should be EOS
@@ -230,9 +230,9 @@ public class LeafStageTransferableBlockOperatorTest {
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryErrorCode.QUERY_EXECUTION, "foobar");
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, errorBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-            queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // When:
@@ -258,9 +258,9 @@ public class LeafStageTransferableBlockOperatorTest {
     InstanceResponseBlock emptySelectionResponseBlock =
         new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList(), queryContext));
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, emptySelectionResponseBlock);
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1),
-            desiredSchema, queryExecutor, _executorService);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
+            _executorService);
     _operatorRef.set(operator);
 
     // When:
@@ -282,11 +282,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        spy(
-            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-                queryExecutor, _executorService)
-        );
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService));
 
     _operatorRef.set(operator);
 
@@ -307,11 +305,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        spy(
-            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-                queryExecutor, _executorService)
-        );
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService));
 
     _operatorRef.set(operator);
 
@@ -332,11 +328,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageTransferableBlockOperator operator =
-        spy(
-            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
-                queryExecutor, _executorService)
-        );
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService));
 
     _operatorRef.set(operator);
 

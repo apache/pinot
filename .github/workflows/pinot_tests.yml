@@ -56,6 +56,12 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
+      - name: Install pinot-dependency-verifier into repo
+        run: |
+          mvn clean install \
+          -pl pinot-dependency-verifier \
+          -am \
+          -DskipTests
       - name: Linter Test
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
