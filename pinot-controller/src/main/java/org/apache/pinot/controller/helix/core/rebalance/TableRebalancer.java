@@ -1585,21 +1585,19 @@ public class TableRebalancer {
     Map<Set<String>, Set<String>> availableInstancesMap = new HashMap<>();
     Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
 
-    Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
-        currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap;
     if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
-      // Don't calculate the current and target instances to partition id current assignment mapping if batching is
-      // disabled since we want to update the next assignment based on all segments in this case. Use a dummy set for
-      // the assigned instances and partitionId as 0.
-      currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap = new HashMap<>();
-      Pair<Set<String>, Set<String>> dummyPair = Pair.of(Set.of(""), Set.of(""));
-      currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap.put(dummyPair, new HashMap<>());
-      currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap.get(dummyPair).put(0, currentAssignment);
-    } else {
-      currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap =
-          getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(currentAssignment, targetAssignment,
-              segmentPartitionIdMap, partitionIdFetcher);
+      // Directly update the nextAssignment with anyServerExhaustedBatchSize = false and return if batching is disabled
+      updateNextAssignmentForPartitionIdStrictReplicaGroup(currentAssignment, targetAssignment, nextAssignment,
+          false, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
+          availableInstancesMap, serverToNumSegmentsAddedSoFar);
+      return nextAssignment;
     }
+
+    // Batching is enabled, calculate the Pair(current instances, target instances) -> partitionId -> currentAssignment
+    Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
+        currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap =
+        getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(currentAssignment, targetAssignment,
+            segmentPartitionIdMap, partitionIdFetcher);
 
     // Iterating over the unique pairs of current and target instances
     for (Map<Integer, Map<String, Map<String, String>>> partitionIdToCurrentAssignment
@@ -1619,21 +1617,19 @@ public class TableRebalancer {
         Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
             firstAssignment._instanceStateMap);
         boolean anyServerExhaustedBatchSize = false;
-        if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER) {
-          for (String server : serversAdded) {
-            int segmentsAddedToServerSoFar = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
-            // Case I: We already exceeded the batchSizePerServer for this server, cannot add any more segments
-            // Case II: We have not yet exceeded the batchSizePerServer for this server, but we don't have sufficient
-            // space to host the segments for this assignment on the server, and we have allocated some partitions so
-            // far. If the batchSizePerServer is less than the number of segments in a given partitionId, we must host
-            // at least 1 partition and exceed the batchSizePerServer to ensure progress is made. Thus, performing this
-            // check only if segmentsAddedToServerSoFar > 0 is necessary.
-            if ((segmentsAddedToServerSoFar >= batchSizePerServer)
-                || (segmentsAddedToServerSoFar > 0
-                && (segmentsAddedToServerSoFar + curAssignment.size()) > batchSizePerServer)) {
-              anyServerExhaustedBatchSize = true;
-              break;
-            }
+        for (String server : serversAdded) {
+          int segmentsAddedToServerSoFar = serverToNumSegmentsAddedSoFar.getOrDefault(server, 0);
+          // Case I: We already exceeded the batchSizePerServer for this server, cannot add any more segments
+          // Case II: We have not yet exceeded the batchSizePerServer for this server, but we don't have sufficient
+          // space to host the segments for this assignment on the server, and we have allocated some partitions so
+          // far. If the batchSizePerServer is less than the number of segments in a given partitionId, we must host
+          // at least 1 partition and exceed the batchSizePerServer to ensure progress is made. Thus, performing this
+          // check only if segmentsAddedToServerSoFar > 0 is necessary.
+          if ((segmentsAddedToServerSoFar >= batchSizePerServer)
+              || (segmentsAddedToServerSoFar > 0
+              && (segmentsAddedToServerSoFar + curAssignment.size()) > batchSizePerServer)) {
+            anyServerExhaustedBatchSize = true;
+            break;
           }
         }
         updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
@@ -1705,8 +1701,7 @@ public class TableRebalancer {
       Map<String, Integer> serverToNumSegmentsAddedSoFar, Logger tableRebalanceLogger) {
     int maxSegmentsAddedToAnyServer = serverToNumSegmentsAddedSoFar.isEmpty() ? 0
         : Collections.max(serverToNumSegmentsAddedSoFar.values());
-    if (batchSizePerServer != RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
-        && maxSegmentsAddedToAnyServer > batchSizePerServer) {
+    if (maxSegmentsAddedToAnyServer > batchSizePerServer) {
       tableRebalanceLogger.warn("Found at least one server with {} segments added which is larger than "
           + "batchSizePerServer: {}. This is expected for strictReplicaGroup based assignment that needs to move a "
           + "full partition to maintain consistency for queries.", maxSegmentsAddedToAnyServer, batchSizePerServer);
