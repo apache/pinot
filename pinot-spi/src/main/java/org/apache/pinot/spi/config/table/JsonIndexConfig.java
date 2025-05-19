@@ -100,6 +100,13 @@ public class JsonIndexConfig extends IndexConfig {
     _maxBytesSize = maxBytesSize;
   }
 
+  public JsonIndexConfig(Boolean disabled, int maxLevels, boolean excludeArray, boolean disableCrossArrayUnnest,
+      @Nullable Set<String> includePaths, @Nullable Set<String> excludePaths, @Nullable Set<String> excludeFields,
+      @Nullable Set<String> indexPaths, int maxValueLength, boolean skipInvalidJson) {
+    this(disabled, maxLevels, excludeArray, disableCrossArrayUnnest, includePaths, excludePaths, excludeFields,
+        indexPaths, maxValueLength, skipInvalidJson, null);
+  }
+
   public int getMaxLevels() {
     return _maxLevels;
   }
