@@ -35,6 +35,7 @@ import org.apache.pinot.core.transport.BaseTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -56,6 +57,8 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   private BrokerRequest _offlineBrokerRequest;
   private BrokerRequest _realtimeBrokerRequest;
+
+  private TimeBoundaryStrategy _timeBoundaryStrategy;
   private TimeBoundaryInfo _timeBoundaryInfo;
 
   public LogicalTableRouteInfo() {
@@ -392,5 +395,14 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   public void setRealtimeBrokerRequest(BrokerRequest realtimeBrokerRequest) {
     _realtimeBrokerRequest = realtimeBrokerRequest;
+  }
+
+  @Nullable
+  public TimeBoundaryStrategy getTimeBoundaryStrategy() {
+    return _timeBoundaryStrategy;
+  }
+
+  public void setTimeBoundaryStrategy(TimeBoundaryStrategy timeBoundaryStrategy) {
+    _timeBoundaryStrategy = timeBoundaryStrategy;
   }
 }
