@@ -32,7 +32,9 @@ public class ExceptionUtils {
     int maxCauses = 10;
     while (e != null && maxCauses-- > 0) {
       sb.append(getStackTrace(e, 3));
-      if (e.getCause() == e) break;
+      if (e.getCause() == e) {
+        break;
+      }
       e = e.getCause();
     }
     return sb.toString();
