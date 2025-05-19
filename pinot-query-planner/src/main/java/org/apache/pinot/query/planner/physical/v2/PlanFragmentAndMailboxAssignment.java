@@ -116,7 +116,8 @@ public class PlanFragmentAndMailboxAssignment {
       int senderFragmentId = context._planFragmentMap.size();
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
-      RelDistribution.Type distributionType = inferDistributionType(physicalExchange.getExchangeStrategy());
+      RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
+          physicalExchange.getExchangeStrategy(), physicalExchange.getDistributionKeys()).getType();
       List<PlanNode> inputs = new ArrayList<>();
       MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, inputs, currentFragmentId,
           PinotRelExchangeType.getDefaultExchangeType(), distributionType, physicalExchange.getDistributionKeys(),
@@ -154,27 +155,6 @@ public class PlanFragmentAndMailboxAssignment {
     context._planFragmentMap.put(fragmentId, fragment);
     context._fragmentMetadataMap.put(fragmentId, new DispatchablePlanMetadata());
     return fragment;
-  }
-
-  private RelDistribution.Type inferDistributionType(ExchangeStrategy desc) {
-    RelDistribution.Type distributionType;
-    switch (desc) {
-      case PARTITIONING_EXCHANGE:
-        distributionType = RelDistribution.Type.HASH_DISTRIBUTED;
-        break;
-      case IDENTITY_EXCHANGE:
-        distributionType = RelDistribution.Type.HASH_DISTRIBUTED;
-        break;
-      case SINGLETON_EXCHANGE:
-        distributionType = RelDistribution.Type.SINGLETON;
-        break;
-      case BROADCAST_EXCHANGE:
-        distributionType = RelDistribution.Type.BROADCAST_DISTRIBUTED;
-        break;
-      default:
-        throw new IllegalStateException("");
-    }
-    return distributionType;
   }
 
   private Map<Integer, QueryServerInstance> createWorkerMap(List<String> workers, Context context) {
@@ -225,6 +205,7 @@ public class PlanFragmentAndMailboxAssignment {
             .put(senderStageId, new SharedMailboxInfos(mailboxInfoListForReceiver));
         break;
       }
+      case RANDOM_EXCHANGE:
       case PARTITIONING_EXCHANGE:
       case BROADCAST_EXCHANGE: {
         MailboxInfos mailboxInfoListForSender = new MailboxInfos(createMailboxInfo(receiverWorkers));
