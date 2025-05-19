@@ -441,45 +441,43 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         (List<String>) timeBoundaryConfig.getParameters().getOrDefault("includedTables", List.of());
 
     for (String tableNameWithType : includedTables) {
-      // skip time boundary manager init for realtime table
-      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-        LOGGER.info("Skip time boundary manager init for realtime table: {}", tableNameWithType);
-        continue;
+      Preconditions.checkArgument(TableNameBuilder.isOfflineTableResource(tableNameWithType),
+          "Invalid table in the time boundary config: %s", tableNameWithType);
+      try {
+        // build routing if it does not exist for the offline table
+        if (!_routingEntryMap.containsKey(tableNameWithType)) {
+          buildRouting(tableNameWithType);
+        }
+
+        if (_routingEntryMap.get(tableNameWithType).getTimeBoundaryManager() != null) {
+          LOGGER.info("Skip time boundary manager init for table: {}", tableNameWithType);
+          continue;
+        }
+
+        // init time boundary manager for the table
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+
+        String idealStatePath = getIdealStatePath(tableNameWithType);
+        IdealState idealState = getIdealState(idealStatePath);
+        Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+
+        String externalViewPath = getExternalViewPath(tableNameWithType);
+        ExternalView externalView = getExternalView(externalViewPath);
+
+        Set<String> onlineSegments = getOnlineSegments(idealState);
+        SegmentPreSelector segmentPreSelector =
+            SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
+        Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
+
+        TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
+        timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
+
+        _routingEntryMap.get(tableNameWithType).setTimeBoundaryManager(timeBoundaryManager);
+      } catch (Exception e) {
+        LOGGER.error("Caught unexpected exception while setting time boundary manager for table: {}", tableNameWithType,
+            e);
       }
-
-      // skip hybrid tables, time boundary for such offline table already exists
-      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(
-          TableNameBuilder.extractRawTableName(tableNameWithType));
-      if (ZKMetadataProvider.isTableConfigExists(_propertyStore, realtimeTableName)) {
-        LOGGER.info("Skip time boundary manager init for for hybrid table: {}", tableNameWithType);
-        continue;
-      }
-
-      // build routing if it does not exist for the offline table
-      if (!_routingEntryMap.containsKey(tableNameWithType)) {
-        buildRouting(tableNameWithType);
-      }
-
-      // init time boundary manager for the table
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
-
-      String idealStatePath = getIdealStatePath(tableNameWithType);
-      IdealState idealState = getIdealState(idealStatePath);
-      Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-
-      String externalViewPath = getExternalViewPath(tableNameWithType);
-      ExternalView externalView = getExternalView(externalViewPath);
-
-      Set<String> onlineSegments = getOnlineSegments(idealState);
-      SegmentPreSelector segmentPreSelector =
-          SegmentPreSelectorFactory.getSegmentPreSelector(tableConfig, _propertyStore);
-      Set<String> preSelectedOnlineSegments = segmentPreSelector.preSelect(onlineSegments);
-
-      TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore, _brokerMetrics);
-      timeBoundaryManager.init(idealState, externalView, preSelectedOnlineSegments);
-
-      _routingEntryMap.get(tableNameWithType).setTimeBoundaryManager(timeBoundaryManager);
     }
   }
 
