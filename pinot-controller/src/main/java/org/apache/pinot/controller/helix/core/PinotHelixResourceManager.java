@@ -127,6 +127,7 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -534,18 +535,33 @@ public class PinotHelixResourceManager {
   }
 
   public List<InstanceConfig> getBrokerInstancesConfigsFor(String tableName) {
-    String brokerTenantName = null;
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-    if (offlineTableConfig != null) {
-      brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
-    } else {
-      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-      if (realtimeTableConfig != null) {
-        brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
-      }
-    }
+    String brokerTenantName = getBrokerTenantName(tableName);
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  @Nullable
+  private String getBrokerTenantName(String physicalOrLogicalTableName) {
+    TableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(_propertyStore, physicalOrLogicalTableName);
+    if (offlineTableConfig != null) {
+      return offlineTableConfig.getTenantConfig().getBroker();
+    }
+
+    TableConfig realtimeTableConfig =
+        ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, physicalOrLogicalTableName);
+    if (realtimeTableConfig != null) {
+      return realtimeTableConfig.getTenantConfig().getBroker();
+    }
+
+    // If the table is not found, check if it is a logical table
+    LogicalTableConfig logicalTableConfig =
+        ZKMetadataProvider.getLogicalTableConfig(_propertyStore, physicalOrLogicalTableName);
+    if (logicalTableConfig != null) {
+      return logicalTableConfig.getBrokerTenant();
+    }
+
+    return null;
   }
 
   public List<String> getAllBrokerInstances() {
@@ -1637,10 +1653,29 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
+  /**
+   * Get all schema names in the cluster across all databases.
+   * @return List of schema names
+   */
+  public List<String> getAllSchemaNames() {
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT
+    );
+  }
+
+  /**
+   * Get all schema names in the cluster for default database.
+   * @return List of schema names
+   */
   public List<String> getSchemaNames() {
     return getSchemaNames(null);
   }
 
+  /**
+   * Get all schema names in the cluster for a given database.
+   * @param databaseName Database name to filter schema names
+   * @return List of schema names
+   */
   public List<String> getSchemaNames(@Nullable String databaseName) {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
@@ -1733,6 +1768,12 @@ public class PinotHelixResourceManager {
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
           + " with it.");
     }
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, rawTableName)) {
+      throw new TableAlreadyExistsException("Logical table '" + rawTableName
+          + "' already exists. Please use a different name for the physical table.");
+    }
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType) != null) {
       throw new TableAlreadyExistsException("External view for " + tableNameWithType
           + " still exists. If the table is just deleted, please wait for the clean up to finish before recreating it. "
@@ -1753,7 +1794,7 @@ public class PinotHelixResourceManager {
             _enableBatchMessageMode);
     TableType tableType = tableConfig.getTableType();
     // Ensure that table is not created if schema is not present
-    if (ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType)) == null) {
+    if (ZKMetadataProvider.getSchema(_propertyStore, rawTableName) == null) {
       throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
     }
     Preconditions.checkState(tableType == TableType.OFFLINE || tableType == TableType.REALTIME,
@@ -1801,6 +1842,40 @@ public class PinotHelixResourceManager {
     });
 
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
+  }
+
+  /**
+   * Adds a logical table.
+   * @param logicalTableConfig The logical table config to be added
+   * @throws TableAlreadyExistsException If the logical table already exists
+   */
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws TableAlreadyExistsException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Adding logical table {}: Start", tableName);
+
+    validateLogicalTableConfig(logicalTableConfig);
+
+    // Check if the logical table name is already used
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
+    }
+
+    // Check if the table name is already used by a physical table
+    PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
+    if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
+        || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+      throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+    }
+
+    LOGGER.info("Adding logical table {}: Creating logical table config in the property store", tableName);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    LOGGER.info("Adding logical table {}: Updating BrokerResource for table", tableName);
+    updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+
+    LOGGER.info("Added logical table {}: Successfully added table", tableName);
   }
 
   /**
@@ -2051,6 +2126,58 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Update the logical table config.
+   * @param logicalTableConfig The logical table config to be updated
+   * @throws TableNotFoundException If the logical table does not exist
+   */
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws TableNotFoundException {
+    String tableName = logicalTableConfig.getTableName();
+    LOGGER.info("Updating logical table {}: Start", tableName);
+
+    validateLogicalTableConfig(logicalTableConfig);
+
+    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
+    if (oldLogicalTableConfig == null) {
+      throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
+    }
+
+    LOGGER.info("Updating logical table {}: Updating logical table config in the property store", tableName);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    if (!oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
+      LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
+      updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    }
+
+    LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
+  }
+
+  private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
+    List<String> brokers = HelixHelper.getInstancesWithTag(
+        _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields()
+          .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
+      return is;
+    });
+  }
+
+  private void validateLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
+    if (StringUtils.isEmpty(logicalTableConfig.getBrokerTenant())) {
+      logicalTableConfig.setBrokerTenant("DefaultTenant");
+    }
+
+    LogicalTableConfigUtils.validateLogicalTableConfig(
+        logicalTableConfig,
+        PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore)::exist,
+        getAllBrokerTenantNames()::contains,
+        _propertyStore
+    );
+  }
+
+  /**
    * Sets the given table config into zookeeper with the expected version, which is the previous tableConfig znRecord
    * version. If the expected version is -1, the version check is ignored.
    */
@@ -2171,6 +2298,33 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Deletes the logical table.
+   * @param tableName The logical table name
+   * @return True if the logical table was deleted, false otherwise
+   */
+  public boolean deleteLogicalTableConfig(String tableName) {
+    LOGGER.info("Deleting logical table {}: Start", tableName);
+    if (!ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
+    }
+
+    LOGGER.info("Deleting logical table {}: Removing BrokerResource for logical table", tableName);
+    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
+      assert is != null;
+      is.getRecord().getMapFields().remove(tableName);
+      return is;
+    });
+
+    LOGGER.info("Deleting logical table {}: Removing logical table config from the property store", tableName);
+    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
+    boolean result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+
+    LOGGER.info("Deleted logical table {}: Successfully deleted table", tableName);
+    return result;
+  }
+
+  /**
    * Toggles the state (ONLINE|OFFLINE|DROP) of the given table.
    */
   public PinotResourceManagerResponse toggleTableState(String tableNameWithType, StateType stateType) {
@@ -2206,62 +2360,15 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void addLogicalTable(LogicalTableConfig logicalTableConfig)
-      throws TableAlreadyExistsException {
-    String tableName = logicalTableConfig.getTableName();
-    LOGGER.info("Adding logical table: {}", tableName);
-
-    // Check if the logical table name is already used
-    LogicalTableConfig existingLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
-    if (existingLogicalTableConfig != null) {
-      throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
-    }
-
-    // Check if the table name is already used by a physical table
-    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
-        .findFirst().ifPresent(tableNameWithType -> {
-          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
-        });
-
-    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
-    LOGGER.info("Added logical table: {}", tableName);
-  }
-
-  public void updateLogicalTable(LogicalTableConfig logicalTableConfig)
-      throws TableNotFoundException {
-    String tableName = logicalTableConfig.getTableName();
-    LOGGER.info("Updating logical table: {}", tableName);
-
-    LogicalTableConfig oldLogicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
-    if (oldLogicalTableConfig == null) {
-      throw new TableNotFoundException("Logical table: " + tableName + " does not exist");
-    }
-
-    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
-    LOGGER.info("Updated logical table: {}", tableName);
-  }
-
-  public boolean deleteLogicalTable(String tableName) {
-    LOGGER.info("Deleting logical table: {}", tableName);
-    boolean result = false;
-    String propertyStorePath = ZKMetadataProvider.constructPropertyStorePathForLogical(tableName);
-    if (_propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      result = _propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    } else {
-      throw new ControllerApplicationException(LOGGER,
-          "Logical table: " + tableName + " does not exists.", Response.Status.NOT_FOUND);
-    }
-    LOGGER.info("Deleted logical table: {}", tableName);
-    return result;
-  }
-
   public LogicalTableConfig getLogicalTableConfig(String tableName) {
     return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
   }
 
   public List<String> getAllLogicalTableNames() {
-    return ZKMetadataProvider.getAllLogicalTableConfigs(_propertyStore).stream().map(LogicalTableConfig::getTableName)
-        .collect(Collectors.toList());
+    List<String> logicalTableNames = _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
+        AccessOption.PERSISTENT);
+    return logicalTableNames != null ? logicalTableNames : Collections.emptyList();
   }
 
   /**
@@ -3409,7 +3516,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getOfflineTableConfig(String tableName) {
-    return getOfflineTableConfig(tableName, true);
+    return getOfflineTableConfig(tableName, true, true);
   }
 
   /**
@@ -3417,11 +3524,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**
@@ -3433,7 +3541,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getRealtimeTableConfig(String tableName) {
-    return getRealtimeTableConfig(tableName, true);
+    return getRealtimeTableConfig(tableName, true, true);
   }
 
   /**
@@ -3441,11 +3549,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**

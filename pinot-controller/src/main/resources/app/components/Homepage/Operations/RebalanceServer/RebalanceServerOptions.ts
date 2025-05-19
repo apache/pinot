@@ -115,6 +115,16 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "markWithWarningIcon": false
     },
     {
+        "name": "batchSizePerServer",
+        "defaultValue": -1,
+        "type": "INTEGER",
+        "label": "Batch Size Per Server",
+        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching.",
+        "isAdvancedConfig": false,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
         "name": "lowDiskMode",
         "defaultValue": false,
         "type": "BOOL",
@@ -140,7 +150,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": 3600000,
         "type": "INTEGER",
         "label": "External View Stabilization Timeout In Milliseconds",
-        "description": "How long to wait for EV-IS convergence, increase this timeout for large tables (TBs in size)",
+        "description": "Maximum time (in milliseconds) to wait for external view to converge with ideal states. It automatically extends the time if progress has been made",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false

@@ -84,6 +84,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
     NettyServerBuilder builder = NettyServerBuilder
         .forPort(port)
+        .intercept(new MailboxServerInterceptor())
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
@@ -117,6 +118,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   @Override
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
-    return new MailboxContentObserver(_mailboxService, responseObserver);
+    String mailboxId = ChannelUtils.MAILBOX_ID_CTX_KEY.get();
+    return new MailboxContentObserver(_mailboxService, mailboxId, responseObserver);
   }
 }

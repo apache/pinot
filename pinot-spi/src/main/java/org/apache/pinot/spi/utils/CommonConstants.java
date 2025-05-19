@@ -614,6 +614,13 @@ public class CommonConstants {
         // Use MSE compiler when trying to fill a response with no schema metadata
         // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
         public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
+
+        // Used by the MSE Engine when auto-inferring data partitioning. Realtime streams can often incorrectly assign
+        // records to stream partitions, which can make a segment have multiple partitions. The scale of this is
+        // usually low, and this query option allows the MSE Optimizer to infer the partition of a segment based on its
+        // name, when that segment has multiple partitions in its columnPartitionMap.
+        public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
+        public static final String USE_LITE_MODE = "useLiteMode";
       }
 
       public static class QueryOptionValue {
@@ -1040,6 +1047,10 @@ public class CommonConstants {
     public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
     public static final String LUCENE_MIN_REFRESH_INTERVAL_MS = "pinot.server.lucene.min.refresh.interval.ms";
     public static final int DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS = 10;
+
+    public static final String CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS =
+        "pinot.server.messagesCount.refreshIntervalSeconds";
+    public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

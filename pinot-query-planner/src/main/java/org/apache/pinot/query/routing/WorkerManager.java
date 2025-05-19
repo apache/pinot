@@ -549,9 +549,9 @@ public class WorkerManager {
     String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
     Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
         PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
-    int numPartitions = Integer.parseInt(numPartitionsStr);
-    Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
-        PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
+    int numWorkers = Integer.parseInt(numPartitionsStr);
+    Preconditions.checkState(numWorkers > 0, "'%s' must be positive, got: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_SIZE, numWorkers);
 
     String partitionFunction = tableOptions.getOrDefault(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION,
         DEFAULT_TABLE_PARTITION_FUNCTION);
@@ -560,30 +560,20 @@ public class WorkerManager {
     // calculates the partition table info using the routing manager
     PartitionTableInfo partitionTableInfo = calculatePartitionTableInfo(tableName);
     // verifies that the partition table obtained from routing manager is compatible with the hint options
-    checkPartitionInfoMap(partitionTableInfo, tableName, partitionKey, numPartitions, partitionFunction);
+    checkPartitionInfoMap(partitionTableInfo, tableName, partitionKey, partitionFunction, numWorkers);
 
-    // Pick one server per partition
-    // NOTE: Pick server based on the request id so that the same server is picked across different table scan when the
-    //       segments for the same partition is colocated
-    long indexToPick = context.getRequestId();
     PartitionInfo[] partitionInfoMap = partitionTableInfo._partitionInfoMap;
-    int workerId = 0;
+    int numPartitions = partitionInfoMap.length;
+    assert numPartitions % numWorkers == 0;
+    int numPartitionsPerWorker = numPartitions / numWorkers;
     Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-    for (int i = 0; i < numPartitions; i++) {
-      PartitionInfo partitionInfo = partitionInfoMap[i];
-      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that the
-      //       leaf stage won't be able to directly return empty response.
-      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
-          tableName, i);
-      ServerInstance serverInstance =
-          pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
-      Preconditions.checkState(serverInstance != null,
-          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
-      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-      workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
-      workerId++;
+    if (numPartitionsPerWorker == 1) {
+      assignOnePartitionPerWorker(tableName, context.getRequestId(), partitionInfoMap,
+          _routingManager.getEnabledServerInstanceMap(), workedIdToServerInstanceMap, workerIdToSegmentsMap);
+    } else {
+      assignMultiplePartitionsPerWorker(tableName, context.getRequestId(), numPartitionsPerWorker, partitionInfoMap,
+          _routingManager.getEnabledServerInstanceMap(), workedIdToServerInstanceMap, workerIdToSegmentsMap);
     }
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
@@ -591,14 +581,99 @@ public class WorkerManager {
     metadata.setPartitionFunction(partitionFunction);
   }
 
+  /// Pick one worker per partition for partitioned leaf stage.
+  private void assignOnePartitionPerWorker(String tableName, long requestId, PartitionInfo[] partitionInfoMap,
+      Map<String, ServerInstance> enabledServerInstanceMap,
+      Map<Integer, QueryServerInstance> workedIdToServerInstanceMap,
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+    int numPartitions = partitionInfoMap.length;
+    int workerId = 0;
+    for (int i = 0; i < numPartitions; i++) {
+      PartitionInfo partitionInfo = partitionInfoMap[i];
+      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that
+      //       the leaf stage won't be able to directly return empty response.
+      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
+          tableName, i);
+      // NOTE: Pick worker based on the request id so that the same worker is picked across different table scan when
+      //       the segments for the same partition is colocated
+      ServerInstance serverInstance =
+          pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, requestId++);
+      Preconditions.checkState(serverInstance != null,
+          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId,
+          getSegmentsMap(partitionInfo._offlineSegments, partitionInfo._realtimeSegments));
+      workerId++;
+    }
+  }
+
+  /// Round-robin partitions to workers, where each worker gets numPartitionsPerWorker partitions. This setup works only
+  /// if all segments for these partitions are assigned to the same group of servers. This is useful when user wants to
+  /// colocate tables with different partition count, but same partition function.
+  /// E.g. when there are 16 partitions for table A and 4 partitions for table B, we may assign 16 partitions for table
+  /// A to 4 workers, where partition 0, 4, 8, 12 goes to worker 0, partition 1, 5, 9, 13 goes to worker 1, etc.
+  private void assignMultiplePartitionsPerWorker(String tableName, long requestId, int numPartitionsPerWorker,
+      PartitionInfo[] partitionInfoMap, Map<String, ServerInstance> enabledServerInstanceMap,
+      Map<Integer, QueryServerInstance> workedIdToServerInstanceMap,
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+    int numPartitions = partitionInfoMap.length;
+    assert numPartitions % numPartitionsPerWorker == 0;
+    int numWorkers = numPartitions / numPartitionsPerWorker;
+    int workerId = 0;
+    for (int i = 0; i < numWorkers; i++) {
+      Set<String> fullyReplicatedServers = null;
+      List<String> offlineSegments = null;
+      List<String> realtimeSegments = null;
+      for (int j = i; j < numPartitions; j += numWorkers) {
+        PartitionInfo partitionInfo = partitionInfoMap[j];
+        if (partitionInfo == null) {
+          continue;
+        }
+        if (fullyReplicatedServers == null) {
+          fullyReplicatedServers = new HashSet<>(partitionInfo._fullyReplicatedServers);
+        } else {
+          fullyReplicatedServers.retainAll(partitionInfo._fullyReplicatedServers);
+        }
+        if (partitionInfo._offlineSegments != null) {
+          if (offlineSegments == null) {
+            offlineSegments = new ArrayList<>(partitionInfo._offlineSegments);
+          } else {
+            offlineSegments.addAll(partitionInfo._offlineSegments);
+          }
+        }
+        if (partitionInfo._realtimeSegments != null) {
+          if (realtimeSegments == null) {
+            realtimeSegments = new ArrayList<>(partitionInfo._realtimeSegments);
+          } else {
+            realtimeSegments.addAll(partitionInfo._realtimeSegments);
+          }
+        }
+      }
+      // TODO: Currently we don't support the case when all partitions for a worker don't contain any segment. The
+      //       reason is that the leaf stage won't be able to directly return empty response.
+      Preconditions.checkState(fullyReplicatedServers != null,
+          "Failed to find any segment for table: %s, worker: %s, partitions per worker: %s", tableName, i,
+          numPartitionsPerWorker);
+      // NOTE: Pick worker based on the request id so that the same worker is picked across different table scan when
+      //       the segments for the same partition is colocated
+      ServerInstance serverInstance = pickEnabledServer(fullyReplicatedServers, enabledServerInstanceMap, requestId++);
+      Preconditions.checkState(serverInstance != null,
+          "Failed to find enabled fully replicated server for table: %s, worker: %s, partitions per worker: %s",
+          tableName, i, numPartitionsPerWorker);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId, getSegmentsMap(offlineSegments, realtimeSegments));
+      workerId++;
+    }
+  }
+
   @Nullable
   public TableOptions inferTableOptions(String tableName) {
     try {
       PartitionTableInfo partitionTableInfo = calculatePartitionTableInfo(tableName);
       return ImmutableTableOptions.builder()
-          .partitionFunction(partitionTableInfo._partitionFunction)
           .partitionKey(partitionTableInfo._partitionKey)
-          .partitionSize(partitionTableInfo._numPartitions)
+          .partitionFunction(partitionTableInfo._partitionFunction)
+          .partitionSize(partitionTableInfo._partitionInfoMap.length)
           .build();
     } catch (IllegalStateException e) {
       return null;
@@ -659,8 +734,8 @@ public class WorkerManager {
           partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
               realtimePartitionInfo._segments);
         }
-        return new PartitionTableInfo(partitionInfoMap, timeBoundaryInfo, offlineTpi.getPartitionColumn(),
-            numPartitions, offlineTpi.getPartitionFunctionName());
+        return new PartitionTableInfo(offlineTpi.getPartitionColumn(), offlineTpi.getPartitionFunctionName(),
+            partitionInfoMap, timeBoundaryInfo);
       } else if (offlineRoutingExists) {
         return getOfflinePartitionTableInfo(offlineTableName);
       } else {
@@ -694,16 +769,16 @@ public class WorkerManager {
    * as arguments.
    */
   private void checkPartitionInfoMap(PartitionTableInfo partitionTableInfo, String tableNameWithType,
-      String partitionKey, int numPartitions, String partitionFunction) {
+      String partitionKey, String partitionFunction, int numPartitions) {
     Preconditions.checkState(partitionTableInfo._partitionKey.equals(partitionKey),
         "Partition key: %s does not match partition column: %s for table: %s", partitionKey,
         partitionTableInfo._partitionKey, tableNameWithType);
-    Preconditions.checkState(partitionTableInfo._numPartitions == numPartitions,
-        "Partition size mismatch (hint: %s, table: %s) for table: %s", numPartitions, partitionTableInfo._numPartitions,
-        tableNameWithType);
     Preconditions.checkState(partitionTableInfo._partitionFunction.equalsIgnoreCase(partitionFunction),
         "Partition function mismatch (hint: %s, table: %s) for table %s", partitionFunction,
         partitionTableInfo._partitionFunction, tableNameWithType);
+    Preconditions.checkState(partitionTableInfo._partitionInfoMap.length % numPartitions == 0,
+        "Partition size mismatch (hint: %s, table: %s) for table: %s, actual partition size must be multiple of "
+            + "hinted partition size", numPartitions, partitionTableInfo._partitionInfoMap.length, tableNameWithType);
   }
 
   private PartitionTableInfo getOfflinePartitionTableInfo(String offlineTableName) {
@@ -720,23 +795,21 @@ public class WorkerManager {
   }
 
   private static class PartitionTableInfo {
+    final String _partitionKey;
+    final String _partitionFunction;
     final PartitionInfo[] _partitionInfoMap;
     @Nullable
     final TimeBoundaryInfo _timeBoundaryInfo;
-    final String _partitionKey;
-    final int _numPartitions;
-    final String _partitionFunction;
 
-    PartitionTableInfo(PartitionInfo[] partitionInfoMap, @Nullable TimeBoundaryInfo timeBoundaryInfo,
-        String partitionKey, int numPartitions, String partitionFunction) {
+    PartitionTableInfo(String partitionKey, String partitionFunction, PartitionInfo[] partitionInfoMap,
+        @Nullable TimeBoundaryInfo timeBoundaryInfo) {
+      _partitionKey = partitionKey;
+      _partitionFunction = partitionFunction;
       _partitionInfoMap = partitionInfoMap;
       _timeBoundaryInfo = timeBoundaryInfo;
-      _partitionKey = partitionKey;
-      _numPartitions = numPartitions;
-      _partitionFunction = partitionFunction;
     }
 
-    public static PartitionTableInfo fromTablePartitionInfo(TablePartitionInfo tablePartitionInfo,
+    static PartitionTableInfo fromTablePartitionInfo(TablePartitionInfo tablePartitionInfo,
         TableType tableType) {
       if (!tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty()) {
         throw new IllegalStateException(
@@ -763,8 +836,8 @@ public class WorkerManager {
           }
         }
       }
-      return new PartitionTableInfo(workerPartitionInfoMap, null, tablePartitionInfo.getPartitionColumn(),
-          numPartitions, tablePartitionInfo.getPartitionFunctionName());
+      return new PartitionTableInfo(tablePartitionInfo.getPartitionColumn(),
+          tablePartitionInfo.getPartitionFunctionName(), workerPartitionInfoMap, null);
     }
   }
 
@@ -807,14 +880,17 @@ public class WorkerManager {
     return null;
   }
 
-  private static Map<String, List<String>> getSegmentsMap(PartitionInfo partitionInfo) {
-    Map<String, List<String>> segmentsMap = new HashMap<>();
-    if (partitionInfo._offlineSegments != null) {
-      segmentsMap.put(TableType.OFFLINE.name(), partitionInfo._offlineSegments);
+  private static Map<String, List<String>> getSegmentsMap(@Nullable List<String> offlineSegments,
+      @Nullable List<String> realtimeSegments) {
+    if (offlineSegments != null) {
+      if (realtimeSegments != null) {
+        return Map.of(TableType.OFFLINE.name(), offlineSegments, TableType.REALTIME.name(), realtimeSegments);
+      } else {
+        return Map.of(TableType.OFFLINE.name(), offlineSegments);
+      }
+    } else {
+      Preconditions.checkState(realtimeSegments != null, "Both offline and realtime segments are null");
+      return Map.of(TableType.REALTIME.name(), realtimeSegments);
     }
-    if (partitionInfo._realtimeSegments != null) {
-      segmentsMap.put(TableType.REALTIME.name(), partitionInfo._realtimeSegments);
-    }
-    return segmentsMap;
   }
 }

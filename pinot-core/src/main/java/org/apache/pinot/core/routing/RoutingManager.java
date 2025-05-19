@@ -48,6 +48,15 @@ public interface RoutingManager {
   Map<String, ServerInstance> getEnabledServerInstanceMap();
 
   /**
+   * Returns whether the given table is enabled
+   * @param tableNameWithType Table name with type
+   * @return Whether the given table is enabled
+   */
+  default boolean isTableDisabled(String tableNameWithType) {
+    return false;
+  }
+
+  /**
    * Get the {@link RoutingTable} for a specific broker request.
    *
    * @param brokerRequest the broker request constructed from a query.
@@ -55,6 +64,16 @@ public interface RoutingManager {
    */
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /**
+   * Get the {@link RoutingTable} for a specific broker request.
+   * @param brokerRequest the broker request constructed from a query.
+   * @param tableNameWithType the name of the table.
+   * @param requestId the request id.
+   * @return the route table.
+   */
+  @Nullable
+  RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId);
 
   /**
    * Returns the segments that are relevant for the given broker request. Returns {@code null} if the table does not

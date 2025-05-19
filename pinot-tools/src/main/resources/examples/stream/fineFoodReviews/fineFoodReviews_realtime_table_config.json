@@ -61,12 +61,14 @@
       }
     },
     {
-      "encodingType": "RAW",
-      "indexType": "TEXT",
       "name": "Text",
-      "properties": {
-        "deriveNumDocsPerChunkForRawIndex": "true",
-        "rawIndexWriterVersion": "3"
+      "encodingType": "RAW",
+      "indexes": {
+        "text": {
+          "deriveNumDocsPerChunkForRawIndex": "true",
+          "rawIndexWriterVersion": "3",
+          "caseSensitive": "false"
+        }
       }
     }
   ]

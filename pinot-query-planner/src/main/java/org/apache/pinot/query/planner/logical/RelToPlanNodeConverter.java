@@ -56,7 +56,6 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
@@ -91,12 +90,9 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
-  private final TableCache _tableCache;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
-      TableCache tableCache) {
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     _tracker = tracker;
-    _tableCache = tableCache;
   }
 
   /**
@@ -294,7 +290,7 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
-    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {

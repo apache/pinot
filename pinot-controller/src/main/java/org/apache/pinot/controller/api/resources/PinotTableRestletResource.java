@@ -387,14 +387,14 @@ public class PinotTableRestletResource {
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
+        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
       if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
@@ -625,9 +625,18 @@ public class PinotTableRestletResource {
           + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "How many maximum segment adds per server to update in the IdealState in each step. For "
+          + "non-strict replica group based assignment, this number will be capped at the batchSizePerServer value "
+          + "per rebalance step (some servers may get fewer segments). For strict replica group based assignment, "
+          + "this is a per-server best effort value since each partition of a replica group must be moved as a whole "
+          + "and at least one partition in a replica group should be moved. A value of -1 is used to disable batching "
+          + "(select as many segments as possible per incremental step in rebalance such that minAvailableReplicas is "
+          + "honored).")
+      @DefaultValue("-1") @QueryParam("batchSizePerServer") int batchSizePerServer,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
-      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
+          + "Extends if progress has been made during the wait, otherwise times out") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
       @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,
@@ -655,6 +664,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
+    rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);

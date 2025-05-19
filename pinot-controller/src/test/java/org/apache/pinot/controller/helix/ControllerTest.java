@@ -70,6 +70,8 @@ import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -395,9 +397,17 @@ public class ControllerTest {
     for (String physicalTableName : physicalTableNames) {
       physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
     }
+    String offlineTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isOfflineTableResource).findFirst().orElse(null);
+    String realtimeTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isRealtimeTableResource).findFirst().orElse(null);
     LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
         .setTableName(tableName)
         .setBrokerTenant(brokerTenant)
+        .setRefOfflineTableName(offlineTableName)
+        .setRefRealtimeTableName(realtimeTableName)
+        .setQuotaConfig(new QuotaConfig(null, "999"))
+        .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }
@@ -1233,7 +1243,7 @@ public class ControllerTest {
     // Delete logical tables
     List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();
     for (String logicalTableName : logicalTables) {
-      _helixResourceManager.deleteLogicalTable(logicalTableName);
+      _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
     }
 
     // Delete all tables
@@ -1254,7 +1264,7 @@ public class ControllerTest {
     }, 60_000L, "Failed to clean up all the external views");
 
     // Delete all schemas.
-    List<String> schemaNames = _helixResourceManager.getSchemaNames();
+    List<String> schemaNames = _helixResourceManager.getAllSchemaNames();
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(schemaName);

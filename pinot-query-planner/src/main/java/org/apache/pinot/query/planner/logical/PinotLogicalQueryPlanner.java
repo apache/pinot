@@ -36,12 +36,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.PRelNodeTreeValidator;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -61,9 +61,9 @@ public class PinotLogicalQueryPlanner {
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
   public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, TableCache tableCache, boolean useSpools,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
       Set<String> tableNames) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker, tableCache).toPlanNode(relRoot.rel);
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker).toPlanNode(relRoot.rel);
 
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools);
     return new SubPlan(rootFragment, new SubPlanMetadata(tableNames, relRoot.fields), List.of());
@@ -97,6 +97,8 @@ public class PinotLogicalQueryPlanner {
   public static Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> makePlanV2(RelRoot relRoot,
       PhysicalPlannerContext physicalPlannerContext, Set<String> tableNames) {
     PRelNode pRelNode = (PRelNode) relRoot.rel;
+    // TODO(mse-physical): Don't emit metrics for explain statements.
+    PRelNodeTreeValidator.emitMetrics(pRelNode);
     PlanFragmentAndMailboxAssignment planFragmentAndMailboxAssignment = new PlanFragmentAndMailboxAssignment();
     PlanFragmentAndMailboxAssignment.Result result =
         planFragmentAndMailboxAssignment.compute(pRelNode, physicalPlannerContext);

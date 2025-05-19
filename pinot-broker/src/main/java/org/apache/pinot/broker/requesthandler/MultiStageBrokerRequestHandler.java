@@ -318,11 +318,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
+    boolean caseSensitive = !_config.getProperty(
+        CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
+        CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+    );
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
         .tableCache(_tableCache)
         .workerManager(_workerManager)
+        .isCaseSensitive(caseSensitive)
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
@@ -365,7 +370,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
-        () -> query.planQuery(requestId), timer);
+        query::planQuery, timer);
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 

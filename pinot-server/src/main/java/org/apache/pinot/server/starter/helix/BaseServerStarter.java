@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,12 +33,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -162,6 +166,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
+  private ScheduledExecutorService _helixMessageCountScheduler;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -698,6 +703,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
 
+    // Start a background task to monitor Helix message count
+    int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
+        Server.DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS);
+    _helixMessageCountScheduler = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder().setNameFormat("message-count-scheduler-%d").setDaemon(true).build());
+    _helixMessageCountScheduler.scheduleAtFixedRate(this::refreshMessageCount, 0, refreshIntervalSeconds,
+        TimeUnit.SECONDS);
+
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
     try {
       _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
@@ -1057,5 +1070,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
+  }
+
+  private void refreshMessageCount() {
+    try {
+      HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+      List<String> children = dataAccessor.getBaseDataAccessor()
+          .getChildNames(String.format("/%s/INSTANCES/%s/MESSAGES", _helixClusterName, _instanceId), 0);
+      int messageCount = children == null ? 0 : children.size();
+      ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+      serverMetrics.setValueOfGlobalGauge(ServerGauge.HELIX_MESSAGES_COUNT, messageCount);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to refresh Helix message count", e);
+    }
   }
 }

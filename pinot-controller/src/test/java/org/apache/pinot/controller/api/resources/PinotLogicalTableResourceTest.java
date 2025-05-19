@@ -22,7 +22,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
@@ -32,7 +39,9 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -40,20 +49,26 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
   private static final String LOGICAL_TABLE_NAME = "test_logical_table";
   public static final String BROKER_TENANT = "DefaultTenant";
+  public static final String NEW_BROKER_TENANT = "NewBrokerTenant";
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  private String _addLogicalTableUrl;
 
   @BeforeClass
   public void setUpClass()
       throws Exception {
     startZk();
     startController();
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(2, false);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
     _controllerRequestURLBuilder = getControllerRequestURLBuilder();
+    _addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    createBrokerTenant(BROKER_TENANT, 1);
+    createBrokerTenant(NEW_BROKER_TENANT, 1);
   }
 
   @AfterClass
   public void tearDownClass() {
+    stopFakeInstances();
     stopController();
     stopZk();
   }
@@ -84,8 +99,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testCreateUpdateDeleteLogicalTables(String logicalTableName, List<String> physicalTableNames,
       List<String> physicalTablesToUpdate)
       throws IOException {
+    addDummySchema(logicalTableName);
     // verify logical table does not exist
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
     String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
     String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
@@ -100,7 +115,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // create logical table
     String resp =
-        ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+        ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     assertEquals(resp,
         "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName + " logical table successfully added.\"}");
 
@@ -128,100 +143,215 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     verifyLogicalTableDoesNotExists(getLogicalTableUrl);
   }
 
-  @Test
-  public void testLogicalTableValidationTests()
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Reason: 'quota.storage' should not be set for logical table.*")
+  public void testLogicalTableQuotaConfigValidation()
       throws IOException {
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-
-    // create physical tables
-    List<String> physicalTableNames = List.of("test_table_1", "test_table_2");
-    List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
-
-    // Test logical table name with _OFFLINE and _REALTIME is not allowed
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1"));
     LogicalTableConfig logicalTableConfig =
-        getDummyLogicalTableConfig("testLogicalTable_OFFLINE", physicalTableNamesWithType, BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
-          e.getMessage());
-    }
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setQuotaConfig(new QuotaConfig("10G", "999"));
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+  }
 
-    logicalTableConfig =
-        getDummyLogicalTableConfig("testLogicalTable_REALTIME", physicalTableNamesWithType, BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
-          e.getMessage());
-    }
+  @Test
+  public void testLogicalTableReferenceTableValidation()
+      throws IOException {
+    final List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_7"));
 
-    // Test logical table name can not be same as existing physical table name
-    logicalTableConfig =
-        getDummyLogicalTableConfig("test_table_1", physicalTableNamesWithType, BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Table name: test_table_1 already exists"), e.getMessage());
-    }
+    // Test ref offline table name is null validation
+    IOException aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName(null);
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refOfflineTableName' should not be null or empty when offline table exists"),
+        aThrows.getMessage());
 
+    // Test ref realtime table name is null validation
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName(null);
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refRealtimeTableName' should not be null or empty when realtime table exists"),
+        aThrows.getMessage());
+
+    // Test ref offline table is present in the offline tables validation
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("random_table_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refOfflineTableName' should be one of the provided offline tables"),
+        aThrows.getMessage());
+
+    // Test ref realtime table is present in the realtime tables validation
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("random_table_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refRealtimeTableName' should be one of the provided realtime tables"),
+        aThrows.getMessage());
+  }
+
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Reason: 'InvalidTenant' should be one of the existing broker tenants.*")
+  public void testLogicalTableBrokerTenantValidation()
+      throws IOException {
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_3"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
+
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+  }
+
+  @Test
+  public void testLogicalTablePhysicalTableConfigValidation() {
     // Test empty physical table names is not allowed
-    logicalTableConfig =
-        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(), BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("'physicalTableConfigMap' should not be null or empty"), e.getMessage());
-    }
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      LogicalTableConfig tableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(), BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, tableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage().contains("Reason: 'physicalTableConfigMap' should not be null or empty"),
+        throwable.getMessage());
 
     // Test all table names are physical table names and none is hybrid table name
-    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNames, BROKER_TENANT);
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'test_table_1' should be one of the existing tables"),
-          e.getMessage());
-    }
+    throwable = expectThrows(IOException.class, () -> {
+      List<String> physicalTableNames = List.of("test_table_1");
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNames, BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage().contains("Reason: 'test_table_1' should be one of the existing tables"),
+        throwable.getMessage());
+  }
 
-    // Test valid broker tenant is provided
-    logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, "InvalidTenant");
-    try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-      fail("Logical Table POST request should have failed");
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("Reason: 'InvalidTenant' should be one of the existing broker tenants"),
-          e.getMessage());
-    }
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp = ".*Table name: test_table already exists.*")
+  public void testLogicalTableNameCannotSameAsPhysicalTableNameValidation()
+      throws IOException {
+    String tableName = "test_table";
+    List<String> physicalTableNamesWithType = createHybridTables(List.of(tableName));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(tableName, physicalTableNamesWithType, BROKER_TENANT);
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+  }
+
+  @Test
+  public void testLogicalTableNameSuffixValidation()
+      throws IOException {
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_4"));
+
+    // Test logical table name with _OFFLINE suffix validation
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig("test_logical_table_OFFLINE", physicalTableNamesWithType, BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
+        throwable.getMessage());
+
+    // Test logical table name with _REALTIME suffix validation
+    throwable = expectThrows(IOException.class, () -> {
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig("test_logical_table_REALTIME", physicalTableNamesWithType, BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
+        throwable.getMessage());
+  }
+
+  @DataProvider
+  public Object[][] tableTypeProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
+  }
+
+  @Test(dataProvider = "tableTypeProvider")
+  public void testCreateLogicalTable(TableType tableType)
+      throws IOException {
+    // Test logical table with only realtime table
+    String tableName = "test_table";
+    addDummySchema(tableName);
+    TableConfig tableConfig = createDummyTableConfig(tableName, tableType);
+    addTableConfig(tableConfig);
+    addDummySchema(LOGICAL_TABLE_NAME);
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of(tableConfig.getTableName()), BROKER_TENANT);
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+  }
+
+  @Test
+  public void testLogicalTableSchemaValidation()
+      throws IOException {
+    final List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_6"));
+
+    // Test logical table schema does not exist
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage().contains("Reason: Schema with same name as logical table '" + LOGICAL_TABLE_NAME
+        + "' does not exist"), throwable.getMessage());
+
+    // Test logical table with db prefix but schema without db prefix
+    throwable = expectThrows(IOException.class, () -> {
+      addDummySchema(LOGICAL_TABLE_NAME);
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig("db." + LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: Schema with same name as logical table 'db." + LOGICAL_TABLE_NAME + "' does not exist"),
+        throwable.getMessage());
   }
 
   @Test
   public void testLogicalTableWithSameNameNotAllowed()
       throws IOException {
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
-    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_1", "test_table_2"));
+    addDummySchema(LOGICAL_TABLE_NAME);
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_5"));
 
     LogicalTableConfig
         logicalTableConfig = getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
-    ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+
     verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
     try {
       // create the same logical table again
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Logical table: test_logical_table already exists"), e.getMessage());
     }
-
-    // clean up the logical table
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(LOGICAL_TABLE_NAME);
-    ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-    verifyLogicalTableDoesNotExists(getLogicalTableUrl);
   }
 
   @DataProvider
@@ -238,8 +368,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testPhysicalTableShouldExist(String logicalTableName, List<String> physicalTableNames,
       String unknownTableName)
       throws IOException {
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-
     // setup physical tables
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
     physicalTableNamesWithType.add(unknownTableName);
@@ -248,7 +376,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     LogicalTableConfig
         logicalTableConfig = getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
     try {
-      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
       fail("Logical Table POST request should have failed");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("'" + unknownTableName + "' should be one of the existing tables"),
@@ -270,23 +398,59 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
 
     for (int i = 0; i < logicalTableNames.size(); i++) {
+      addDummySchema(logicalTableNames.get(i));
       LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableNames.get(i), List.of(
           physicalTableNamesWithType.get(2 * i), physicalTableNamesWithType.get(2 * i + 1)), BROKER_TENANT);
 
-      ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forLogicalTableCreate(),
-          logicalTableConfig.toSingleLineJsonString(), getHeaders());
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     }
 
     // verify logical table names
     String getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
     assertEquals(getLogicalTableNamesResponse, objectMapper.writeValueAsString(logicalTableNames));
+  }
 
-    // cleanup: delete logical tables
-    for (String logicalTableName : logicalTableNames) {
-      String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
-      String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-      assertEquals(deleteResponse, "{\"status\":\"" + logicalTableName + " logical table successfully deleted.\"}");
-    }
+  @Test
+  public void testLogicalTableUpdateBrokerTenantUpdate()
+      throws Exception {
+    PinotHelixResourceManager helixResourceManager = getHelixResourceManager();
+    String logicalTableName = "test_logical_table";
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
+    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+
+    // Create a logical table
+    addDummySchema(logicalTableName);
+    List<String> physicalTables = createHybridTables(List.of("physical_table"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(logicalTableName, physicalTables, BROKER_TENANT);
+    String addLogicalTableResponse =
+        ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    assertEquals(addLogicalTableResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName + " logical table successfully added.\"}");
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+
+    // verify table broker node and broker tenant node is same
+    IdealState brokerIdealStates = HelixHelper.getBrokerIdealStates(helixResourceManager.getHelixAdmin(),
+        helixResourceManager.getHelixClusterName());
+    Map<String, String> instanceStateMap = brokerIdealStates.getInstanceStateMap(logicalTableName);
+    Set<String> brokerForTenant = helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT);
+    assertEquals(brokerForTenant, instanceStateMap.keySet());
+
+    //verify broker tenant node sets are different
+    Set<String> allInstancesForBrokerTenant = helixResourceManager.getAllInstancesForBrokerTenant(NEW_BROKER_TENANT);
+    assertNotEquals(brokerForTenant, allInstancesForBrokerTenant);
+
+    // update logical table with new broker tenant
+    logicalTableConfig.setBrokerTenant(NEW_BROKER_TENANT);
+    sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
+
+    // verify the broker node set is updated in IS
+    brokerIdealStates = HelixHelper.getBrokerIdealStates(helixResourceManager.getHelixAdmin(),
+        helixResourceManager.getHelixClusterName());
+    instanceStateMap = brokerIdealStates.getInstanceStateMap(logicalTableName);
+    Set<String> brokerForNewTenant = helixResourceManager.getAllInstancesForBrokerTenant(NEW_BROKER_TENANT);
+    assertEquals(brokerForNewTenant, instanceStateMap.keySet());
   }
 
   private void verifyLogicalTableExists(String getLogicalTableUrl, LogicalTableConfig logicalTableConfig)
