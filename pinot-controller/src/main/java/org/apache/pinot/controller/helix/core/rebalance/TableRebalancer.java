@@ -1813,13 +1813,13 @@ public class TableRebalancer {
             // rebalance without batching
             partitionId = 0;
           } else {
-            // This how partitionId is calculated for OFFLINE tables
+            // This is how partitionId is calculated for OFFLINE tables
             partitionId = SegmentAssignmentUtils.getOfflineSegmentPartitionId(segmentName, _tableNameWithType,
                 _helixManager, _partitionColumn);
           }
         } else {
           if (isConsuming || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED)) {
-            // This how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
+            // This is how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
             // instance partitions in RealtimeSegmentAssignment
             partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
                 _helixManager, _partitionColumn);
@@ -1833,7 +1833,7 @@ public class TableRebalancer {
               // rebalance without batching
               partitionId = 0;
             } else {
-              // This how partitionId is calculated for REALTIME tables if a partition column exists and if the
+              // This is how partitionId is calculated for REALTIME tables if a partition column exists and if the
               // COMPLETED instance partitions has more than 1 partition
               partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
                   _helixManager, _partitionColumn);
