@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -36,6 +37,8 @@ import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfi
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -272,11 +275,24 @@ public class StarTreeBuilderUtils {
           .equals(metadata.getSkipStarNodeCreationForDimensions())) {
         return true;
       }
-      if (!builderConfig.getAggregationSpecs().equals(metadata.getAggregationSpecs())) {
-        return true;
-      }
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
         return true;
+      }
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> newSpecs = builderConfig.getAggregationSpecs();
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> existingSpecs = metadata.getAggregationSpecs();
+      if (newSpecs.size() != existingSpecs.size()) {
+        return true;
+      }
+      for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : newSpecs.entrySet()) {
+        AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+        AggregationSpec newSpec = entry.getValue();
+        AggregationSpec existingSpec = existingSpecs.get(functionColumnPair);
+        if (existingSpec == null) {
+          return true;
+        }
+        if (newSpec.shouldModifyStarTree(existingSpec)) {
+          return true;
+        }
       }
     }
     return false;
