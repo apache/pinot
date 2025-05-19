@@ -577,10 +577,6 @@ public class WorkerManager {
         realtimeBrokerRequest, context.getRequestId());
 
     assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
-
-    if (logicalTableRouteInfo.getTimeBoundaryInfo() != null) {
-      metadata.setTimeBoundaryInfo(logicalTableRouteInfo.getTimeBoundaryInfo());
-    }
   }
 
   private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
