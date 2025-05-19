@@ -556,6 +556,7 @@ public class IngestionDelayTracker {
       return 0;
     }
 
+    // TODO: Support other types of offsets
     if (!(currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
       return 0;
     }
