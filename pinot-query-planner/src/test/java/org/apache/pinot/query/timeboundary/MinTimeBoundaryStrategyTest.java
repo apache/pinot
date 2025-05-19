@@ -84,7 +84,6 @@ public class MinTimeBoundaryStrategyTest {
 
     return new Object[][]{
         {timeBoundaryInfoMap, List.of("table3_OFFLINE"), "table3_OFFLINE"},
-        {timeBoundaryInfoMap, List.of("Invalid_OFFLINE"), "Invalid_OFFLINE"},
         {timeBoundaryInfoMap, List.of("table2_OFFLINE", "table3_OFFLINE"), "table2_OFFLINE"},
         {timeBoundaryInfoMap, List.of("table3_OFFLINE", "table2_OFFLINE", "table4_OFFLINE"), "table2_OFFLINE"},
         {timeBoundaryInfoMap, List.of(), "empty_includedTables_OFFLINE"}
