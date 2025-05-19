@@ -166,11 +166,7 @@ public class TableViews {
           .filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
     }
 
-    Map<String, Map<String, String>> filteredIdealStateMap = idealStateMap.entrySet().stream()
-        .filter(entry -> segments.contains(entry.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    List<SegmentStatusInfo> segmentStatusInfoListMap = getSegmentStatuses(externalViewStateMap, filteredIdealStateMap);
+    List<SegmentStatusInfo> segmentStatusInfoListMap = getSegmentStatuses(externalViewStateMap, idealStateMap);
 
     return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
   }
@@ -183,7 +179,8 @@ public class TableViews {
       String segment = entry.getKey();
       Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
       Map<String, String> idealViewEntryValue = entry.getValue();
-      if (isErrorSegment(externalViewEntryValue)) {
+
+      if (externalViewEntryValue == null || isErrorSegment(externalViewEntryValue)) {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
       } else {

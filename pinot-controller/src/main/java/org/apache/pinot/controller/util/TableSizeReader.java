@@ -24,11 +24,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnegative;
@@ -36,9 +33,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.lineage.SegmentLineage;
-import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
-import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -250,41 +244,11 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
   }
 
-  private Map<String, List<String>> getServerToSegmentsMap(final String tableNameWithType,
-      boolean includeReplacedSegments) {
-    Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType);
-
-    Set<String> segments = new HashSet<>();
-    for (List<String> segmentList : serverToSegmentsMap.values()) {
-      segments.addAll(segmentList);
-    }
-
-    // Filter out replaced segments
-    if (!includeReplacedSegments) {
-      SegmentLineage segmentLineage = SegmentLineageAccessHelper
-          .getSegmentLineage(_helixResourceManager.getPropertyStore(), tableNameWithType);
-      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
-    }
-
-    for (Iterator<Map.Entry<String, List<String>>> it = serverToSegmentsMap.entrySet().iterator(); it.hasNext(); ) {
-      Map.Entry<String, List<String>> entry = it.next();
-      List<String> filtered = entry.getValue().stream()
-          .filter(segments::contains)
-          .collect(Collectors.toList());
-      if (filtered.isEmpty()) {
-        it.remove();
-      } else {
-        entry.setValue(filtered);
-      }
-    }
-
-    return serverToSegmentsMap;
-  }
-
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
       boolean includeReplacedSegments)
       throws InvalidConfigException {
-    Map<String, List<String>> serverToSegmentsMap = getServerToSegmentsMap(tableNameWithType, includeReplacedSegments);
+    Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType,
+        null, includeReplacedSegments);
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap =
