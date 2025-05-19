@@ -295,11 +295,12 @@ public class TableSizeReader {
     // TODO: here we assume server contains all segments in ideal state, which might not be the case
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
-      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server)
-          .stream()
-          .filter(segmentSizeInfo -> entry.getValue().contains(segmentSizeInfo.getSegmentName()))
-          .collect(Collectors.toList());
-      if (!segmentSizeInfoList.isEmpty()) {
+      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server);
+      if (segmentSizeInfoList != null) {
+        segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server)
+            .stream()
+            .filter(segmentSizeInfo -> entry.getValue().contains(segmentSizeInfo.getSegmentName()))
+            .collect(Collectors.toList());
         for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
           SegmentSizeDetails segmentSizeDetails =
               segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.getSegmentName(), k -> new SegmentSizeDetails());
