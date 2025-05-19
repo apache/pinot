@@ -236,14 +236,6 @@ public class QueryRunner {
    */
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    // run pre-stage execution for all pipeline breakers
-    return CompletableFuture.runAsync(
-        () -> processQueryInternal(workerMetadata, stagePlan, requestMetadata, parentContext),
-        _executorService);
-  }
-
-  protected void processQueryInternal(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
@@ -257,7 +249,7 @@ public class QueryRunner {
             opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean()),
         _executorService);
 
-    pipelineBreakerResultFuture.thenAcceptAsync(pipelineBreakerResult -> {
+    return pipelineBreakerResultFuture.thenAcceptAsync(pipelineBreakerResult -> {
       // Send error block to all the receivers if pipeline breaker fails
       if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
         ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
