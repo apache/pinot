@@ -161,7 +161,6 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       } else {
         logicalTableRouteInfo.setTimeBoundaryInfo(timeBoundaryInfo);
       }
-
     }
   }
 
