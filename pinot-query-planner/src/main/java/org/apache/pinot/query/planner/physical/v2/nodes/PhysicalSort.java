@@ -96,4 +96,9 @@ public class PhysicalSort extends Sort implements PRelNode {
     return new PhysicalSort(getCluster(), getTraitSet(), getHints(), getCollation(), offset, fetch, _pRelInputs.get(0),
         _nodeId, _pinotDataDistribution, true);
   }
+
+  public PhysicalSort withFetch(RexNode newFetch) {
+    return new PhysicalSort(getCluster(), getTraitSet(), getHints(), getCollation(), offset, newFetch,
+        _pRelInputs.get(0), _nodeId, _pinotDataDistribution, _leafStage);
+  }
 }

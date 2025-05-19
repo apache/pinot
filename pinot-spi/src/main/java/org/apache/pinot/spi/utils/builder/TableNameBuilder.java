@@ -70,7 +70,7 @@ public class TableNameBuilder {
    * @return Whether the table has type suffix that matches the builder type
    */
   private boolean tableHasTypeSuffix(String tableName) {
-    return tableName.toUpperCase().endsWith(_typeSuffix);
+    return tableName.endsWith(_typeSuffix);
   }
 
   /**

@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -75,7 +74,7 @@ public class SchemaUtils {
     validate(schema, tableConfigs, false);
   }
 
-  public static void validate(Schema schema, List<TableConfig> tableConfigs, @Nullable boolean isIgnoreCase) {
+  public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase) {
     for (TableConfig tableConfig : tableConfigs) {
       validateCompatibilityWithTableConfig(schema, tableConfig);
     }

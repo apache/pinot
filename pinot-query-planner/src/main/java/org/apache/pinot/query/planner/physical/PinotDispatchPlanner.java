@@ -27,6 +27,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
+import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -54,12 +55,15 @@ public class PinotDispatchPlanner {
    */
   public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
     // perform physical plan conversion and assign workers to each stage.
+    // metadata may come directly from Calcite's RelNode which has not resolved actual table names (taking
+    // case-sensitivity into account) yet, so we need to ensure table names are resolved while creating the subplan.
     DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
-        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+        subPlan.getSubPlanMetadata().getFields(),
+        resolveActualTableNames(subPlan.getSubPlanMetadata().getTableNames()));
     PlanFragment rootFragment = subPlan.getSubPlanRoot();
     PlanNode rootNode = rootFragment.getFragmentRoot();
     // 1. start by visiting the sub plan fragment root.
-    rootNode.visit(new DispatchablePlanVisitor(), context);
+    rootNode.visit(new DispatchablePlanVisitor(_tableCache), context);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
     context.getDispatchablePlanStageRootMap().put(0, rootNode);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
@@ -71,6 +75,35 @@ public class PinotDispatchPlanner {
     // 6. Run validations
     runValidations(rootFragment, context);
     // 7. convert it into query plan.
+    return finalizeDispatchableSubPlan(rootFragment, context);
+  }
+
+  /// Returns the actual table names taking the case-sensitivity configured within the `TableCache` instance into
+  /// account.
+  private Set<String> resolveActualTableNames(Set<String> tableNames) {
+    Set<String> actualTableNames = new HashSet<>();
+    for (String tableName : tableNames) {
+      String actualTableName = _tableCache.getActualTableName(tableName);
+      if (actualTableName != null) {
+        actualTableNames.add(actualTableName);
+      } else {
+        actualTableNames.add(tableName);
+      }
+    }
+    return actualTableNames;
+  }
+
+  public DispatchableSubPlan createDispatchableSubPlanV2(SubPlan subPlan,
+      PlanFragmentAndMailboxAssignment.Result result) {
+    // perform physical plan conversion and assign workers to each stage.
+    DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
+        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+    PlanFragment rootFragment = subPlan.getSubPlanRoot();
+    context.getDispatchablePlanMetadataMap().putAll(result._fragmentMetadataMap);
+    for (var entry : result._planFragmentMap.entrySet()) {
+      context.getDispatchablePlanStageRootMap().put(entry.getKey(), entry.getValue().getFragmentRoot());
+    }
+    runValidations(rootFragment, context);
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 

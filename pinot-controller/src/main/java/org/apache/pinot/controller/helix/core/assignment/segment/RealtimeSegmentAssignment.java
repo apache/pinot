@@ -120,7 +120,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       // Uniformly spray the partitions and replicas across the instances.
       // E.g. (6 instances, 3 partitions, 4 replicas)
       // "0_0": [i0,  i1,  i2,  i3,  i4,  i5  ]
-      //         p0r0 p0r1 p0r2 p1r3 p1r0 p1r1
+      //         p0r0 p0r1 p0r2 p0r3 p1r0 p1r1
       //         p1r2 p1r3 p2r0 p2r1 p2r2 p2r3
 
       List<String> instances =

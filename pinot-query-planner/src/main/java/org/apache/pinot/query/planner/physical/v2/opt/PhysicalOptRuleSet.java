@@ -22,9 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.AggregatePushdownRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageAggregateRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageBoundaryRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeSortInsertRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.LiteModeWorkerAssignmentRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.SortPushdownRule;
+import org.apache.pinot.query.planner.physical.v2.opt.rules.WorkerExchangeAssignmentRule;
 
 
 public class PhysicalOptRuleSet {
@@ -37,13 +42,21 @@ public class PhysicalOptRuleSet {
     transformers.add(create(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER,
         context));
     transformers.add(create(new LeafStageAggregateRule(context), RuleExecutors.Type.POST_ORDER, context));
-    // transformers.add(new WorkerExchangeAssignmentRule(context));
-    // transformers.add(create(new AggregatePushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
-    // transformers.add(create(new SortPushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
+    transformers.add(createWorkerAssignmentRule(context));
+    transformers.add(create(new AggregatePushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
+    transformers.add(create(new SortPushdownRule(context), RuleExecutors.Type.POST_ORDER, context));
+    if (context.isUseLiteMode()) {
+      transformers.add(create(new LiteModeSortInsertRule(context), RuleExecutors.Type.POST_ORDER, context));
+    }
     return transformers;
   }
 
   private static PRelNodeTransformer create(PRelOptRule rule, RuleExecutors.Type type, PhysicalPlannerContext context) {
     return (pRelNode) -> RuleExecutors.create(type, rule, context).execute(pRelNode);
+  }
+
+  private static PRelNodeTransformer createWorkerAssignmentRule(PhysicalPlannerContext context) {
+    return context.isUseLiteMode() ? new LiteModeWorkerAssignmentRule(context)
+        : new WorkerExchangeAssignmentRule(context);
   }
 }

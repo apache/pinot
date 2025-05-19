@@ -65,7 +65,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-
 // TODO: Plug in QueryScheduler
 public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
@@ -74,12 +73,18 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
+  private static final int DEFAULT_GRPC_QUERY_WORKER_THREAD =
+      Math.max(2, Math.min(8, ResourceManager.DEFAULT_QUERY_WORKER_THREADS));
+
   private final QueryExecutor _queryExecutor;
   private final ServerMetrics _serverMetrics;
   private final Server _server;
   private final ExecutorService _executorService;
   private final AccessControl _accessControl;
   private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
+  // Memory allocator and throttling configuration
+  private final PooledByteBufAllocator _bufAllocator;
+  private final long _memoryThresholdBytes;
 
   // Filter to keep track of gRPC connections.
   private class GrpcQueryTransportFilter extends ServerTransportFilter {
@@ -107,10 +112,18 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
             ? config.getQueryWorkerThreads()
-            : ResourceManager.DEFAULT_QUERY_WORKER_THREADS)
+            : DEFAULT_GRPC_QUERY_WORKER_THREAD)
     );
     _queryExecutor = queryExecutor;
     _serverMetrics = serverMetrics;
+
+    _bufAllocator = new PooledByteBufAllocator(true);
+
+    if (config.isRequestThrottlingMemroyThresholdSet()) {
+      _memoryThresholdBytes = config.getRequestThrottlingMemoryThresholdBytes();
+    } else {
+      _memoryThresholdBytes = GrpcConfig.DEFAULT_REQUEST_THROTTLING_MEMORY_THRESHOLD_BYTES;
+    }
 
     try {
       NettyServerBuilder builder = NettyServerBuilder.forPort(port);
@@ -119,8 +132,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       }
 
       // Add metrics for Netty buffer allocator
-      PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      PooledByteBufAllocatorMetric metric = _bufAllocator.metric();
       ServerMetrics metrics = ServerMetrics.get();
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.GRPC_NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
@@ -135,8 +147,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
           .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
           .addService(this)
           .addTransportFilter(new GrpcQueryTransportFilter())
-          .withOption(ChannelOption.ALLOCATOR, bufAllocator)
-          .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
+          .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+          .withChildOption(ChannelOption.ALLOCATOR, _bufAllocator)
           .build();
     } catch (Exception e) {
       throw new RuntimeException("Failed to start secure grpcQueryServer", e);
@@ -194,6 +206,19 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     long startTime = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_QUERIES, 1);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_RECEIVED, request.getSerializedSize());
+
+    // Check memory usage before processing the request
+    long usedDirectMemory = _bufAllocator.metric().usedDirectMemory();
+    if (usedDirectMemory > _memoryThresholdBytes) {
+      LOGGER.warn("Request rejected due to memory pressure. Used direct memory: {} bytes, threshold: {} bytes",
+          usedDirectMemory, _memoryThresholdBytes);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_MEMORY_REJECTIONS, 1);
+      responseObserver.onError(Status.RESOURCE_EXHAUSTED
+          .withDescription(String.format("Server under memory pressure (used: %d bytes, threshold: %d bytes)",
+              usedDirectMemory, _memoryThresholdBytes))
+          .asException());
+      return;
+    }
 
     try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
       QueryThreadContext.setQueryEngine("sse-grpc");

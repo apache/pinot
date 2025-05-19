@@ -58,7 +58,7 @@ public class LookupJoinOperator extends MultiStageOperator {
       Set.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.SEMI, JoinRelType.ANTI);
 
   private final MultiStageOperator _leftInput;
-  private final LeafStageTransferableBlockOperator _rightInput;
+  private final LeafOperator _rightInput;
   private final JoinRelType _joinType;
   private final int[] _leftKeyIds;
   private final DimensionTableDataManager _rightTable;
@@ -72,9 +72,8 @@ public class LookupJoinOperator extends MultiStageOperator {
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
     _leftInput = leftInput;
-    Preconditions.checkState(rightInput instanceof LeafStageTransferableBlockOperator,
-        "Right input must be leaf stage operator");
-    _rightInput = (LeafStageTransferableBlockOperator) rightInput;
+    Preconditions.checkState(rightInput instanceof LeafOperator, "Right input must be leaf operator");
+    _rightInput = (LeafOperator) rightInput;
     _joinType = node.getJoinType();
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(_joinType), "Join type: % is not supported for lookup join",
         _joinType);

@@ -119,13 +119,12 @@ public class PinotDataDistribution {
     RelDistribution.Type constraintType = distributionConstraint.getType();
     switch (constraintType) {
       case ANY:
+      case RANDOM_DISTRIBUTED:
         return true;
       case BROADCAST_DISTRIBUTED:
         return _type == RelDistribution.Type.BROADCAST_DISTRIBUTED;
       case SINGLETON:
         return _type == RelDistribution.Type.SINGLETON;
-      case RANDOM_DISTRIBUTED:
-        return _type == RelDistribution.Type.RANDOM_DISTRIBUTED;
       case HASH_DISTRIBUTED:
         if (_type != RelDistribution.Type.HASH_DISTRIBUTED) {
           return false;
