@@ -27,7 +27,9 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -53,6 +55,7 @@ public class IngestionDelayTrackerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 100;
+  public static final long OFFSET_TRACKING_INTERVAL = 1000L;
 
   private ServerMetrics _serverMetrics;
   private RealtimeTableDataManager _realtimeTableDataManager;
@@ -94,6 +97,14 @@ public class IngestionDelayTrackerTest {
 
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
     when(_realtimeTableDataManager.getStreamIngestionConfig()).thenReturn(streamIngestionConfig);
+
+    PinotConfiguration instanceConfig = new PinotConfiguration();
+    instanceConfig.setProperty(IngestionDelayTracker.OFFSET_LAG_TRACKING_ENABLE_CONFIG_KEY, "true");
+    instanceConfig.setProperty(IngestionDelayTracker.OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY,
+        String.valueOf(OFFSET_TRACKING_INTERVAL));
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getConfig()).thenReturn(instanceConfig);
+    when(_realtimeTableDataManager.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
   }
 
   @AfterMethod
@@ -369,7 +380,7 @@ public class IngestionDelayTrackerTest {
     StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(50);
     StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(150);
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0);
-    ingestionDelayTracker.updateOffsetLagForPartition(partition0, latestOffset0);
+    mockUpdateLatestStreamOffset(latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 50);
@@ -378,7 +389,7 @@ public class IngestionDelayTrackerTest {
     StreamPartitionMsgOffset msgOffset1 = new LongMsgOffset(50);
     StreamPartitionMsgOffset latestOffset1 = new LongMsgOffset(150);
     ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset1);
-    ingestionDelayTracker.updateOffsetLagForPartition(partition1, latestOffset1);
+    mockUpdateLatestStreamOffset(latestOffset1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition1), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition1), 50);
@@ -387,11 +398,21 @@ public class IngestionDelayTrackerTest {
     msgOffset0 = new LongMsgOffset(150);
     latestOffset0 = new LongMsgOffset(200);
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0);
-    ingestionDelayTracker.updateOffsetLagForPartition(partition0, latestOffset0);
+    mockUpdateLatestStreamOffset(latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 200);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 150);
 
     ingestionDelayTracker.shutdown();
+  }
+
+  private void mockUpdateLatestStreamOffset(StreamPartitionMsgOffset latestOffset0) {
+    try {
+      when(_mockStreamMetadataProvider.fetchStreamPartitionOffset(any(), anyLong())).thenReturn(
+          new LongMsgOffset(latestOffset0));
+      Thread.sleep(2 * OFFSET_TRACKING_INTERVAL);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
