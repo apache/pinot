@@ -204,7 +204,7 @@ public class IngestionDelayTracker {
       _offsetLagUpdateIntervalMs = pinotConfiguration.getProperty(OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY,
           DEFAULT_OFFSET_LAG_UPDATE_INTERVAL_MS);
 
-      Preconditions.checkArgument(_offsetLagUpdateIntervalMs > MIN_OFFSET_LAG_UPDATE_INTERVAL,
+      Preconditions.checkArgument(_offsetLagUpdateIntervalMs >= MIN_OFFSET_LAG_UPDATE_INTERVAL,
           String.format("Value of Offset lag update interval config: %s must be greater than %d",
               OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY, MIN_OFFSET_LAG_UPDATE_INTERVAL));
     } else {
