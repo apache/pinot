@@ -102,8 +102,8 @@ public class MinTimeBoundaryStrategyTest {
   private void testComputeTimeBoundary(Map<String, TimeBoundaryInfo> timeBoundaryInfoMap, String expectedTableName,
       Map<String, Object> parameters) {
     setupMocks(timeBoundaryInfoMap);
-    TimeBoundaryInfo timeBoundaryInfo = _minTimeBoundaryStrategy.computeTimeBoundary(
-        createLogicalTableConfig(parameters), _mockTableCache, _mockRoutingManager);
+    _minTimeBoundaryStrategy.init(createLogicalTableConfig(parameters), _mockTableCache);
+    TimeBoundaryInfo timeBoundaryInfo = _minTimeBoundaryStrategy.computeTimeBoundary(_mockRoutingManager);
     assertSame(timeBoundaryInfo, timeBoundaryInfoMap.get(expectedTableName));
   }
 

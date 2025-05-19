@@ -556,6 +556,10 @@ public class WorkerManager {
     LogicalTableRouteInfo logicalTableRouteInfo = metadata.getLogicalTableRouteInfo();
     Preconditions.checkNotNull(logicalTableRouteInfo);
     LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+    tableRouteProvider.calculateTimeBoundaryInfo(logicalTableRouteInfo, _routingManager);
+    if (logicalTableRouteInfo.getTimeBoundaryInfo() != null) {
+      metadata.setTimeBoundaryInfo(logicalTableRouteInfo.getTimeBoundaryInfo());
+    }
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
 
@@ -574,7 +578,9 @@ public class WorkerManager {
 
     assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
 
-    // TODO: Set Time Boundary Info if applicable. https://github.com/apache/pinot/issues/15640
+    if (logicalTableRouteInfo.getTimeBoundaryInfo() != null) {
+      metadata.setTimeBoundaryInfo(logicalTableRouteInfo.getTimeBoundaryInfo());
+    }
   }
 
   private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,

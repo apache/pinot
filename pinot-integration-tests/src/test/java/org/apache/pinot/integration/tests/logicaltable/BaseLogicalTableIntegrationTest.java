@@ -110,6 +110,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     if (_sharedClusterTestSuite != this) {
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
+      _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
     }
 
     _avroFiles = getAllAvroFiles();

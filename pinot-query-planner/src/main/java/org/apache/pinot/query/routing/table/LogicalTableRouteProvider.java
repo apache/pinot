@@ -86,7 +86,8 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
       TimeBoundaryStrategy timeBoundaryStrategy =
           TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
-      timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(logicalTable, tableCache, routingManager);
+      timeBoundaryStrategy.init(logicalTable, tableCache);
+      timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(routingManager);
       if (timeBoundaryInfo == null) {
         LOGGER.info("No time boundary info found for logical hybrid table: ");
         routeInfo.setOfflineTables(null);
@@ -138,8 +139,30 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       routeInfo.setRealtimeTableConfig(realtimeTableConfig);
     }
 
+    if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
+      String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
+      TimeBoundaryStrategy timeBoundaryStrategy =
+          TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
+      timeBoundaryStrategy.init(logicalTable, tableCache);
+      routeInfo.setTimeBoundaryStrategy(timeBoundaryStrategy);
+    }
+
     routeInfo.setQueryConfig(logicalTable.getQueryConfig());
     return routeInfo;
+  }
+
+  public void calculateTimeBoundaryInfo(LogicalTableRouteInfo logicalTableRouteInfo, RoutingManager routingManager) {
+    TimeBoundaryStrategy timeBoundaryStrategy = logicalTableRouteInfo.getTimeBoundaryStrategy();
+    if (timeBoundaryStrategy != null) {
+      TimeBoundaryInfo timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(routingManager);
+      if (timeBoundaryInfo == null) {
+        LOGGER.info("No time boundary info found for logical hybrid table: ");
+        logicalTableRouteInfo.setOfflineTables(null);
+      } else {
+        logicalTableRouteInfo.setTimeBoundaryInfo(timeBoundaryInfo);
+      }
+
+    }
   }
 
   @Override
