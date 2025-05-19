@@ -47,7 +47,9 @@ public class ExceptionUtils {
         }
         sb.append(e.getMessage());
       }
-      if (e.getCause() == e) break;
+      if (e.getCause() == e) {
+        break;
+      }
       e = e.getCause();
     }
     return sb.toString();
