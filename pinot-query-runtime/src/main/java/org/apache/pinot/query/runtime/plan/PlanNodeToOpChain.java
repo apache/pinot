@@ -41,7 +41,7 @@ import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.IntersectOperator;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
@@ -105,7 +105,7 @@ public class PlanNodeToOpChain {
       MultiStageOperator result;
       if (context.getLeafStageContext() != null && context.getLeafStageContext().getLeafStageBoundaryNode() == node) {
         ServerPlanRequestContext leafStageContext = context.getLeafStageContext();
-        result = new LeafStageTransferableBlockOperator(context, leafStageContext.getServerQueryRequests(),
+        result = new LeafOperator(context, leafStageContext.getServerQueryRequests(),
             leafStageContext.getLeafStageBoundaryNode().getDataSchema(), leafStageContext.getLeafQueryExecutor(),
             leafStageContext.getExecutorService());
       } else {

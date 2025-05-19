@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import io.grpc.Context;
+import io.grpc.Metadata;
+
 public class ChannelUtils {
   private ChannelUtils() {
   }
 
   public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
   public static final String MAILBOX_METADATA_REQUEST_EARLY_TERMINATE = "request.early.terminate";
+
+  public static final Metadata.Key<String> MAILBOX_ID_METADATA_KEY =
+    Metadata.Key.of("mailboxId", Metadata.ASCII_STRING_MARSHALLER);
+  public static final Context.Key<String> MAILBOX_ID_CTX_KEY = Context.key("mailboxId");
 }

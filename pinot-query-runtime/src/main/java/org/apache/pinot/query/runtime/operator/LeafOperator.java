@@ -34,7 +34,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Plan;
@@ -71,23 +70,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Leaf-stage transfer block operator is used to wrap around the leaf stage process results. They are passed to the
- * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
- * intermediate stage operators. An additional {@link MetadataBlock} needs to be transferred after the data block.
- *
- * <p>In order to achieve this:
- * <ul>
- *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
- *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
- *   <li>Leaf-stage result blocks are in the {@link ColumnDataType#getStoredColumnDataTypes()} format
- *       thus requires canonicalization.</li>
- * </ul>
- */
-public class LeafStageTransferableBlockOperator extends MultiStageOperator {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
-  private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
+/// Leaf operator processes the leaf stage of a multi-stage query with single-stage engine on the server.
+/// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
+/// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
+/// data schema.
+public class LeafOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
+  private static final String EXPLAIN_NAME = "LEAF";
 
   // Use a special results block to indicate that this is the last results block
   private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
@@ -105,8 +94,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private volatile Map<Integer, String> _exceptions;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
-      DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
+  public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
+      QueryExecutor queryExecutor, ExecutorService executorService) {
     super(context);
     int numRequests = requests.size();
     Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
@@ -312,8 +301,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   public ExplainedNode explain() {
-    Preconditions.checkState(_requests.stream()
-        .allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
+    Preconditions.checkState(
+        _requests.stream().allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
         "All requests must have explain mode set to ExplainMode.NODE");
 
     if (_executionFuture == null) {
@@ -354,12 +343,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (tableName == null) { // this should never happen, but let's be paranoid to never fail
       attributes = Collections.emptyMap();
     } else {
-      attributes = Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder()
-          .setString(tableName)
-          .build());
+      attributes =
+          Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder().setString(tableName).build());
     }
-    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
-        "LeafStageCombineOperator", attributes);
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes, "LeafStageCombineOperator",
+        attributes);
   }
 
   private ExplainedNode asNode(ExplainInfo info) {
@@ -369,8 +357,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       inputs.add(asNode(info.getInputs().get(i)));
     }
 
-    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getTitle(),
-        info.getAttributes());
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getTitle(), info.getAttributes());
   }
 
   private Future<Void> startExecution() {

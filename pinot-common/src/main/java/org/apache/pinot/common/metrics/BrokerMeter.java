@@ -205,6 +205,14 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
 
   /**
+   * How many MSE queries have encountered segments with invalid partitions.
+   * <p>
+   * This is only emitted for when usePhysicalOptimizer is set to true.
+   */
+  public static final BrokerMeter INVALID_SEGMENT_PARTITION_IN_QUERY = create("INVALID_SEGMENT_PARTITION_IN_QUERY",
+      "queries", false);
+
+  /**
    * Number of queries executed with cursors. This count includes queries that use SSE and MSE
    */
   public static final BrokerMeter CURSOR_QUERIES_GLOBAL = create("CURSOR_QUERIES_GLOBAL", "queries", true);

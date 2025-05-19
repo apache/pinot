@@ -288,47 +288,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
   }
 
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  public void testStarTreeTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testDefaultColumns(boolean useMultiStageQueryEngine) {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testForwardIndexTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  public void testBloomFilterTriggering() {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testRangeIndexTriggering(boolean useMultiStageQueryEngine)
-      throws Exception {
-    // Ignored
-  }
-
-  // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
-  @Test(enabled = false)
-  @Override
-  public void testInvertedIndexTriggering() {
-    // Ignored
-  }
-
+  // Disabled because segments might not be server partitioned with multiple servers
   @Test(enabled = false)
   @Override
   public void testHardcodedServerPartitionedSqlQueries() {
