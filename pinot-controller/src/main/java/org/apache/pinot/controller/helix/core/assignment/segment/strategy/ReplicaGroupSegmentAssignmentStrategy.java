@@ -72,19 +72,8 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
       InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
     int numPartitions = instancePartitions.getNumPartitions();
     checkReplication(instancePartitions, _replication, _tableName);
-    int partitionId;
-    if (_partitionColumn == null || numPartitions == 1) {
-      partitionId = 0;
-    } else {
-      // Uniformly spray the segment partitions over the instance partitions
-      if (_tableConfig.getTableType() == TableType.OFFLINE) {
-        partitionId = SegmentAssignmentUtils
-            .getOfflineSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      } else {
-        partitionId = SegmentAssignmentUtils
-            .getRealtimeSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      }
-    }
+    int partitionId = SegmentAssignmentUtils.getPartitionId(segmentName, _tableName, _tableConfig.getTableType(),
+        _helixManager, numPartitions, _partitionColumn) % numPartitions;
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
 
