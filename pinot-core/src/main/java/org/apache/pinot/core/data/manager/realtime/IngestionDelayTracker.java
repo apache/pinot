@@ -140,7 +140,7 @@ public class IngestionDelayTracker {
   public static final String OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY = "offset.lag.tracking.update.interval";
 
   // Since offset lag metric fetches metadata from upstream, we want to make sure we don't do it too frequently.
-  public static final boolean DEFAULT_ENABLE_OFFSET_LAG_METRIC = true;
+  public static final boolean DEFAULT_ENABLE_OFFSET_LAG_METRIC = false;
   public static final long DEFAULT_OFFSET_LAG_UPDATE_INTERVAL_MS = 60000; // 1 minute
   public static final long MIN_OFFSET_LAG_UPDATE_INTERVAL = 1000L;
   public static final int MAX_OFFSET_FETCH_WAIT_TIME_MS = 5000;
