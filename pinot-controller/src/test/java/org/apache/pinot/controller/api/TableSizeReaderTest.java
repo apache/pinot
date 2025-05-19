@@ -61,6 +61,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -231,7 +233,7 @@ public class TableSizeReaderTest {
 
   private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
       throws InvalidConfigException {
-    when(_helix.getServerToSegmentsMap(anyString())).thenAnswer(new Answer<Object>() {
+    when(_helix.getServerToSegmentsMap(anyString(), any(), anyBoolean())).thenAnswer(new Answer<Object>() {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return subsetOfServerSegments(servers);
