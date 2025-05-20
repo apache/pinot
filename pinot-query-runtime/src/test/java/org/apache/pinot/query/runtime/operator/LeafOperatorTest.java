@@ -53,9 +53,9 @@ import static org.mockito.Mockito.when;
 
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
-public class LeafStageOperatorTest {
+public class LeafOperatorTest {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
-  private final AtomicReference<LeafStageOperator> _operatorRef = new AtomicReference<>();
+  private final AtomicReference<LeafOperator> _operatorRef = new AtomicReference<>();
 
   private AutoCloseable _mocks;
 
@@ -82,7 +82,7 @@ public class LeafStageOperatorTest {
   private QueryExecutor mockQueryExecutor(List<BaseResultsBlock> dataBlocks, InstanceResponseBlock metadataBlock) {
     QueryExecutor queryExecutor = mock(QueryExecutor.class);
     when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
-      LeafStageOperator operator = _operatorRef.get();
+      LeafOperator operator = _operatorRef.get();
       for (BaseResultsBlock dataBlock : dataBlocks) {
         operator.addResultsBlock(dataBlock);
       }
@@ -111,8 +111,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -143,8 +143,8 @@ public class LeafStageOperatorTest {
         Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -171,8 +171,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -204,8 +204,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(2), schema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(2), schema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -230,8 +230,8 @@ public class LeafStageOperatorTest {
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryErrorCode.QUERY_EXECUTION, "foobar");
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, errorBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -258,8 +258,8 @@ public class LeafStageOperatorTest {
     InstanceResponseBlock emptySelectionResponseBlock =
         new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList(), queryContext));
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, emptySelectionResponseBlock);
-    LeafStageOperator operator =
-        new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), desiredSchema, queryExecutor,
             _executorService);
     _operatorRef.set(operator);
 
@@ -282,8 +282,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        spy(new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService));
 
     _operatorRef.set(operator);
@@ -305,8 +305,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        spy(new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService));
 
     _operatorRef.set(operator);
@@ -328,8 +328,8 @@ public class LeafStageOperatorTest {
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
-    LeafStageOperator operator =
-        spy(new LeafStageOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+    LeafOperator operator =
+        spy(new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
             _executorService));
 
     _operatorRef.set(operator);

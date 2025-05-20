@@ -81,6 +81,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -408,6 +409,7 @@ public class ControllerTest {
         .setRefRealtimeTableName(realtimeTableName)
         .setQuotaConfig(new QuotaConfig(null, "999"))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
+        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }

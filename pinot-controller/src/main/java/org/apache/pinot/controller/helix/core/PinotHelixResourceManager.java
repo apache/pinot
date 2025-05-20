@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -179,6 +180,7 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -1865,7 +1867,7 @@ public class PinotHelixResourceManager {
     PinotHelixPropertyStoreZnRecordProvider pinotHelixPropertyStoreZnRecordProvider =
         PinotHelixPropertyStoreZnRecordProvider.forTable(_propertyStore);
     if (pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.OFFLINE.tableNameWithType(tableName))
-    || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
+        || pinotHelixPropertyStoreZnRecordProvider.exist(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
       throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
     }
 
@@ -2148,6 +2150,14 @@ public class PinotHelixResourceManager {
     if (!oldLogicalTableConfig.getBrokerTenant().equals(logicalTableConfig.getBrokerTenant())) {
       LOGGER.info("Updating logical table {}: Updating BrokerResource for table", tableName);
       updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
+    }
+
+    TimeBoundaryConfig oldTimeBoundaryConfig = oldLogicalTableConfig.getTimeBoundaryConfig();
+    TimeBoundaryConfig newTimeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    // compare the old and new time boundary config and send message if they are different
+    if ((oldTimeBoundaryConfig != null && !oldTimeBoundaryConfig.equals(newTimeBoundaryConfig))
+    || (oldTimeBoundaryConfig == null && newTimeBoundaryConfig != null)) {
+      sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
     }
 
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
@@ -3172,6 +3182,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
+    LogicalTableConfigRefreshMessage refreshMessage = new LogicalTableConfigRefreshMessage(logicalTableName);
+
+    // Send logical table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(logicalTableName);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, refreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} logical table config refresh messages to brokers for table: {}", numMessagesSent,
+          logicalTableName);
+    } else {
+      LOGGER.warn("No logical table config refresh message sent to brokers for table: {}", logicalTableName);
+    }
+  }
+
   private void sendApplicationQpsQuotaRefreshMessage(String appName) {
     ApplicationQpsQuotaRefreshMessage message = new ApplicationQpsQuotaRefreshMessage(appName);
 
@@ -3516,7 +3547,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getOfflineTableConfig(String tableName) {
-    return getOfflineTableConfig(tableName, true);
+    return getOfflineTableConfig(tableName, true, true);
   }
 
   /**
@@ -3524,11 +3555,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**
@@ -3540,7 +3572,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public TableConfig getRealtimeTableConfig(String tableName) {
-    return getRealtimeTableConfig(tableName, true);
+    return getRealtimeTableConfig(tableName, true, true);
   }
 
   /**
@@ -3548,11 +3580,12 @@ public class PinotHelixResourceManager {
    *
    * @param tableName Table name with or without type suffix
    * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @param applyDecorator Whether to apply decorator to the table config
    * @return Table config
    */
   @Nullable
-  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables) {
-    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables);
+  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables, boolean applyDecorator) {
+    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables, applyDecorator);
   }
 
   /**

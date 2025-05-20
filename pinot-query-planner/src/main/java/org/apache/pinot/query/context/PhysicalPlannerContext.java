@@ -57,6 +57,7 @@ public class PhysicalPlannerContext {
    */
   private final String _instanceId;
   private final Map<String, String> _queryOptions;
+  private final boolean _useLiteMode;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -69,6 +70,7 @@ public class PhysicalPlannerContext {
     _requestId = 0;
     _instanceId = "";
     _queryOptions = Map.of();
+    _useLiteMode = false;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
@@ -79,6 +81,7 @@ public class PhysicalPlannerContext {
     _requestId = requestId;
     _instanceId = instanceId;
     _queryOptions = queryOptions == null ? Map.of() : queryOptions;
+    _useLiteMode = PhysicalPlannerContext.useLiteMode(queryOptions);
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -114,10 +117,21 @@ public class PhysicalPlannerContext {
     return _queryOptions;
   }
 
+  public boolean isUseLiteMode() {
+    return _useLiteMode;
+  }
+
   public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {
     if (queryOptions == null) {
       return false;
     }
     return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
+  }
+
+  private static boolean useLiteMode(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return false;
+    }
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
   }
 }

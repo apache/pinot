@@ -46,7 +46,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
   private final TableRebalanceContext _tableRebalanceContext;
-  // These previous stats are used for rollback scenarios where the IdealState update fails dure to a version
+  // These previous stats are used for rollback scenarios where the IdealState update fails due to a version
   // change and the rebalance loop is retried.
   private TableRebalanceProgressStats.RebalanceProgressStats _previousStepStats;
   private TableRebalanceProgressStats.RebalanceProgressStats _previousOverallStats;
@@ -136,13 +136,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           updatedStatsInZk = true;
         }
         break;
-      case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+      case NEXT_ASSIGNMENT_CALCULATION_TRIGGER:
         // Update the previous stats with the current values in case a rollback is needed due to IdealState version
         // change
         _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
             _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
-            Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
+            Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
           _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
           trackStatsInZk();
@@ -524,7 +524,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
     switch (trigger) {
       case START_TRIGGER:
-      case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+      case NEXT_ASSIGNMENT_CALCULATION_TRIGGER:
         // These are initialization steps for global / step progress stats
         progressStats._totalSegmentsToBeAdded = totalSegmentsToBeAdded;
         progressStats._totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
@@ -542,7 +542,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._totalEstimatedDataToBeMovedInBytes =
             TableRebalanceProgressStats.calculateNewEstimatedDataToBeMovedInBytes(0,
                 rebalanceContext.getEstimatedAverageSegmentSizeInBytes(), totalSegmentsToBeAdded);
-        progressStats._startTimeMs = trigger == Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER
+        progressStats._startTimeMs = trigger == Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER
             ? System.currentTimeMillis() : rebalanceProgressStats.getStartTimeMs();
         break;
       case IDEAL_STATE_CHANGE_TRIGGER:

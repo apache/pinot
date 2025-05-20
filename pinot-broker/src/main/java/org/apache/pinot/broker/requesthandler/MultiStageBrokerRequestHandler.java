@@ -184,16 +184,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         LOGGER.warn("Request {} failed with exception", requestId, e);
       } else {
         // a _green_ error (see handleRequestThrowing javadoc)
-        LOGGER.info("Request {} failed with message {}", requestId, e.getMessage());
+        LOGGER.info("Request {} failed with messages {}", requestId, ExceptionUtils.consolidateExceptionMessages(e));
       }
-      BrokerResponseNative brokerResponseNative = new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+      BrokerResponseNative brokerResponseNative = new BrokerResponseNative(
+          e.getErrorCode(), ExceptionUtils.consolidateExceptionMessages(e));
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
     } catch (RuntimeException e) {
       // a _red_ error (see handleRequestThrowing javadoc)
       LOGGER.warn("Request {} failed in an uncontrolled manner", requestId, e);
-      String subStackTrace = ExceptionUtils.consolidateExceptionMessages(e);
-      BrokerResponseNative brokerResponseNative = new BrokerResponseNative(QueryErrorCode.UNKNOWN, subStackTrace);
+      BrokerResponseNative brokerResponseNative = new BrokerResponseNative(
+          QueryErrorCode.UNKNOWN, ExceptionUtils.consolidateExceptionMessages(e));
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
     }
@@ -437,7 +438,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         throw e;
       } catch (Throwable t) {
         QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
-        String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
+        String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
         LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
