@@ -279,6 +279,17 @@ public class QueryContext {
   }
 
   /**
+   * Return true in-case deterministic result is expected
+   * @return
+   */
+  public boolean isEnableDeterministicGroupTrim() {
+    return Boolean.parseBoolean(_queryOptions.getOrDefault("enableDeterministicGroupTrim", "false"));
+  }
+
+
+
+
+  /**
    * Returns the aggregation functions for the query, or {@code null} if the query does not have any aggregation.
    */
   @Nullable
