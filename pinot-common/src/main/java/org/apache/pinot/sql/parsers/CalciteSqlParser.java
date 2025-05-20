@@ -558,7 +558,7 @@ public class CalciteSqlParser {
     return join;
   }
 
-  private static void queryRewrite(PinotQuery pinotQuery) {
+  public static void queryRewrite(PinotQuery pinotQuery) {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
