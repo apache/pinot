@@ -41,8 +41,8 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
   @Override
   public TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache, RoutingManager routingManager) {
-    LogicalTableConfig logicalTable = tableCache.getLogicalTableConfig(tableName);
-    if (logicalTable == null) {
+    LogicalTableConfig logicalTableConfig = tableCache.getLogicalTableConfig(tableName);
+    if (logicalTableConfig == null) {
       return new LogicalTableRouteInfo();
     }
 
@@ -50,7 +50,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     List<TableRouteInfo> offlineTables = new ArrayList<>();
     List<TableRouteInfo> realtimeTables = new ArrayList<>();
-    for (String physicalTableName : logicalTable.getPhysicalTableConfigMap().keySet()) {
+    for (String physicalTableName : logicalTableConfig.getPhysicalTableConfigMap().keySet()) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       Preconditions.checkNotNull(tableType);
       TableRouteInfo physicalTableInfo =
@@ -64,29 +64,29 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-    LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTable);
+    LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTableConfig);
     if (!offlineTables.isEmpty()) {
-      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTable.getRefOfflineTableName());
+      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTableConfig.getRefOfflineTableName());
       Preconditions.checkNotNull(offlineTableConfig,
-          "Offline table config not found: " + logicalTable.getRefOfflineTableName());
+          "Offline table config not found: " + logicalTableConfig.getRefOfflineTableName());
       routeInfo.setOfflineTables(offlineTables);
       routeInfo.setOfflineTableConfig(offlineTableConfig);
     }
     if (!realtimeTables.isEmpty()) {
-      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTable.getRefRealtimeTableName());
+      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTableConfig.getRefRealtimeTableName());
       Preconditions.checkNotNull(realtimeTableConfig,
-          "Realtime table config not found: " + logicalTable.getRefRealtimeTableName());
+          "Realtime table config not found: " + logicalTableConfig.getRefRealtimeTableName());
       routeInfo.setRealtimeTables(realtimeTables);
       routeInfo.setRealtimeTableConfig(realtimeTableConfig);
     }
-    routeInfo.setQueryConfig(logicalTable.getQueryConfig());
+    routeInfo.setQueryConfig(logicalTableConfig.getQueryConfig());
 
     TimeBoundaryInfo timeBoundaryInfo;
     if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
-      String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
+      String boundaryStrategy = logicalTableConfig.getTimeBoundaryConfig().getBoundaryStrategy();
       TimeBoundaryStrategy timeBoundaryStrategy =
           TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
-      timeBoundaryStrategy.init(logicalTable, tableCache);
+      timeBoundaryStrategy.init(logicalTableConfig, tableCache);
       timeBoundaryInfo = timeBoundaryStrategy.computeTimeBoundary(routingManager);
       if (timeBoundaryInfo == null) {
         LOGGER.info("No time boundary info found for logical hybrid table: ");
@@ -99,8 +99,8 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   }
 
   public LogicalTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache) {
-    LogicalTableConfig logicalTable = tableCache.getLogicalTableConfig(tableName);
-    if (logicalTable == null) {
+    LogicalTableConfig logicalTableConfig = tableCache.getLogicalTableConfig(tableName);
+    if (logicalTableConfig == null) {
       return new LogicalTableRouteInfo();
     }
 
@@ -108,7 +108,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
 
     List<TableRouteInfo> offlineTables = new ArrayList<>();
     List<TableRouteInfo> realtimeTables = new ArrayList<>();
-    for (String physicalTableName : logicalTable.getPhysicalTableConfigMap().keySet()) {
+    for (String physicalTableName : logicalTableConfig.getPhysicalTableConfigMap().keySet()) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       Preconditions.checkNotNull(tableType);
       TableRouteInfo physicalTableInfo = routeProvider.getTableRouteInfo(physicalTableName, tableCache);
@@ -122,32 +122,32 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-    LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTable);
+    LogicalTableRouteInfo routeInfo = new LogicalTableRouteInfo(logicalTableConfig);
     if (!offlineTables.isEmpty()) {
-      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTable.getRefOfflineTableName());
+      TableConfig offlineTableConfig = tableCache.getTableConfig(logicalTableConfig.getRefOfflineTableName());
       Preconditions.checkNotNull(offlineTableConfig,
-          "Offline table config not found: " + logicalTable.getRefOfflineTableName());
+          "Offline table config not found: " + logicalTableConfig.getRefOfflineTableName());
       routeInfo.setOfflineTables(offlineTables);
       routeInfo.setOfflineTableConfig(offlineTableConfig);
     }
 
     if (!realtimeTables.isEmpty()) {
-      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTable.getRefRealtimeTableName());
+      TableConfig realtimeTableConfig = tableCache.getTableConfig(logicalTableConfig.getRefRealtimeTableName());
       Preconditions.checkNotNull(realtimeTableConfig,
-          "Realtime table config not found: " + logicalTable.getRefRealtimeTableName());
+          "Realtime table config not found: " + logicalTableConfig.getRefRealtimeTableName());
       routeInfo.setRealtimeTables(realtimeTables);
       routeInfo.setRealtimeTableConfig(realtimeTableConfig);
     }
 
     if (!offlineTables.isEmpty() && !realtimeTables.isEmpty()) {
-      String boundaryStrategy = logicalTable.getTimeBoundaryConfig().getBoundaryStrategy();
+      String boundaryStrategy = logicalTableConfig.getTimeBoundaryConfig().getBoundaryStrategy();
       TimeBoundaryStrategy timeBoundaryStrategy =
           TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(boundaryStrategy);
-      timeBoundaryStrategy.init(logicalTable, tableCache);
+      timeBoundaryStrategy.init(logicalTableConfig, tableCache);
       routeInfo.setTimeBoundaryStrategy(timeBoundaryStrategy);
     }
 
-    routeInfo.setQueryConfig(logicalTable.getQueryConfig());
+    routeInfo.setQueryConfig(logicalTableConfig.getQueryConfig());
     return routeInfo;
   }
 
