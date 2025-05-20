@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -56,6 +57,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -224,6 +226,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
+    tableNames = populateTableNames(tableNames);
     AccessControl accessControl = _accessControlFactory.create();
 
     TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
@@ -249,6 +252,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
 
     return tableAuthorizationResult;
+  }
+
+  private Set<String> populateTableNames(Set<String> tableNames) {
+    Set<String> populatedTableNames = new HashSet<>();
+    for (String tableName : tableNames) {
+      LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(tableName);
+      if (logicalTableConfig != null) {
+        populatedTableNames.addAll(logicalTableConfig.getPhysicalTableConfigMap().keySet());
+      } else {
+        populatedTableNames.add(tableName);
+      }
+    }
+    return populatedTableNames;
   }
 
   /**
