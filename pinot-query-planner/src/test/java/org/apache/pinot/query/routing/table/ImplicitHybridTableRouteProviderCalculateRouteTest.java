@@ -27,9 +27,9 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -59,9 +59,8 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
     }
   }
 
-  private ImplicitHybridTableRouteInfo getImplicitHybridTableRouteInfo(String tableName) {
-    ImplicitHybridTableRouteInfo routeInfo =
-        _hybridTableRouteProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);
+  private TableRouteInfo getImplicitHybridTableRouteInfo(String tableName) {
+    TableRouteInfo routeInfo = _hybridTableRouteProvider.getTableRouteInfo(tableName, _tableCache, _routingManager);
     BrokerRequestPair brokerRequestPair =
         getBrokerRequestPair(tableName, routeInfo.hasOffline(), routeInfo.hasRealtime(),
             routeInfo.getOfflineTableName(), routeInfo.getRealtimeTableName());
@@ -73,7 +72,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
 
   private void assertTableRoute(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    ImplicitHybridTableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
+    TableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
 
     // If a routing table for offline table is expected, then compare it with the expected routing table.
     if (isOfflineExpected) {
@@ -281,7 +280,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
   private void assertEqualsTableRouteInfoGetTableRouteResult(String tableName,
       Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    ImplicitHybridTableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
+    TableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
     GetTableRouteResult expectedTableRoute = getTableRouting(tableName, _routingManager);
 
     if (isOfflineExpected) {
@@ -332,7 +331,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
 
   @Test(dataProvider = "routeNotExistsProvider")
   void testTableRoutingForRouteNotExists(String tableName) {
-    ImplicitHybridTableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
+    TableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
     GetTableRouteResult expectedTableRoute = getTableRouting(tableName, _routingManager);
 
     assertNull(expectedTableRoute._offlineRoutingTable);
@@ -348,7 +347,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
   @Test(dataProvider = "partiallyDisabledTableAndRouteProvider")
   void testTableRoutingForPartiallyDisabledTable(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
-    ImplicitHybridTableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
+    TableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
     GetTableRouteResult expectedTableRoute = getTableRouting(tableName, _routingManager);
 
     if (expectedOfflineRoutingTable == null) {
@@ -376,7 +375,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
 
   @Test(dataProvider = "disabledTableProvider")
   void testTableRoutingForDisabledTable(String tableName) {
-    ImplicitHybridTableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
+    TableRouteInfo routeInfo = getImplicitHybridTableRouteInfo(tableName);
     GetTableRouteResult expectedTableRoute = getTableRouting(tableName, _routingManager);
 
     if (expectedTableRoute._offlineTableDisabled) {
