@@ -26,15 +26,15 @@ import org.apache.pinot.spi.data.Schema;
 public class LogicalTableManager {
   private final LogicalTableConfig _logicalTableConfig;
   private final Schema _logicalTableSchema;
-  private final TableConfig _offlineTableConfig;
-  private final TableConfig _realtimeTableConfig;
+  private final TableConfig _refOfflineTableConfig;
+  private final TableConfig _refRealtimeTableConfig;
 
   public LogicalTableManager(LogicalTableConfig logicalTableConfig, Schema logicalTableSchema,
-      TableConfig offlineTableConfig, TableConfig realtimeTableConfig) {
+      TableConfig refOfflineTableConfig, TableConfig refRealtimeTableConfig) {
     _logicalTableConfig = logicalTableConfig;
     _logicalTableSchema = logicalTableSchema;
-    _offlineTableConfig = offlineTableConfig;
-    _realtimeTableConfig = realtimeTableConfig;
+    _refOfflineTableConfig = refOfflineTableConfig;
+    _refRealtimeTableConfig = refRealtimeTableConfig;
   }
 
   public LogicalTableConfig getLogicalTableConfig() {
@@ -43,10 +43,10 @@ public class LogicalTableManager {
   public Schema getLogicalTableSchema() {
     return _logicalTableSchema;
   }
-  public TableConfig getOfflineTableConfig() {
-    return _offlineTableConfig;
+  public TableConfig getRefOfflineTableConfig() {
+    return _refOfflineTableConfig;
   }
-  public TableConfig getRealtimeTableConfig() {
-    return _realtimeTableConfig;
+  public TableConfig getRefRealtimeTableConfig() {
+    return _refRealtimeTableConfig;
   }
 }
