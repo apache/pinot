@@ -147,7 +147,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     String tableName = _tableCache.getActualTableName(tableNameInNode);
     if (tableName == null) {
       tableName = _tableCache.getActualLogicalTableName(tableNameInNode);
-      Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableName);
+      Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableNameInNode);
       LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
       logicalTableRouteInfo = new LogicalTableRouteInfo();
       tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, tableName, _tableCache);
