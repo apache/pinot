@@ -47,6 +47,8 @@ import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.get
 
 /**
  * Create many small segments with many columns to test metadata overhead.
+ * Test is rather slow (1 minute+) and thus disabled by default.
+ * Still, it can be useful to run it manually.
  */
 public class BigNumberOfSegmentsIntegrationTest extends BaseClusterIntegrationTestSet {
 
