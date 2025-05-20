@@ -110,8 +110,8 @@ export const getExternalView = (name: string): Promise<AxiosResponse<IdealState>
 export const getServerToSegmentsCount = (name: string, tableType: TableType, verbose: boolean = false): Promise<AxiosResponse<ServerToSegmentsCount[]>> =>
   baseApi.get(`/segments/${name}/servers?type=${tableType}&verbose=${verbose}`);
 
-export const getSegmentsStatus = (name: string, showReplacedSegments: boolean = false): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
-  baseApi.get(`/tables/${name}/segmentsStatus?showReplacedSegments=${showReplacedSegments}`);
+export const getSegmentsStatus = (name: string, includeReplacedSegments: boolean = false): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
+  baseApi.get(`/tables/${name}/segmentsStatus?includeReplacedSegments=${includeReplacedSegments}`);
 
 // Fetch consuming segments information for a table
 // API: GET /tables/{tableName}/consumingSegmentsInfo

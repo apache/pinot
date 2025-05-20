@@ -3270,9 +3270,9 @@ public class PinotHelixResourceManager {
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
     }
 
-    for (String segmentName : segments) {
-      Set<Map.Entry<String, String>> entry = idealStateMap.get(segmentName).entrySet();
-      for (Map.Entry<String, String> instanceStateEntry : entry) {
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         String server = instanceStateEntry.getKey();
         if (targetServer != null && !server.equals(targetServer)) {
           continue;

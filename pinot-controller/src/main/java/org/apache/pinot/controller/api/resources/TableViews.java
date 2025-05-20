@@ -147,7 +147,7 @@ public class TableViews {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
       @ApiParam(value = "Show segments being replaced: true|false", required = false)
-      @QueryParam("showReplacedSegments") @DefaultValue("true") boolean showReplacedSegments,
+      @QueryParam("includeReplacedSegments") @DefaultValue("true") boolean includeReplacedSegments,
       @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -159,7 +159,7 @@ public class TableViews {
     Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
     Set<String> segments = idealStateMap.keySet();
 
-    if (!showReplacedSegments) {
+    if (!includeReplacedSegments) {
       SegmentLineage segmentLineage = SegmentLineageAccessHelper
           .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableName);
       SegmentLineageUtils
@@ -180,7 +180,10 @@ public class TableViews {
       Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
       Map<String, String> idealViewEntryValue = entry.getValue();
 
-      if (externalViewEntryValue == null || isErrorSegment(externalViewEntryValue)) {
+      if (externalViewEntryValue == null) {
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+      } else if (isErrorSegment(externalViewEntryValue)) {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
       } else {
