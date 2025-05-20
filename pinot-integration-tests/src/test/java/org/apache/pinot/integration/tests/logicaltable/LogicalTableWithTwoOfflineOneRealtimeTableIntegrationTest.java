@@ -72,6 +72,6 @@ public class LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest extends B
     Map<String, Object> parameters = Map.of("includedTables", List.of(newTimeBoundaryTableName));
     logicalTableConfig.getTimeBoundaryConfig().setParameters(parameters);
 
-    updateLogicalTableConfig(logicalTableConfig.getTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
   }
 }

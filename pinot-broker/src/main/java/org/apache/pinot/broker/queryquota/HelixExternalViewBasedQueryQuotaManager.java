@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -175,6 +176,20 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
+  public void initOrUpdateLogicalTableQueryQuota(String logicalTableName) {
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
+    if (logicalTableConfig == null) {
+      LOGGER.info("No query quota to update since logical table config is null");
+      return;
+    }
+
+    LOGGER.info("Initializing rate limiter for logical table {}", logicalTableName);
+
+    ExternalView brokerResourceEV = getBrokerResource();
+    Stat stat = _propertyStore.getStat(constructLogicalTableConfigPath(logicalTableName), AccessOption.PERSISTENT);
+    createOrUpdateRateLimiter(logicalTableName, brokerResourceEV, logicalTableConfig.getQuotaConfig(), stat);
+  }
+
   public void initOrUpdateTableQueryQuota(String tableNameWithType) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     ExternalView brokerResourceEV = getBrokerResource();
@@ -195,24 +210,25 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     LOGGER.info("Initializing rate limiter for table {}", tableNameWithType);
 
     // Create rate limiter if query quota config is specified.
-    createOrUpdateRateLimiter(tableNameWithType, brokerResourceEV, tableConfig.getQuotaConfig());
+    Stat stat = _propertyStore.getStat(constructTableConfigPath(tableNameWithType), AccessOption.PERSISTENT);
+    createOrUpdateRateLimiter(tableNameWithType, brokerResourceEV, tableConfig.getQuotaConfig(), stat);
   }
 
   /**
    * Drop table query quota.
-   * @param tableNameWithType table name with type.
+   * @param physicalOrLogicalTable physical or logical table name.
    */
-  public void dropTableQueryQuota(String tableNameWithType) {
-    LOGGER.info("Dropping rate limiter for table {}", tableNameWithType);
-    removeRateLimiter(tableNameWithType);
+  public void dropTableQueryQuota(String physicalOrLogicalTable) {
+    LOGGER.info("Dropping rate limiter for table {}", physicalOrLogicalTable);
+    removeRateLimiter(physicalOrLogicalTable);
   }
 
   /** Remove or update rate limiter if another table with the same raw table name but different type is still using
    * the quota config.
-   * @param tableNameWithType table name with type
+   * @param physicalOrLogicalTable physical or logical table name.
    */
-  private void removeRateLimiter(String tableNameWithType) {
-    _rateLimiterMap.remove(tableNameWithType);
+  private void removeRateLimiter(String physicalOrLogicalTable) {
+    _rateLimiterMap.remove(physicalOrLogicalTable);
   }
 
   /**
@@ -233,9 +249,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    * @param tableNameWithType table name with table type.
    * @param brokerResource broker resource which stores all the broker states of each table.
    * @param quotaConfig quota config of the table.
+   * @param tableStat stat of the table config.
    */
   private void createOrUpdateRateLimiter(String tableNameWithType, ExternalView brokerResource,
-      QuotaConfig quotaConfig) {
+      QuotaConfig quotaConfig, Stat tableStat) {
     if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
       LOGGER.info("No qps config specified for table: {}", tableNameWithType);
       buildEmptyOrResetRateLimiterInQueryQuotaEntity(tableNameWithType);
@@ -267,22 +284,18 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
     // Get the dynamic rate
     double overallRate = quotaConfig.getMaxQPS();
-
-    // Get stat from property store
-    String tableConfigPath = constructTableConfigPath(tableNameWithType);
-    Stat stat = _propertyStore.getStat(tableConfigPath, AccessOption.PERSISTENT);
     double perBrokerRate = overallRate / onlineCount;
 
     QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(tableNameWithType);
     if (queryQuotaEntity == null) {
       queryQuotaEntity =
           new QueryQuotaEntity(RateLimiter.create(perBrokerRate), new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND),
-              new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), onlineCount, overallRate, stat.getVersion());
+              new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), onlineCount, overallRate, tableStat.getVersion());
       _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
       LOGGER.info(
           "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online "
               + "broker instances: {}. Table config stat version: {}", tableNameWithType, overallRate, perBrokerRate,
-          onlineCount, stat.getVersion());
+          onlineCount, tableStat.getVersion());
     } else {
       RateLimiter rateLimiter = queryQuotaEntity.getRateLimiter();
       double previousRate = -1;
@@ -297,11 +310,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       }
       queryQuotaEntity.setNumOnlineBrokers(onlineCount);
       queryQuotaEntity.setOverallRate(overallRate);
-      queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
+      queryQuotaEntity.setTableConfigStatVersion(tableStat.getVersion());
       LOGGER.info(
           "Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
               + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
-          tableNameWithType, overallRate, previousRate, perBrokerRate, onlineCount, stat.getVersion());
+          tableNameWithType, overallRate, previousRate, perBrokerRate, onlineCount, tableStat.getVersion());
     }
     addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
     addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
@@ -536,19 +549,19 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
    * quota entity.
    */
-  private void buildEmptyOrResetRateLimiterInQueryQuotaEntity(String tableNameWithType) {
-    QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(tableNameWithType);
+  private void buildEmptyOrResetRateLimiterInQueryQuotaEntity(String physicalOrLogicalTableName) {
+    QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(physicalOrLogicalTableName);
     if (queryQuotaEntity == null) {
       // Create an QueryQuotaEntity object without setting a rate limiter.
       queryQuotaEntity = new QueryQuotaEntity(null, new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND),
           new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), 0, 0, 0);
-      _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
+      _rateLimiterMap.put(physicalOrLogicalTableName, queryQuotaEntity);
     } else {
       // Set rate limiter to null for an existing QueryQuotaEntity object.
       queryQuotaEntity.setRateLimiter(null);
     }
-    addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
-    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
+    addMaxBurstQPSCallbackTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
+    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
   }
 
   /**
@@ -647,6 +660,15 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (isQueryRateLimitDisabled()) {
       return true;
     }
+
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
+      return acquireForLogicalTable(tableName);
+    } else {
+      return acquireForPhysicalTable(tableName);
+    }
+  }
+
+  private boolean acquireForPhysicalTable(String tableName) {
     String offlineTableName = null;
     String realtimeTableName = null;
     QueryQuotaEntity offlineTableQueryQuotaEntity = null;
@@ -676,8 +698,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       LOGGER.debug("Trying to acquire token for table: {}", realtimeTableName);
       realtimeQuotaOk = tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaEntity);
     }
-
     return offlineQuotaOk && realtimeQuotaOk;
+  }
+
+  private boolean acquireForLogicalTable(String tableName) {
+    QueryQuotaEntity logicalTableQueryQuotaEntity = _rateLimiterMap.get(tableName);
+    if (logicalTableQueryQuotaEntity != null) {
+      LOGGER.debug("Trying to acquire token for logical table: {}", tableName);
+      return tryAcquireToken(tableName, logicalTableQueryQuotaEntity);
+    }
+    return true;
   }
 
   /**
@@ -749,7 +779,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     int numRebuilt = 0;
     for (Iterator<Map.Entry<String, QueryQuotaEntity>> it = _rateLimiterMap.entrySet().iterator(); it.hasNext(); ) {
       Map.Entry<String, QueryQuotaEntity> entry = it.next();
-      String tableNameWithType = entry.getKey();
+      String physicalOrLogicalTableName = entry.getKey();
       QueryQuotaEntity queryQuotaEntity = entry.getValue();
       if (queryQuotaEntity.getRateLimiter() == null) {
         // No rate limiter set, skip this table.
@@ -757,9 +787,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       }
 
       // Get number of online brokers.
-      Map<String, String> stateMap = currentBrokerResourceEV.getStateMap(tableNameWithType);
+      Map<String, String> stateMap = currentBrokerResourceEV.getStateMap(physicalOrLogicalTableName);
       if (stateMap == null) {
-        LOGGER.info("No broker resource for Table {}. Removing its rate limit.", tableNameWithType);
+        LOGGER.info("No broker resource for Table {}. Removing its rate limit.", physicalOrLogicalTableName);
         it.remove();
         continue;
       }
@@ -773,10 +803,14 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       int onlineBrokerCount = otherOnlineBrokerCount + 1;
 
       // Get stat from property store
-      String tableConfigPath = constructTableConfigPath(tableNameWithType);
-      Stat stat = _propertyStore.getStat(tableConfigPath, AccessOption.PERSISTENT);
+      String physicalOrLogicalTableConfigPath =
+          ZKMetadataProvider.isTableConfigExists(_propertyStore, physicalOrLogicalTableName)
+              ? constructTableConfigPath(physicalOrLogicalTableName)
+              : constructLogicalTableConfigPath(physicalOrLogicalTableName);
+      Stat stat = _propertyStore.getStat(physicalOrLogicalTableConfigPath, AccessOption.PERSISTENT);
       if (stat == null) {
-        LOGGER.info("Table {} has been deleted from property store. Removing its rate limit.", tableNameWithType);
+        LOGGER.info("Table {} has been deleted from property store. Removing its rate limit.",
+            physicalOrLogicalTableName);
         it.remove();
         continue;
       }
@@ -790,10 +824,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       double overallRate;
       // Get latest quota config only if stat don't match.
       if (stat.getVersion() != queryQuotaEntity.getTableConfigStatVersion()) {
-        QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(tableNameWithType);
+        QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(physicalOrLogicalTableName);
         if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
           LOGGER.info("No query quota config or the config is invalid for Table {}. Removing its rate limit.",
-              tableNameWithType);
+              physicalOrLogicalTableName);
           it.remove();
           continue;
         }
@@ -810,7 +844,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         queryQuotaEntity.setTableConfigStatVersion(stat.getVersion());
         LOGGER.info("Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
                 + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}.",
-            tableNameWithType, overallRate, previousRate, latestRate, onlineBrokerCount, stat.getVersion());
+            physicalOrLogicalTableName, overallRate, previousRate, latestRate, onlineBrokerCount, stat.getVersion());
         numRebuilt++;
       }
     }
@@ -930,5 +964,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   private String constructTableConfigPath(String tableNameWithType) {
     return "/CONFIGS/TABLE/" + tableNameWithType;
+  }
+
+  private String constructLogicalTableConfigPath(String tableName) {
+    return "/LOGICAL/TABLE/" + tableName;
   }
 }
