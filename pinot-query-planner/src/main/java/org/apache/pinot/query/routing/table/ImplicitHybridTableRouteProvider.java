@@ -46,10 +46,18 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitHybridTableRouteProvider.class);
 
   @Override
-  public ImplicitHybridTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache,
+  public TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache,
       RoutingManager routingManager) {
     ImplicitHybridTableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo();
 
+    fillTableConfigMetadata(tableRouteInfo, tableName, tableCache);
+    fillRouteMetadata(tableRouteInfo, routingManager);
+
+    return tableRouteInfo;
+  }
+
+  public void fillTableConfigMetadata(ImplicitHybridTableRouteInfo tableRouteInfo,
+      String tableName, TableCache tableCache) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {
@@ -71,19 +79,24 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
     if (realtimeTableName != null) {
       tableRouteInfo.setRealtimeTableConfig(tableCache.getTableConfig(realtimeTableName));
     }
+  }
 
+  public void fillRouteMetadata(ImplicitHybridTableRouteInfo tableRouteInfo, RoutingManager routingManager) {
     if (tableRouteInfo.hasOffline()) {
+      String offlineTableName = tableRouteInfo.getOfflineTableName();
       tableRouteInfo.setOfflineRouteExists(routingManager.routingExists(offlineTableName));
       tableRouteInfo.setOfflineTableDisabled(routingManager.isTableDisabled(offlineTableName));
     }
 
     if (tableRouteInfo.hasRealtime()) {
+      String realtimeTableName = tableRouteInfo.getRealtimeTableName();
       tableRouteInfo.setRealtimeRouteExists(routingManager.routingExists(realtimeTableName));
       tableRouteInfo.setRealtimeTableDisabled(routingManager.isTableDisabled(realtimeTableName));
     }
 
     // Get TimeBoundaryInfo. If there is no time boundary, then do not consider the offline table.
     if (tableRouteInfo.isHybrid()) {
+      String offlineTableName = tableRouteInfo.getOfflineTableName();
       // Time boundary info might be null when there is no segment in the offline table, query real-time side only
       TimeBoundaryInfo timeBoundaryInfo = routingManager.getTimeBoundaryInfo(offlineTableName);
       if (timeBoundaryInfo == null) {
@@ -95,35 +108,6 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
         tableRouteInfo.setTimeBoundaryInfo(timeBoundaryInfo);
       }
     }
-
-    return tableRouteInfo;
-  }
-
-  public ImplicitHybridTableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache) {
-    ImplicitHybridTableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo();
-
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-
-    if (tableType == TableType.OFFLINE) {
-      tableRouteInfo.setOfflineTableName(tableName);
-    } else if (tableType == TableType.REALTIME) {
-      tableRouteInfo.setRealtimeTableName(tableName);
-    } else {
-      tableRouteInfo.setOfflineTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-      tableRouteInfo.setRealtimeTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
-    }
-
-    String offlineTableName = tableRouteInfo.getOfflineTableName();
-    String realtimeTableName = tableRouteInfo.getRealtimeTableName();
-
-    if (offlineTableName != null) {
-      tableRouteInfo.setOfflineTableConfig(tableCache.getTableConfig(offlineTableName));
-    }
-
-    if (realtimeTableName != null) {
-      tableRouteInfo.setRealtimeTableConfig(tableCache.getTableConfig(realtimeTableName));
-    }
-    return tableRouteInfo;
   }
 
   @Override

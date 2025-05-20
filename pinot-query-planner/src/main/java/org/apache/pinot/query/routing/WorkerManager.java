@@ -556,7 +556,7 @@ public class WorkerManager {
     LogicalTableRouteInfo logicalTableRouteInfo = metadata.getLogicalTableRouteInfo();
     Preconditions.checkNotNull(logicalTableRouteInfo);
     LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
-    tableRouteProvider.calculateTimeBoundaryInfo(logicalTableRouteInfo, _routingManager);
+    tableRouteProvider.fillRouteMetadata(logicalTableRouteInfo, _routingManager);
     if (logicalTableRouteInfo.getTimeBoundaryInfo() != null) {
       metadata.setTimeBoundaryInfo(logicalTableRouteInfo.getTimeBoundaryInfo());
     }
