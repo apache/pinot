@@ -73,14 +73,9 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
   }
 
   protected void upsertWithoutOrderBy(Key key, Record record) {
-    if (_noMoreNewRecords.get()) {
-      updateExistingRecord(key, record);
-    } else {
-      addOrUpdateRecord(key, record);
-      if (_lookupMap.size() > _resultSize) {
-        ((ConcurrentSkipListMap<Key, Record>) _lookupMap).pollLastEntry();
-        _noMoreNewRecords.set(_lookupMap.size() >= _resultSize);
-      }
+    addOrUpdateRecord(key, record);
+    if (_lookupMap.size() > _resultSize) {
+      ((ConcurrentSkipListMap<Key, Record>) _lookupMap).pollLastEntry(); // evict largest key
     }
   }
 }
