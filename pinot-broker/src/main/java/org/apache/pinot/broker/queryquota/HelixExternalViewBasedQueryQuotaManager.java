@@ -246,27 +246,27 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   /**
    * Create or update a rate limiter for a table.
-   * @param tableNameWithType table name with table type.
+   * @param physicalOrLogicalTableName physical or logical table name.
    * @param brokerResource broker resource which stores all the broker states of each table.
    * @param quotaConfig quota config of the table.
    * @param tableStat stat of the table config.
    */
-  private void createOrUpdateRateLimiter(String tableNameWithType, ExternalView brokerResource,
+  private void createOrUpdateRateLimiter(String physicalOrLogicalTableName, ExternalView brokerResource,
       QuotaConfig quotaConfig, Stat tableStat) {
     if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
-      LOGGER.info("No qps config specified for table: {}", tableNameWithType);
-      buildEmptyOrResetRateLimiterInQueryQuotaEntity(tableNameWithType);
+      LOGGER.info("No qps config specified for table: {}", physicalOrLogicalTableName);
+      buildEmptyOrResetRateLimiterInQueryQuotaEntity(physicalOrLogicalTableName);
       return;
     }
 
     if (brokerResource == null) {
-      LOGGER.warn("Failed to init qps quota for table {}. No broker resource connected!", tableNameWithType);
+      LOGGER.warn("Failed to init qps quota for table {}. No broker resource connected!", physicalOrLogicalTableName);
       // It could be possible that brokerResourceEV is null due to ZK connection issue.
       // In this case, the rate limiter should not be reset. Simply exit the method would be sufficient.
       return;
     }
 
-    Map<String, String> stateMap = brokerResource.getStateMap(tableNameWithType);
+    Map<String, String> stateMap = brokerResource.getStateMap(physicalOrLogicalTableName);
     int otherOnlineBrokerCount = 0;
 
     // If stateMap is null, that means this broker is the first broker for this table.
@@ -280,22 +280,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
 
     int onlineCount = otherOnlineBrokerCount + 1;
-    LOGGER.info("The number of online brokers for table {} is {}", tableNameWithType, onlineCount);
+    LOGGER.info("The number of online brokers for table {} is {}", physicalOrLogicalTableName, onlineCount);
 
     // Get the dynamic rate
     double overallRate = quotaConfig.getMaxQPS();
     double perBrokerRate = overallRate / onlineCount;
 
-    QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(tableNameWithType);
+    QueryQuotaEntity queryQuotaEntity = _rateLimiterMap.get(physicalOrLogicalTableName);
     if (queryQuotaEntity == null) {
       queryQuotaEntity =
           new QueryQuotaEntity(RateLimiter.create(perBrokerRate), new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND),
               new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), onlineCount, overallRate, tableStat.getVersion());
-      _rateLimiterMap.put(tableNameWithType, queryQuotaEntity);
+      _rateLimiterMap.put(physicalOrLogicalTableName, queryQuotaEntity);
       LOGGER.info(
           "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online "
-              + "broker instances: {}. Table config stat version: {}", tableNameWithType, overallRate, perBrokerRate,
-          onlineCount, tableStat.getVersion());
+              + "broker instances: {}. Table config stat version: {}", physicalOrLogicalTableName, overallRate,
+          perBrokerRate, onlineCount, tableStat.getVersion());
     } else {
       RateLimiter rateLimiter = queryQuotaEntity.getRateLimiter();
       double previousRate = -1;
@@ -314,10 +314,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       LOGGER.info(
           "Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New "
               + "per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
-          tableNameWithType, overallRate, previousRate, perBrokerRate, onlineCount, tableStat.getVersion());
+          physicalOrLogicalTableName, overallRate, previousRate, perBrokerRate, onlineCount, tableStat.getVersion());
     }
-    addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
-    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
+    addMaxBurstQPSCallbackTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
+    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(physicalOrLogicalTableName, queryQuotaEntity);
     if (isQueryRateLimitDisabled()) {
       LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
     }
@@ -660,15 +660,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (isQueryRateLimitDisabled()) {
       return true;
     }
-
-    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, tableName)) {
-      return acquireForLogicalTable(tableName);
-    } else {
-      return acquireForPhysicalTable(tableName);
-    }
-  }
-
-  private boolean acquireForPhysicalTable(String tableName) {
     String offlineTableName = null;
     String realtimeTableName = null;
     QueryQuotaEntity offlineTableQueryQuotaEntity = null;
@@ -698,14 +689,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       LOGGER.debug("Trying to acquire token for table: {}", realtimeTableName);
       realtimeQuotaOk = tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaEntity);
     }
+
     return offlineQuotaOk && realtimeQuotaOk;
   }
 
-  private boolean acquireForLogicalTable(String tableName) {
-    QueryQuotaEntity logicalTableQueryQuotaEntity = _rateLimiterMap.get(tableName);
+  @Override
+  public boolean acquireLogicalTable(String logicalTableName) {
+    QueryQuotaEntity logicalTableQueryQuotaEntity = _rateLimiterMap.get(logicalTableName);
     if (logicalTableQueryQuotaEntity != null) {
-      LOGGER.debug("Trying to acquire token for logical table: {}", tableName);
-      return tryAcquireToken(tableName, logicalTableQueryQuotaEntity);
+      LOGGER.debug("Trying to acquire token for logical table: {}", logicalTableName);
+      return tryAcquireToken(logicalTableName, logicalTableQueryQuotaEntity);
     }
     return true;
   }
