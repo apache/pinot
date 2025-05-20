@@ -73,7 +73,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
+  private final TreeMap<String, ColumnMetadataImpl> _columnMetadataMap;
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
@@ -231,7 +231,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build column metadata map and schema.
     for (String column : physicalColumns) {
-      ColumnMetadata columnMetadata =
+      ColumnMetadataImpl columnMetadata =
           ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
@@ -413,7 +413,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return _columnMetadataMap;
+    return (TreeMap<String, ColumnMetadata>) (TreeMap<String, ?>) _columnMetadataMap;
   }
 
   @Override
@@ -465,7 +465,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     if (_columnMetadataMap != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
+      for (Map.Entry<String, ColumnMetadataImpl> entry : _columnMetadataMap.entrySet()) {
         if (columnFilter == null || columnFilter.contains(entry.getKey())) {
           columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
         }
