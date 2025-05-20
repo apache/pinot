@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 
+import java.util.Comparator;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +36,7 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
       QueryContext queryContext, int resultSize,
       int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-        new ConcurrentSkipListMap<>(), executorService);
+        new ConcurrentSkipListMap<>(Comparator.comparing(Key::toString)), executorService);
   }
 
   /**
