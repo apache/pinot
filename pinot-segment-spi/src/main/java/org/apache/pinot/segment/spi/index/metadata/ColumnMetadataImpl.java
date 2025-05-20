@@ -378,6 +378,22 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     return fieldSpec;
   }
 
+  // This method is only meant to retain compatibility of deserialization for
+  // /tables/{tableName}/segments/{segmentName}/metadata endpoint .
+  @SuppressWarnings("unused")
+  public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
+    IndexService service = IndexService.getInstance();
+    Map<IndexType<?, ?, ?>, Long> result = new HashMap<>();
+
+    for (int i = 0, n = getNumIndexes(); i < n; i++) {
+      short type = getIndexType(i);
+      long size = getIndexSize(i);
+      result.put(service.get(type), size);
+    }
+
+    return result;
+  }
+
   public static Builder builder() {
     return new Builder();
   }
