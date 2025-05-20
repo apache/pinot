@@ -73,7 +73,8 @@ public class HashJoinOperator extends BaseJoinOperator {
     if (joinKeys.size() > 1) {
       return new ObjectLookupTable();
     }
-    switch (schema.getColumnDataType(joinKeys.get(0)).getStoredType()) {
+    DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(joinKeys.get(0));
+    switch (columnDataType.getStoredType()) {
       case INT:
         return new IntLookupTable();
       case LONG:

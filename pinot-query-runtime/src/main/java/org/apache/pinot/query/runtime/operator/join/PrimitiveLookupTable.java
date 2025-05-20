@@ -1,0 +1,86 @@
+package org.apache.pinot.query.runtime.operator.join;
+
+import com.google.common.collect.Sets;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+
+
+public abstract class PrimitiveLookupTable extends LookupTable {
+
+  private Object _valueForNullKey;
+
+  @Override
+  public void addRow(@Nullable Object key, Object[] row) {
+    if (key == null) {
+      _valueForNullKey = computeNewValue(row, _valueForNullKey);
+      return;
+    }
+    addRowNotNullKey(key, row);
+  }
+
+  @Override
+  public void finish() {
+    if (!_keysUnique) {
+      if (_valueForNullKey != null) {
+        _valueForNullKey = convertArrayToList(_valueForNullKey);
+      }
+      finishNotNullKey();
+    }
+  }
+
+  protected abstract void finishNotNullKey();
+
+  protected abstract void addRowNotNullKey(Object key, Object[] row);
+
+  @Override
+  public boolean containsKey(@Nullable Object key) {
+    if (key == null) {
+      return _valueForNullKey != null;
+    }
+    return containsNotNullKey(key);
+  }
+
+  protected abstract boolean containsNotNullKey(Object key);
+
+  @Nullable
+  @Override
+  public Object lookup(@Nullable Object key) {
+    if (key == null) {
+      return _valueForNullKey;
+    }
+    return lookupNotNullKey(key);
+  }
+
+  protected abstract Object lookupNotNullKey(Object key);
+
+  @SuppressWarnings("rawtypes")
+  @Override
+  public Set<Map.Entry> entrySet() {
+    Set notNullSet = notNullKeyEntrySet();
+    if (_valueForNullKey != null) {
+      HashSet<Map.Entry<Object, Object>> nullEntry = Sets.newHashSet(new Map.Entry<Object, Object>() {
+        @Override
+        public Object getKey() {
+          return null;
+        }
+
+        @Override
+        public Object getValue() {
+          return _valueForNullKey;
+        }
+
+        @Override
+        public Object setValue(Object value) {
+          throw new UnsupportedOperationException();
+        }
+      });
+      return Sets.union(notNullSet, nullEntry);
+    } else {
+      return notNullSet;
+    }
+  }
+
+  protected abstract Set<Map.Entry> notNullKeyEntrySet();
+}
