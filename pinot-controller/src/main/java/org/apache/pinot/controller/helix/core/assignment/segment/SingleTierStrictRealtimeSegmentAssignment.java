@@ -46,10 +46,11 @@ public class SingleTierStrictRealtimeSegmentAssignment extends BaseStrictRealtim
     Preconditions.checkState(instancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",
         _tableNameWithType);
     Preconditions.checkArgument(config.isIncludeConsuming(),
-        "Consuming segment must be included when rebalancing table: %s using StrictRealtimeSegmentAssignment",
-        _tableNameWithType);
+        "Consuming segment must be included when rebalancing table: %s using single-tier "
+            + "StrictRealtimeSegmentAssignment", _tableNameWithType);
     Preconditions.checkState(sortedTiers == null,
-        "Tiers must not be specified for table: %s using StrictRealtimeSegmentAssignment", _tableNameWithType);
+        "Tiers must not be specified for table: %s using single-tier StrictRealtimeSegmentAssignment",
+        _tableNameWithType);
     _logger.info("Rebalancing table: {} with instance partitions: {}", _tableNameWithType, instancePartitions);
 
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
@@ -69,6 +70,8 @@ public class SingleTierStrictRealtimeSegmentAssignment extends BaseStrictRealtim
         newAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, state));
       }
     }
+    _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
+        _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 }

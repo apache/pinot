@@ -180,17 +180,15 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         "Failed to find CONSUMING instance partitions for table: %s", _tableNameWithType);
     boolean includeConsuming = config.isIncludeConsuming();
     boolean bootstrap = config.isBootstrap();
+    _logger.info("Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, "
+            + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
+        consumingInstancePartitions, includeConsuming, bootstrap);
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
         rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
             InstancePartitionsType.COMPLETED);
-
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
-
-    _logger.info("Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, "
-            + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
-        consumingInstancePartitions, includeConsuming, bootstrap);
 
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
         new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment);
