@@ -107,6 +107,8 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
+      Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
+          "Both workerIdToSegmentsMap and workerIdToTableNameSegmentsMap cannot be set at the same time");
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
       for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {

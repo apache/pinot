@@ -47,7 +47,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.LogicalTableManager;
+import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -520,9 +520,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  // TODO: LogicalTableContext has to be cached. https://github.com/apache/pinot/issues/15859
   @Nullable
   @Override
-  public LogicalTableManager getLogicalTableManager(String logicalTableName) {
+  public LogicalTableContext getLogicalTableContext(String logicalTableName) {
     Schema schema = ZKMetadataProvider.getSchema(getPropertyStore(), logicalTableName);
     if (schema == null) {
       LOGGER.warn("Failed to find schema for logical table: {}, skipping", logicalTableName);
@@ -554,6 +555,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         return null;
       }
     }
-    return new LogicalTableManager(logicalTableConfig, schema, offlineTableConfig, realtimeTableConfig);
+    return new LogicalTableContext(logicalTableConfig, schema, offlineTableConfig, realtimeTableConfig);
   }
 }
