@@ -421,11 +421,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(new HashSet<>(getPhysicalTableNames()), logicalTableConfig.getPhysicalTableConfigMap().keySet());
   }
 
-  @Override
-  protected Map<String, String> getExtraQueryProperties() {
-    return Map.of(); //"timeoutMs", "300000");
-  }
-
   @Test(dataProvider = "useBothQueryEngines")
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
