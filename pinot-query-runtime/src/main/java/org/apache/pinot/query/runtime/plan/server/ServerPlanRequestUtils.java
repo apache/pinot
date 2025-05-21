@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -65,6 +66,7 @@ import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQuer
 import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.apache.pinot.sql.parsers.rewriter.RowFiltersRewriter;
 
 
 public class ServerPlanRequestUtils {
@@ -74,10 +76,17 @@ public class ServerPlanRequestUtils {
   private static final int DEFAULT_LEAF_NODE_LIMIT = Integer.MAX_VALUE;
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(PredicateComparisonRewriter.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName());
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RowFiltersRewriter.class.getName());
   private static final List<QueryRewriter> QUERY_REWRITERS =
       new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
+
+  public static OpChain compileLeafStage(OpChainExecutionContext executionContext, StagePlan stagePlan,
+      QueryExecutor leafQueryExecutor, ExecutorService executorService, Map<String, String> rowFilters) {
+    return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
+        (planNode, multiStageOperator) -> {
+        }, false, rowFilters);
+  }
 
   public static OpChain compileLeafStage(
       OpChainExecutionContext executionContext,
@@ -86,7 +95,7 @@ public class ServerPlanRequestUtils {
       ExecutorService executorService) {
     return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
         (planNode, multiStageOperator) -> {
-        }, false);
+        }, false, Map.of());
   }
 
   /**
@@ -102,7 +111,7 @@ public class ServerPlanRequestUtils {
       QueryExecutor leafQueryExecutor,
       ExecutorService executorService,
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
-      boolean explain) {
+      boolean explain, Map<String, String> rowFilters) {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
     ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
@@ -112,6 +121,11 @@ public class ServerPlanRequestUtils {
     // 2. Convert PinotQuery into InstanceRequest list (one for each physical table)
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     pinotQuery.setExplain(explain);
+
+    if (MapUtils.isNotEmpty(rowFilters)) {
+      pinotQuery.setQueryOptions(rowFilters);
+    }
+
     List<InstanceRequest> instanceRequests =
         constructServerQueryRequests(executionContext, pinotQuery, leafQueryExecutor.getInstanceDataManager());
     int numRequests = instanceRequests.size();
