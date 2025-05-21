@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
+import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -41,10 +44,15 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 
 public class UpsertCompactMergeTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private UpsertCompactMergeTaskGenerator _taskGenerator;
+  private TableConfig _tableConfig;
   private SegmentZKMetadata _completedSegment;
   private SegmentZKMetadata _completedSegment2;
   private Map<String, SegmentZKMetadata> _completedSegmentsMap;
@@ -52,6 +60,14 @@ public class UpsertCompactMergeTaskGeneratorTest {
   @BeforeClass
   public void setUp() {
     _taskGenerator = new UpsertCompactMergeTaskGenerator();
+    Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
+    Map<String, String> compactionConfigs = new HashMap<>();
+    tableTaskConfigs.put(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, compactionConfigs);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableSnapshot(true);
+    _tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setUpsertConfig(upsertConfig).setTaskConfig(new TableTaskConfig(tableTaskConfigs)).build();
 
     _completedSegment = new SegmentZKMetadata("testTable__0");
     _completedSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
@@ -81,8 +97,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     // check with OFFLINE table
     Map<String, String> upsertCompactMergeTaskConfig = Map.of("bufferTimePeriod", "5d");
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setTaskConfig(
-            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
+
+        .setTaskConfig(new TableTaskConfig(
+            Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(offlineTableConfig, new Schema(), upsertCompactMergeTaskConfig));
@@ -184,8 +201,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     segmentWithinBufferPeriod.setTotalDocs(100L);
     segmentWithinBufferPeriod.setCrc(1000);
     segmentWithinBufferPeriod.setDownloadUrl("fs://testTable__3");
-    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs,
-        List.of(segmentWithinBufferPeriod), System.currentTimeMillis());
+    candidateSegments =
+        UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, List.of(segmentWithinBufferPeriod),
+            System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
 
     // no completed segment
@@ -195,8 +213,8 @@ public class UpsertCompactMergeTaskGeneratorTest {
     incompleteSegment.setTimeUnit(TimeUnit.MILLISECONDS);
     incompleteSegment.setTotalDocs(100L);
     incompleteSegment.setCrc(1000);
-    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs,
-        List.of(incompleteSegment), System.currentTimeMillis());
+    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, List.of(incompleteSegment),
+        System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
   }
 
@@ -214,8 +232,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
         new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
-    );
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000));
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList),
         "fs://testTable__0,fs://testTable__1");
   }
@@ -234,8 +251,45 @@ public class UpsertCompactMergeTaskGeneratorTest {
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
         new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
-    );
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000));
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000,2000");
+  }
+
+  @Test
+  public void testGetMaxCreationTimeMillis()
+      throws IOException {
+    // Mock serverToSegments and serverToEndpoints
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    serverToSegments.put("server1", List.of("testTable__0", "testTable__1"));
+    serverToSegments.put("server2", List.of("testTable__1"));
+
+    BiMap<String, String> serverToEndpoints = com.google.common.collect.HashBiMap.create();
+    serverToEndpoints.put("server1", "server_1/endpoint");
+    serverToEndpoints.put("server2", "server_2/endpoint");
+
+    // Mock ServerSegmentMetadataReader
+    ServerSegmentMetadataReader mockReader = mock(ServerSegmentMetadataReader.class);
+    Map<String, List<Long>> creationTimeMap = new HashMap<>();
+    creationTimeMap.put("testTable__0", List.of(1000L, 1001L));
+    creationTimeMap.put("testTable__1", List.of(900L));
+
+    when(mockReader.getSegmentCreationMetadataFromServers("testTable_REALTIME", serverToSegments, serverToEndpoints,
+        60_000)).thenReturn(creationTimeMap);
+
+    UpsertCompactMergeTaskGenerator generator = new UpsertCompactMergeTaskGenerator();
+    List<String> segmentNames = List.of("testTable__0", "testTable__1");
+    Long maxCreationTime =
+        generator.getMaxCreationTimeMillis("testTable_REALTIME", segmentNames, serverToSegments, serverToEndpoints,
+            mockReader);
+    Assert.assertEquals(maxCreationTime.longValue(), 1001L);
+
+
+    // Test with empty creationTimeMap (should throw exception)
+
+    when(mockReader.getSegmentCreationMetadataFromServers("testTable_REALTIME", serverToSegments, serverToEndpoints,
+        60_000)).thenReturn(null);
+    Assert.assertThrows(RuntimeException.class,
+        () -> generator.getMaxCreationTimeMillis("testTable_REALTIME", segmentNames, serverToSegments,
+            serverToEndpoints, mockReader));
   }
 }
