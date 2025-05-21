@@ -31,7 +31,6 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -47,6 +46,7 @@ import static org.testng.Assert.assertNotEquals;
 public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   // Default settings
+  private static final int V1_DEFAULT_SELECTION_COUNT = 10;
   protected static final String DEFAULT_TABLE_NAME = "MapFieldTypeTest";
   private static final int NUM_DOCS = 100;
   private static final String STRING_MAP_FIELD_NAME = "stringMap";
@@ -89,13 +89,8 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
   public TableConfig createOfflineTableConfig() {
     // Create table config with field configs
     TableConfig config =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(new IngestionConfig())
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setFieldConfigList(createFieldConfigs())
             .build();
-    // Get indexing config
-    List<FieldConfig> fieldConfigList = createFieldConfigs();
-
-    config.setFieldConfigList(fieldConfigList);
-    LOGGER.info("Table config: {}", config);
     return config;
   }
 
@@ -448,6 +443,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
   @Override
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? 100 : 10;
+    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? NUM_DOCS : V1_DEFAULT_SELECTION_COUNT;
   }
 }

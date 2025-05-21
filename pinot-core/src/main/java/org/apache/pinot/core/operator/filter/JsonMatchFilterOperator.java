@@ -66,12 +66,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    ImmutableRoaringBitmap bitmap;
-    if (_predicate != null) {
-      bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
-    } else {
-      bitmap = _jsonIndex.getMatchingDocIds(_filterContext);
-    }
+    ImmutableRoaringBitmap bitmap = getMatchingDocIdBitmap();
     record(bitmap);
     return new BitmapDocIdSet(bitmap, _numDocs);
   }
@@ -83,13 +78,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    ImmutableRoaringBitmap bitmap;
-    if (_predicate != null) {
-      bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
-    } else {
-      bitmap = _jsonIndex.getMatchingDocIds(_filterContext);
-    }
-    return bitmap.getCardinality();
+    return getMatchingDocIdBitmap().getCardinality();
   }
 
   @Override
@@ -99,12 +88,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap;
-    if (_predicate != null) {
-      bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
-    } else {
-      bitmap = _jsonIndex.getMatchingDocIds(_filterContext);
-    }
+    ImmutableRoaringBitmap bitmap = getMatchingDocIdBitmap();
     return new BitmapCollection(_numDocs, false, bitmap);
   }
 
@@ -140,6 +124,14 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, _predicate.getType().name());
       recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
+    }
+  }
+
+  private ImmutableRoaringBitmap getMatchingDocIdBitmap() {
+    if (_predicate != null) {
+      return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
+    } else {
+      return _jsonIndex.getMatchingDocIds(_filterContext);
     }
   }
 }
