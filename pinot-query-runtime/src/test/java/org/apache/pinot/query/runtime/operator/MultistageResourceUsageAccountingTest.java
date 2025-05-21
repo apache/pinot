@@ -27,6 +27,7 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -56,15 +57,13 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
-import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.MockitoAnnotations.*;
+import static org.testng.Assert.*;
 
 
-public class MultiStageAccountingTest implements ITest {
+public class MultistageResourceUsageAccountingTest implements ITest {
   private AutoCloseable _mocks;
   @Mock
   private VirtualServerAddress _serverAddress;
@@ -73,7 +72,7 @@ public class MultiStageAccountingTest implements ITest {
   protected MultiStageOperator _operator;
 
   @Factory(dataProvider = "operatorProvider")
-  public MultiStageAccountingTest(String testName, MultiStageOperator operator) {
+  public MultistageResourceUsageAccountingTest(String testName, MultiStageOperator operator) {
     _testName = testName;
     _operator = operator;
   }
@@ -86,13 +85,15 @@ public class MultiStageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
-        InstanceType.SERVER);
+    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    WorkloadBudgetManager.init(pinotCfg);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);

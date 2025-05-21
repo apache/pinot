@@ -70,6 +70,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -101,12 +102,15 @@ public class ResourceManagerAccountingTest {
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
     Future[] futures = new Future[2000];
     AtomicInteger atomicInteger = new AtomicInteger();
+    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
+        InstanceType.SERVER);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -160,12 +164,15 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
+    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
+        InstanceType.SERVER);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -197,6 +204,92 @@ public class ResourceManagerAccountingTest {
     }
     Thread.sleep(1000000);
   }
+
+
+  /**
+   * Test thread memory usage tracking for a workload in a multithread environment, add @Test to run.
+   * Default to unused as this is a proof of concept and will take a long time to run.
+   * Each runner thread allocates about 800KB of memory (80KB per worker task). So setting limit of 27MB for 30 runner
+   * threads.
+   */
+  @SuppressWarnings("unused")
+  public void testWorkloadLevelThreadMemoryAccounting()
+      throws Exception {
+    // Logger initialization.
+    LogManager.getLogger(ResourceManagerAccountingTest.class).setLevel(Level.INFO);
+    LogManager.getLogger(ResourceUsageAccountantFactory.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(QueryAggregator.class).setLevel(Level.INFO);
+    LogManager.getLogger(WorkloadAggregator.class).setLevel(Level.INFO);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.DEBUG);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+
+    HashMap<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, 100_000_000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS, 1_000);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS, 1);
+
+    String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
+    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    WorkloadBudgetManager.init(pinotCfg);
+    WorkloadBudgetManager.getInstance().addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
+        InstanceType.SERVER);
+    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
+
+    for (int k = 0; k < 30; k++) {
+      int finalK = k;
+      rm.getQueryRunners().submit(() -> {
+        try {
+          String queryId = "q" + finalK;
+          Tracing.ThreadAccountantOps.setupRunner(queryId, workloadName);
+          CountDownLatch countDownLatch = new CountDownLatch(10);
+          Tracing.ThreadAccountantOps.sample();
+          ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
+          LOGGER.info("RunnerThread: Queueing tasks");
+
+          for (int j = 0; j < 10; j++) {
+            int finalJ = j;
+            rm.getQueryWorkers().submit(() -> {
+              try {
+                Tracing.ThreadAccountantOps.setupWorker(finalJ, threadExecutionContext);
+                long[][] a = new long[1000][];
+                for (int i = 0; i < 10; i++) {
+                  a[i] = new long[1000];
+                  Tracing.ThreadAccountantOps.sample();
+                  Thread.sleep(100);
+                }
+
+                Tracing.ThreadAccountantOps.clear();
+                Assert.assertEquals(a[0][0], 0);
+                countDownLatch.countDown();
+              } catch (Exception e) {
+                LOGGER.error("====Worker Thread:{} task={} interrupted. Working", Thread.currentThread(), finalJ, e);
+                Tracing.ThreadAccountantOps.clear();
+              }
+            });
+          }
+          LOGGER.info("RunnerThread. Queued all tasks: {}", queryId);
+          Thread.sleep(10000);
+          countDownLatch.await();
+          Tracing.ThreadAccountantOps.clear();
+        } catch (InterruptedException e) {
+          LOGGER.error("====Runner Thread:{} interrupted. Working", Thread.currentThread(), e);
+          Tracing.ThreadAccountantOps.clear();
+        }
+      });
+    }
+    Thread.sleep(1000_000);
+  }
+
 
   /**
    * Test the mechanism of worker thread checking for runnerThread's interruption flag
@@ -250,8 +343,8 @@ public class ResourceManagerAccountingTest {
   /**
    * Test instrumentation during {@link DataTable} creation
    */
-  @Test
-  public void testGetDataTableOOMSelect()
+  @Test(dataProvider = "accountantFactories")
+  public void testGetDataTableOOMSelect(String accountantFactoryClass)
       throws Exception {
 
     // generate random rows
@@ -277,12 +370,12 @@ public class ResourceManagerAccountingTest {
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME, accountantFactoryClass);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
+    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
@@ -293,7 +386,7 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI);
+        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI, null);
         try {
           SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false).toBytes();
         } catch (EarlyTerminationException e) {
@@ -314,8 +407,8 @@ public class ResourceManagerAccountingTest {
   /**
    * Test instrumentation during {@link DataTable} creation
    */
-  @Test
-  public void testGetDataTableOOMGroupBy()
+  @Test (dataProvider = "accountantFactories")
+  public void testGetDataTableOOMGroupBy(String accountantFactoryClass)
       throws Exception {
 
     // generate random indexedTable
@@ -346,12 +439,14 @@ public class ResourceManagerAccountingTest {
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME, accountantFactoryClass);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
+    WorkloadBudgetManager.init(config);
+
+
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
@@ -362,7 +457,7 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI);
+        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI, null);
         try {
           groupByResultsBlock.getDataTable().toBytes();
         } catch (EarlyTerminationException e) {
@@ -390,8 +485,8 @@ public class ResourceManagerAccountingTest {
    *
    * It is roughly equivalent to running json_extract_index(col, '$.key', 'STRING').
    */
-  @Test
-  public void testJsonIndexExtractMapOOM()
+  @Test(dataProvider = "accountantFactories")
+  public void testJsonIndexExtractMapOOM(String accountantFactoryClass)
       throws Exception {
     HashMap<String, Object> configs = new HashMap<>();
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));
@@ -400,14 +495,14 @@ public class ResourceManagerAccountingTest {
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
     configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME, accountantFactoryClass);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
 
     PinotConfiguration config = getConfig(2, 2, configs);
+    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
@@ -441,7 +536,7 @@ public class ResourceManagerAccountingTest {
 
       // test mutable json index .getMatchingFlattenedDocsMap()
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1");
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1", null);
         try {
           mutableJsonIndex.getMatchingFlattenedDocsMap("key", null);
         } catch (EarlyTerminationException e) {
@@ -456,7 +551,7 @@ public class ResourceManagerAccountingTest {
       File indexFile = new File(indexDir, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
       AtomicBoolean immutableEarlyTerminationOccurred = new AtomicBoolean(false);
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2");
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2", null);
         try {
           try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
               ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, 1000000)) {
@@ -506,7 +601,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       futures[finalK] = rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         Future[] futuresThread = new Future[10];
@@ -579,5 +674,13 @@ public class ResourceManagerAccountingTest {
     properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
     properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
     return new PinotConfiguration(properties);
+  }
+
+  @DataProvider(name = "accountantFactories")
+  public Object[][] accountantFactories() {
+    return new Object[][] {
+        {"org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory"},
+        {"org.apache.pinot.core.accounting.ResourceUsageAccountantFactory"}
+    };
   }
 }
