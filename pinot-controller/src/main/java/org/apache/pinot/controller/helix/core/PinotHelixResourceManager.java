@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -179,6 +180,7 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -2150,6 +2152,14 @@ public class PinotHelixResourceManager {
       updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
     }
 
+    TimeBoundaryConfig oldTimeBoundaryConfig = oldLogicalTableConfig.getTimeBoundaryConfig();
+    TimeBoundaryConfig newTimeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
+    // compare the old and new time boundary config and send message if they are different
+    if ((oldTimeBoundaryConfig != null && !oldTimeBoundaryConfig.equals(newTimeBoundaryConfig))
+    || (oldTimeBoundaryConfig == null && newTimeBoundaryConfig != null)) {
+      sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
+    }
+
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
   }
 
@@ -3169,6 +3179,27 @@ public class PinotHelixResourceManager {
       LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
       LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
+  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
+    LogicalTableConfigRefreshMessage refreshMessage = new LogicalTableConfigRefreshMessage(logicalTableName);
+
+    // Send logical table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(logicalTableName);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, refreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} logical table config refresh messages to brokers for table: {}", numMessagesSent,
+          logicalTableName);
+    } else {
+      LOGGER.warn("No logical table config refresh message sent to brokers for table: {}", logicalTableName);
     }
   }
 

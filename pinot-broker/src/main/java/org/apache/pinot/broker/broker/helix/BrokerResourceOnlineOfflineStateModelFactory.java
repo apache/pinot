@@ -75,18 +75,22 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      String tableNameWithType = message.getPartitionName();
-      LOGGER.info("Processing transition from OFFLINE to ONLINE for table: {}", tableNameWithType);
+      String physicalOrLogicalTable = message.getPartitionName();
+      LOGGER.info("Processing transition from OFFLINE to ONLINE for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.buildRouting(tableNameWithType);
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
-            _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
-        _queryQuotaManager.createDatabaseRateLimiter(
-            DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableNameWithType));
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.buildRoutingForLogicalTable(physicalOrLogicalTable);
+        } else {
+          _routingManager.buildRouting(physicalOrLogicalTable);
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalOrLogicalTable);
+          _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
+              _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
+          _queryQuotaManager.createDatabaseRateLimiter(
+              DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalOrLogicalTable));
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",
-            tableNameWithType, e);
+            physicalOrLogicalTable, e);
         throw e;
       }
     }

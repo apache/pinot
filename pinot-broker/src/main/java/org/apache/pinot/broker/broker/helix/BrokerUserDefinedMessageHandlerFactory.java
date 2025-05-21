@@ -27,6 +27,7 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -62,6 +63,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
       case TableConfigRefreshMessage.REFRESH_TABLE_CONFIG_MSG_SUB_TYPE:
         return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
+      case LogicalTableConfigRefreshMessage.REFRESH_LOGICAL_TABLE_CONFIG_MSG_SUB_TYPE:
+        return new RefreshLogicalTableConfigMessageHandler(new LogicalTableConfigRefreshMessage(message), context);
       case RoutingTableRebuildMessage.REBUILD_ROUTING_TABLE_MSG_SUB_TYPE:
         return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
       case DatabaseConfigRefreshMessage.REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE:
@@ -136,6 +139,30 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
+    }
+  }
+
+  private class RefreshLogicalTableConfigMessageHandler extends MessageHandler {
+    final String _logicalTableName;
+
+    RefreshLogicalTableConfigMessageHandler(LogicalTableConfigRefreshMessage refreshMessage,
+        NotificationContext context) {
+      super(refreshMessage, context);
+      _logicalTableName = refreshMessage.getLogicalTableName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _routingManager.buildRoutingForLogicalTable(_logicalTableName);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing logical table config for table: {} (error code: {}, error type: {})",
+          _logicalTableName, code, type, e);
     }
   }
 
