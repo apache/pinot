@@ -246,6 +246,9 @@ public class QueryRunner {
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
+    MseWorkerThreadContext.setStageId(stagePlan.getStageMetadata().getStageId());
+    MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
+
     long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
