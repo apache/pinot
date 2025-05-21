@@ -925,14 +925,13 @@ public class CommonConstants {
      * The ExecutorServiceProvider to be used for submission threads, which are the ones
      * that receive requests in protobuf and transform them into MultiStageOperators.
      *
-     * It is recommended to use a fixed thread pool here, although defaults to cached for historical
-     * reasons.
+     * It is recommended to use a fixed thread pool, given submission code should not block.
      *
      * See QueryServer
      */
     public static final String MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + "multistage.submission";
-    public static final String DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE = "cached";
+    public static final String DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE = "fixed";
     @Deprecated
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
     @Deprecated
