@@ -82,22 +82,10 @@ public class DispatchablePlanMetadata implements Serializable {
   private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
 
   /**
-   * Map from workerId -> {tableType -> {tableName -> segments}} is required for logical tables.
-   * Raw definition of the map is:
-   * Map<String, Map<String, Map<String, List<String>>>>. Since this definition is hard to understand - specifically
-   * what do each of the string keys store, we define two classes:
-   * {@link TableTypeToSegmentsMap} and {@link TableTypeTableNameToSegmentsMap} to help read code more easily.
+   * Map from workerId -> {physicalTableName -> segments} is required for logical tables.
    */
-  public static class TableTypeToSegmentsMap {
-    public final Map<String, List<String>> _map = new HashMap<>();
-  }
-
-  public static class TableTypeTableNameToSegmentsMap {
-    public final Map<String, TableTypeToSegmentsMap> _map = new HashMap<>();
-  }
-
+  private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
   private LogicalTableRouteInfo _logicalTableRouteInfo;
-  private Map<Integer, TableTypeTableNameToSegmentsMap> _workerIdToTableSegmentsMap;
 
   public List<String> getScannedTables() {
     return _scannedTables;
@@ -208,12 +196,12 @@ public class DispatchablePlanMetadata implements Serializable {
   }
 
   @Nullable
-  public Map<Integer, TableTypeTableNameToSegmentsMap> getWorkerIdToTableSegmentsMap() {
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToTableSegmentsMap() {
     return _workerIdToTableSegmentsMap;
   }
 
   public void setWorkerIdToTableSegmentsMap(
-      Map<Integer, TableTypeTableNameToSegmentsMap> workerIdToTableSegmentsMap) {
+      Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
     _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
 }
