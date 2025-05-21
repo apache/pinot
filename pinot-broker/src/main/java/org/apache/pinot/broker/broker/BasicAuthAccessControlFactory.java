@@ -33,8 +33,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
