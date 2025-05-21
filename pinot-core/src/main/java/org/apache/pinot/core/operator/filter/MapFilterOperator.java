@@ -22,9 +22,9 @@ import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -66,47 +66,46 @@ public class MapFilterOperator extends BaseFilterOperator {
     _keyName = arguments.get(1).getLiteral().getStringValue();
 
     // Get JSON index and create operator
-    JsonMatchPredicate jsonMatchPredicate;
     DataSource dataSource = indexSegment.getDataSource(_columnName);
     JsonIndexReader jsonIndex = dataSource.getJsonIndex();
     if (jsonIndex != null && useJsonIndex(_predicate.getType())) {
-      jsonMatchPredicate = createJsonMatchPredicate();
-      _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, jsonMatchPredicate, numDocs);
+      FilterContext filterContext = createFilterContext();
+      _jsonMatchOperator = new JsonMatchFilterOperator(jsonIndex, filterContext, numDocs);
       _expressionFilterOperator = null;
     } else {
-      jsonMatchPredicate = null;
       _jsonMatchOperator = null;
       _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
     }
   }
 
   /**
-   * Creates a JsonMatchPredicate based on the original predicate type
+   * Creates a FilterContext based on the original predicate type
    */
-  private JsonMatchPredicate createJsonMatchPredicate() {
-    // Convert predicate to JSON format based on type
-    String jsonFilterString;
+  private FilterContext createFilterContext() {
+    // Create identifier expression for the JSON column
+    ExpressionContext keyLhs = ExpressionContext.forIdentifier(_keyName);
+
+    // Create predicate based on type
+    Predicate predicate;
     switch (_predicate.getType()) {
       case EQ:
-        jsonFilterString = createJsonEqPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
+        predicate = new EqPredicate(keyLhs, ((EqPredicate) _predicate).getValue());
         break;
       case NOT_EQ:
-        jsonFilterString = createJsonNotEqPredicateValue(_keyName, ((NotEqPredicate) _predicate).getValue());
+        predicate = new NotEqPredicate(keyLhs, ((NotEqPredicate) _predicate).getValue());
         break;
       case IN:
-        jsonFilterString = createJsonInPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
+        predicate = new InPredicate(keyLhs, ((InPredicate) _predicate).getValues());
         break;
       case NOT_IN:
-        jsonFilterString = createJsonNotInPredicateValue(_keyName, ((NotInPredicate) _predicate).getValues());
+        predicate = new NotInPredicate(keyLhs, ((NotInPredicate) _predicate).getValues());
         break;
       default:
         throw new IllegalStateException(
-            "Unsupported predicate type for creating json match predicate: " + _predicate.getType());
+            "Unsupported predicate type for creating filter context: " + _predicate.getType());
     }
 
-    // Create identifier expression for the JSON column
-    ExpressionContext jsonLhs = ExpressionContext.forIdentifier(_columnName);
-    return new JsonMatchPredicate(jsonLhs, jsonFilterString, null);
+    return FilterContext.forPredicate(predicate);
   }
 
   @Override
@@ -194,46 +193,6 @@ public class MapFilterOperator extends BaseFilterOperator {
     } else {
       attributeBuilder.putString("delegateTo", "expression_filter");
     }
-  }
-
-  /**
-   * Initializes the JsonMatchFilterOperator with the given JsonIndexReader
-   */
-  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex,
-      JsonMatchPredicate jsonMatchPredicate, int numDocs) {
-    return new JsonMatchFilterOperator(jsonIndex, jsonMatchPredicate, numDocs);
-  }
-
-  private String createJsonEqPredicateValue(String key, String value) {
-    return String.format("%s = '%s'", key, value);
-  }
-
-  private String createJsonNotEqPredicateValue(String key, String value) {
-    return String.format("%s != '%s'", key, value);
-  }
-
-  private String createJsonInPredicateValue(String key, List<String> values) {
-    StringBuilder valuesStr = new StringBuilder();
-    for (int i = 0; i < values.size(); i++) {
-      if (i > 0) {
-        valuesStr.append(", ");
-      }
-      valuesStr.append("'").append(values.get(i)).append("'");
-    }
-    // Format: '"key" IN ('value1', 'value2')'
-    return String.format("%s IN (%s)", key, valuesStr);
-  }
-
-  private String createJsonNotInPredicateValue(String key, List<String> values) {
-    StringBuilder valuesStr = new StringBuilder();
-    for (int i = 0; i < values.size(); i++) {
-      if (i > 0) {
-        valuesStr.append(", ");
-      }
-      valuesStr.append("'").append(values.get(i)).append("'");
-    }
-    // Format: '"key" NOT IN ('value1', 'value2')'
-    return String.format("%s NOT IN (%s)", key, valuesStr);
   }
 
   /**

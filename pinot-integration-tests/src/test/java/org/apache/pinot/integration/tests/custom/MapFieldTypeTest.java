@@ -423,6 +423,28 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringWithQuotes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test string with single quote in map value
+    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v_25''s value'";
+    JsonNode pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+
+    // Test string with multiple single quotes
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v_25''s ''quoted'' value'";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+
+    // Test IN predicate with quoted strings
+    query = "SELECT stringMap['k2'] FROM " + getTableName()
+        + " WHERE stringMap['k1'] IN ('v_25''s value', 'v_26''s value')";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+  }
+
   @Override
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
