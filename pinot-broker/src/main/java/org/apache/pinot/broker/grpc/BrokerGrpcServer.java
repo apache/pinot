@@ -40,7 +40,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.stream.Collectors;
 import nl.altindag.ssl.SSLFactory;
-import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.compression.CompressionFactory;
 import org.apache.pinot.common.compression.Compressor;

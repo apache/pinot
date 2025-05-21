@@ -20,7 +20,7 @@ package org.apache.pinot.broker.broker;
 
 import java.util.Set;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;

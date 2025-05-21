@@ -26,7 +26,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;

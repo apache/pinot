@@ -41,7 +41,7 @@ import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
-import org.apache.pinot.server.access.RequesterIdentity;
+import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
