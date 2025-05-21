@@ -581,32 +581,29 @@ public class WorkerManager {
 
   private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
       DispatchablePlanMetadata metadata) {
-    Map<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> serverInstanceToLogicalSegmentsMap =
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap =
         new HashMap<>();
 
-    String tableType = TableType.OFFLINE.name();
     if (logicalTableRouteInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
         Preconditions.checkNotNull(physicalTableRoute.getOfflineRoutingTable());
         transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
-            physicalTableRoute.getOfflineRoutingTable(), tableType, serverInstanceToLogicalSegmentsMap);
+            physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
       }
     }
 
-    tableType = TableType.REALTIME.name();
     if (logicalTableRouteInfo.getRealtimeTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
         Preconditions.checkNotNull(physicalTableRoute.getRealtimeRoutingTable());
         transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
-            physicalTableRoute.getRealtimeRoutingTable(), tableType, serverInstanceToLogicalSegmentsMap);
+            physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
       }
     }
 
     int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> workerIdToLogicalTableSegmentsMap =
-        new HashMap<>();
-    for (Map.Entry<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> entry
+    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry
         : serverInstanceToLogicalSegmentsMap.entrySet()) {
       workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
       workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
@@ -618,26 +615,15 @@ public class WorkerManager {
   }
 
   private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
-      Map<ServerInstance, ServerRouteInfo> segmentsMap, String tableType,
-      Map<ServerInstance, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap>
-          serverInstanceToLogicalSegmentsMap) {
-    Map<ServerInstance, DispatchablePlanMetadata.TableTypeToSegmentsMap> serverInstanceToTableTypeToSegmentsMap =
-        new HashMap<>();
+      Map<ServerInstance, ServerRouteInfo> segmentsMap,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
     for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
-      DispatchablePlanMetadata.TableTypeToSegmentsMap tableTypeToSegmentsMap =
-          serverInstanceToTableTypeToSegmentsMap.computeIfAbsent(serverEntry.getKey(),
-              k -> new DispatchablePlanMetadata.TableTypeToSegmentsMap());
+      Map<String, List<String>> tableNameToSegmentsMap =
+          serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
       // TODO: support optional segments for multi-stage engine.
-      Preconditions.checkState(tableTypeToSegmentsMap._map.put(tableType, serverEntry.getValue().getSegments()) == null,
-          "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-    }
-
-    for (Map.Entry<ServerInstance, DispatchablePlanMetadata.TableTypeToSegmentsMap> entry
-        : serverInstanceToTableTypeToSegmentsMap.entrySet()) {
-      DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap =
-          serverInstanceToLogicalSegmentsMap.computeIfAbsent(entry.getKey(),
-              k -> new DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap());
-      logicalTableSegmentsMap._map.put(physicalTableName, entry.getValue());
+      Preconditions.checkState(
+          tableNameToSegmentsMap.put(physicalTableName, serverEntry.getValue().getSegments()) == null,
+          "Entry for server {} and physical table: {} already exist!", serverEntry.getKey(), physicalTableName);
     }
   }
 

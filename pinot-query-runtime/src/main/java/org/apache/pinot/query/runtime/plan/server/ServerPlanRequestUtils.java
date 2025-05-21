@@ -46,7 +46,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -419,25 +418,22 @@ public class ServerPlanRequestUtils {
     Preconditions.checkNotNull(logicalTableContext,
         "LogicalTableManager not found for logical table name: " + logicalTableName);
 
-    DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap =
+    Map<String, List<String>> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
     List<TableSegmentsInfo> offlineTableRouteInfoList = new ArrayList<>();
     List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
 
     Preconditions.checkNotNull(logicalTableSegmentsMap);
-    for (Map.Entry<String, DispatchablePlanMetadata.TableTypeToSegmentsMap> entry
-        : logicalTableSegmentsMap._map.entrySet()) {
+    for (Map.Entry<String, List<String>> entry: logicalTableSegmentsMap.entrySet()) {
       String physicalTableName = entry.getKey();
-      for (Map.Entry<String, List<String>> tableTypeSegmentListEntry : entry.getValue()._map.entrySet()) {
-        TableType tableType = TableType.valueOf(tableTypeSegmentListEntry.getKey());
-        TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
-        tableSegmentsInfo.setTableName(physicalTableName);
-        tableSegmentsInfo.setSegments(tableTypeSegmentListEntry.getValue());
-        if (tableType == TableType.REALTIME) {
-          realtimeTableRouteInfoList.add(tableSegmentsInfo);
-        } else {
-          offlineTableRouteInfoList.add(tableSegmentsInfo);
-        }
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
+      TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
+      tableSegmentsInfo.setTableName(physicalTableName);
+      tableSegmentsInfo.setSegments(entry.getValue());
+      if (tableType == TableType.REALTIME) {
+        realtimeTableRouteInfoList.add(tableSegmentsInfo);
+      } else {
+        offlineTableRouteInfoList.add(tableSegmentsInfo);
       }
     }
 

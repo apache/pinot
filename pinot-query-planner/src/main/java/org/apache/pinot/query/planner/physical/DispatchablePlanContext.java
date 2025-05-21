@@ -103,7 +103,7 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
-      Map<Integer, DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap> workerIdToTableNameSegmentsMap =
+      Map<Integer, Map<String, List<String>>> workerIdToTableNameSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();

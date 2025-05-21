@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -106,12 +105,13 @@ public class WorkerMetadata {
   }
 
   @Nullable
-  public DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap getLogicalTableSegmentsMap() {
+  public Map<String, List<String>> getLogicalTableSegmentsMap() {
     String logicalTableSegmentsMapStr = _customProperties.get(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
     if (logicalTableSegmentsMapStr != null) {
       try {
         return JsonUtils.stringToObject(logicalTableSegmentsMapStr,
-            DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap.class);
+            new TypeReference<Map<String, List<String>>>() {
+            });
       } catch (IOException e) {
         throw new RuntimeException("Unable to deserialize table segments map: " + logicalTableSegmentsMapStr, e);
       }
@@ -120,8 +120,7 @@ public class WorkerMetadata {
     }
   }
 
-  public void setLogicalTableSegmentsMap(
-      DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap) {
+  public void setLogicalTableSegmentsMap(Map<String, List<String>> logicalTableSegmentsMap) {
     String logicalTableSegmentsMapStr;
     try {
       logicalTableSegmentsMapStr = JsonUtils.objectToString(logicalTableSegmentsMap);
