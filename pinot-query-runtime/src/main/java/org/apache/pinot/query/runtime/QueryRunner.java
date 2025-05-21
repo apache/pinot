@@ -228,13 +228,23 @@ public class QueryRunner {
     ExecutorServiceUtils.close(_executorService);
   }
 
-  /**
-   * Execute a {@link StagePlan}.
-   *
-   * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
-   * for results/exceptions.</p>
-   */
+  /// Asynchronously executes a [StagePlan].
+  ///
+  /// This method will not block the current thread but use [#_executorService] instead.
+  /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
+    Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
+    return CompletableFuture.runAsync(runnable, _executorService);
+  }
+
+  /// Executes a {@link StagePlan} pseudo-synchronously.
+  ///
+  /// First, the pipeline breaker is executed on the current thread. This is the blocking part of the method.
+  /// If the pipeline breaker execution fails, the current thread will send the error block to the receivers mailboxes.
+  ///
+  /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
+  private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
@@ -244,61 +254,70 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
-    CompletableFuture<PipelineBreakerResult> pipelineBreakerResultFuture = CompletableFuture.supplyAsync(() ->
+    PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean()),
-        _executorService);
+            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
 
-    return pipelineBreakerResultFuture.thenAcceptAsync(pipelineBreakerResult -> {
-      // Send error block to all the receivers if pipeline breaker fails
-      if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-        ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-        int stageId = stageMetadata.getStageId();
-        LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-            stageId, errorBlock);
-        MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
-        List<RoutingInfo> routingInfos = new ArrayList<>();
-        for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
-          List<MailboxInfo> receiverMailboxInfos =
-              workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-          List<RoutingInfo> stageRoutingInfos =
-              MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-                  receiverMailboxInfos);
-          routingInfos.addAll(stageRoutingInfos);
-        }
-        for (RoutingInfo routingInfo : routingInfos) {
-          try {
-            StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-            SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(
-                routingInfo.getHostname(), routingInfo.getPort(), routingInfo.getMailboxId(), deadlineMs, statMap);
-            // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
-            //  current stage. We will need to fix this in future, but for now, we are sending the error block without
-            //  the stats.
-            sendingMailbox.send(errorBlock, Collections.emptyList());
-          } catch (TimeoutException e) {
-            LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-                routingInfo.getMailboxId(), requestId, stageId, e);
-          } catch (Exception e) {
-            LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-                routingInfo.getMailboxId(), requestId, stageId, e);
-          }
-        }
-        return;
-      }
+    // Send error block to all the receivers if pipeline breaker fails
+    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+      ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, requestId, workerMetadata, stagePlan,
+          deadlineMs);
+      return;
+    }
 
-      // run OpChain
-      OpChainExecutionContext executionContext =
-          new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-              workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
-      OpChain opChain;
-      if (workerMetadata.isLeafStageWorker()) {
-        opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan,
-            _leafQueryExecutor, _executorService);
-      } else {
-        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-      }
+    // run OpChain
+    OpChainExecutionContext executionContext =
+        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+    OpChain opChain;
+    if (workerMetadata.isLeafStageWorker()) {
+      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan,
+          _leafQueryExecutor, _executorService);
+    } else {
+      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+    }
+    try {
+      // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
-    }, _executorService);
+    } catch (RuntimeException e) {
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, requestId, workerMetadata, stagePlan,
+          deadlineMs);
+    }
+  }
+
+  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock, long requestId,
+      WorkerMetadata workerMetadata, StagePlan stagePlan, long deadlineMs) {
+    LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
+        stageId, errorBlock);
+    MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+    List<RoutingInfo> routingInfos = new ArrayList<>();
+    for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+      List<MailboxInfo> receiverMailboxInfos =
+          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+      List<RoutingInfo> stageRoutingInfos =
+          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+              receiverMailboxInfos);
+      routingInfos.addAll(stageRoutingInfos);
+    }
+    for (RoutingInfo routingInfo : routingInfos) {
+      try {
+        StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+        SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
+            routingInfo.getPort(), routingInfo.getMailboxId(), deadlineMs, statMap);
+        // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
+        //  current stage. We will need to fix this in future, but for now, we are sending the error block without
+        //  the stats.
+        sendingMailbox.send(errorBlock, Collections.emptyList());
+      } catch (TimeoutException e) {
+        LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
+            routingInfo.getMailboxId(), requestId, stageId, e);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+            routingInfo.getMailboxId(), requestId, stageId, e);
+      }
+    }
   }
 
   /**
@@ -461,8 +480,7 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
-      // TODO: Support pipeline breakers before merging this feature.
-      //  See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
+      //TODO: See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
       LOGGER.error("Pipeline breaker is not supported in explain query");
       return stagePlan;
     }
