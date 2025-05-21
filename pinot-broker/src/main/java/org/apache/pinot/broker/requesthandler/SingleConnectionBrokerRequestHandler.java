@@ -55,9 +55,9 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
+ * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe
+ * broker request handler using a single
  * connection per server to route the queries.
  */
 @ThreadSafe
@@ -106,12 +106,12 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, route, timeoutMs);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, rawTableName, route, timeoutMs);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS
+          : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
       _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
     if (asyncQueryResponse.getFailedServer() != null) {
@@ -139,10 +139,17 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     int numServersResponded = dataTableMap.size();
 
     long reduceStartTimeNs = System.nanoTime();
-    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
-    BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
+    // Calculate base timeout as remaining time after scatter-gather
+    long baseReduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
+    // Add the additional reduce phase timeout
+    long additionalReduceTimeoutMs = _config.getProperty(CommonConstants.Broker.CONFIG_OF_ADDITIONAL_REDUCE_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_ADDITIONAL_REDUCE_TIMEOUT_MS);
+    // Use the larger of the two values to ensure we have enough time for the reduce
+    // phase
+    long reduceTimeoutMs = Math.max(baseReduceTimeoutMs, additionalReduceTimeoutMs);
+    BrokerResponseNative brokerResponse = _brokerReduceService.reduceOnDataTable(originalBrokerRequest,
+        serverBrokerRequest, dataTableMap,
+        reduceTimeoutMs, _brokerMetrics);
     long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
 
