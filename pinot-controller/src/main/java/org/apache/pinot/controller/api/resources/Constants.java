@@ -53,8 +53,13 @@ public class Constants {
   public static final String APP_CONFIGS = "AppConfigs";
   public static final String PERIODIC_TASK_TAG = "PeriodicTask";
   public static final String UPSERT_RESOURCE_TAG = "Upsert";
+  public static final String RESET_OFFSET_FROM = "ResetOffsetFrom";
+  public static final String RESET_OFFSET_TO = "ResetOffsetTo";
+  public static final String RESET_OFFSET_TOPIC_NAME = "ResetOffsetTopicName";
+  public static final String RESET_OFFSET_TOPIC_PARTITION = "ResetOffsetTopicPartition";
 
   public static final String REALTIME_SEGMENT_VALIDATION_MANAGER = "RealtimeSegmentValidationManager";
+  public static final String REALTIME_OFFSET_AUTO_RESET_MANAGER = "RealtimeOffsetAutoResetManager";
 
   public static TableType validateTableType(String tableTypeStr) {
     if (StringUtils.isBlank(tableTypeStr)) {

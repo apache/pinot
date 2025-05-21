@@ -69,28 +69,34 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     _newPartitionGroupMetadataList.clear();
+    int rawTopicIndex = 0;
     for (int i = 0; i < _streamConfigs.size(); i++) {
       String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-"
           + _streamConfigs.get(i).getTableNameWithType() + "-" + _topicNames.get(i);
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfigs.get(i));
-      final int index = i;
+      final int finalIdx = i;
+      final int finalRawTopicIndex = rawTopicIndex;
       List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
           _partitionGroupConsumptionStatusList.stream()
-              .filter(partitionGroupConsumptionStatus ->
-                  IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
-                      partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
+              .filter(partitionGroupConsumptionStatus -> _streamConfigs.get(finalIdx).isEphemeralBackfillTopic()
+                  ? _streamConfigs.get(finalIdx).getTopicName().equals(partitionGroupConsumptionStatus.getTopicName())
+                  : IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
+                      partitionGroupConsumptionStatus.getPartitionGroupId()) == finalRawTopicIndex)
               .collect(Collectors.toList());
       try (
           StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
               StreamConsumerFactory.getUniqueClientId(clientId))) {
         _newPartitionGroupMetadataList.addAll(
             streamMetadataProvider.computePartitionGroupMetadata(StreamConsumerFactory.getUniqueClientId(clientId),
-                _streamConfigs.get(i),
-                topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream).stream()
+                    _streamConfigs.get(i), topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
+                    _forceGetOffsetFromStream)
+                .stream()
                 .map(metadata -> new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
-                        metadata.getPartitionGroupId(), index),
-                    metadata.getStartOffset())).collect(Collectors.toList())
+                    _streamConfigs.get(finalIdx).isEphemeralBackfillTopic() ? _streamConfigs.get(finalIdx)
+                        .getTopicName() : "",
+                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
+                        finalRawTopicIndex), metadata.getStartOffset()))
+                .collect(Collectors.toList())
         );
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
@@ -105,6 +111,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         _exception = e;
         throw e;
       }
+      rawTopicIndex += _streamConfigs.get(i).isEphemeralBackfillTopic() ? 0 : 1;
     }
     return Boolean.TRUE;
   }
