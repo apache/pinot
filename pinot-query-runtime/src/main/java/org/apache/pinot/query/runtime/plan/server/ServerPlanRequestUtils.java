@@ -41,7 +41,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.LogicalTableManager;
+import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -414,10 +414,10 @@ public class ServerPlanRequestUtils {
   private static List<InstanceRequest> constructLogicalTableServerQueryRequests(
       OpChainExecutionContext executionContext, PinotQuery pinotQuery, InstanceDataManager instanceDataManager) {
     StageMetadata stageMetadata = executionContext.getStageMetadata();
-    String logicalTableName = TableNameBuilder.extractRawTableName(stageMetadata.getTableName());
-    LogicalTableManager logicalTableManager = instanceDataManager.getLogicalTableManager(logicalTableName);
-    Preconditions.checkNotNull(logicalTableManager,
-        "LogicalTableManager is null for logical table name: " + logicalTableName);
+    String logicalTableName = stageMetadata.getTableName();
+    LogicalTableContext logicalTableContext = instanceDataManager.getLogicalTableContext(logicalTableName);
+    Preconditions.checkNotNull(logicalTableContext,
+        "LogicalTableManager not found for logical table name: " + logicalTableName);
 
     DispatchablePlanMetadata.TableTypeTableNameToSegmentsMap logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
@@ -448,34 +448,34 @@ public class ServerPlanRequestUtils {
           offlineTableRouteInfoList.isEmpty() ? realtimeTableRouteInfoList : offlineTableRouteInfoList;
       String tableType = offlineTableRouteInfoList.isEmpty() ? TableType.REALTIME.name() : TableType.OFFLINE.name();
       if (tableType.equals(TableType.OFFLINE.name())) {
-        Preconditions.checkNotNull(logicalTableManager.getRefOfflineTableConfig());
+        Preconditions.checkNotNull(logicalTableContext.getRefOfflineTableConfig());
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(logicalTableName);
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.OFFLINE, offlineTableName,
-                logicalTableManager.getRefOfflineTableConfig(), logicalTableManager.getLogicalTableSchema(), null,
+                logicalTableContext.getRefOfflineTableConfig(), logicalTableContext.getLogicalTableSchema(), null,
                 routeInfoList));
       } else {
-        Preconditions.checkNotNull(logicalTableManager.getRefRealtimeTableConfig());
+        Preconditions.checkNotNull(logicalTableContext.getRefRealtimeTableConfig());
         String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
         return List.of(
             compileInstanceRequest(executionContext, pinotQuery, timeBoundaryInfo, TableType.REALTIME,
-                realtimeTableName, logicalTableManager.getRefRealtimeTableConfig(),
-                logicalTableManager.getLogicalTableSchema(), null, routeInfoList));
+                realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
+                logicalTableContext.getLogicalTableSchema(), null, routeInfoList));
       }
     } else {
-      Preconditions.checkNotNull(logicalTableManager.getRefOfflineTableConfig());
-      Preconditions.checkNotNull(logicalTableManager.getRefRealtimeTableConfig());
+      Preconditions.checkNotNull(logicalTableContext.getRefOfflineTableConfig());
+      Preconditions.checkNotNull(logicalTableContext.getRefRealtimeTableConfig());
       String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(logicalTableName);
       String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(logicalTableName);
       PinotQuery offlinePinotQuery = pinotQuery.deepCopy();
       PinotQuery realtimePinotQuery = pinotQuery.deepCopy();
       return List.of(
           compileInstanceRequest(executionContext, offlinePinotQuery, timeBoundaryInfo, TableType.OFFLINE,
-              offlineTableName, logicalTableManager.getRefOfflineTableConfig(),
-              logicalTableManager.getLogicalTableSchema(), null, offlineTableRouteInfoList),
+              offlineTableName, logicalTableContext.getRefOfflineTableConfig(),
+              logicalTableContext.getLogicalTableSchema(), null, offlineTableRouteInfoList),
           compileInstanceRequest(executionContext, realtimePinotQuery, timeBoundaryInfo, TableType.REALTIME,
-              realtimeTableName, logicalTableManager.getRefRealtimeTableConfig(),
-              logicalTableManager.getLogicalTableSchema(), null, realtimeTableRouteInfoList));
+              realtimeTableName, logicalTableContext.getRefRealtimeTableConfig(),
+              logicalTableContext.getLogicalTableSchema(), null, realtimeTableRouteInfoList));
     }
   }
 }

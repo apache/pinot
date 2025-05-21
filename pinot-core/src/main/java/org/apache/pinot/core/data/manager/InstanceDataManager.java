@@ -206,5 +206,5 @@ public interface InstanceDataManager {
    * Returns the logical table config and schema for the given logical table name.
    */
   @Nullable
-  LogicalTableManager getLogicalTableManager(String logicalTableName);
+  LogicalTableContext getLogicalTableContext(String logicalTableName);
 }
