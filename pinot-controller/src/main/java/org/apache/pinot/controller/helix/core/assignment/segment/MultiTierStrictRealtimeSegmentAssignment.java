@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -45,13 +47,21 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
     Preconditions.checkState(instancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",
         _tableNameWithType);
     Preconditions.checkArgument(config.isIncludeConsuming(),
-        "Consuming segment must be included when rebalancing table: %s using MultiTierStrictRealtimeSegmentAssignment",
+        "Consuming segment must be included when rebalancing table: %s using multi-tier "
+            + "StrictRealtimeSegmentAssignment",
         _tableNameWithType);
-
-    _logger.info("Rebalancing table: {} with instance partitions: {}", _tableNameWithType, instancePartitions);
-
+    boolean bootstrap = config.isBootstrap();
+    _logger.info("Rebalancing table: {} with instance partitions: {}, bootstrap: {}", _tableNameWithType,
+        instancePartitions, bootstrap);
+    // Rebalance tiers first. Only completed segments are moved to other tiers, although the last parameter of
+    // rebalanceTiers() method, i.e. InstancePartitionsType.COMPLETED, is not checked at all under the hood.
+    Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
+        rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
+            InstancePartitionsType.COMPLETED);
+    List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
+    Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
-    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : nonTierAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
       if (isOfflineSegment(instanceStateMap)) {
@@ -68,6 +78,12 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
         newAssignment.put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, state));
       }
     }
+    // Add tier assignments, if available
+    if (CollectionUtils.isNotEmpty(newTierAssignments)) {
+      newTierAssignments.forEach(newAssignment::putAll);
+    }
+    _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
+        _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 }
