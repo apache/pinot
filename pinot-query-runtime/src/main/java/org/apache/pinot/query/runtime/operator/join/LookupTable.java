@@ -68,7 +68,7 @@ public abstract class LookupTable {
     }
   }
 
-  protected static Object convertArrayToList(Object value) {
+  protected static Object convertValueToList(Object value) {
     if (value instanceof Object[]) {
       return Collections.singletonList(value);
     }

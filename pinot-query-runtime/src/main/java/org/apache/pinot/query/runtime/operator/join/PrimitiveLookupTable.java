@@ -42,7 +42,7 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   public void finish() {
     if (!_keysUnique) {
       if (_valueForNullKey != null) {
-        _valueForNullKey = convertArrayToList(_valueForNullKey);
+        _valueForNullKey = convertValueToList(_valueForNullKey);
       }
       finishNotNullKey();
     }
