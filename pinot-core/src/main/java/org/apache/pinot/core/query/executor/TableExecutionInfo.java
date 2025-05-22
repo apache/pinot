@@ -30,9 +30,14 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.data.Schema;
 
 
 public interface TableExecutionInfo {
+
+  /// Returns the latest [Schema] for the table.
+  Schema getSchema();
+
   /**
    * Check if consuming segments are being queried.
    * @return true if consuming segments are being queried, false otherwise
