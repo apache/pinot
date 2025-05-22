@@ -4060,4 +4060,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     assertEquals(result.get("clientRequestId").asText(), clientRequestId);
   }
+
+  @Test
+  public void testSegmentReload() {
+    // Test reload of segments
+    String tableName = getTableName();
+    String sqlQuery = "SELECT count(*) FROM " + tableName;
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(response.get("numRowsResultSet").asInt(), 1);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ROWS);
+
+    // Reload the segments
+    reloadAllSegments(tableName, false, NUM_ROWS);
+
+    // Test query again
+    response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(response.get("numRowsResultSet").asInt(), 1);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ROWS);
+  }
 }
