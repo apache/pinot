@@ -67,23 +67,23 @@
       },
       {
         "description": "Joining with nullable int column",
-        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
-        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
+        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
       },
       {
         "description": "Joining with nullable long column",
-        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
-        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
+        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
       },
       {
         "description": "Joining with nullable float column",
-        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
-        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
+        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
       },
       {
         "description": "Joining with nullable double column",
-        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
-        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
+        "sql": "SET enableNullHandling = TRUE;WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                            WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE)END AS nullableCol1 FROM {tbl1})SELECT t1.col1FROM tableWithNull as t1 JOIN tableWithNull as t2ON t1.col1 = t2.nullableCol1"
       }
     ]
   },
