@@ -42,8 +42,8 @@ public class ByteBufferUtil {
         Constructor<? extends ByteBuffer> dbbCC =
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class, memorySegmentProxyClass);
+        dbbCC.setAccessible(true);
         return (addr, size, att) -> {
-          dbbCC.setAccessible(true);
           try {
             return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att, null);
           } catch (Exception e) {
@@ -56,8 +56,8 @@ public class ByteBufferUtil {
         Constructor<? extends ByteBuffer> dbbCC =
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class);
+        dbbCC.setAccessible(true);
         return (addr, size, att) -> {
-          dbbCC.setAccessible(true);
           try {
             return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att);
           } catch (Exception e) {
@@ -70,8 +70,8 @@ public class ByteBufferUtil {
         Constructor<? extends ByteBuffer> dbbCC =
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE);
+        dbbCC.setAccessible(true);
         return (addr, size, att) -> {
-          dbbCC.setAccessible(true);
           try {
             return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size));
           } catch (Exception e) {
