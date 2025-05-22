@@ -93,9 +93,10 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   @Override
   public JsonIndexCreator createIndexCreator(IndexCreationContext context, JsonIndexConfig indexConfig)
       throws IOException {
+    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
     Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
         "Json index is currently only supported on single-value columns");
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+    Preconditions.checkState(storedType == FieldSpec.DataType.STRING || storedType == FieldSpec.DataType.MAP,
         "Json index is currently only supported on STRING columns");
     return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
         indexConfig)
@@ -147,7 +148,8 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.json(),
             "Json index is currently only supported on single-value columns");
       }
-      if (metadata.getFieldSpec().getDataType().getStoredType() != FieldSpec.DataType.STRING) {
+      FieldSpec.DataType storedType = metadata.getFieldSpec().getDataType().getStoredType();
+      if (storedType != FieldSpec.DataType.STRING && storedType != FieldSpec.DataType.MAP) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.json(),
             "Json index is currently only supported on STRING columns");
       }
