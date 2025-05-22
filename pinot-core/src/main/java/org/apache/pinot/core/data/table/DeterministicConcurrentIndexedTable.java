@@ -19,57 +19,27 @@
 package org.apache.pinot.core.data.table;
 
 
-import java.util.Comparator;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DeterministicConcurrentIndexedTable extends IndexedTable {
-  private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
-  private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
 
   public DeterministicConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize,
       int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
-        new ConcurrentSkipListMap<>(Comparator.comparing(Key::toString)), executorService);
+        new ConcurrentSkipListMap<>(), executorService);
   }
-
   /**
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
   public boolean upsert(Key key, Record record) {
-    if (_hasOrderBy) {
-      upsertWithOrderBy(key, record);
-    } else {
-      upsertWithoutOrderBy(key, record);
-    }
+    upsertWithoutOrderBy(key, record);
     return true;
-  }
-
-  protected void upsertWithOrderBy(Key key, Record record) {
-    _readWriteLock.readLock().lock();
-    try {
-      addOrUpdateRecord(key, record);
-    } finally {
-      _readWriteLock.readLock().unlock();
-    }
-
-    if (_lookupMap.size() >= _trimThreshold) {
-      _readWriteLock.writeLock().lock();
-      try {
-        if (_lookupMap.size() >= _trimThreshold) {
-          resize();
-        }
-      } finally {
-        _readWriteLock.writeLock().unlock();
-      }
-    }
   }
 
   protected void upsertWithoutOrderBy(Key key, Record record) {
