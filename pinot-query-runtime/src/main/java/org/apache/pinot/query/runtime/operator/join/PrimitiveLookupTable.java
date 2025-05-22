@@ -78,7 +78,7 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   public Set<Map.Entry> entrySet() {
     Set notNullSet = notNullKeyEntrySet();
     if (_valueForNullKey != null) {
-      HashSet<Map.Entry<Object, Object>> nullEntry = Sets.newHashSet(new Map.Entry<Object, Object>() {
+      Set<Map.Entry<Object, Object>> nullEntry = Set.of(new Map.Entry<>() {
         @Override
         public Object getKey() {
           return null;
