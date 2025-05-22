@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -160,7 +161,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
-  private void initInstanceDataDir(File instanceDataDir) {
+  @VisibleForTesting
+  void initInstanceDataDir(File instanceDataDir) {
     if (!instanceDataDir.exists()) {
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
@@ -186,20 +188,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     // Ensure we can write to the instance data dir
     if (!instanceDataDir.canWrite()) {
-      throw new IllegalStateException("Cannot write to the instance data directory: " + instanceDataDir);
+      throw new IllegalStateException("Cannot write to the instance data dir: " + instanceDataDir);
     }
   }
 
-  private static void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+  @VisibleForTesting
+  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
     if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance  segment tar dir: %s",
+          instanceSegmentTarDir);
     }
     // Ensure we can write to the instance segment tar dir
     if (!instanceSegmentTarDir.canWrite()) {
-      throw new IllegalStateException("Cannot write to the instance segment tar directory: " + instanceSegmentTarDir);
+      throw new IllegalStateException("Cannot write to the instance segment tar dir: " + instanceSegmentTarDir);
     }
   }
-
 
   @Override
   public List<File> getConsumerDirPaths() {
