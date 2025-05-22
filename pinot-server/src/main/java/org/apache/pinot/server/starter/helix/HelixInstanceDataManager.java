@@ -132,9 +132,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     initInstanceDataDir(instanceDataDir);
 
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
-    }
+    initInstanceSegmentTarDir(instanceSegmentTarDir);
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
@@ -186,7 +184,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+    // Ensure we can write to the instance data dir
+    if (!instanceDataDir.canWrite()) {
+      throw new IllegalStateException("Cannot write to the instance data directory: " + instanceDataDir);
+    }
   }
+
+  private static void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+    if (!instanceSegmentTarDir.exists()) {
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
+    }
+    // Ensure we can write to the instance segment tar dir
+    if (!instanceSegmentTarDir.canWrite()) {
+      throw new IllegalStateException("Cannot write to the instance segment tar directory: " + instanceSegmentTarDir);
+    }
+  }
+
 
   @Override
   public List<File> getConsumerDirPaths() {
