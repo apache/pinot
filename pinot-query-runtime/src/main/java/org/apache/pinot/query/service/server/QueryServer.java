@@ -51,7 +51,6 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
@@ -63,7 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// QueryServer is theGRPC server that accepts MSE query plan request sent from [QueryDispatcher].
+/// QueryServer is theGRPC server that accepts MSE query plan request sent from
+/// [org.apache.pinot.query.service.dispatch.QueryDispatcher].
 ///
 /// All endpoints are being called by the GRPC server threads, which must never be blocked.
 /// In some situations we need to run blocking code to resolve these requests, so we need to move the work to a
@@ -90,6 +90,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// Given the QPS for explain plans is much lower than the normal query submission, we can use a single thread for
   /// this.
   private final ExecutorService _explainExecutorService;
+  /// The thread executor service used to run time series query requests.
+  ///
+  /// In order to run time series we need to call [QueryRunner#processTimeSeriesQuery] which contrary to the normal MSE
+  /// methods, is a blocking method. This is why we need to use a different (and usually cached) thread pool for this.
+  private final ExecutorService _timeSeriesExecutorService;
 
   private Server _server = null;
 
@@ -115,10 +120,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
 
     NamedThreadFactory explainThreadFactory =
-        new NamedThreadFactory("query_cancellation_executor_on_" + _port + "_port");
-    _explainExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(
-            Executors.newSingleThreadExecutor(explainThreadFactory)));
+        new NamedThreadFactory("query_explain_on_" + _port + "_port");
+    _explainExecutorService = Executors.newSingleThreadExecutor(explainThreadFactory);
+
+    ExecutorService baseTimeSeriesExecutorService = ExecutorServiceUtils.create(config,
+        CommonConstants.Server.MULTISTAGE_TIMESERIES_EXEC_CONFIG_PREFIX,
+        "query_ts_on_" + _port + "_port",
+        CommonConstants.Server.DEFAULT_TIMESERIES_EXEC_CONFIG_PREFIX);
+    _timeSeriesExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
+        QueryThreadContext.contextAwareExecutorService(baseTimeSeriesExecutorService));
   }
 
   public void start() {
@@ -382,7 +392,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    // TODO: The correctness of the thread model of this method has not been reviewed yet.
+    CompletableFuture.runAsync(() -> submitTimeSeriesInternal(request, responseObserver), _timeSeriesExecutorService);
+  }
+
+  private void submitTimeSeriesInternal(Worker.TimeSeriesQueryRequest request,
+      StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
     try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // TODO: populate the thread context with TSE information

@@ -937,6 +937,16 @@ public class CommonConstants {
     @Deprecated
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
 
+    /**
+     * The ExecutorServiceProvider to be used for timeseries threads.
+     *
+     * It is recommended to use a cached thread pool, given timeseries endpoints are blocking.
+     *
+     * See QueryServer
+     */
+    public static final String MULTISTAGE_TIMESERIES_EXEC_CONFIG_PREFIX =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + "timeseries";
+    public static final String DEFAULT_TIMESERIES_EXEC_CONFIG_PREFIX = "cached";
     /* End of query executor related configs */
 
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
