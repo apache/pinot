@@ -63,9 +63,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
- */
+/// QueryServer is theGRPC server that accepts MSE query plan request sent from [QueryDispatcher].
+///
+/// All endpoints are being called by the GRPC server threads, which must never be blocked.
+/// In some situations we need to run blocking code to resolve these requests, so we need to move the work to a
+/// different thread pool. See each method for details.
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
@@ -80,6 +82,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
   private final ExecutorService _submissionExecutorService;
+  /// The thread executor service used to run explain plan requests.
+  /// In order to calculate explain plans we need to calculate the physical plan for each worker, which is a
+  /// non-blocking but heavier CPU operation than the normal query submission.
+  /// This is why we use a different thread pool for this operation: We don't want to block the query submission thread
+  /// pool.
+  /// Given the QPS for explain plans is much lower than the normal query submission, we can use a single thread for
+  /// this.
   private final ExecutorService _explainExecutorService;
 
   private Server _server = null;
@@ -100,12 +109,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
 
     ServerMetrics serverMetrics = ServerMetrics.get();
-    MetricsExecutor withMetrics = new MetricsExecutor(
+    _submissionExecutorService = new MetricsExecutor(
         baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
-    _submissionExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(withMetrics));
 
     NamedThreadFactory explainThreadFactory =
         new NamedThreadFactory("query_cancellation_executor_on_" + _port + "_port");
@@ -160,12 +167,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
   }
 
+  /// Submits a query for executions.
+  ///
+  /// The request is deserialized on the GRPC thread and the rest of the work is done on the submission thread pool.
+  /// Given the submission code should be not blocking, we could directly use the GRPC thread pool, but we decide to
+  /// use a different thread pool to be able to time out the submission in the rare case it takes too long.
+  ///
+  // TODO: Study if that is actually needed. We could just use the GRPC thread pool and timeout once the execution
+  //   starts in the query runner.
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
-    // This code is designed to run on the GRPC thread.
-    // The work done here is minimal. It just read the request metadata, initializes the thread context and delegates
-    // the rest of the submission work on the submission thread pool.
-
     Map<String, String> reqMetadata;
     try {
       reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
@@ -179,32 +190,32 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      QueryThreadContext.setQueryEngine("mse");
-      long requestId = QueryThreadContext.getRequestId();
-      CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
-          .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
-          .whenComplete((result, error) -> {
-            // this will always be called, either on the submission thread that finished the last or in the caller
-            // (GRPC) thread in the improbable case all submission tasks finished before the caller thread reaches
-            // this line
-            if (error != null) { // if there was an error submitting the request, return an error response
+    QueryThreadContext.setQueryEngine("mse");
+    long requestId = QueryThreadContext.getRequestId();
+    CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
+        .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
+        .whenComplete((result, error) -> {
+          // this will always be called, either on the submission thread that finished the last or in the caller
+          // (GRPC) thread in the improbable case all submission tasks finished before the caller thread reaches
+          // this line
+          if (error != null) { // if there was an error submitting the request, return an error response
+            try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+                QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
               LOGGER.error("Caught exception while submitting request: {}", requestId, error);
               String errorMsg = "Caught exception while submitting request: " + error.getMessage();
               responseObserver.onNext(Worker.QueryResponse.newBuilder()
                   .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
                   .build());
               responseObserver.onCompleted();
-            } else { // if the request was submitted successfully, return a success response
-              responseObserver.onNext(
-                  Worker.QueryResponse.newBuilder()
-                      .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
-                      .build());
-              responseObserver.onCompleted();
             }
-          });
-    }
+          } else { // if the request was submitted successfully, return a success response
+            responseObserver.onNext(
+                Worker.QueryResponse.newBuilder()
+                    .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
+                    .build());
+            responseObserver.onCompleted();
+          }
+        });
   }
 
   /// Iterates over all the stage plans in the request and submits each worker to the query runner.
@@ -217,22 +228,25 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// running, the exception will be managed by the worker, which usually send the error downstream to the receiver
   /// mailboxes. Therefore these error won't be reported here.
   private void submitInternal(Worker.QueryRequest request, Map<String, String> reqMetadata) {
-    List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
+      List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
 
-    List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
+      List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
 
-    for (Worker.StagePlan protoStagePlan : protoStagePlans) {
-      StagePlan stagePlan = deserializePlan(protoStagePlan);
-      StageMetadata stageMetadata = stagePlan.getStageMetadata();
-      List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
+      for (Worker.StagePlan protoStagePlan : protoStagePlans) {
+        StagePlan stagePlan = deserializePlan(protoStagePlan);
+        StageMetadata stageMetadata = stagePlan.getStageMetadata();
+        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
 
-      for (WorkerMetadata workerMetadata : workerMetadataList) {
-        try {
-          CompletableFuture<Void> job = submitWorker(workerMetadata, stagePlan, reqMetadata);
-          startedWorkers.add(job);
-        } catch (RuntimeException e) {
-          startedWorkers.forEach(worker -> worker.cancel(true));
-          throw e;
+        for (WorkerMetadata workerMetadata : workerMetadataList) {
+          try {
+            CompletableFuture<Void> job = submitWorker(workerMetadata, stagePlan, reqMetadata);
+            startedWorkers.add(job);
+          } catch (RuntimeException e) {
+            startedWorkers.forEach(worker -> worker.cancel(true));
+            throw e;
+          }
         }
       }
     }
@@ -278,12 +292,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      CompletableFuture.runAsync(() -> explainInternal(request, responseObserver, reqMetadata), _explainExecutorService)
-          .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
-          .handle((result, error) -> {
-        if (error != null) {
+    CompletableFuture.runAsync(() -> explainInternal(request, responseObserver, reqMetadata), _explainExecutorService)
+        .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
+        .handle((result, error) -> {
+      if (error != null) {
+        try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+            QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
           long requestId = QueryThreadContext.getRequestId();
           LOGGER.error("Caught exception while submitting request: {}", requestId, error);
           String errorMsg = "Caught exception while submitting request: " + error.getMessage();
@@ -293,18 +307,18 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
                 .build());
             responseObserver.onCompleted();
           }
-        } else {
-          synchronized (responseObserver) {
-            responseObserver.onNext(
-                Worker.ExplainResponse.newBuilder()
-                    .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_OK, "")
-                    .build());
-            responseObserver.onCompleted();
-          }
         }
-        return null;
-      });
-    }
+      } else {
+        synchronized (responseObserver) {
+          responseObserver.onNext(
+              Worker.ExplainResponse.newBuilder()
+                  .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_OK, "")
+                  .build());
+          responseObserver.onCompleted();
+        }
+      }
+      return null;
+    });
   }
 
   /// Iterates over all the stage plans in the request and explains the query for each worker.
@@ -316,21 +330,24 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// Remember that in case of error some stages may have been explained and some not.
   private void explainInternal(Worker.QueryRequest request, StreamObserver<Worker.ExplainResponse> responseObserver,
       Map<String, String> reqMetadata) {
-    // Explain the stage for each worker
-    BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
-        _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
+    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
+      // Explain the stage for each worker
+      BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
+          _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
 
-    List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+      List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
 
-    for (Worker.StagePlan protoStagePlan : protoStagePlans) {
-      StagePlan stagePlan = deserializePlan(protoStagePlan);
-      StageMetadata stageMetadata = stagePlan.getStageMetadata();
-      List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
+      for (Worker.StagePlan protoStagePlan : protoStagePlans) {
+        StagePlan stagePlan = deserializePlan(protoStagePlan);
+        StageMetadata stageMetadata = stagePlan.getStageMetadata();
+        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
 
-      Worker.ExplainResponse stageResponse = calculateExplainPlanForStage(
-          protoStagePlan, workerMetadataList.toArray(new WorkerMetadata[0]), reqMetadata);
-      synchronized (responseObserver) {
-        responseObserver.onNext(stageResponse);
+        Worker.ExplainResponse stageResponse = calculateExplainPlanForStage(
+            protoStagePlan, workerMetadataList.toArray(new WorkerMetadata[0]), reqMetadata);
+        synchronized (responseObserver) {
+          responseObserver.onNext(stageResponse);
+        }
       }
     }
   }
@@ -374,6 +391,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
   }
 
+  /// Executes a cancel request.
+  ///
+  /// Cancel requests should always be executed on different threads than the submission threads to be sure that
+  /// the cancel request is not waiting for the query submission to finish. Given these requests are not blocking, we
+  /// run them in the GRPC thread pool.
   @Override
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
     long requestId = request.getRequestId();
@@ -383,6 +405,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
       Worker.CancelResponse.Builder cancelBuilder = Worker.CancelResponse.newBuilder();
       for (Map.Entry<Integer, MultiStageQueryStats.StageStats.Closed> statEntry : stats.entrySet()) {
+        // even we are using output streams here, these calls are non-blocking because we use in memory output streams
         try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream.Builder().get();
             DataOutputStream daos = new DataOutputStream(baos)) {
           statEntry.getValue().serialize(daos);
