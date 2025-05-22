@@ -499,7 +499,8 @@ public class CommonConstants {
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
         /**
-         * This will help in getting deterministic and correct result for queries with group by and limit but  without order by
+         * This will help in getting deterministic and correct result for queries
+         * with group by and limit but  without order by
          */
         public static final String ENABLE_DETERMINISTIC_GROUP_TRIM = "enableDeterministicGroupTrim";
 
