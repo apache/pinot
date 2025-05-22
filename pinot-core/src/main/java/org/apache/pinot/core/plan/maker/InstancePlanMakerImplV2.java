@@ -217,6 +217,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipStarTree
     queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions));
 
+    queryContext.setEnableDeterministicGroupTrim(
+        QueryOptionsUtils.isEnableDeterministicGroupTrim(queryOptions));
+
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
 

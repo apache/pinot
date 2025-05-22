@@ -138,6 +138,7 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
+  private boolean _enableDeterministicGroupTrim;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -271,19 +272,19 @@ public class QueryContext {
     return _explain != ExplainMode.NONE;
   }
 
+  public boolean isEnableDeterministicGroupTrim() {
+    return _enableDeterministicGroupTrim;
+  }
+
+  public void setEnableDeterministicGroupTrim(boolean enable) {
+    _enableDeterministicGroupTrim = enable;
+  }
+
   /**
    * Returns the explain mode of the query.
    */
   public ExplainMode getExplain() {
     return _explain;
-  }
-
-  /**
-   * Return true in-case deterministic result is expected
-   * @return
-   */
-  public boolean isEnableDeterministicGroupTrim() {
-    return Boolean.parseBoolean(_queryOptions.getOrDefault("enableDeterministicGroupTrim", "false"));
   }
 
   /**
