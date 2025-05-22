@@ -169,12 +169,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         _server.shutdown();
         _server.awaitTermination();
       }
-      if (_submissionExecutorService != null) {
-        _submissionExecutorService.shutdown();
-      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    _submissionExecutorService.shutdown();
+    _explainExecutorService.shutdown();
+    _timeSeriesExecutorService.shutdown();
   }
 
   /// Submits a query for executions.
