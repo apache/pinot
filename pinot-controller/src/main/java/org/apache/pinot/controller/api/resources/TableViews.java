@@ -146,7 +146,7 @@ public class TableViews {
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @ApiParam(value = "Show segments being replaced: true|false", required = false)
+      @ApiParam(value = "Include segments being replaced", required = false)
       @QueryParam("includeReplacedSegments") @DefaultValue("true") boolean includeReplacedSegments,
       @Context HttpHeaders headers)
       throws JsonProcessingException {

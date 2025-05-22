@@ -23,11 +23,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -257,27 +257,30 @@ public class TableSizeReader {
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
 
+    Map<String, Map<String, SegmentSizeInfo>> serverToSegmentMap = new HashMap<>();
+    for (Map.Entry<String, List<SegmentSizeInfo>> entry : serverToSegmentSizeInfoListMap.entrySet()) {
+      Map<String, SegmentSizeInfo> segmentMap = new HashMap<>();
+      for (SegmentSizeInfo info : entry.getValue()) {
+        segmentMap.put(info.getSegmentName(), info);
+      }
+      serverToSegmentMap.put(entry.getKey(), segmentMap);
+    }
+
     // Convert map from (server -> List<SegmentSizeInfo>) to (segment -> SegmentSizeDetails (server -> SegmentSizeInfo))
     // If no response returned from a server, put -1 as size for all the segments on the server
-    // TODO: here we assume server contains all segments in ideal state, which might not be the case
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
-      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server);
-      if (segmentSizeInfoList != null) {
-        segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server)
-            .stream()
-            .filter(segmentSizeInfo -> entry.getValue().contains(segmentSizeInfo.getSegmentName()))
-            .collect(Collectors.toList());
-        for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
-          SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.getSegmentName(), k -> new SegmentSizeDetails());
-          segmentSizeDetails._serverInfo.put(server, segmentSizeInfo);
-        }
-      } else {
-        List<String> segments = entry.getValue();
-        for (String segment : segments) {
-          SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
+      Map<String, SegmentSizeInfo> segmentToSegmentSizeInfoMap = serverToSegmentMap.getOrDefault(server,
+          Collections.emptyMap());
+
+      List<String> segments = entry.getValue();
+      for (String segment : segments) {
+        SegmentSizeDetails segmentSizeDetails =
+            segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
+
+        if (segmentToSegmentSizeInfoMap.containsKey(segment)) {
+          segmentSizeDetails._serverInfo.put(server, segmentToSegmentSizeInfoMap.get(segment));
+        } else {
           segmentSizeDetails._serverInfo.put(server, new SegmentSizeInfo(segment, DEFAULT_SIZE_WHEN_MISSING_OR_ERROR));
         }
       }
