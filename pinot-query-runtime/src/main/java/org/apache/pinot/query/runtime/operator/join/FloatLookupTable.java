@@ -59,7 +59,7 @@ public class FloatLookupTable extends PrimitiveLookupTable {
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> notNullKeyEntrySet() {
+  public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.float2ObjectEntrySet();
   }
 }

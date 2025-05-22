@@ -59,7 +59,7 @@ public class DoubleLookupTable extends PrimitiveLookupTable {
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> notNullKeyEntrySet() {
+  public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.double2ObjectEntrySet();
   }
 }

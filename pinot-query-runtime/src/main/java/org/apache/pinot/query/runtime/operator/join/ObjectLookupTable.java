@@ -58,7 +58,7 @@ public class ObjectLookupTable extends LookupTable {
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
-    return (Set) _lookupTable.entrySet();
+  public Set<Map.Entry<Object, Object>> entrySet() {
+    return _lookupTable.entrySet();
   }
 }

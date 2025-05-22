@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.join;
 
 import com.google.common.collect.Sets;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -75,8 +74,8 @@ public abstract class PrimitiveLookupTable extends LookupTable {
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
-    Set notNullSet = notNullKeyEntrySet();
+  public Set<Map.Entry<Object, Object>> entrySet() {
+    Set<Map.Entry<Object, Object>> notNullSet = notNullKeyEntrySet();
     if (_valueForNullKey != null) {
       Set<Map.Entry<Object, Object>> nullEntry = Set.of(new Map.Entry<>() {
         @Override
@@ -100,5 +99,5 @@ public abstract class PrimitiveLookupTable extends LookupTable {
     }
   }
 
-  protected abstract Set<Map.Entry> notNullKeyEntrySet();
+  protected abstract Set<Map.Entry<Object, Object>> notNullKeyEntrySet();
 }

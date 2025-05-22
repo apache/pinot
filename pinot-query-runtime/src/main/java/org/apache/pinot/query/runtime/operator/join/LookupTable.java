@@ -103,5 +103,5 @@ public abstract class LookupTable {
    * entries is a list of rows ({@code List<Object[]>}).
    */
   @SuppressWarnings("rawtypes")
-  public abstract Set<Map.Entry> entrySet();
+  public abstract Set<Map.Entry<Object, Object>> entrySet();
 }
