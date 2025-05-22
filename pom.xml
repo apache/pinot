@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.46</aws.sdk.version>
+    <aws.sdk.version>2.31.48</aws.sdk.version>
     <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -195,7 +195,7 @@
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
-    <kafka3.version>3.9.0</kafka3.version>
+    <kafka3.version>3.9.1</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>4.0.4</pulsar.version>
     <flink.version>1.20.1</flink.version>
@@ -253,7 +253,7 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.30.2</jline.version>
+    <jline.version>3.30.3</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.3</nimbus-jose-jwt.version>
@@ -2540,7 +2540,7 @@
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
           <artifactId>sisu-maven-plugin</artifactId>
-          <version>0.9.0.M3</version>
+          <version>0.9.0.M4</version>
           <executions>
             <execution>
               <goals>
@@ -2569,7 +2569,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.23.1</version>
+            <version>10.24.0</version>
           </dependency>
         </dependencies>
         <executions>
