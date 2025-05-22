@@ -215,8 +215,8 @@ public class BenchmarkDeterministicIndexedTable {
 
       // make 10 indexed tables
       IndexedTable deterministicIndexedTable =
-          new DeterministicConcurrentIndexedTable(_dataSchema, false, _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD,
-              TRIM_THRESHOLD, _executorService);
+          new DeterministicConcurrentIndexedTable(_dataSchema, false,
+              _queryContext, TRIM_SIZE, TRIM_SIZE, TRIM_THRESHOLD, TRIM_THRESHOLD, _executorService);
       deterministicIndexedTables.add(deterministicIndexedTable);
 
       // put 10k records in each indexed table, in parallel
@@ -250,10 +250,10 @@ public class BenchmarkDeterministicIndexedTable {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt =
-        new OptionsBuilder().include(BenchmarkDeterministicIndexedTable.class.getSimpleName()).warmupTime(TimeValue.seconds(10))
+        new OptionsBuilder().include(BenchmarkDeterministicIndexedTable.class.getSimpleName())
+            .warmupTime(TimeValue.seconds(10))
             .warmupIterations(1).measurementTime(TimeValue.seconds(30)).measurementIterations(3).forks(1);
 
     new Runner(opt.build()).run();
   }
 }
-
