@@ -498,6 +498,11 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        /**
+         * This will help in getting deterministic and correct result for queries with group by and limit but  without order by
+         */
+        public static final String ENABLE_DETERMINISTIC_GROUP_TRIM = "enableDeterministicGroupTrim";
+
         /** Number of threads used in the final reduce.
          * This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
          * aggregation functions. */
