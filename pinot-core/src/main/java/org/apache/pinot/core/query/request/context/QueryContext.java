@@ -286,9 +286,6 @@ public class QueryContext {
     return Boolean.parseBoolean(_queryOptions.getOrDefault("enableDeterministicGroupTrim", "false"));
   }
 
-
-
-
   /**
    * Returns the aggregation functions for the query, or {@code null} if the query does not have any aggregation.
    */

@@ -36,7 +36,7 @@ import java.util.Arrays;
  *
  * TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
  */
-public class Key {
+public class Key implements Comparable<Key> {
   private final Object[] _values;
 
   public Key(Object[] values) {
@@ -62,5 +62,15 @@ public class Key {
   @Override
   public String toString() {
     return Arrays.toString(_values);
+  }
+  @Override
+  public int compareTo(Key other) {
+    for (int i = 0; i < _values.length; i++) {
+      int cmp = ((Comparable<Object>) _values[i]).compareTo(other._values[i]);
+      if (cmp != 0) {
+        return cmp;
+      }
+    }
+    return 0;
   }
 }
