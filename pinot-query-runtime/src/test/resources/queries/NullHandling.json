@@ -64,6 +64,26 @@
         "description": "LEFT JOIN and GROUP BY with AGGREGATE AND SORT",
         "sql": "SELECT {tbl1}.strCol2, COUNT({tbl2}.intCol1), MIN({tbl2}.intCol1) AS minCol, MAX({tbl2}.doubleCol1) AS maxCol, SUM({tbl2}.doubleCol1) FROM {tbl1} LEFT OUTER JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 GROUP BY {tbl1}.strCol2 ORDER BY minCol DESC NULLS LAST, maxCol ASC NULLS LAST",
         "keepOutputRowOrder": true
+      },
+      {
+        "description": "Joining with nullable int column",
+        "sql": "SET enableNullHandling = TRUE; WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                             WITH tableWithNull AS (SELECT cast(intCol1 as INT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as INT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1"
+      },
+      {
+        "description": "Joining with nullable long column",
+        "sql": "SET enableNullHandling = TRUE; WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                             WITH tableWithNull AS (SELECT cast(intCol1 as LONG) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as LONG) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1"
+      },
+      {
+        "description": "Joining with nullable float column",
+        "sql": "SET enableNullHandling = TRUE; WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                             WITH tableWithNull AS (SELECT cast(intCol1 as FLOAT) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as FLOAT) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1"
+      },
+      {
+        "description": "Joining with nullable double column",
+        "sql": "SET enableNullHandling = TRUE; WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1",
+        "h2Sql": "                             WITH tableWithNull AS (SELECT cast(intCol1 as DOUBLE) col1, CASE WHEN intCol1 > 0 THEN NULL ELSE cast(intCol1 as DOUBLE) END AS nullableCol1 FROM {tbl1}) SELECT t1.col1 FROM tableWithNull AS t1 JOIN tableWithNull AS t2 ON t1.col1 = t2.nullableCol1"
       }
     ]
   },
