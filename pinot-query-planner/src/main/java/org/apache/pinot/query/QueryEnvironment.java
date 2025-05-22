@@ -220,6 +220,7 @@ public class QueryEnvironment {
       extraFields.put(RuleTimingPlannerListener.RULE_TIMINGS,
           plannerContext.getPlannerOutput().get(RuleTimingPlannerListener.RULE_TIMINGS));
     }
+    extraFields.put("rowFilters", plannerContext.getOptions().get("rowFilters"));
     return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
   }
 
@@ -651,6 +652,10 @@ public class QueryEnvironment {
 
     public boolean isExplain() {
       return _sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN);
+    }
+
+    public PlannerContext getPlannerContext() {
+      return _plannerContext;
     }
 
     /// Explain the query plan.

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.spi.auth;
 
-/**
- * The AuthorizationResult interface defines the contract for authorization results in the Pinot system.
- * Implementations of this interface provide the access status and an optional failure message indicating
- * the reason for denied access.
- */
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+
 public interface AuthorizationResult {
 
   /**
@@ -38,4 +38,22 @@ public interface AuthorizationResult {
    * @return A string containing the failure message if access is denied, otherwise an empty string or null.
    */
   String getFailureMessage();
+
+  /**
+   * Returns a map of row-level filters applicable to different access policies.
+   * The map key is the policy identifier, and the value is a list of row filter expressions.
+   *
+   * Example:
+   * {
+   *   "OrdersMetricsReadonlyAccess" => ["'transactionValue' < 1000", "'year' > 2018"]
+   * }
+   *
+   * The logic for how multiple filters are combined (e.g., ANDed or ORed) is not defined here and is left
+   * to the consuming system to interpret.
+   *
+   * @return A map where each key is a policy ID and the corresponding value is a list of row filter expressions.
+   */
+  default Map<String, List<String>> rowFilters() {
+    return Map.of("policyId1", List.of("ArrDelay < 50", "ActualElapsedTime < 100"));
+  }
 }
