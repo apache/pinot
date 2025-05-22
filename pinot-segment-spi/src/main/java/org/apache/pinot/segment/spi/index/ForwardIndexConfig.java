@@ -101,14 +101,6 @@ public class ForwardIndexConfig extends IndexConfig {
   @Nullable
   private final Map<String, Object> _configs;
 
-  @Deprecated
-  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
-      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
-      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk) {
-    this(disabled, compressionCodec, deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize,
-        targetDocsPerChunk, null);
-  }
-
   public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
       @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
       @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk,
@@ -160,15 +152,6 @@ public class ForwardIndexConfig extends IndexConfig {
       _dictIdCompressionType = null;
       _chunkCompressionType = null;
     }
-  }
-
-  @Deprecated
-  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
-      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType,
-      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
-      @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk) {
-    this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
-        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk);
   }
 
   @JsonCreator
