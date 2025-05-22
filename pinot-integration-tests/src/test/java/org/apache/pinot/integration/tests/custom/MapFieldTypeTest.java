@@ -48,7 +48,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
   // Default settings
   private static final int V1_DEFAULT_SELECTION_COUNT = 10;
   protected static final String DEFAULT_TABLE_NAME = "MapFieldTypeTest";
-  private static final int NUM_DOCS = 100;
+  private static final int NUM_DOCS = 1000;
   private static final String STRING_MAP_FIELD_NAME = "stringMap";
   private static final String INT_MAP_FIELD_NAME = "intMap";
   private int _setSelectionDefaultDocCount = 10;
@@ -149,7 +149,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
         Map<String, Integer> intMap = new HashMap<>();
         for (int j = 0; j < i; j++) {
           String key = "k" + j;
-          stringMap.put(key, "v_" + i);
+          stringMap.put(key, "v" + i);
           intMap.put(key, i);
         }
         GenericData.Record record = new GenericData.Record(avroSchema);
@@ -180,7 +180,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
       JsonNode stringMap = rows.get(i).get(1);
       for (int j = 0; j < i; j++) {
         assertEquals(intMap.get("k" + j).intValue(), i);
-        assertEquals(stringMap.get("k" + j).textValue(), "v_" + i);
+        assertEquals(stringMap.get("k" + j).textValue(), "v" + i);
       }
     }
     // Selection only
@@ -193,7 +193,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(0).get(0).textValue(), "null");
     assertEquals(rows.get(0).get(1).intValue(), -2147483648);
     for (int i = 1; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).textValue(), "v_" + i);
+      assertEquals(rows.get(i).get(0).textValue(), "v" + i);
       assertEquals(rows.get(i).get(1).intValue(), i);
     }
 
@@ -210,12 +210,12 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(0).get(2).textValue(), "null");
     assertEquals(rows.get(1).get(0).intValue(), 1);
     assertEquals(rows.get(1).get(1).intValue(), -2147483648);
-    assertEquals(rows.get(1).get(2).textValue(), "v_1");
+    assertEquals(rows.get(1).get(2).textValue(), "v1");
     for (int i = 2; i < getSelectionDefaultDocCount(); i++) {
       assertEquals(rows.get(i).get(0).intValue(), i);
       assertEquals(rows.get(i).get(1).intValue(), i);
-      assertEquals(rows.get(i).get(2).textValue(), "v_" + i);
-      assertEquals(rows.get(i).get(3).textValue(), "v_" + i);
+      assertEquals(rows.get(i).get(2).textValue(), "v" + i);
+      assertEquals(rows.get(i).get(3).textValue(), "v" + i);
     }
 
     // Aggregation only
@@ -235,17 +235,17 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(0).get(0).textValue(), "null");
     assertEquals(rows.get(0).get(1).intValue(), Integer.MIN_VALUE);
     for (int i = 1; i < getSelectionDefaultDocCount(); i++) {
-      assertEquals(rows.get(i).get(0).textValue(), "v_" + i);
+      assertEquals(rows.get(i).get(0).textValue(), "v" + i);
       assertEquals(rows.get(i).get(1).intValue(), i);
     }
 
     // Filter
-    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v_25'";
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v25'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).textValue(), "v_25");
+    assertEquals(rows.get(0).get(0).textValue(), "v25");
 
     query = "SELECT intMap['k2'] FROM " + getTableName() + " WHERE intMap['k1'] = 25";
     pinotResponse = postQuery(query);
@@ -255,7 +255,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(0).get(0).intValue(), 25);
 
     // Filter on non-existing key
-    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] = 'v_25'";
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] = 'v25'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -283,14 +283,14 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test NOT_EQ predicate with string map
-    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] != 'v_25'";
+    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] != 'v25'";
     JsonNode pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
-    // All records except the one with k1 = 'v_25' should be returned
-    // Verify that none of the returned rows have k1 = 'v_25'
+    // All records except the one with k1 = 'v25' should be returned
+    // Verify that none of the returned rows have k1 = 'v25'
     for (int i = 0; i < rows.size(); i++) {
-      assertNotEquals(rows.get(i).get(0).textValue(), "v_25");
+      assertNotEquals(rows.get(i).get(0).textValue(), "v25");
     }
 
     // Test NOT_EQ predicate with int map
@@ -301,11 +301,11 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // All records except the one with k1 = 25 should be returned
     // Verify that none of the returned rows have k1 = 25
     for (int i = 0; i < rows.size(); i++) {
-      assertNotEquals(rows.get(i).get(0).textValue(), "v_25");
+      assertNotEquals(rows.get(i).get(0).textValue(), "v25");
     }
 
     // Test NOT_EQ predicate with non-existing key
-    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] != 'v_25'";
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] != 'v25'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -319,17 +319,17 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test IN predicate with string map
-    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] IN ('v_25', 'v_26')";
+    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] IN ('v25', 'v26')";
     JsonNode pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
-    // Only records with k1 = 'v_25' or 'v_26' should be returned
+    // Only records with k1 = 'v25' or 'v26' should be returned
     assertEquals(rows.size(), 2);
 
     // Verify the returned values
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      assert (value.equals("v_25") || value.equals("v_26"));
+      assert (value.equals("v25") || value.equals("v26"));
     }
 
     // Test IN predicate with int map
@@ -347,7 +347,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     // Test IN predicate with non-existing key
-    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] IN ('v_25', 'v_26')";
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk'] IN ('v25', 'v26')";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -361,7 +361,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test NOT IN predicate with string map
-    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] NOT IN ('v_25', 'v_26')";
+    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] NOT IN ('v25', 'v26')";
     JsonNode pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
@@ -369,7 +369,7 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Verify the returned values
     for (int i = 0; i < rows.size(); i++) {
       String value = rows.get(i).get(0).textValue();
-      assert (!value.equals("v_25") && !value.equals("v_26"));
+      assert (!value.equals("v25") && !value.equals("v26"));
     }
 
     // Test NOT IN predicate with int map
@@ -424,18 +424,18 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test string with single quote in map value
-    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v_25''s value'";
+    String query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v25''s value'";
     JsonNode pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
 
     // Test string with multiple single quotes
-    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v_25''s ''quoted'' value'";
+    query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1'] = 'v25''s ''quoted'' value'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
 
     // Test IN predicate with quoted strings
     query = "SELECT stringMap['k2'] FROM " + getTableName()
-        + " WHERE stringMap['k1'] IN ('v_25''s value', 'v_26''s value')";
+        + " WHERE stringMap['k1'] IN ('v25''s value', 'v26''s value')";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
   }
