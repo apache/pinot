@@ -27,6 +27,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -89,7 +91,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, config.getTenantName(),
         tables, _pinotHelixResourceManager);
     observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
-    ConcurrentLinkedDeque<String> parallelQueue = getTableQueue(config, tables, true);
+    ConcurrentLinkedDeque<String> parallelQueue = createTableQueue(config, tables, true);
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
     int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
     try {
@@ -148,8 +150,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
-      if (tenantName.equals(tableConfigTenant)) {
+      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
+      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
         tables.add(table);
       }
     }
@@ -173,7 +175,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     }
   }
 
-  private ConcurrentLinkedDeque<String> getTableQueue(TenantRebalanceConfig config, Set<String> tables,
+  private ConcurrentLinkedDeque<String> createTableQueue(TenantRebalanceConfig config, Set<String> tables,
       boolean isScaleOut) {
     ConcurrentLinkedDeque<String> queue = new ConcurrentLinkedDeque<>();
     Set<String> dimTables = getDimensionalTables(config.getTenantName());
