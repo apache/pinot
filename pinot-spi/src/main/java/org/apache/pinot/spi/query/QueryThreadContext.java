@@ -112,7 +112,7 @@ public class QueryThreadContext {
       String errorMessage = "QueryThreadContext is not initialized";
       if (_strictMode) {
         LOGGER.error(errorMessage);
-        throw new IllegalStateException("QueryThreadContext is not initialized");
+        throw new IllegalStateException(errorMessage);
       } else {
         LOGGER.debug(errorMessage);
         // in non-strict mode, return the fake instance

@@ -201,10 +201,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    QueryThreadContext.setQueryEngine("mse");
-    long requestId = QueryThreadContext.getRequestId();
+    long timeoutMs = Long.parseLong(reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+
     CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
-        .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
+        .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .whenComplete((result, error) -> {
           // this will always be called, either on the submission thread that finished the last or in the caller
           // (GRPC) thread in the improbable case all submission tasks finished before the caller thread reaches
@@ -212,6 +212,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           if (error != null) { // if there was an error submitting the request, return an error response
             try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
                 QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
+              long requestId = QueryThreadContext.getRequestId();
               LOGGER.error("Caught exception while submitting request: {}", requestId, error);
               String errorMsg = "Caught exception while submitting request: " + error.getMessage();
               responseObserver.onNext(Worker.QueryResponse.newBuilder()
@@ -241,6 +242,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private void submitInternal(Worker.QueryRequest request, Map<String, String> reqMetadata) {
     try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
+      QueryThreadContext.setQueryEngine("mse");
       List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
 
       List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
@@ -303,8 +305,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
+    long timeoutMs = Long.parseLong(reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+
     CompletableFuture.runAsync(() -> explainInternal(request, responseObserver, reqMetadata), _explainExecutorService)
-        .orTimeout(QueryThreadContext.getDeadlineMs(), TimeUnit.MILLISECONDS)
+        .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .handle((result, error) -> {
       if (error != null) {
         try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
