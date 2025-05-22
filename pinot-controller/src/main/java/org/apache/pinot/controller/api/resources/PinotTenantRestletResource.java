@@ -56,6 +56,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -384,31 +386,14 @@ public class PinotTenantRestletResource {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
-      if (tenantName.equals(tableConfigTenant)) {
+      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
+      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
         tables.add(table);
-      }
-      if (tableConfig.getTenantConfig().getTagOverrideConfig() != null) {
-        String completed = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted();
-        if (completed != null && getRawTenantName(completed).equals(tenantName)) {
-          tables.add(table);
-        }
-        String consuming = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming();
-        if (consuming != null && getRawTenantName(consuming).equals(tenantName)) {
-          tables.add(table);
-        }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
-  }
-
-  private String getRawTenantName(String tenantName) {
-    if (tenantName.lastIndexOf("_") > 0) {
-      return tenantName.substring(0, tenantName.lastIndexOf("_"));
-    }
-    return tenantName;
   }
 
   private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
