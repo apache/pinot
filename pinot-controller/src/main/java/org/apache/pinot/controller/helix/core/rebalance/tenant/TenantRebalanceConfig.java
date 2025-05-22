@@ -37,6 +37,12 @@ public class TenantRebalanceConfig extends RebalanceConfig {
   @JsonProperty("parallelBlacklist")
   private Set<String> _parallelBlacklist = new HashSet<>();
 
+  // If empty, default to allow all tables
+  @JsonProperty("allowTables")
+  private Set<String> _allowTables = new HashSet<>();
+  @JsonProperty("blockTables")
+  private Set<String> _blockTables = new HashSet<>();
+
   private boolean _verboseResult = false;
 
   public String getTenantName() {
@@ -70,6 +76,14 @@ public class TenantRebalanceConfig extends RebalanceConfig {
   public void setParallelBlacklist(Set<String> parallelBlacklist) {
     _parallelBlacklist = parallelBlacklist;
   }
+
+  public Set<String> getAllowTables() { return _allowTables; }
+
+  public void setAllowTables(Set<String> allowTables) { _allowTables = allowTables; }
+
+  public Set<String> getBlockTables() { return _blockTables; }
+
+  public void setBlockTables(Set<String> blockTables) { _blockTables = blockTables; }
 
   public boolean isVerboseResult() {
     return _verboseResult;

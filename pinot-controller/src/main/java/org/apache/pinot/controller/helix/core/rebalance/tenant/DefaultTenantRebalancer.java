@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
-import com.google.common.collect.Sets;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -38,6 +34,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class DefaultTenantRebalancer implements TenantRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTenantRebalancer.class);
@@ -56,6 +53,11 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   public TenantRebalanceResult rebalance(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
+    Set<String> allowTables = config.getAllowTables();
+    if (!allowTables.isEmpty()) {
+      tables.retainAll(allowTables);
+    }
+    tables.removeAll(config.getBlockTables());
     tables.forEach(table -> {
       try {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
@@ -87,50 +89,10 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, config.getTenantName(),
         tables, _pinotHelixResourceManager);
     observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
-    final Deque<String> sequentialQueue = new LinkedList<>();
-    final Deque<String> parallelQueue = new ConcurrentLinkedDeque<>();
+    ConcurrentLinkedDeque<String> parallelQueue = getTableQueue(config, tables, true);
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
     int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
-    Set<String> dimTables = getDimensionalTables(config.getTenantName());
-    AtomicInteger activeThreads = new AtomicInteger(parallelism);
     try {
-      if (parallelism > 1) {
-        Set<String> parallelTables;
-        if (!config.getParallelWhitelist().isEmpty()) {
-          parallelTables = new HashSet<>(config.getParallelWhitelist());
-        } else {
-          parallelTables = new HashSet<>(tables);
-        }
-        if (!config.getParallelBlacklist().isEmpty()) {
-          parallelTables = Sets.difference(parallelTables, config.getParallelBlacklist());
-        }
-        parallelTables.forEach(table -> {
-          if (dimTables.contains(table)) {
-            // prioritise dimension tables
-            parallelQueue.addFirst(table);
-          } else {
-            parallelQueue.addLast(table);
-          }
-        });
-        Sets.difference(tables, parallelTables).forEach(table -> {
-          if (dimTables.contains(table)) {
-            // prioritise dimension tables
-            sequentialQueue.addFirst(table);
-          } else {
-            sequentialQueue.addLast(table);
-          }
-        });
-      } else {
-        tables.forEach(table -> {
-          if (dimTables.contains(table)) {
-            // prioritise dimension tables
-            sequentialQueue.addFirst(table);
-          } else {
-            sequentialQueue.addLast(table);
-          }
-        });
-      }
-
       for (int i = 0; i < parallelism; i++) {
         _executorService.submit(() -> {
           while (true) {
@@ -140,22 +102,16 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             }
             RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
             rebalanceConfig.setDryRun(false);
+            if (rebalanceResult.get(table)
+                .getRebalanceSummaryResult()
+                .getSegmentInfo()
+                .getReplicationFactor()
+                .getExpectedValueAfterRebalance() == 1) {
+              rebalanceConfig.setMinAvailableReplicas(0);
+            }
             rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
           }
-          // Last parallel thread to finish the table rebalance job will pick up the
-          // sequential table rebalance execution
-          if (activeThreads.decrementAndGet() == 0) {
-            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
-            rebalanceConfig.setDryRun(false);
-            while (true) {
-              String table = sequentialQueue.pollFirst();
-              if (table == null) {
-                break;
-              }
-              rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
-            }
-            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
-          }
+          observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
         });
       }
     } catch (Exception exception) {
@@ -215,5 +171,29 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
           String.format("Caught exception/error while rebalancing table: %s", tableName));
     }
+  }
+
+  private ConcurrentLinkedDeque<String> getTableQueue(TenantRebalanceConfig config, Set<String> tables,
+      boolean isScaleOut) {
+    ConcurrentLinkedDeque<String> queue = new ConcurrentLinkedDeque<>();
+    Set<String> dimTables = getDimensionalTables(config.getTenantName());
+    tables.forEach(table -> {
+      if (isScaleOut) {
+        if (dimTables.contains(table)) {
+          // prioritise dimension tables
+          queue.addFirst(table);
+        } else {
+          queue.addLast(table);
+        }
+      } else {
+        if (dimTables.contains(table)) {
+          queue.addLast(table);
+        } else {
+          // prioritise non-dimension tables
+          queue.addFirst(table);
+        }
+      }
+    });
+    return queue;
   }
 }
