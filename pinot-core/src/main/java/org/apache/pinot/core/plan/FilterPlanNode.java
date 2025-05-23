@@ -148,8 +148,12 @@ public class FilterPlanNode implements PlanNode {
         findLiteral = true;
       }
     }
-    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral
-        && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+    if (columnName == null || !findLiteral) {
+      return false;
+    }
+    DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+    return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+        FieldConfig.IndexType.H3);
   }
 
   /**
@@ -179,16 +183,18 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+            FieldConfig.IndexType.H3);
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+            FieldConfig.IndexType.H3);
       }
       return false;
     }
@@ -256,7 +262,7 @@ public class FilterPlanNode implements PlanNode {
           }
         } else {
           String column = lhs.getIdentifier();
-          DataSource dataSource = _indexSegment.getDataSource(column);
+          DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
           PredicateEvaluator predicateEvaluator;
           switch (predicate.getType()) {
             case TEXT_CONTAINS:

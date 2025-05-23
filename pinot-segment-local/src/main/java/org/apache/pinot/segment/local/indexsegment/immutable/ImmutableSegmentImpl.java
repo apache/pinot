@@ -235,14 +235,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public DataSource getDataSource(String column) {
-    DataSource result = _dataSources.get(column);
-    Preconditions.checkNotNull(result,
-        "DataSource for %s should not be null. Potentially invalid column name specified.", column);
-    return result;
-  }
-
-  @Override
   public Set<String> getColumnNames() {
     return _segmentMetadata.getSchema().getColumnNames();
   }
@@ -306,6 +298,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
   }
 
+  @Nullable
+  @Override
+  public DataSource getDataSourceNullable(String column) {
+    return _dataSources.get(column);
+  }
+
+  @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return _starTreeIndexContainer != null ? _starTreeIndexContainer.getStarTrees() : null;
