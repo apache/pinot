@@ -102,7 +102,9 @@ public class PlanNodeDeserializer {
     return new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertJoinType(protoJoinNode.getJoinType()), protoJoinNode.getLeftKeysList(),
         protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()),
-        convertJoinStrategy(protoJoinNode.getJoinStrategy()));
+        convertJoinStrategy(protoJoinNode.getJoinStrategy()),
+        protoJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
+            protoJoinNode.getMatchCondition()) : null);
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
@@ -284,6 +286,10 @@ public class PlanNodeDeserializer {
         return JoinRelType.SEMI;
       case ANTI:
         return JoinRelType.ANTI;
+      case ASOF:
+        return JoinRelType.ASOF;
+      case LEFT_ASOF:
+        return JoinRelType.LEFT_ASOF;
       default:
         throw new IllegalStateException("Unsupported JoinType: " + joinType);
     }
@@ -295,6 +301,8 @@ public class PlanNodeDeserializer {
         return JoinNode.JoinStrategy.HASH;
       case LOOKUP:
         return JoinNode.JoinStrategy.LOOKUP;
+      case AS_OF:
+        return JoinNode.JoinStrategy.ASOF;
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }

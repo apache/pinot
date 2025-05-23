@@ -37,6 +37,7 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -123,6 +124,13 @@ public final class RelToPlanNodeConverter {
         _joinFound = true;
       }
       result = convertLogicalJoin((LogicalJoin) node);
+    } else if (node instanceof LogicalAsofJoin) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
+      if (!_joinFound) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
+        _joinFound = true;
+      }
+      result = convertLogicalAsofJoin((LogicalAsofJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
@@ -356,6 +364,33 @@ public final class RelToPlanNodeConverter {
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy);
+  }
+
+  private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
+    JoinInfo joinInfo = join.analyzeCondition();
+    DataSchema dataSchema = toDataSchema(join.getRowType());
+    List<PlanNode> inputs = convertInputs(join.getInputs());
+    JoinRelType joinType = join.getJoinType();
+
+    // Basic validations
+    Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
+    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty(),
+        "Non-equi conditions are not supported for ASOF join, got: %s", joinInfo.nonEquiConditions);
+    Preconditions.checkState(joinType == JoinRelType.ASOF || joinType == JoinRelType.LEFT_ASOF,
+        "Join type should be ASOF or LEFT_ASOF, got: %s", joinType);
+
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+    int numLeftColumns = left.getDataSchema().size();
+    int numResultColumns = dataSchema.size();
+    int numRightColumns = right.getDataSchema().size();
+    Preconditions.checkState(numLeftColumns + numRightColumns == numResultColumns,
+        "Invalid number of columns for join type: %s, left: %s, right: %s, result: %s", joinType, numLeftColumns,
+        numRightColumns, numResultColumns);
+
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
   }
 
   private List<PlanNode> convertInputs(List<RelNode> inputs) {
