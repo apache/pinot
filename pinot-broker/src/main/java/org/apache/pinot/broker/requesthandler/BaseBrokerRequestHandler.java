@@ -262,17 +262,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return true;
     }
     for (String physicalOrLogicalTableName : tableNames) {
+      String rawTableName = physicalOrLogicalTableName;
       boolean acquired;
       if (_tableCache.isLogicalTable(physicalOrLogicalTableName)) {
         acquired = _queryQuotaManager.acquireLogicalTable(physicalOrLogicalTableName);
       } else {
         acquired = _queryQuotaManager.acquire(physicalOrLogicalTableName);
+        rawTableName = TableNameBuilder.extractRawTableName(physicalOrLogicalTableName);
       }
       if (!acquired) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}",
             requestContext.getRequestId(), physicalOrLogicalTableName);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(physicalOrLogicalTableName);
+
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return true;
       }
