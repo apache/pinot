@@ -406,7 +406,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS
-      if (hasExceededQPSQuota(database, physicalTableNames, requestContext)) {
+      if (hasExceededQPSQuota(database, Set.of(logicalTableConfig.getTableName()), requestContext)) {
         String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }

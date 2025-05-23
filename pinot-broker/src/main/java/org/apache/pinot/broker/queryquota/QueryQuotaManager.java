@@ -28,6 +28,13 @@ public interface QueryQuotaManager {
   boolean acquire(String tableName);
 
   /**
+   * Try to acquire a quota for the given logical table.
+   * @param logicalTableName Logical table name
+   * @return {@code true} if the table quota has not been reached, {@code false} otherwise
+   */
+  boolean acquireLogicalTable(String logicalTableName);
+
+  /**
    * Try to acquire a quota for the given database.
    * @param databaseName database name
    * @return {@code true} if the database quota has not been reached, {@code false} otherwise

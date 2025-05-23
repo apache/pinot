@@ -261,11 +261,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
       return true;
     }
-    for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
-        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
+    for (String physicalOrLogicalTableName : tableNames) {
+      String rawTableName = physicalOrLogicalTableName;
+      boolean acquired;
+      if (_tableCache.isLogicalTable(physicalOrLogicalTableName)) {
+        acquired = _queryQuotaManager.acquireLogicalTable(physicalOrLogicalTableName);
+      } else {
+        acquired = _queryQuotaManager.acquire(physicalOrLogicalTableName);
+        rawTableName = TableNameBuilder.extractRawTableName(physicalOrLogicalTableName);
+      }
+      if (!acquired) {
+        LOGGER.warn("Request {}: query exceeds quota for table: {}",
+            requestContext.getRequestId(), physicalOrLogicalTableName);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return true;
       }
@@ -285,7 +294,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @return true if the query was successfully cancelled, false otherwise.
    */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
-      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
