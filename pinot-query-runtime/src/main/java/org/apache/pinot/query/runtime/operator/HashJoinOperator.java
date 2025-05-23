@@ -260,15 +260,15 @@ public class HashJoinOperator extends BaseJoinOperator {
   protected List<Object[]> buildNonMatchRightRows() {
     List<Object[]> rows = new ArrayList<>();
     if (_rightTable.isKeysUnique()) {
-      for (Map.Entry<Object, Object[]> entry : _rightTable.entrySet()) {
-        Object[] rightRow = entry.getValue();
+      for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
+        Object[] rightRow = (Object[]) entry.getValue();
         if (!_matchedRightRows.containsKey(entry.getKey())) {
           rows.add(joinRow(null, rightRow));
         }
       }
     } else {
-      for (Map.Entry<Object, ArrayList<Object[]>> entry : _rightTable.entrySet()) {
-        List<Object[]> rightRows = entry.getValue();
+      for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
+        List<Object[]> rightRows = ((List<Object[]>) entry.getValue());
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {

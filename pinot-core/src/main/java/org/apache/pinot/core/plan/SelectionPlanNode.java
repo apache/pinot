@@ -158,7 +158,7 @@ public class SelectionPlanNode implements PlanNode {
           return false;
         }
         String column = orderByExpression.getExpression().getIdentifier();
-        DataSource dataSource = _indexSegment.getDataSource(column);
+        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
         // If there are null values, we cannot trust DataSourceMetadata.isSorted
         if (isNullHandlingEnabled) {
           NullValueVectorReader nullValueVector = dataSource.getNullValueVector();

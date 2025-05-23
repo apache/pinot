@@ -216,6 +216,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               .collect(Collectors.toList()));
     }
 
+    queryContext.setSchema(executionInfo.getSchema());
+
     // Gather stats for realtime consuming segments
     // TODO: the freshness time should not be collected at query time because there is no guarantee that the consuming
     //       segment is queried (consuming segment might be pruned, or the server only contains relocated committed
