@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.timeboundary;
 
+import java.util.List;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -43,4 +44,12 @@ public interface TimeBoundaryStrategy {
    */
   TimeBoundaryInfo computeTimeBoundary(LogicalTableConfig logicalTableConfig, TableCache tableCache,
       RoutingManager routingManager);
+
+
+  /**
+   * Returns the list of physical table names that are part of the time boundary.
+   * @param logicalTableConfig The logical table configuration
+   * @return The list of physical table names that are part of the time boundary.
+   */
+  List<String> getTimeBoundaryTableNames(LogicalTableConfig logicalTableConfig);
 }

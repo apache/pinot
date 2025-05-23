@@ -36,6 +36,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 @AutoService(TimeBoundaryStrategy.class)
 public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
 
+  public static final String INCLUDED_TABLES = "includedTables";
+
   @Override
   public String getName() {
     return "min";
@@ -75,5 +77,11 @@ public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
       }
     }
     return minTimeBoundaryInfo;
+  }
+
+  @Override
+  public List<String> getTimeBoundaryTableNames(LogicalTableConfig logicalTableConfig) {
+    Map<String, Object> parameters = logicalTableConfig.getTimeBoundaryConfig().getParameters();
+    return parameters != null ? (List) parameters.getOrDefault(INCLUDED_TABLES, List.of()) : List.of();
   }
 }
