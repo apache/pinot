@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,12 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
 
   public LogicalTableExecutionInfo(List<SingleTableExecutionInfo> tableExecutionInfos) {
     _tableExecutionInfos = tableExecutionInfos;
+  }
+
+  @Override
+  public Schema getSchema() {
+    // TODO: Return the schema of the logical table
+    return _tableExecutionInfos.get(0).getSchema();
   }
 
   @Override

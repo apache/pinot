@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.slf4j.Logger;
@@ -85,7 +86,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
 
     _minMaxValueContexts = new ArrayList<>(_numOperators);
     for (Operator<BaseResultsBlock> operator : _operators) {
-      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn));
+      _minMaxValueContexts.add(new MinMaxValueContext(operator, firstOrderByColumn, queryContext.getSchema()));
     }
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column min value in ascending order
@@ -313,9 +314,10 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     final Comparable _minValue;
     final Comparable _maxValue;
 
-    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column) {
+    MinMaxValueContext(Operator<BaseResultsBlock> operator, String column, Schema schema) {
       _operator = operator;
-      DataSourceMetadata dataSourceMetadata = operator.getIndexSegment().getDataSource(column).getDataSourceMetadata();
+      DataSourceMetadata dataSourceMetadata =
+          operator.getIndexSegment().getDataSource(column, schema).getDataSourceMetadata();
       _minValue = dataSourceMetadata.getMinValue();
       _maxValue = dataSourceMetadata.getMaxValue();
     }
