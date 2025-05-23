@@ -138,7 +138,7 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
-  private boolean _enableDeterministicGroupTrim;
+  private boolean _enableAccurateGroupTrim;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -272,12 +272,12 @@ public class QueryContext {
     return _explain != ExplainMode.NONE;
   }
 
-  public boolean isEnableDeterministicGroupTrim() {
-    return _enableDeterministicGroupTrim;
+  public boolean isEnableAccurateGroupTrim() {
+    return _enableAccurateGroupTrim;
   }
 
-  public void setEnableDeterministicGroupTrim(boolean enable) {
-    _enableDeterministicGroupTrim = enable;
+  public void setEnableAccurateGroupTrim(boolean enable) {
+    _enableAccurateGroupTrim = enable;
   }
 
   /**

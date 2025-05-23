@@ -66,7 +66,16 @@ public class Key implements Comparable<Key> {
   @Override
   public int compareTo(Key other) {
     for (int i = 0; i < _values.length; i++) {
-      int cmp = ((Comparable<Object>) _values[i]).compareTo(other._values[i]);
+      Object a = _values[i];
+      Object b = other._values[i];
+      if (a == null && b == null) {
+        continue;
+      } else if (a == null) {
+        return 1;   // null > non-null
+      } else if (b == null) {
+        return -1;  // non-null < null
+      }
+      int cmp = ((Comparable<Object>) a).compareTo(b);
       if (cmp != 0) {
         return cmp;
       }
