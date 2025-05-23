@@ -20,6 +20,7 @@
 package org.apache.pinot.spi.auth;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -31,14 +32,14 @@ public class TableAuthorizationResultTest {
   public void testParameterizedConstructor() {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
+    TableAuthorizationResult result = new TableAuthorizationResult(failedTables, Map.of());
     Assert.assertFalse(result.hasAccess());
     Assert.assertTrue(result.getFailureMessage().contains("table1"));
   }
 
   @Test
   public void testAddFailedTable() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"));
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"), Map.of());
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1]");
   }
@@ -48,14 +49,14 @@ public class TableAuthorizationResultTest {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
     failedTables.add("table2");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
+    TableAuthorizationResult result = new TableAuthorizationResult(failedTables, Map.of());
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailedTables(), failedTables);
   }
 
   @Test
   public void testGetFailureMessage() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"));
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"), Map.of());
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 

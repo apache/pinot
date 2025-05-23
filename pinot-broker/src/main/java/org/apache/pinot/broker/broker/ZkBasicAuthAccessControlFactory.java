@@ -120,7 +120,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       if (failedTables.isEmpty()) {
         return TableAuthorizationResult.success();
       }
-      return new TableAuthorizationResult(failedTables);
+      return new TableAuthorizationResult(failedTables, Map.of());
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

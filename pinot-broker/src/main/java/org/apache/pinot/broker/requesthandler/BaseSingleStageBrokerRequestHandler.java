@@ -122,7 +122,6 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.apache.pinot.sql.parsers.rewriter.RowFiltersRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -901,7 +900,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Map<String, String> queryOptions =
         pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
     List<String> rowFilters =
-        authorizationResult.rowFilters().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+        authorizationResult.getRLSFilters().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < rowFilters.size(); i++) {
       sb.append(rowFilters.get(i));

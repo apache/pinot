@@ -21,7 +21,10 @@ package org.apache.pinot.spi.auth;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import javax.swing.text.html.Option;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -31,11 +34,13 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class TableAuthorizationResult implements AuthorizationResult {
 
-  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of());
+  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of(), Map.of());
   private final Set<String> _failedTables;
+  private final Map<String, List<String>> _tableRLSFilters;
 
-  public TableAuthorizationResult(Set<String> failedTables) {
+  public TableAuthorizationResult(Set<String> failedTables, Map<String, List<String>> tableRLSFilters) {
     _failedTables = failedTables;
+    _tableRLSFilters = tableRLSFilters;
   }
 
   /**
@@ -70,5 +75,9 @@ public class TableAuthorizationResult implements AuthorizationResult {
     List<String> failedTablesList = new ArrayList<>(_failedTables);
     Collections.sort(failedTablesList); // Sort to make output deterministic
     return "Authorization Failed for tables: " + failedTablesList;
+  }
+
+  public Optional<List<String>> getRLSFiltersForTable(String tableName) {
+    return Optional.ofNullable(_tableRLSFilters.get(tableName));
   }
 }

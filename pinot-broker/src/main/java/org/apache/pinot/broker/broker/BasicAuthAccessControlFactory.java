@@ -20,7 +20,9 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -101,14 +103,16 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       Set<String> failedTables = new HashSet<>();
+      Map<String, List<String>> tableRLSFilters = new HashMap<>();
 
       if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
         failedTables.add(brokerRequest.getQuerySource().getTableName());
       }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables);
+
+      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(brokerRequest.getQuerySource().getTableName());
+      rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(brokerRequest.getQuerySource().getTableName(), strings));
+
+      return new TableAuthorizationResult(failedTables, tableRLSFilters);
     }
 
     @Override
@@ -124,15 +128,16 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
       BasicAuthPrincipal principal = principalOpt.get();
       Set<String> failedTables = new HashSet<>();
+      Map<String, List<String>> tableRLSFilters = new HashMap<>();
       for (String table : tables) {
         if (!principal.hasTable(table)) {
           failedTables.add(table);
         }
+        //check if RLS filters have been defined for this table
+        Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
+        rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(table, strings));
       }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables);
+      return new TableAuthorizationResult(failedTables, tableRLSFilters);
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

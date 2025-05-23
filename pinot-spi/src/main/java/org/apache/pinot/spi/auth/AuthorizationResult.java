@@ -20,7 +20,6 @@ package org.apache.pinot.spi.auth;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 public interface AuthorizationResult {
@@ -53,7 +52,7 @@ public interface AuthorizationResult {
    *
    * @return A map where each key is a policy ID and the corresponding value is a list of row filter expressions.
    */
-  default Map<String, List<String>> rowFilters() {
+  default Map<String, List<String>> getRLSFilters() {
     return Map.of("policyId1", List.of("ArrDelay < 50", "ActualElapsedTime < 100"));
   }
 }
