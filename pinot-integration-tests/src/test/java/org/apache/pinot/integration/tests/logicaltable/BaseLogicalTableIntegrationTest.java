@@ -110,6 +110,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     if (_sharedClusterTestSuite != this) {
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
+      _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
     }
 
     _avroFiles = getAllAvroFiles();
@@ -247,6 +248,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   protected String getBrokerTenant() {
     return DEFAULT_TENANT;
+  }
+
+  // Setup H2 table with the same name as the logical table.
+  protected void setUpH2Connection(List<File> avroFiles)
+      throws Exception {
+    setUpH2Connection();
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
   }
 
   /**
@@ -423,22 +431,24 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(new HashSet<>(getPhysicalTableNames()), logicalTableConfig.getPhysicalTableConfigMap().keySet());
   }
 
-  @Test
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
   public void testQueriesFromQueryFile()
       throws Exception {
+    setUseMultiStageQueryEngine(false);
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries(true, false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test

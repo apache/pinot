@@ -103,8 +103,12 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
+      Map<Integer, Map<String, List<String>>> workerIdToTableNameSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToTableSegmentsMap();
       Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
+      Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
+          "Both workerIdToSegmentsMap and workerIdToTableNameSegmentsMap cannot be set at the same time");
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
       for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {
@@ -114,6 +118,9 @@ public class DispatchablePlanContext {
         WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
         if (workerIdToSegmentsMap != null) {
           workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+        }
+        if (workerIdToTableNameSegmentsMap != null) {
+          workerMetadata.setLogicalTableSegmentsMap(workerIdToTableNameSegmentsMap.get(workerId));
         }
         workerMetadataArray[workerId] = workerMetadata;
       }
