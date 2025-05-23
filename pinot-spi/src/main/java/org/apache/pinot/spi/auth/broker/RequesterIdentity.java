@@ -16,19 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.auth.broker;
 
-package org.apache.pinot.segment.local.segment.index.map;
+import org.apache.pinot.spi.utils.CommonConstants;
 
-import com.google.auto.service.AutoService;
-import org.apache.pinot.segment.spi.index.IndexPlugin;
-
-
-@AutoService(IndexPlugin.class)
-public class MapIndexPlugin implements IndexPlugin<MapIndexType> {
-  public static final MapIndexType INSTANCE = new MapIndexType();
-
-  @Override
-  public MapIndexType getIndexType() {
-    return INSTANCE;
+public abstract class RequesterIdentity {
+  public String getClientIp() {
+    return CommonConstants.UNKNOWN;
   }
 }

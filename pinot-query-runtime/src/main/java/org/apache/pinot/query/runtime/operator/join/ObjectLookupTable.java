@@ -32,7 +32,7 @@ public class ObjectLookupTable extends LookupTable {
   private final Map<Object, Object> _lookupTable = Maps.newHashMapWithExpectedSize(INITIAL_CAPACITY);
 
   @Override
-  public void addRow(Object key, Object[] row) {
+  public void addRow(@Nullable Object key, Object[] row) {
     _lookupTable.compute(key, (k, v) -> computeNewValue(row, v));
   }
 
@@ -46,19 +46,19 @@ public class ObjectLookupTable extends LookupTable {
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  public boolean containsKey(@Nullable Object key) {
     return _lookupTable.containsKey(key);
   }
 
   @Nullable
   @Override
-  public Object lookup(Object key) {
+  public Object lookup(@Nullable Object key) {
     return _lookupTable.get(key);
   }
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
-    return (Set) _lookupTable.entrySet();
+  public Set<Map.Entry<Object, Object>> entrySet() {
+    return _lookupTable.entrySet();
   }
 }

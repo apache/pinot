@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -25,6 +26,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -59,17 +61,30 @@ public interface IndexSegment {
    */
   Set<String> getPhysicalColumnNames();
 
-  /**
-   * Returns the {@link DataSource} for the given column.
-   *
-   * @param columnName Column name
-   * @return Data source for the given column
-   */
-  DataSource getDataSource(String columnName);
+  /// Returns the [DataSource] for the given column.
+  /// TODO: Revisit all usage of this method to support virtual [DataSource].
+  default DataSource getDataSource(String column) {
+    DataSource dataSource = getDataSourceNullable(column);
+    Preconditions.checkState(dataSource != null, "Failed to find data source for column: ", column);
+    return dataSource;
+  }
+
+  /// Returns the [DataSource] for the given column, or `null` if the column does not exist in the segment.
+  @Nullable
+  DataSource getDataSourceNullable(String column);
+
+  /// Returns the [DataSource] for the given column, or creates a virtual one if it doesn't exist. The passed in
+  /// [Schema] should be the latest schema of the table, not the one from [SegmentMetadata], and should contain the
+  /// asked column.
+  /// TODO: Add support for virtual [DataSource].
+  default DataSource getDataSource(String column, Schema schema) {
+    return getDataSource(column);
+  }
 
   /**
    * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.
    */
+  @Nullable
   List<StarTreeV2> getStarTrees();
 
   /**
