@@ -1523,6 +1523,7 @@
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
       </dependency>
+
       <!-- Required by Calcite -->
       <dependency>
         <groupId>org.immutables</groupId>
