@@ -77,13 +77,21 @@ public class TenantRebalanceConfig extends RebalanceConfig {
     _parallelBlacklist = parallelBlacklist;
   }
 
-  public Set<String> getAllowTables() { return _allowTables; }
+  public Set<String> getAllowTables() {
+    return _allowTables;
+  }
 
-  public void setAllowTables(Set<String> allowTables) { _allowTables = allowTables; }
+  public void setAllowTables(Set<String> allowTables) {
+    _allowTables = allowTables;
+  }
 
-  public Set<String> getBlockTables() { return _blockTables; }
+  public Set<String> getBlockTables() {
+    return _blockTables;
+  }
 
-  public void setBlockTables(Set<String> blockTables) { _blockTables = blockTables; }
+  public void setBlockTables(Set<String> blockTables) {
+    _blockTables = blockTables;
+  }
 
   public boolean isVerboseResult() {
     return _verboseResult;
