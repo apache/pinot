@@ -32,15 +32,24 @@ import java.util.function.BiPredicate;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +57,8 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentPreloadUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreloadUtils.class);
+  private static final TableConfigAndSchemaCache TABLE_CONFIG_AND_SCHEMA_CACHE
+          = TableConfigAndSchemaCache.getInstance();
 
   private SegmentPreloadUtils() {
   }
@@ -190,5 +201,50 @@ public class SegmentPreloadUtils {
     ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType)
         .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
     return segmentMetadataMap;
+  }
+
+    /**
+     * Get a virtual data source for the given column in the table.
+     *
+     * @param segmentSchema Segment schema for the table has virtual columns like docId, segmentName, hostname
+     * @param tableName Table name could be with or without type suffix
+     * @param column Column name for which the data source is needed
+     * @param totalDocCount Total document count for the column
+     * @return DataSource for the column
+     */
+  public static DataSource getVirtualDataSource(Schema segmentSchema, String tableName, String column,
+                                                int totalDocCount) {
+    assert segmentSchema != null : "Segment Schema should not be null";
+    FieldSpec fieldSpec;
+    Schema tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getSchema(tableName);
+    // First check if the column is present in the segment schema
+    // If not, check if the column is present in the table schema
+    if (segmentSchema.hasColumn(column)) {
+      fieldSpec = segmentSchema.getFieldSpecFor(column);
+    } else {
+      if (!tableSchema.hasColumn(column)) {
+        // Fetch the latest schema from ZK if the column is not present in the table schema
+        tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getLatestSchema(tableName);
+      }
+      // Make a copy of the field spec from the table schema to avoid modifying the original field spec
+      // This is important because the field spec in the table schema is used in different places to infer physical
+      // column and also during segment creation/updates
+      FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
+      fieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
+              originalFieldSpec.isSingleValueField()) {
+        @Override
+        public FieldType getFieldType() {
+          return originalFieldSpec.getFieldType();
+        }
+      };
+    }
+    if (!fieldSpec.isVirtualColumn()) {
+      // Set the default virtual column provider if it is not set
+      fieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
+    }
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, totalDocCount);
+    VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+    return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
+            virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
   }
 }

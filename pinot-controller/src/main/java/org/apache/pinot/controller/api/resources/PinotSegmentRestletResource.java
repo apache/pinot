@@ -559,7 +559,9 @@ public class PinotSegmentRestletResource {
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
         List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
+        List<String> encodedTargetSegments =
+            targetSegments.stream().map(URIUtils::encode).collect(Collectors.toList());
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(encodedTargetSegments,
             SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
       }
       serverUrls.add(reloadTaskStatusEndpoint);
