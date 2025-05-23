@@ -47,6 +47,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -138,7 +139,7 @@ public class CombineSlowOperatorsTest {
       DataSourceMetadata dsmd = mock(DataSourceMetadata.class);
       when(dsmd.getMinValue()).thenReturn(100L);
       when(dsmd.getMaxValue()).thenReturn(200L);
-      when(seg.getDataSource(anyString())).thenReturn(ds);
+      when(seg.getDataSource(anyString(), any())).thenReturn(ds);
       when(ds.getDataSourceMetadata()).thenReturn(dsmd);
       return seg;
     });
