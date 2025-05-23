@@ -897,19 +897,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
                 }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
-                buildSegmentForCommit(buildTimeSeconds * 1000L);
+                try {
+                  buildSegmentForCommit(buildTimeSeconds * 1000L);
+                } catch (SegmentBuildFailureException e) {
+                  handleSegmentBuildFailure();
+                  break;
+                }
                 if (_segmentBuildDescriptor == null) {
-                  // We could not build the segment. Go into error state.
-                  _state = State.ERROR;
-                  _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-                  if (_segmentBuildFailedWithDeterministicError
-                      && _tableConfig.getIngestionConfig().isRetryOnSegmentBuildPrecheckFailure()) {
-                    _segmentLogger.error(
-                        "Found non-recoverable segment build error for {}, from offset {} to {},"
-                            + "sending notifyCannotBuild event.",
-                        _segmentNameStr, _startOffset, _currentOffset);
-                    notifySegmentBuildFailedWithDeterministicError();
-                  }
+                  handleSegmentBuildFailure();
                   break;
                 }
                 if (commitSegment(response.getControllerVipUrl())) {
@@ -970,6 +965,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
+
+    private void handleSegmentBuildFailure() {
+      // We could not build the segment. Go into error state.
+      _state = State.ERROR;
+      _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
+      if (_segmentBuildFailedWithDeterministicError && _tableConfig.getIngestionConfig()
+          .isRetryOnSegmentBuildPrecheckFailure()) {
+        _segmentLogger.error(
+            "Found non-recoverable segment build error for {}, from offset {} to {}, sending notifyCannotBuild event.",
+            _segmentNameStr, _startOffset, _currentOffset);
+        notifySegmentBuildFailedWithDeterministicError();
+      }
+    }
   }
 
   private boolean startSegmentCommit() {
@@ -995,7 +1003,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
   // built the segment successfully.
-  protected void buildSegmentForCommit(long buildTimeLeaseMs) {
+  protected void buildSegmentForCommit(long buildTimeLeaseMs)
+      throws SegmentBuildFailureException {
     try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
@@ -1096,7 +1105,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   @Nullable
-  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
+      throws SegmentBuildFailureException {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
       closeStreamConsumer();
     }
@@ -1123,7 +1133,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.error(errorMessage, e);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-      return null;
+      throw new SegmentBuildFailureException(errorMessage, e);
     }
     try {
       // Increment llc simultaneous segment builds.
@@ -1147,16 +1157,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       try {
         converter.build(_segmentVersion, _serverMetrics);
       } catch (Exception e) {
-        _segmentLogger.error("Could not build segment", e);
+        String errorMessage = "Could not build segment";
+        _segmentLogger.error(errorMessage, e);
         FileUtils.deleteQuietly(tempSegmentFolder);
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-            new SegmentErrorInfo(now(), "Could not build segment", e));
+        _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         if (e instanceof IllegalStateException) {
           // Precondition checks fail, the segment build would fail consistently
           _segmentBuildFailedWithDeterministicError = true;
         }
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-        return null;
+        throw new SegmentBuildFailureException(errorMessage, e);
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
@@ -1178,7 +1188,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.error(errorMessage, e);
         _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-        return null;
+        throw new SegmentBuildFailureException(errorMessage, e);
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
       }
@@ -1199,7 +1209,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
           _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-          return null;
+          throw new SegmentBuildFailureException(errorMessage, e);
         }
 
         File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
@@ -1209,7 +1219,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.error(errorMessage);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, null));
           _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-          return null;
+          throw new SegmentBuildFailureException(errorMessage);
         }
         File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
         if (creationMetaFile == null) {
@@ -1218,7 +1228,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.error(errorMessage);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, null));
           _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
-          return null;
+          throw new SegmentBuildFailureException(errorMessage);
         }
         Map<String, File> metadataFiles = new HashMap<>();
         metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
@@ -1295,7 +1305,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean buildSegmentAndReplace()
       throws Exception {
-    SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
+    SegmentBuildDescriptor descriptor;
+    try {
+      descriptor = buildSegmentInternal(false);
+    } catch (SegmentBuildFailureException e) {
+      return false;
+    }
     if (descriptor == null) {
       return false;
     }

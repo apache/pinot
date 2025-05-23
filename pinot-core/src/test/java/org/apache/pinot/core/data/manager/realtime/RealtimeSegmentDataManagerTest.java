@@ -949,7 +949,8 @@ public class RealtimeSegmentDataManagerTest {
       return new PartitionConsumer();
     }
 
-    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime)
+        throws SegmentBuildFailureException {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
     }
