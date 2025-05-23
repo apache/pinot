@@ -19,12 +19,9 @@
 package org.apache.pinot.controller.api.access;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -47,8 +44,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
 
-  private static final String HEADER_AUTHORIZATION = "Authorization";
-
   private AccessControl _accessControl;
 
   @Override
@@ -64,7 +59,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
   /**
    * Access Control using header-based basic http authentication
    */
-  private static class BasicAuthAccessControl implements AccessControl {
+  private static class BasicAuthAccessControl extends AbstractBasicAuthAccessControl {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
     public BasicAuthAccessControl(Collection<BasicAuthPrincipal> principals) {
@@ -72,42 +67,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean protectAnnotatedOnly() {
-      return false;
-    }
-
-    @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      if (getPrincipal(httpHeaders).isEmpty()) {
-        throw new NotAuthorizedException("Basic");
-      }
-      return true;
-    }
-
-    private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
-      if (headers == null) {
-        return Optional.empty();
-      }
-
-      List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
-      if (authHeaders == null) {
-        return Optional.empty();
-      }
-
-      return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-          .map(_token2principal::get)
-          .filter(Objects::nonNull).findFirst();
-    }
-
-    @Override
-    public AuthWorkflowInfo getAuthWorkflowInfo() {
-      return new AuthWorkflowInfo(AccessControl.WORKFLOW_BASIC);
+    protected Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
+      return BasicAuthUtils.getPrincipal(getTokens(headers), _token2principal);
     }
   }
 }
