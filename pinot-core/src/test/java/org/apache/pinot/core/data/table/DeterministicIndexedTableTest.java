@@ -34,7 +34,7 @@ public class DeterministicIndexedTableTest {
   @Test
   public void testLexicographicEviction() {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT COUNT(*) FROM testTable GROUP BY d1 LIMIT 3 OPTION(enableDeterministicGroupTrim=true)");
+        "SELECT COUNT(*) FROM testTable GROUP BY d1 LIMIT 3 OPTION(accurateGroupByWithoutOrderBy=true)");
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.LONG
     });
@@ -46,14 +46,75 @@ public class DeterministicIndexedTableTest {
     // Insert out-of-order keys
     upsert(table, new Object[]{"zebra", 1L});
     upsert(table, new Object[]{"apple", 1L});
+    upsert(table, new Object[]{"applee", 1L});
     upsert(table, new Object[]{"banana", 1L});
     upsert(table, new Object[]{"cherry", 1L});
     upsert(table, new Object[]{"yak", 1L});
+    upsert(table, new Object[]{null, 1L});
 
     table.finish(false);
 
     Iterator<Record> it = table.iterator();
-    String[] expected = {"apple", "banana", "cherry"};
+    String[] expected = {"apple", "applee", "banana"};
+    int i = 0;
+    while (it.hasNext()) {
+      Record r = it.next();
+      Assert.assertEquals(r.getValues()[0], expected[i]);
+      i++;
+    }
+    Assert.assertEquals(i, 3);
+  }
+  @Test
+  public void testLexicographicEvictionNull() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable GROUP BY d1 LIMIT 3 OPTION(accurateGroupByWithoutOrderBy=true)");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.LONG
+    });
+
+    ExecutorService executor = Executors.newCachedThreadPool();
+    DeterministicConcurrentIndexedTable table = new DeterministicConcurrentIndexedTable(
+        dataSchema, false, queryContext, 3, Integer.MAX_VALUE, Integer.MAX_VALUE, 16, executor);
+
+    // Insert out-of-order keys
+    upsert(table, new Object[]{"zebra", 1L});
+    upsert(table, new Object[]{null, 1L});
+
+    table.finish(false);
+
+    Iterator<Record> it = table.iterator();
+    String[] expected = {"zebra", null};
+    int i = 0;
+    while (it.hasNext()) {
+      Record r = it.next();
+      Assert.assertEquals(r.getValues()[0], expected[i]);
+      i++;
+    }
+    Assert.assertEquals(i, 2);
+  }
+
+  @Test
+  public void testLexicographicEvictionNumbers() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable GROUP BY d1 LIMIT 3 OPTION(accurateGroupByWithoutOrderBy=true)");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.LONG
+    });
+
+    ExecutorService executor = Executors.newCachedThreadPool();
+    DeterministicConcurrentIndexedTable table = new DeterministicConcurrentIndexedTable(
+        dataSchema, false, queryContext, 3, Integer.MAX_VALUE, Integer.MAX_VALUE, 16, executor);
+
+    // Insert numeric keys (auto-boxed to Integer)
+    upsert(table, new Object[]{1, 1L});
+    upsert(table, new Object[]{2, 1L});
+    upsert(table, new Object[]{3, 1L});
+    upsert(table, new Object[]{4, 1L});  // Should be evicted (largest)
+
+    table.finish(false);
+
+    Iterator<Record> it = table.iterator();
+    Object[] expected = {1, 2, 3};
     int i = 0;
     while (it.hasNext()) {
       Record r = it.next();

@@ -374,9 +374,9 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
-  public static boolean isEnableDeterministicGroupTrim(Map<String, String> queryOptions) {
+  public static boolean isEnableAccurateGroupTrim(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(
-        queryOptions.getOrDefault(QueryOptionKey.ENABLE_DETERMINISTIC_GROUP_TRIM, "false"));
+        queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
   }
 
   public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
