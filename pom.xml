@@ -312,6 +312,8 @@
     <assertj.version>3.27.3</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
+
+    <japicmp.skip>true</japicmp.skip>
   </properties>
 
   <profiles>
@@ -479,6 +481,16 @@
       <properties>
         <scala.version>2.13.16</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>binary-compat-check</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <japicmp.skip>false</japicmp.skip>
       </properties>
     </profile>
   </profiles>
