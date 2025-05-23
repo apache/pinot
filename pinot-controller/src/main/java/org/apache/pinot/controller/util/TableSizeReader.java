@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,10 +77,12 @@ public class TableSizeReader {
    * Returns null if the table is not found.
    * @param tableName table name without type
    * @param timeoutMsec timeout in milliseconds for reading table sizes from server
+   * @param includeReplacedSegments include replaced segments in table size calculation
    * @return
    */
   @Nullable
-  public TableSizeDetails getTableSizeDetails(@Nonnull String tableName, @Nonnegative int timeoutMsec)
+  public TableSizeDetails getTableSizeDetails(@Nonnull String tableName, @Nonnegative int timeoutMsec,
+      boolean includeReplacedSegments)
       throws InvalidConfigException {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
@@ -100,7 +103,7 @@ public class TableSizeReader {
     TableSizeDetails tableSizeDetails = new TableSizeDetails(tableName);
     if (hasRealtimeTableConfig) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec);
+      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._estimatedSizeInBytes, 0L);
@@ -126,7 +129,7 @@ public class TableSizeReader {
     }
     if (hasOfflineTableConfig) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec);
+      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._estimatedSizeInBytes, 0L);
@@ -241,9 +244,11 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
   }
 
-  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs)
+  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
+      boolean includeReplacedSegments)
       throws InvalidConfigException {
-    Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType,
+        null, includeReplacedSegments);
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap =
@@ -252,23 +257,30 @@ public class TableSizeReader {
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
 
+    Map<String, Map<String, SegmentSizeInfo>> serverToSegmentMap = new HashMap<>();
+    for (Map.Entry<String, List<SegmentSizeInfo>> entry : serverToSegmentSizeInfoListMap.entrySet()) {
+      Map<String, SegmentSizeInfo> segmentMap = new HashMap<>();
+      for (SegmentSizeInfo info : entry.getValue()) {
+        segmentMap.put(info.getSegmentName(), info);
+      }
+      serverToSegmentMap.put(entry.getKey(), segmentMap);
+    }
+
     // Convert map from (server -> List<SegmentSizeInfo>) to (segment -> SegmentSizeDetails (server -> SegmentSizeInfo))
     // If no response returned from a server, put -1 as size for all the segments on the server
-    // TODO: here we assume server contains all segments in ideal state, which might not be the case
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
-      List<SegmentSizeInfo> segmentSizeInfoList = serverToSegmentSizeInfoListMap.get(server);
-      if (segmentSizeInfoList != null) {
-        for (SegmentSizeInfo segmentSizeInfo : segmentSizeInfoList) {
-          SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segmentSizeInfo.getSegmentName(), k -> new SegmentSizeDetails());
-          segmentSizeDetails._serverInfo.put(server, segmentSizeInfo);
-        }
-      } else {
-        List<String> segments = entry.getValue();
-        for (String segment : segments) {
-          SegmentSizeDetails segmentSizeDetails =
-              segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
+      Map<String, SegmentSizeInfo> segmentToSegmentSizeInfoMap = serverToSegmentMap.getOrDefault(server,
+          Collections.emptyMap());
+
+      List<String> segments = entry.getValue();
+      for (String segment : segments) {
+        SegmentSizeDetails segmentSizeDetails =
+            segmentToSizeDetailsMap.computeIfAbsent(segment, k -> new SegmentSizeDetails());
+
+        if (segmentToSegmentSizeInfoMap.containsKey(segment)) {
+          segmentSizeDetails._serverInfo.put(server, segmentToSegmentSizeInfoMap.get(segment));
+        } else {
           segmentSizeDetails._serverInfo.put(server, new SegmentSizeInfo(segment, DEFAULT_SIZE_WHEN_MISSING_OR_ERROR));
         }
       }
