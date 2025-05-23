@@ -89,6 +89,15 @@ jobs:
           java-version: 11
           distribution: 'temurin'
           cache: 'maven'
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Verify with binary-compatibility-check profile
         run: mvn verify -DskipTests -Pbinary-compat-check -T1C
   unit-test:
