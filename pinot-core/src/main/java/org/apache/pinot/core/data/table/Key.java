@@ -63,6 +63,7 @@ public class Key implements Comparable<Key> {
   public String toString() {
     return Arrays.toString(_values);
   }
+
   @Override
   public int compareTo(Key other) {
     for (int i = 0; i < _values.length; i++) {
