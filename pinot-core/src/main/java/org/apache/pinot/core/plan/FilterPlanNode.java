@@ -43,6 +43,7 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
@@ -50,6 +51,7 @@ import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
@@ -146,8 +148,12 @@ public class FilterPlanNode implements PlanNode {
         findLiteral = true;
       }
     }
-    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral
-        && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+    if (columnName == null || !findLiteral) {
+      return false;
+    }
+    DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+    return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+        FieldConfig.IndexType.H3);
   }
 
   /**
@@ -177,19 +183,29 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+            FieldConfig.IndexType.H3);
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
+            FieldConfig.IndexType.H3);
       }
       return false;
     }
+  }
+
+  private boolean canApplyMapFilter(Predicate predicate) {
+    // Get column name and key name from function arguments
+    FunctionContext function = predicate.getLhs().getFunction();
+
+    // Check if the function is an ItemTransformFunction
+    return function.getFunctionName().equals(ItemTransformFunction.FUNCTION_NAME);
   }
 
   /**
@@ -238,13 +254,15 @@ public class FilterPlanNode implements PlanNode {
             return new H3IndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
+          } else if (canApplyMapFilter(predicate)) {
+            return new MapFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           }
         } else {
           String column = lhs.getIdentifier();
-          DataSource dataSource = _indexSegment.getDataSource(column);
+          DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
           PredicateEvaluator predicateEvaluator;
           switch (predicate.getType()) {
             case TEXT_CONTAINS:

@@ -21,6 +21,7 @@ package org.apache.pinot.broker.api;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Map;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.Request;
 

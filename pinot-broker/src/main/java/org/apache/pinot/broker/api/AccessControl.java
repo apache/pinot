@@ -26,6 +26,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
 @InterfaceAudience.Public
