@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.spi.memory;
 
 import com.google.common.collect.Lists;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -43,10 +46,15 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class, memorySegmentProxyClass);
         dbbCC.setAccessible(true);
+        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
+            .asType(MethodType.methodType(
+                ByteBuffer.class,
+                long.class, int.class, Object.class, Object.class
+            ));
         return (addr, size, att) -> {
           try {
-            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att, null);
-          } catch (Exception e) {
+            return (ByteBuffer) dbbCCMh.invokeExact(addr, size, att, (Object) null);
+          } catch (Throwable e) {
             throw new IllegalStateException("Failed to create DirectByteBuffer", e);
           }
         };
@@ -57,10 +65,12 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class);
         dbbCC.setAccessible(true);
+        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
+            .asType(MethodType.methodType(ByteBuffer.class, long.class, int.class, Object.class));
         return (addr, size, att) -> {
           try {
-            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size), att);
-          } catch (Exception e) {
+            return (ByteBuffer) dbbCCMh.invokeExact(addr, size, att);
+          } catch (Throwable e) {
             throw new IllegalStateException("Failed to create DirectByteBuffer", e);
           }
         };
@@ -71,10 +81,12 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE);
         dbbCC.setAccessible(true);
+        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
+            .asType(MethodType.methodType(ByteBuffer.class, long.class, int.class));
         return (addr, size, att) -> {
           try {
-            return dbbCC.newInstance(Long.valueOf(addr), Integer.valueOf(size));
-          } catch (Exception e) {
+            return (ByteBuffer) dbbCCMh.invokeExact(addr, size);
+          } catch (Throwable e) {
             throw new IllegalStateException("Failed to create DirectByteBuffer", e);
           }
         };
@@ -90,7 +102,7 @@ public class ByteBufferUtil {
     for (CreatorSupplier supplier : _SUPPLIERS) {
       try {
         creator = supplier.createCreator();
-      } catch (ClassNotFoundException | NoSuchMethodException e) {
+      } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
         if (firstException == null) {
           firstException = e;
         }
@@ -108,7 +120,7 @@ public class ByteBufferUtil {
   }
 
   private interface CreatorSupplier {
-    ByteBufferCreator createCreator() throws ClassNotFoundException, NoSuchMethodException;
+    ByteBufferCreator createCreator() throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException;
   }
 
   private interface ByteBufferCreator {
