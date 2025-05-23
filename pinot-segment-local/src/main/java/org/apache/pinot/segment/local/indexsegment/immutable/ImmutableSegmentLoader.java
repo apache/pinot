@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.File;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -256,7 +256,7 @@ public class ImmutableSegmentLoader {
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
-    Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+    Map<String, ColumnIndexContainer> indexContainerMap = new Object2ObjectOpenHashMap<>(columnMetadataMap.size());
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(entry.getKey(),
