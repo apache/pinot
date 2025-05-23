@@ -31,6 +31,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -675,9 +677,29 @@ public class PinotTenantRestletResource {
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig config) {
+      @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true)
+      @DefaultValue("1")
+      @QueryParam("degreeOfParallelism") int degreeOfParallelism,
+      @ApiParam(value =
+          "Comma separated list of tables that are allowed in this tenant rebalance job. Leave blank to allow all "
+              + "tables from the tenant")
+      @QueryParam("allowTables") @DefaultValue("") String allowTables,
+      @ApiParam(value =
+          "Comma separated list of tables that are blocked in this tenant rebalance job. These table will be removed "
+              + "from allowTables")
+      @QueryParam("blockTables") @DefaultValue("") String blockTables,
+      @ApiParam(value = "Show full rebalance results of each table in the response") @DefaultValue("false")
+      @QueryParam("verboseResult") boolean verboseResult,
+      @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
+      TenantRebalanceConfig config) {
     // TODO decide on if the tenant rebalance should be database aware or not
     config.setTenantName(tenantName);
+    // Query params should override the config provided in the body
+    config.setAllowTables(new HashSet<>(Arrays.asList(StringUtil.split(allowTables, ',', 0))));
+    config.setBlockTables(new HashSet<>(Arrays.asList(StringUtil.split(blockTables, ',', 0))));
+    config.setDegreeOfParallelism(degreeOfParallelism);
+    config.setVerboseResult(verboseResult);
     return _tenantRebalancer.rebalance(config);
   }
 

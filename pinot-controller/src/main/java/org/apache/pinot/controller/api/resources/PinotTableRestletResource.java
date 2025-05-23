@@ -617,7 +617,7 @@ public class PinotTableRestletResource {
       //@formatter:off
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
+      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("true") @QueryParam("dryRun")
       boolean dryRun,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
