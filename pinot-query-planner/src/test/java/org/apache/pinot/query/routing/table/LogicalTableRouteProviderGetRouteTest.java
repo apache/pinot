@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -68,6 +69,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     TableRouteInfo routeInfo = getLogicalTableRouteInfo(tableName, "testOfflineTable");
     assertTrue(routeInfo.isExists(), "The table should exist");
     assertTrue(routeInfo.isOffline(), "The table should be offline");
+    assertNull(routeInfo.getTimeBoundaryInfo(), "The table should not have time boundary info");
   }
 
   @Test(dataProvider = "realtimeTableProvider")
@@ -75,6 +77,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     TableRouteInfo routeInfo = getLogicalTableRouteInfo(tableName, "testRealtimeTable");
     assertTrue(routeInfo.isExists(), "The table should exist");
     assertTrue(routeInfo.isRealtime(), "The table should be realtime");
+    assertNull(routeInfo.getTimeBoundaryInfo(), "The table should not have time boundary info");
   }
 
   @Test(dataProvider = "hybridTableProvider")
@@ -82,6 +85,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     TableRouteInfo routeInfo = getLogicalTableRouteInfo(tableName, "testHybridTable");
     assertTrue(routeInfo.isExists(), "The table should exist");
     assertTrue(routeInfo.isHybrid(), "The table should be hybrid");
+    assertNotNull(routeInfo.getTimeBoundaryInfo(), "The table should have time boundary info");
   }
 
   @Test(dataProvider = "routeExistsProvider")
@@ -216,6 +220,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     assertTrue(routeInfo.isRouteExists());
     assertFalse(routeInfo.isDisabled());
     assertNull(routeInfo.getDisabledTableNames());
+    assertNotNull(routeInfo.getTimeBoundaryInfo());
   }
 
   @Test(dataProvider = "disabledTableProvider")
@@ -259,6 +264,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
+    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =
@@ -297,6 +303,7 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
     }
     logicalTable.setPhysicalTableConfigMap(tableConfigMap);
     logicalTable.setBrokerTenant("brokerTenant");
+    logicalTable.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)));
     when(_tableCache.getLogicalTableConfig(eq(logicalTableName))).thenReturn(logicalTable);
 
     TableRouteInfo routeInfo =

@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.api;
+package org.apache.pinot.integration.tests.logicaltable;
 
-import org.apache.pinot.spi.utils.CommonConstants;
+import java.util.List;
 
-public abstract class RequesterIdentity {
-  public String getClientIp() {
-    return CommonConstants.UNKNOWN;
+
+public class LogicalTableWithOneRealtimeTableIntegrationTest extends BaseLogicalTableIntegrationTest {
+  @Override
+  protected List<String> getRealtimeTableNames() {
+    return List.of("r_1");
   }
 }

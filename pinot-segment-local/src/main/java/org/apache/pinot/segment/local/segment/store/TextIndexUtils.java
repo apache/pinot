@@ -36,6 +36,7 @@ import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -50,6 +51,7 @@ import org.slf4j.LoggerFactory;
 
 public class TextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexUtils.class);
+
   private TextIndexUtils() {
   }
 
@@ -134,18 +136,20 @@ public class TextIndexUtils {
    * @return Lucene Analyzer class instance
    * @throws ReflectiveOperationException if instantiation via reflection fails
    */
-  public static Analyzer getAnalyzer(TextIndexConfig config) throws ReflectiveOperationException {
+  public static Analyzer getAnalyzer(TextIndexConfig config)
+      throws ReflectiveOperationException {
     String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
     List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
     List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
 
     if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
-            || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
-                    && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
+        || ((luceneAnalyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
+        || luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName()))
+        && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
       return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-              config.getStopWordsInclude(), config.getStopWordsExclude());
+          config.getStopWordsInclude(), config.getStopWordsExclude(), config.isCaseSensitive());
     }
 
     // Custom analyzer + custom configs via reflection
@@ -176,7 +180,7 @@ public class TextIndexUtils {
 
     // Return a new instance of custom lucene analyzer class
     return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
-            .newInstance(argValues.toArray(new Object[0]));
+        .newInstance(argValues.toArray(new Object[0]));
   }
 
   /**
@@ -185,7 +189,8 @@ public class TextIndexUtils {
    * @return Class object of the value type
    * @throws ClassNotFoundException when the value type is not supported
    */
-  public static Class<?> parseSupportedTypes(String valueTypeString) throws ClassNotFoundException {
+  public static Class<?> parseSupportedTypes(String valueTypeString)
+      throws ClassNotFoundException {
     try {
       // Support both primitive types + class
       switch (valueTypeString) {
@@ -222,7 +227,7 @@ public class TextIndexUtils {
    * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
    */
   public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
-          throws ReflectiveOperationException {
+      throws ReflectiveOperationException {
     try {
       if (clazz.equals(String.class)) {
         return stringValue;
@@ -259,7 +264,7 @@ public class TextIndexUtils {
       }
     } catch (NumberFormatException | ReflectiveOperationException ex) {
       String exceptionMessage = "Custom analyzer argument cannot be coerced from "
-              + stringValue + " to " + clazz.getName() + " type";
+          + stringValue + " to " + clazz.getName() + " type";
       LOGGER.error(exceptionMessage);
       throw new ReflectiveOperationException(exceptionMessage);
     } catch (UnsupportedOperationException ex) {
@@ -270,8 +275,8 @@ public class TextIndexUtils {
     }
   }
 
-  public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
-      @Nullable List<String> stopWordsExclude) {
+  public static Analyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
+      @Nullable List<String> stopWordsExclude, boolean isCaseSensitive) {
     HashSet<String> stopWordSet = LuceneTextIndexCreator.getDefaultEnglishStopWordsSet();
     if (stopWordsInclude != null) {
       stopWordSet.addAll(stopWordsInclude);
@@ -279,11 +284,12 @@ public class TextIndexUtils {
     if (stopWordsExclude != null) {
       stopWordsExclude.forEach(stopWordSet::remove);
     }
-    return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
+    return new CaseAwareStandardAnalyzer(new CharArraySet(stopWordSet, !isCaseSensitive), isCaseSensitive);
   }
 
   public static Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(
-          String queryParserClassName) throws ReflectiveOperationException {
+      String queryParserClassName)
+      throws ReflectiveOperationException {
     // Fail-fast if the query parser is specified class is not QueryParseBase class
     final Class<?> queryParserClass = Class.forName(queryParserClassName);
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {

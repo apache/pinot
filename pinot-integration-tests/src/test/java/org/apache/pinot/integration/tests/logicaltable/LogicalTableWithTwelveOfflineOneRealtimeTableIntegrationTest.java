@@ -16,29 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.integration.tests.logicaltable;
 
+import java.io.File;
+import java.util.List;
 import java.util.Map;
 
 
-/**
- * Creates the durable representation of a map index. Metadata about the Map Column can be passed through via
- * the IndexCreationContext and the implementation of this Interface can use that to determine the on
- * disk representation of the Map.
- */
-public interface MapIndexCreator extends ForwardIndexCreator {
-  int VERSION_1 = 1;
-
-  /**
-   *
-   * @param value The nonnull value of the cell. In case the cell was actually null, a default value is received instead
-   * @param dict This is ignored as the MapIndexCreator will manage the construction of dictionaries itself.
-   */
+public class LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest extends BaseLogicalTableIntegrationTest {
   @Override
-  default void add(Object value, int dict) {
-    Map<String, Object> mapValue = (Map<String, Object>) value;
-    add(mapValue);
+  protected List<String> getOfflineTableNames() {
+    return List.of("o_1", "o_2", "o_3", "o_4", "o_5", "o_6", "o_7", "o_8", "o_9", "o_10", "o_11", "o_12");
   }
 
-  void add(Map<String, Object> mapValue);
+  @Override
+  protected List<String> getRealtimeTableNames() {
+    return List.of("r_1");
+  }
+
+  @Override
+  protected Map<String, List<File>> getRealtimeTableDataFiles() {
+    // Overlapping data files for the hybrid table
+    return distributeFilesToTables(getRealtimeTableNames(),
+        _avroFiles.subList(_avroFiles.size() - 2, _avroFiles.size()));
+  }
 }

@@ -85,6 +85,7 @@ public class QueryThreadContext {
     String mode = conf.getProperty(CommonConstants.Query.CONFIG_OF_QUERY_CONTEXT_MODE);
     if ("strict".equalsIgnoreCase(mode)) {
       _strictMode = true;
+      return;
     }
     if (mode != null && !mode.isEmpty()) {
       throw new IllegalArgumentException("Invalid value '" + mode + "' for "
@@ -111,7 +112,7 @@ public class QueryThreadContext {
       String errorMessage = "QueryThreadContext is not initialized";
       if (_strictMode) {
         LOGGER.error(errorMessage);
-        throw new IllegalStateException("QueryThreadContext is not initialized");
+        throw new IllegalStateException(errorMessage);
       } else {
         LOGGER.debug(errorMessage);
         // in non-strict mode, return the fake instance

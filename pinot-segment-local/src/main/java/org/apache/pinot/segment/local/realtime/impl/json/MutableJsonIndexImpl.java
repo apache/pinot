@@ -134,6 +134,15 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
+    return getMatchingDocIds(filter);
+  }
+
+  @Override
+  public MutableRoaringBitmap getMatchingDocIds(Object filterObj) {
+    if (!(filterObj instanceof FilterContext)) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterObj);
+    }
+    FilterContext filter = (FilterContext) filterObj;
 
     _readLock.lock();
     try {
