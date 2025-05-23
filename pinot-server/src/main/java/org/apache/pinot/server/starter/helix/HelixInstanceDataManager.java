@@ -187,21 +187,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     // Ensure we can write to the instance data dir
-    if (!instanceDataDir.canWrite()) {
-      throw new IllegalStateException("Cannot write to the instance data dir: " + instanceDataDir);
-    }
+    Preconditions.checkState(instanceDataDir.canWrite(), "Cannot write to the instance data dir: %s", instanceDataDir);
   }
 
   @VisibleForTesting
   void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
     if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance  segment tar dir: %s",
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
     }
     // Ensure we can write to the instance segment tar dir
-    if (!instanceSegmentTarDir.canWrite()) {
-      throw new IllegalStateException("Cannot write to the instance segment tar dir: " + instanceSegmentTarDir);
-    }
+    Preconditions.checkState(instanceSegmentTarDir.canWrite(), "Cannot write to the instance segment tar dir: %s",
+        instanceSegmentTarDir);
   }
 
   @Override
