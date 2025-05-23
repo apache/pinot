@@ -673,14 +673,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (String tableNameWithType : timeBoundaryTableNames) {
 
       if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-        LOGGER.warn("Skipping removing time boundary manager for real-time table: {}", tableNameWithType);
+        LOGGER.info("Skipping removing time boundary manager for real-time table: {}", tableNameWithType);
         continue;
       }
 
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
       if (_routingEntryMap.containsKey(realtimeTableName)) {
-        LOGGER.warn("Skipping removing time boundary manager for hybrid physical table: {}", rawTableName);
+        LOGGER.info("Skipping removing time boundary manager for hybrid physical table: {}", rawTableName);
         continue;
       }
 
