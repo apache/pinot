@@ -217,6 +217,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipStarTree
     queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions));
 
+    // Set accurateGroupByWithoutOrderBy
     queryContext.setEnableAccurateGroupTrim(
         QueryOptionsUtils.isEnableAccurateGroupTrim(queryOptions));
 
