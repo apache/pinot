@@ -186,7 +186,7 @@ public final class GroupByUtils {
 
   private static IndexedTable getTrimDisabledIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int initialCapacity, int numThreads, ExecutorService executorService) {
-    if (queryContext.isAccurateGroupByWithoutOrderByEnabled() && queryContext.getOrderByExpressions() == null
+    if (queryContext.isAccurateGroupByWithoutOrderBy() && queryContext.getOrderByExpressions() == null
         && queryContext.getHavingFilter() == null) {
       return new DeterministicConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
           Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity, executorService);
