@@ -138,7 +138,7 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
-  private boolean _enableAccurateGroupTrim;
+  private boolean _accurateGroupByWithoutOrderByEnabled;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -272,12 +272,13 @@ public class QueryContext {
     return _explain != ExplainMode.NONE;
   }
 
-  public boolean isEnableAccurateGroupTrim() {
-    return _enableAccurateGroupTrim;
+
+  public boolean isAccurateGroupByWithoutOrderByEnabled() {
+    return _accurateGroupByWithoutOrderByEnabled;
   }
 
-  public void setEnableAccurateGroupTrim(boolean enable) {
-    _enableAccurateGroupTrim = enable;
+  public void setAccurateGroupByWithoutOrderByEnabled(boolean enable) {
+    _accurateGroupByWithoutOrderByEnabled = enable;
   }
 
   /**
