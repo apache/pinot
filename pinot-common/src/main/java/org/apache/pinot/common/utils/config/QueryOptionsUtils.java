@@ -374,7 +374,7 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
-  public static boolean isEnableAccurateGroupTrim(Map<String, String> queryOptions) {
+  public static boolean isAccurateGroupByWithoutOrderByEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(
         queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
   }
