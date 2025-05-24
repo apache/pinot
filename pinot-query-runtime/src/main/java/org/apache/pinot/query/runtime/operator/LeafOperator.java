@@ -268,6 +268,12 @@ public class LeafOperator extends MultiStageOperator {
           case RESPONSE_SER_CPU_TIME_NS:
             _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
             break;
+          case THREAD_MEM_ALLOCATED_BYTES:
+            _statMap.merge(StatKey.THREAD_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
+            break;
+          case RESPONSE_SER_MEM_ALLOCATED_BYTES:
+            _statMap.merge(StatKey.RESPONSE_SER_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
+            break;
           case NUM_SEGMENTS_PRUNED_BY_SERVER:
             _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
             break;
@@ -648,6 +654,8 @@ public class LeafOperator extends MultiStageOperator {
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
+    THREAD_MEM_ALLOCATED_BYTES(StatMap.Type.LONG, null),
+    RESPONSE_SER_MEM_ALLOCATED_BYTES(StatMap.Type.LONG, null),
     SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG, null),
     RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, null) {
       @Override
