@@ -113,6 +113,7 @@ public class QueryLoggerTest {
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
         + "queryEngine=singleStage,"
+        + "replicaGroups=[],"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }

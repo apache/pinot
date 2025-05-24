@@ -308,6 +308,12 @@ public class QueryLogger {
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._queryEngine.getName());
       }
+    },
+    REPLICA_GROUPS("replicaGroups") {
+        @Override
+        void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+            builder.append(params._response.getReplicaGroups());
+        }
     };
 
     public final String _entryName;
