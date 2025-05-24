@@ -138,6 +138,7 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
+  private boolean _accurateGroupByWithoutOrderBy;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -269,6 +270,15 @@ public class QueryContext {
    */
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
+  }
+
+
+  public boolean isAccurateGroupByWithoutOrderBy() {
+    return _accurateGroupByWithoutOrderBy;
+  }
+
+  public void setAccurateGroupByWithoutOrderBy(boolean enable) {
+    _accurateGroupByWithoutOrderBy = enable;
   }
 
   /**

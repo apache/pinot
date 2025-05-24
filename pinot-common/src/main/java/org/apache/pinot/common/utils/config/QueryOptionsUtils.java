@@ -374,6 +374,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
+  public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(
+        queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
+  }
+
   public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
     String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
