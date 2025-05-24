@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
 
 
 /**
@@ -79,6 +80,12 @@ public class DispatchablePlanMetadata implements Serializable {
   // Calculated in {@link MailboxAssignmentVisitor}
   // Map from workerId -> {planFragmentId -> mailboxes}
   private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
+
+  /**
+   * Map from workerId -> {physicalTableName -> segments} is required for logical tables.
+   */
+  private Map<Integer, Map<String, List<String>>> _workerIdToTableSegmentsMap;
+  private LogicalTableRouteInfo _logicalTableRouteInfo;
 
   public List<String> getScannedTables() {
     return _scannedTables;
@@ -177,5 +184,24 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
     _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
+  }
+
+  @Nullable
+  public LogicalTableRouteInfo getLogicalTableRouteInfo() {
+    return _logicalTableRouteInfo;
+  }
+
+  public void setLogicalTableRouteInfo(LogicalTableRouteInfo logicalTableRouteInfo) {
+    _logicalTableRouteInfo = logicalTableRouteInfo;
+  }
+
+  @Nullable
+  public Map<Integer, Map<String, List<String>>> getWorkerIdToTableSegmentsMap() {
+    return _workerIdToTableSegmentsMap;
+  }
+
+  public void setWorkerIdToTableSegmentsMap(
+      Map<Integer, Map<String, List<String>>> workerIdToTableSegmentsMap) {
+    _workerIdToTableSegmentsMap = workerIdToTableSegmentsMap;
   }
 }
