@@ -113,13 +113,19 @@ public class InstancePartitions {
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
   }
 
+  /**
+   * Generates a mapping from instance names to their corresponding partition IDs.
+   * This method iterates over the `_partitionToInstancesMap`, which maps partition-replica group keys
+   * (e.g., "0_0", "1_1") to lists of instances. For each entry, it extracts the partition ID from the key
+   * and associates each instance in the list with that partition ID in the resulting map.
+   *
+   * @return A mapping from instance names to the corresponding partition ID they belong to.
+   */
   public Map<String, Integer> getInstanceToPartitionIdMap() {
     Map<String, Integer> instanceToPartitionIdMap = new HashMap<>();
-
     for (Map.Entry<String, List<String>> entry : _partitionToInstancesMap.entrySet()) {
       Pair<Integer, Integer> partitionIdAndReplicaGroupId = getPartitionIdAndReplicaGroupId(entry.getKey());
       int partitionId = partitionIdAndReplicaGroupId.getLeft();
-
       List<String> instances = entry.getValue();
       for (String instance : instances) {
         instanceToPartitionIdMap.put(instance, partitionId);

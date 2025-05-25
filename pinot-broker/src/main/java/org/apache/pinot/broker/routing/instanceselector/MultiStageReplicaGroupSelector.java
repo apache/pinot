@@ -107,20 +107,31 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   /**
    * Returns a map from the segmentName to the corresponding server. It tries to select all servers from the
    * preferredReplicaGroup, but if it fails, it will try to select the relevant server from other instance partitions.
+   *
+   * @return A pair of maps, where the first map contains the segments that are assigned to a server and the second
+   * map contains the segments that are optional (i.e., the server is not online to serve that segment).
+   * Example:
+   * {
+   *   "required_segments": {
+   *     "segment1": "server1",
+   *     "segment2": "server2"
+   *   },
+   *   "optional_segments": {
+   *     "segment3": "server3",
+   *     "segment4": "server4"
+   *   }
+   * }
    */
-  private Pair<Map<String, String>, Map<String, String>> tryAssigning(
-    Set<String> segments,
-    SegmentStates segmentStates,
-    InstancePartitions instancePartitions,
-    int preferredReplicaId) {
-
+  private Pair<Map<String, String>, Map<String, String>> tryAssigning(Set<String> segments,
+    SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
 
     // instanceToSegmentsMap stores the mapping from instance to the active segments it can serve.
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      Preconditions.checkState(candidates != null, "Failed to find servers for segment: %s", segment);
+      Preconditions.checkState(candidates != null && !candidates.isEmpty(),
+        "Failed to find servers for segment: %s", segment);
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
           .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
@@ -145,8 +156,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (int partition = 0; partition < numPartitions; partition++) {
       Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
       if (requiredSegments != null) {
-        segmentToSelectedInstanceMap.putAll(
-          getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId));
+        getSelectedInstancesForPartition(segmentToSelectedInstanceMap, instanceToSegmentsMap, requiredSegments,
+          partition, preferredReplicaId);
       }
     }
 
@@ -159,12 +170,9 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * the segments are available in the selected instances.
    * If no replica group is found, it throws an exception.
    */
-  private Map<String, String> getSelectedInstancesForPartition(
-    Map<String, Set<String>> instanceToSegmentsMap,
-    Set<String> requiredSegments,
-    int partitionId,
+  private void getSelectedInstancesForPartition(Map<String, String> segmentToSelectedInstanceMap,
+    Map<String, Set<String>> instanceToSegmentsMap, Set<String> requiredSegments, int partitionId,
     int preferredReplicaId) {
-
     int numReplicaGroups = _instancePartitions.getNumReplicaGroups();
 
     for (int i = 0; i < numReplicaGroups; i += 1) {
@@ -180,17 +188,18 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       }
 
       if (segmentsFromSelectedInstances.containsAll(requiredSegments)) {
-        Map<String, String> segmentToInstance = new HashMap<>();
-        for (String segment : requiredSegments) {
-          for (String instance : selectedInstances) {
-            Set<String> servedSegments = instanceToSegmentsMap.get(instance);
-            if (servedSegments != null && servedSegments.contains(segment)) {
-              segmentToInstance.put(segment, instance);
-              break;
+        for (String instance: selectedInstances) {
+          Set<String> servedSegments = instanceToSegmentsMap.get(instance);
+          if (servedSegments == null || servedSegments.isEmpty()) {
+            continue;
+          }
+          for (String segment : servedSegments) {
+            if (requiredSegments.contains(segment)) {
+              segmentToSelectedInstanceMap.put(segment, instance);
             }
           }
         }
-        return segmentToInstance;
+        return; // Successfully selected instances for the partition.
       }
     }
 
@@ -215,7 +224,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       // If candidates are null, we will throw an exception and log a warning.
-      Preconditions.checkState(candidates != null, "Failed to find servers for segment: %s", segment);
+      Preconditions.checkState(candidates != null && !candidates.isEmpty(),
+        "Failed to find servers for segment: %s", segment);
 
       for (SegmentInstanceCandidate candidate : candidates) {
         if (selectedInstance.equals(candidate.getInstance())) {
