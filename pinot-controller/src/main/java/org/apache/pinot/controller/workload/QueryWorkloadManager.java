@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.PropagationScheme;
@@ -38,8 +40,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The PropagationManager class is responsible for propagating the query workload
- * refresh message to the relevant instances based on the node configurations.
+ * The QueryWorkloadManager is responsible for managing the query workload configuration and propagating/computing
+ * the cost to be enforced by relevant instances based on the propagation scheme.
  */
 public class QueryWorkloadManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
@@ -70,8 +72,10 @@ public class QueryWorkloadManager {
       if (instances.isEmpty()) {
         String errorMsg = String.format("No instances found for Workload: %s", queryWorkloadName);
         LOGGER.warn(errorMsg);
-        return;
+        continue;
       }
+      // TODO: Currently the assumption is that each instance for a workload can be tied to one node type or have
+      // one cost. To re-evaluate this, once we support this for MSE, where a instance can be both leaf and non-leaf
       // Calculate the instance cost for each instance
       Map<String, InstanceCost> instanceCostMap = _costSplitter.computeInstanceCostMap(nodeConfig, instances);
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
@@ -99,7 +103,7 @@ public class QueryWorkloadManager {
           return;
       }
       // Get the helixTags associated with the table
-      Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
+      List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
       // Find all workloads associated with the helix tags
       Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
           PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
@@ -133,12 +137,15 @@ public class QueryWorkloadManager {
         return workloadToInstanceCostMap;
       }
       // Find all the helix tags associated with the instance
-      Map<String, Set<String>> instanceToHelixTags
-          = PropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
-      Set<String> helixTags = instanceToHelixTags.get(instanceName);
+      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+      if (instanceConfig == null) {
+        LOGGER.warn("Instance config not found for instance: {}", instanceName);
+        return workloadToInstanceCostMap;
+      }
       // Find all workloads associated with the helix tags
       Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
-          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
+          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, instanceConfig.getTags(),
+                  queryWorkloadConfigs);
       // Calculate the instance cost from each workload
       for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
         for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {

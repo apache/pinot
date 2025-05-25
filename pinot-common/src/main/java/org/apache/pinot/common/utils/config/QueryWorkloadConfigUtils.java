@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -35,8 +36,10 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -80,11 +83,6 @@ public class QueryWorkloadConfigUtils {
    * @param znRecord The ZNRecord to update.
    */
   public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, QueryWorkloadConfig queryWorkloadConfig) {
-    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(queryWorkloadConfig, "QueryWorkloadConfig cannot be null");
-    Preconditions.checkNotNull(queryWorkloadConfig.getQueryWorkloadName(), "QueryWorkload cannot be null");
-    Preconditions.checkNotNull(queryWorkloadConfig.getNodeConfigs(), "NodeConfigs cannot be null");
-
     znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadConfig.getQueryWorkloadName());
     try {
       znRecord.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS,
@@ -179,5 +177,61 @@ public class QueryWorkloadConfigUtils {
           queryWorkloadConfigsJson);
       throw new RuntimeException(errorMessage, e);
     }
+  }
+
+  /**
+   * Validates the given QueryWorkloadConfig and returns a list of validation error messages.
+   *
+   * @param config the QueryWorkloadConfig to validate
+   * @return a list of validation errors; empty if config is valid
+   */
+  public static List<String> validateQueryWorkloadConfig(QueryWorkloadConfig config) {
+    List<String> errors = new ArrayList<>();
+    if (config == null) {
+      errors.add("QueryWorkloadConfig cannot be null");
+      return errors;
+    }
+    String name = config.getQueryWorkloadName();
+    if (name == null || name.trim().isEmpty()) {
+      errors.add("queryWorkloadName cannot be null or empty");
+    }
+    List<NodeConfig> nodeConfigs = config.getNodeConfigs();
+    if (nodeConfigs == null || nodeConfigs.isEmpty()) {
+      errors.add("nodeConfigs cannot be null or empty");
+    } else {
+      for (int i = 0; i < nodeConfigs.size(); i++) {
+        NodeConfig nodeConfig = nodeConfigs.get(i);
+        String prefix = "nodeConfigs[" + i + "]";
+        if (nodeConfig == null) {
+          errors.add(prefix + " cannot be null");
+          continue;
+        }
+        if (nodeConfig.getNodeType() == null) {
+          errors.add(prefix + ".type cannot be null");
+        }
+        // Validate EnforcementProfile
+        EnforcementProfile enforcementProfile = nodeConfig.getEnforcementProfile();
+        if (enforcementProfile == null) {
+          errors.add(prefix + "enforcementProfile cannot be null");
+        } else {
+           if (enforcementProfile.getCpuCostNs() < 0) {
+             errors.add(prefix + ".enforcementProfile.cpuCostNs cannot be negative");
+           }
+           if (enforcementProfile.getMemoryCostBytes() < 0) {
+               errors.add(prefix + ".enforcementProfile.memoryCostBytes cannot be negative");
+           }
+        }
+        // Validate PropagationScheme
+        PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
+        if (propagationScheme == null) {
+          errors.add(prefix + ".propagationScheme cannot be null");
+        } else {
+          if (propagationScheme.getPropagationType() == null) {
+            errors.add(prefix + ".propagationScheme.type cannot be null");
+          }
+        }
+      }
+    }
+    return errors;
   }
 }

@@ -38,6 +38,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -82,6 +84,9 @@ public class PinotQueryWorkloadConfigRestletResource {
     try {
       LOGGER.info("Received request to get all queryWorkloadConfigs");
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+      if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "No workload configs found", Response.Status.NOT_FOUND, null);
+      }
       String response = JsonUtils.objectToString(queryWorkloadConfigs);
       LOGGER.info("Successfully fetched all queryWorkloadConfigs");
       return response;
@@ -245,6 +250,11 @@ public class PinotQueryWorkloadConfigRestletResource {
     try {
       LOGGER.info("Received request to update queryWorkloadConfig with request: {}", requestString);
       QueryWorkloadConfig queryWorkloadConfig = JsonUtils.stringToObject(requestString, QueryWorkloadConfig.class);
+      List<String> validationErrors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
+      if (!validationErrors.isEmpty()) {
+        String errorMessage = String.format("Invalid query workload config: %s", validationErrors);
+        throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.BAD_REQUEST, null);
+      }
       _pinotHelixResourceManager.setQueryWorkloadConfig(queryWorkloadConfig);
       String successMessage = String.format("Query Workload config updated successfully for workload: %s",
           queryWorkloadConfig.getQueryWorkloadName());

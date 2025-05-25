@@ -62,11 +62,11 @@ public class PropagationUtils {
       TableType tableType = tableConfig.getTableType();
 
       // Gather all relevant tags for this tenant
-      Set<String> tenantTags = new HashSet<>();
+      List<String> tenantTags = new ArrayList<>();
       collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
 
       // Populate the helix tags for NON_LEAF_NODE and LEAF_NODE separately to provide flexibility
-      // in workload propagation to either leaf nodes or non-leaf nodes
+      // in workload propagation to direct the workload to only specific node types
       String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
       Set<String> nonLeafTags = Collections.singleton(brokerTag);
 
@@ -82,12 +82,12 @@ public class PropagationUtils {
     return tableToTags;
   }
 
-  private static void collectHelixTagsForTable(Set<String> tagSet, TenantConfig tenantConfig, TableType tableType) {
-    tagSet.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+  private static void collectHelixTagsForTable(List<String> tags, TenantConfig tenantConfig, TableType tableType) {
+    tags.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
     if (tableType == TableType.OFFLINE) {
-      tagSet.add(TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer()));
+      tags.add(TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer()));
     } else {
-      tagSet.add(TagNameUtils.getRealtimeTagForTenant(tenantConfig.getServer()));
+      tags.add(TagNameUtils.getRealtimeTagForTenant(tenantConfig.getServer()));
     }
   }
 
@@ -95,15 +95,13 @@ public class PropagationUtils {
    * Get the helix tags for a given table name.
    * If the table name does not have a type suffix, it will return both offline and realtime tags.
    */
-  public static Set<String> getHelixTagsForTable(PinotHelixResourceManager pinotResourceManager,
-          String tableName) {
-    Set<String> combinedTags = new HashSet<>();
+  public static List<String> getHelixTagsForTable(PinotHelixResourceManager pinotResourceManager, String tableName) {
+    List<String> combinedTags = new ArrayList<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     List<String> tablesWithType = (tableType == null)
         ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
             TableNameBuilder.REALTIME.tableNameWithType(tableName))
         : Collections.singletonList(tableName);
-
     for (String table : tablesWithType) {
       TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
       if (tableConfig != null) {
@@ -128,20 +126,6 @@ public class PropagationUtils {
   }
 
   /**
-   * Get the mapping between instance -> helix tags
-   */
-  public static Map<String, Set<String>> getInstanceToHelixTags(PinotHelixResourceManager pinotHelixResourceManager) {
-    List<InstanceConfig> instanceConfigs = pinotHelixResourceManager.getAllHelixInstanceConfigs();
-    Map<String, Set<String>> instanceToHelixTags = new HashMap<>();
-    for (InstanceConfig instanceConfig : instanceConfigs) {
-      String instanceName = instanceConfig.getInstanceName();
-      List<String> tags = instanceConfig.getTags();
-      instanceToHelixTags.computeIfAbsent(instanceName, k -> new HashSet<>()).addAll(tags);
-    }
-    return instanceToHelixTags;
-  }
-
-  /**
    * Returns a set of QueryWorkloadConfigs that are associated with the specified helix tags.
    * The method performs the following:
    * 1. Fetches all QueryWorkloadConfigs from the PinotHelixResourceManager.
@@ -155,7 +139,7 @@ public class PropagationUtils {
    *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
    */
   public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
-      PinotHelixResourceManager pinotHelixResourceManager, Set<String> filterTags,
+      PinotHelixResourceManager pinotHelixResourceManager, List<String> filterTags,
       List<QueryWorkloadConfig> queryWorkloadConfigs) {
     Set<QueryWorkloadConfig> matchedConfigs = new HashSet<>();
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = getTableToHelixTags(pinotHelixResourceManager);

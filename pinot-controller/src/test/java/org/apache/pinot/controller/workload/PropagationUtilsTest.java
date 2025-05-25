@@ -103,7 +103,7 @@ public class PropagationUtilsTest {
             String tableName = entry.getKey();
             Set<String> expectedHelixTags = entry.getValue();
             // Call the method to get helix tags for the table
-            Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
+            List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
                     tableName);
             // Verify the results
             for (String helixTag : expectedHelixTags) {
@@ -147,37 +147,6 @@ public class PropagationUtilsTest {
     }
 
     @Test
-    public void getInstanceToHelixTagsTest() {
-        // Create a list of instance configurations
-        List<InstanceConfig> instanceConfigs = List.of(
-                createInstanceConfig("instance1", List.of("serverTag1_OFFLINE", "serverTag2_REALTIME")),
-                createInstanceConfig("instance2", List.of("brokerTenant1_BROKER", "brokerTenant2_BROKER"))
-        );
-        Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
-        // Call the method to get instance to Helix tags mapping
-        Map<String, Set<String>> instanceToHelixTags
-                = PropagationUtils.getInstanceToHelixTags(_pinotHelixResourceManager);
-        // Verify the results
-        Map<String, Set<String>> expected = new HashMap<>();
-        expected.put("instance1", Set.of("serverTag1_OFFLINE", "serverTag2_REALTIME"));
-        expected.put("instance2", Set.of("brokerTenant1_BROKER", "brokerTenant2_BROKER"));
-
-        Assert.assertEquals(instanceToHelixTags.size(), expected.size(),
-                "Expected size of instance to helix tags mapping does not match");
-        for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
-            String instanceName = entry.getKey();
-            Set<String> expectedHelixTags = entry.getValue();
-            Assert.assertTrue(instanceToHelixTags.containsKey(instanceName),
-                    "Expected instance " + instanceName + " but not found in the mapping");
-            for (String helixTag : expectedHelixTags) {
-                Assert.assertTrue(instanceToHelixTags.get(instanceName).contains(helixTag),
-                        "Expected helix tag " + helixTag + " for instance " + instanceName + " but found "
-                                + instanceToHelixTags.get(instanceName));
-            }
-        }
-    }
-
-    @Test
     public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
         QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
@@ -198,7 +167,7 @@ public class PropagationUtilsTest {
         // Mock the behavior of getAllTableConfigs to return the list of table configurations
         Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
 
-        Set<String> helixTags = Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
+        List<String> helixTags = List.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
                 "serverTag2_REALTIME", "brokerTenant2_BROKER");
         Set<QueryWorkloadConfig> workloadConfigsForTags =
                 PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags,

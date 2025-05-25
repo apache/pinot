@@ -850,15 +850,15 @@ public class ZKMetadataProvider {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
             CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
-    if (znRecords != null) {
-      int numZNRecords = znRecords.size();
-      List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
-      for (ZNRecord znRecord : znRecords) {
-        queryWorkloadConfigs.add(QueryWorkloadConfigUtils.fromZNRecord(znRecord));
-      }
-      return queryWorkloadConfigs;
+    if (znRecords == null) {
+      return null;
     }
-    return null;
+    int numZNRecords = znRecords.size();
+    List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
+    for (ZNRecord znRecord : znRecords) {
+      queryWorkloadConfigs.add(QueryWorkloadConfigUtils.fromZNRecord(znRecord));
+    }
+    return queryWorkloadConfigs;
   }
 
   @Nullable
@@ -874,7 +874,6 @@ public class ZKMetadataProvider {
 
   public static boolean setQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       QueryWorkloadConfig queryWorkloadConfig) {
-
     String path = constructPropertyStorePathForQueryWorkloadConfig(queryWorkloadConfig.getQueryWorkloadName());
     boolean isNewConfig = !propertyStore.exists(path, AccessOption.PERSISTENT);
     ZNRecord znRecord = isNewConfig ? new ZNRecord(queryWorkloadConfig.getQueryWorkloadName())
