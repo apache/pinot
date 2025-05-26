@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -131,6 +132,14 @@ public class CalciteSqlParser {
     for (SqlNode sqlNode : sqlNodeList) {
       if (sqlNode instanceof SqlInsertFromFile) {
         // extract insert statement (execution statement)
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DML;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
+      } else if (sqlNode instanceof SqlDelete) {
+        // extract delete statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
