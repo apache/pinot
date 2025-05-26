@@ -89,6 +89,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+      //Although this var is unused, the method call checks for a precondition on requester identity
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept

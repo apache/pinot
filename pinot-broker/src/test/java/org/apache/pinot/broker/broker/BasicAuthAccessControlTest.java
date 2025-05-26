@@ -30,6 +30,7 @@ import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -122,19 +123,22 @@ public class BasicAuthAccessControlTest {
 
     Set<String> tableNames = new HashSet<>();
     tableNames.add("veryImportantStuff");
-    authorizationResult = _accessControl.authorize(identity, tableNames);
-    Assert.assertFalse(authorizationResult.hasAccess());
-    Assert.assertEquals(authorizationResult.getFailureMessage(),
+
+    MultiTableAuthResult multiTableAuthResult;
+
+    multiTableAuthResult = _accessControl.authorize(identity, tableNames);
+    Assert.assertFalse(multiTableAuthResult.hasAccess());
+    Assert.assertEquals(multiTableAuthResult.getFailureMessage(),
         "Authorization Failed for tables: [veryImportantStuff]");
     tableNames.add("lessImportantStuff");
-    authorizationResult = _accessControl.authorize(identity, tableNames);
-    Assert.assertFalse(authorizationResult.hasAccess());
-    Assert.assertEquals(authorizationResult.getFailureMessage(),
+    multiTableAuthResult = _accessControl.authorize(identity, tableNames);
+    Assert.assertFalse(multiTableAuthResult.hasAccess());
+    Assert.assertEquals(multiTableAuthResult.getFailureMessage(),
         "Authorization Failed for tables: [veryImportantStuff]");
     tableNames.add("lesserImportantStuff");
-    authorizationResult = _accessControl.authorize(identity, tableNames);
-    Assert.assertFalse(authorizationResult.hasAccess());
-    Assert.assertEquals(authorizationResult.getFailureMessage(),
+    multiTableAuthResult = _accessControl.authorize(identity, tableNames);
+    Assert.assertFalse(multiTableAuthResult.hasAccess());
+    Assert.assertEquals(multiTableAuthResult.getFailureMessage(),
         "Authorization Failed for tables: [veryImportantStuff]");
   }
 
@@ -160,9 +164,9 @@ public class BasicAuthAccessControlTest {
     tableNames.add("veryImportantStuff");
     tableNames.add("lesserImportantStuff");
 
-    authorizationResult = _accessControl.authorize(identity, tableNames);
-    Assert.assertTrue(authorizationResult.hasAccess());
-    Assert.assertEquals(authorizationResult.getFailureMessage(), "");
+    MultiTableAuthResult multiTableAuthResult = _accessControl.authorize(identity, tableNames);
+    Assert.assertTrue(multiTableAuthResult.hasAccess());
+    Assert.assertEquals(multiTableAuthResult.getFailureMessage(), "");
   }
 
   @Test
@@ -178,8 +182,9 @@ public class BasicAuthAccessControlTest {
     Assert.assertTrue(authorizationResult.hasAccess());
 
     Set<String> tableNames = new HashSet<>();
-    authorizationResult = _accessControl.authorize(identity, tableNames);
-    Assert.assertTrue(authorizationResult.hasAccess());
+
+    MultiTableAuthResult multiTableAuthResult = _accessControl.authorize(identity, tableNames);
+    Assert.assertTrue(multiTableAuthResult.hasAccess());
   }
 
   @Test
