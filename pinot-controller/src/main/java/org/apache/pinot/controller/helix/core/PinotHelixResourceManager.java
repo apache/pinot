@@ -3026,7 +3026,7 @@ public class PinotHelixResourceManager {
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
       try {
         resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
-      } catch (RuntimeException e) {
+      } catch (Exception e) {
         if (instanceFailedList == null) {
           instanceFailedList = new ArrayList<>();
         }
