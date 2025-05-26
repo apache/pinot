@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public class TableAuthorizationResult implements MultiTableAuthResult {
 
-  private static final MultiTableAuthResult SUCCESS = new TableAuthorizationResult(Map.of());
+  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Map.of());
 
   private final Map<String, Boolean> _authResult;
   private final Set<String> _failedTables;
@@ -78,7 +78,7 @@ public class TableAuthorizationResult implements MultiTableAuthResult {
     return "Authorization Failed for tables: " + failedTablesList;
   }
 
-  public static MultiTableAuthResult success() {
+  public static TableAuthorizationResult success() {
     return SUCCESS;
   }
 }
