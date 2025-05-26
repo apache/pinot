@@ -27,6 +27,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRLSCLSAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
@@ -121,4 +122,7 @@ public interface AccessControl extends FineGrainedAccessControl {
     return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
         : new TableAuthorizationResult(tables, Map.of());
   }
+
+  TableRLSCLSAuthResult getRLSCLSFilters(RequesterIdentity requesterIdentity, String table);
+
 }

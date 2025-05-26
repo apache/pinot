@@ -35,7 +35,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthTableRLSCLSAuthResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRLSCLSAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -138,6 +140,30 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(table, strings));
       }
       return new TableAuthorizationResult(failedTables, tableRLSFilters);
+    }
+
+    @Override
+    public TableRLSCLSAuthResult getRLSCLSFilters(RequesterIdentity requesterIdentity, String table) {
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
+
+      if (!principalOpt.isPresent()) {
+        throw new NotAuthorizedException("Basic");
+      }
+
+      if (table == null) {
+        //
+        return BasicAuthTableRLSCLSAuthResultImpl.noRLSCLSFilters();
+      }
+
+      BasicAuthPrincipal principal = principalOpt.get();
+
+      if (principal.hasTable(table)) {
+        Optional<List<String>> rlsFilters = principal.getRLSFilters(table);
+        if (rlsFilters.isPresent()) {
+          return new BasicAuthTableRLSCLSAuthResultImpl(rlsFilters.get());
+        }
+      }
+      throw new IllegalArgumentException("Table: " + table + " not authorized for principal: " + principal.getName());
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
