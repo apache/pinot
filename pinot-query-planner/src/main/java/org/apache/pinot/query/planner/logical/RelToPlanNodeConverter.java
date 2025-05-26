@@ -388,6 +388,20 @@ public final class RelToPlanNodeConverter {
         "Invalid number of columns for join type: %s, left: %s, right: %s, result: %s", joinType, numLeftColumns,
         numRightColumns, numResultColumns);
 
+    RexExpression matchCondition = RexExpressionUtils.fromRexNode(join.getMatchCondition());
+    Preconditions.checkState(matchCondition != null, "ASOF_JOIN must have a match condition");
+    Preconditions.checkState(matchCondition instanceof RexExpression.FunctionCall,
+        "ASOF JOIN only supports function call match condition, got: %s", matchCondition);
+
+    List<RexExpression> matchKeys = ((RexExpression.FunctionCall) matchCondition).getFunctionOperands();
+    // TODO: Add support for MATCH_CONDITION containing two columns of different types. In that case, there would be
+    //       a CAST RexExpression.FunctionCall on top of the RexExpression.InputRef, and the physical ASOF join operator
+    //       can't currently handle that.
+    Preconditions.checkState(
+        matchKeys.size() == 2 && matchKeys.get(0) instanceof RexExpression.InputRef
+            && matchKeys.get(1) instanceof RexExpression.InputRef,
+        "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
+
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));

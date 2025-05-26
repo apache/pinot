@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,33 +49,19 @@ public class AsofJoinOperator extends BaseJoinOperator {
   public AsofJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context, leftInput, leftSchema, rightInput, node);
-    Preconditions.checkState(node.getNonEquiConditions().isEmpty(),
-        "ASOF_JOIN operator cannot have non-equi join keys");
-    Preconditions.checkState(node.getMatchCondition() != null, "ASOF_JOIN operator must have a match condition");
     _rightTable = new HashMap<>();
-
     _leftKeySelector = KeySelectorFactory.getKeySelector(node.getLeftKeys());
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
 
     RexExpression matchCondition = node.getMatchCondition();
-    Preconditions.checkState(matchCondition instanceof RexExpression.FunctionCall,
-        "ASOF_JOIN operator only supports function call match condition");
-
     try {
       _matchConditionType =
           MatchConditionType.valueOf(((RexExpression.FunctionCall) matchCondition).getFunctionName().toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new UnsupportedOperationException("Unsupported match condition: " + matchCondition);
     }
+
     List<RexExpression> matchKeys = ((RexExpression.FunctionCall) matchCondition).getFunctionOperands();
-    // TODO: Add support for MATCH_CONDITION containing two columns of different types. In that case, there would be
-    //       a CAST RexExpression.FunctionCall on top of the RexExpression.InputRef, and we'd need to add the
-    //       appropriate type casts to make sure that the Comparable based comparisons in this class don't throw
-    //       ClassCastException.
-    Preconditions.checkState(
-        matchKeys.size() == 2 && matchKeys.get(0) instanceof RexExpression.InputRef
-            && matchKeys.get(1) instanceof RexExpression.InputRef,
-        "ASOF_JOIN operator only supports match conditions with a comparison between two columns of the same type");
     _leftMatchKeyIndex = ((RexExpression.InputRef) matchKeys.get(0)).getIndex();
     _rightMatchKeyIndex = ((RexExpression.InputRef) matchKeys.get(1)).getIndex() - leftSchema.size();
   }

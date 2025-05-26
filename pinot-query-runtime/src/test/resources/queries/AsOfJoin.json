@@ -410,7 +410,7 @@
       },
       {
         "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.key_col) ON {t1}.key_col = {t2}.key_col",
-        "expectedException": ".*ASOF_JOIN operator only supports match conditions with a comparison between two columns of the same type.*",
+        "expectedException": ".*ASOF_JOIN only supports match conditions with a comparison between two columns of the same type.*",
         "comment": "We currently don't support MATCH_CONDITION comparing columns of different types"
       }
     ]
