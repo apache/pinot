@@ -35,9 +35,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.BasicAuthTableRLSCLSAuthResultImpl;
+import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
-import org.apache.pinot.spi.auth.TableRLSCLSAuthResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -114,7 +114,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(brokerRequest.getQuerySource().getTableName());
       rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(brokerRequest.getQuerySource().getTableName(), strings));
 
-      return new TableAuthorizationResult(failedTables, tableRLSFilters);
+      return new TableAuthorizationResult(failedTables);
     }
 
     @Override
@@ -139,20 +139,19 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
         rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(table, strings));
       }
-      return new TableAuthorizationResult(failedTables, tableRLSFilters);
+      return new TableAuthorizationResult(failedTables);
     }
 
     @Override
-    public TableRLSCLSAuthResult getRLSCLSFilters(RequesterIdentity requesterIdentity, String table) {
+    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
-      if (!principalOpt.isPresent()) {
+      if (principalOpt.isEmpty()) {
         throw new NotAuthorizedException("Basic");
       }
 
       if (table == null) {
-        //
-        return BasicAuthTableRLSCLSAuthResultImpl.noRLSCLSFilters();
+        return TableRowColAuthResultImpl.noRowColFilters();
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
@@ -160,9 +159,13 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (principal.hasTable(table)) {
         Optional<List<String>> rlsFilters = principal.getRLSFilters(table);
         if (rlsFilters.isPresent()) {
-          return new BasicAuthTableRLSCLSAuthResultImpl(rlsFilters.get());
+          return new TableRowColAuthResultImpl(rlsFilters.get());
+        } else {
+          return TableRowColAuthResultImpl.noRowColFilters();
         }
       }
+      //if the principal does not have the table. Ideally, this check should be done before fetching the row/col
+      // filters so the control flow should never reach here
       throw new IllegalArgumentException("Table: " + table + " not authorized for principal: " + principal.getName());
     }
 

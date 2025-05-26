@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.broker.api;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
@@ -26,8 +29,11 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultiTableRowColAuthResultImpl;
+import org.apache.pinot.spi.auth.MultiTableRowColAuthResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
-import org.apache.pinot.spi.auth.TableRLSCLSAuthResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
@@ -120,9 +126,33 @@ public interface AccessControl extends FineGrainedAccessControl {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
     return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
-        : new TableAuthorizationResult(tables, Map.of());
+        : new TableAuthorizationResult(tables);
   }
 
-  TableRLSCLSAuthResult getRLSCLSFilters(RequesterIdentity requesterIdentity, String table);
+  /**
+   * Returns RLS/CLS filters for a particular table. By default, there are no RLS/CLS filters on any table.
+   * @param requesterIdentity requested identity
+   * @param table Table used in the query. Table name can be with or without tableType.
+   * @return {@link TableRowColAuthResult} with the result of the access control check
+   */
+  default TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+    return TableRowColAuthResultImpl.noRowColFilters();
+  }
 
+  /**
+   * Convenience method to get RLS/CLS filters for a set of tables. By default, we iterate through each table and do
+   * the check using {@link AccessControl#getRowColFilters(RequesterIdentity, String)} and construct the final
+   * response by returning an instance of {@link MultiTableRowColAuthResult}
+   * @param requesterIdentity requester identity
+   * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
+   * @return {@link MultiTableRowColAuthResult} with the result of the access control check.
+   */
+  default MultiTableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, Set<String> tables) {
+    Map<String, List<String>> rlsFilters = new HashMap<>();
+    for (String table : tables) {
+      Optional<List<String>> rlsFiltersMaybe = getRowColFilters(requesterIdentity, table).getRLSFilters();
+      rlsFiltersMaybe.ifPresent(rlsFilterList -> rlsFilters.put(table, rlsFilterList));
+    }
+    return new MultiTableRowColAuthResultImpl(rlsFilters);
+  }
 }

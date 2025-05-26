@@ -24,12 +24,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -40,7 +40,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -98,6 +97,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -896,26 +896,31 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     AuthorizationResult authorizationResult =
         accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
 
+    if (!authorizationResult.hasAccess()) {
+      throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+    }
+
+    //get RLS/CLS filters now
+    TableRowColAuthResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
+
     //rewrite query
     Map<String, String> queryOptions =
         pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
-    List<String> rowFilters =
-        authorizationResult.getRLSFilters().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < rowFilters.size(); i++) {
-      sb.append(rowFilters.get(i));
-      if (i < rowFilters.size() - 1) {
-        sb.append(" AND ");
+
+    Optional<List<String>> rlsFiltersMaybe = rlsFilters.getRLSFilters();
+    if (rlsFiltersMaybe.isPresent()) {
+      List<String> rowFilters = rlsFiltersMaybe.get();
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < rowFilters.size(); i++) {
+        sb.append(rowFilters.get(i));
+        if (i < rowFilters.size() - 1) {
+          sb.append(" AND ");
+        }
       }
-    }
-    queryOptions.put("rowFilters", sb.toString());
-    pinotQuery.setQueryOptions(queryOptions);
+      queryOptions.put("rowFilters", sb.toString());
+      pinotQuery.setQueryOptions(queryOptions);
 
-    CalciteSqlParser.queryRewrite(pinotQuery);
-
-
-    if (!authorizationResult.hasAccess()) {
-      throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+      CalciteSqlParser.queryRewrite(pinotQuery);
     }
 
     try {

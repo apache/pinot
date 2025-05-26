@@ -323,20 +323,20 @@ public class QueryRunner {
     }
 
     // run OpChain
-    OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      HashMap<String, String> rowFilters = new HashMap<>();
-      rowFilters.put("rowFilters", requestMetadata.get("rowFilters"));
-      opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-              rowFilters);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
-    _opChainScheduler.register(opChain);
+//    OpChainExecutionContext executionContext =
+//        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+//            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+//    OpChain opChain;
+//    if (workerMetadata.isLeafStageWorker()) {
+//      HashMap<String, String> rowFilters = new HashMap<>();
+//      rowFilters.put("rowFilters", requestMetadata.get("rowFilters"));
+//      opChain =
+//          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+//              rowFilters);
+//    } else {
+//      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+//    }
+    _opChainScheduler.register(null);
   }
 
   /**

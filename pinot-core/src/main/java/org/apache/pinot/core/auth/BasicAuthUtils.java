@@ -41,7 +41,7 @@ public final class BasicAuthUtils {
   private static final String TABLES = "tables";
   private static final String EXCLUDE_TABLES = "excludeTables";
   private static final String ALL = "*";
-  private static final String RLS_FILTER = "rlsFilter";
+  private static final String RLS_FILTER = "rls";
 
   private BasicAuthUtils() {
     // left blank
@@ -115,9 +115,10 @@ public final class BasicAuthUtils {
       Set<String> permissions =
           Optional.ofNullable(user.getPermissios()).orElseGet(() -> Collections.emptyList()).stream()
               .map(x -> x.toString()).collect(Collectors.toSet());
+      //todo: handle rls filters properly
       return new ZkBasicAuthPrincipal(name,
           org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
-          tables, excludeTables, permissions);
+          tables, excludeTables, permissions, Map.of());
     }).collect(Collectors.toList());
   }
 

@@ -4,6 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 
-public interface TableRLSCLSAuthResult {
+public interface TableRowColAuthResult {
   Optional<List<String>> getRLSFilters();
 }
