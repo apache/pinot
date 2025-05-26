@@ -87,7 +87,7 @@ public class PeerServerSegmentFinder {
     // Find out the ONLINE servers serving the segment.
     Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
     if (instanceStateMap == null) {
-      LOGGER.warn("Failed to find segment: {} in table: {}", segmentName, tableNameWithType);
+      LOGGER.warn("Failed to find segment: {} in external view for the table: {}", segmentName, tableNameWithType);
       return;
     }
     for (Map.Entry<String, String> instanceState : instanceStateMap.entrySet()) {
