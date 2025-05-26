@@ -33,7 +33,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -87,32 +89,16 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
-
-      if (!principalOpt.isPresent()) {
-        throw new NotAuthorizedException("Basic");
-      }
-
-      BasicAuthPrincipal principal = principalOpt.get();
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return TableAuthorizationResult.success();
+        return new BasicAuthorizationResultImpl(true);
       }
-
-      Set<String> failedTables = new HashSet<>();
-
-      if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
-        failedTables.add(brokerRequest.getQuerySource().getTableName());
-      }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables);
+      return authorize(requesterIdentity, brokerRequest.getQuerySource().getTableName());
     }
 
     @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public MultiTableAuthResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
@@ -120,7 +106,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.success();
+        return MultiTableAuthResultImpl.success();
       }
       BasicAuthPrincipal principal = principalOpt.get();
       Set<String> failedTables = new HashSet<>();
@@ -130,9 +116,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         }
       }
       if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
+        return MultiTableAuthResultImpl.success();
       }
-      return new TableAuthorizationResult(failedTables);
+      return new MultiTableAuthResultImpl(failedTables);
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

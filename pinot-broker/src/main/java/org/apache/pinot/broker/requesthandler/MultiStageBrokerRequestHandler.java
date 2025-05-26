@@ -81,7 +81,7 @@ import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -299,7 +299,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
-      TableAuthorizationResult tableAuthorizationResult =
+      MultiTableAuthResult tableAuthorizationResult =
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
@@ -393,7 +393,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    TableAuthorizationResult tableAuthorizationResult =
+    MultiTableAuthResult tableAuthorizationResult =
         hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
     if (!tableAuthorizationResult.hasAccess()) {
       throwTableAccessError(tableAuthorizationResult);
@@ -522,7 +522,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {
+  private static void throwTableAccessError(MultiTableAuthResult tableAuthorizationResult) {
     String failureMessage = tableAuthorizationResult.getFailureMessage();
     if (StringUtils.isNotBlank(failureMessage)) {
       failureMessage = "Reason: " + failureMessage;

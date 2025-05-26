@@ -25,20 +25,20 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class TableAuthorizationResultTest {
+public class MultiTableAuthResultTest {
 
   @Test
   public void testParameterizedConstructor() {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
+    MultiTableAuthResult result = new MultiTableAuthResultImpl(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertTrue(result.getFailureMessage().contains("table1"));
   }
 
   @Test
   public void testAddFailedTable() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"));
+    MultiTableAuthResult result = new MultiTableAuthResultImpl(Set.of("table1"));
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1]");
   }
@@ -48,20 +48,20 @@ public class TableAuthorizationResultTest {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
     failedTables.add("table2");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
+    MultiTableAuthResult result = new MultiTableAuthResultImpl(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailedTables(), failedTables);
   }
 
   @Test
   public void testGetFailureMessage() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"));
+    MultiTableAuthResult result = new MultiTableAuthResultImpl(Set.of("table1", "table2"));
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 
   @Test
   public void testNoFailureResult() {
-    TableAuthorizationResult result = TableAuthorizationResult.success();
+    MultiTableAuthResult result = MultiTableAuthResultImpl.success();
     Assert.assertTrue(result.hasAccess());
     Assert.assertEquals("", result.getFailureMessage());
   }

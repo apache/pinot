@@ -16,35 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.spi.auth;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Implementation of the AuthorizationResult interface that provides authorization results
- * at the table level, including which tables failed authorization.
- */
-public class TableAuthorizationResult implements AuthorizationResult {
+public class MultiTableAuthResultImpl implements MultiTableAuthResult {
 
-  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of());
+  private static final MultiTableAuthResult SUCCESS = new MultiTableAuthResultImpl(Map.of());
+
+  private final Map<String, Boolean> _authResult;
   private final Set<String> _failedTables;
 
-  public TableAuthorizationResult(Set<String> failedTables) {
-    _failedTables = failedTables;
+  public MultiTableAuthResultImpl(Map<String, Boolean> authResult) {
+    _authResult = authResult;
+    _failedTables =
+        _authResult.entrySet().stream().filter(e -> !e.getValue()).map(Map.Entry::getKey).collect(Collectors.toSet());
   }
 
-  /**
-   * Creates a TableAuthorizationResult with no failed tables.
-   *
-   * @return a TableAuthorizationResult with no failed tables.
-   */
-  public static TableAuthorizationResult success() {
-    return SUCCESS;
+  public MultiTableAuthResultImpl(Set<String> failedTables) {
+    Map<String, Boolean> authResult = new HashMap<>();
+    for (String tableName : failedTables) {
+      authResult.put(tableName, false);
+    }
+    _authResult = authResult;
+    _failedTables = failedTables;
   }
 
   @Override
@@ -52,15 +57,16 @@ public class TableAuthorizationResult implements AuthorizationResult {
     return _failedTables.isEmpty();
   }
 
+  @Override
+  public Optional<Boolean> hasAccess(String tableName) {
+    return Optional.of(_authResult.get(tableName));
+  }
+
+  @Override
   public Set<String> getFailedTables() {
     return _failedTables;
   }
 
-  /**
-   * Provides the failure message indicating which tables failed authorization.
-   *
-   * @return a string containing the failure message if there are failed tables, otherwise an empty string.
-   */
   @Override
   public String getFailureMessage() {
     if (hasAccess()) {
@@ -70,5 +76,9 @@ public class TableAuthorizationResult implements AuthorizationResult {
     List<String> failedTablesList = new ArrayList<>(_failedTables);
     Collections.sort(failedTablesList); // Sort to make output deterministic
     return "Authorization Failed for tables: " + failedTablesList;
+  }
+
+  public static MultiTableAuthResult success() {
+    return SUCCESS;
   }
 }

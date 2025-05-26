@@ -20,7 +20,6 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -39,7 +38,9 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -94,20 +95,19 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return TableAuthorizationResult.success();
+        return new BasicAuthorizationResultImpl(true);
       }
-
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return authorize(requesterIdentity, brokerRequest.getQuerySource().getTableName());
     }
 
     @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public MultiTableAuthResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
       if (!principalOpt.isPresent()) {
         throw new NotAuthorizedException("Basic");
       }
       if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.success();
+        return MultiTableAuthResultImpl.success();
       }
 
       ZkBasicAuthPrincipal principal = principalOpt.get();
@@ -118,9 +118,9 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         }
       }
       if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
+        return MultiTableAuthResultImpl.success();
       }
-      return new TableAuthorizationResult(failedTables);
+      return new MultiTableAuthResultImpl(failedTables);
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

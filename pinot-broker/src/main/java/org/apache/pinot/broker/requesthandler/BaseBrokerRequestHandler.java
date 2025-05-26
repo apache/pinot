@@ -54,7 +54,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
@@ -221,12 +222,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Validates whether the requester has access to all the tables.
    */
-  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+  protected MultiTableAuthResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
 
-    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+    MultiTableAuthResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
 
     Set<String> failedTables = tableNames.stream()
         .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
@@ -235,9 +236,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     failedTables.addAll(tableAuthorizationResult.getFailedTables());
 
     if (!failedTables.isEmpty()) {
-      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
+      tableAuthorizationResult = new MultiTableAuthResultImpl(failedTables);
     } else {
-      tableAuthorizationResult = TableAuthorizationResult.success();
+      tableAuthorizationResult = MultiTableAuthResultImpl.success();
     }
 
     if (!tableAuthorizationResult.hasAccess()) {

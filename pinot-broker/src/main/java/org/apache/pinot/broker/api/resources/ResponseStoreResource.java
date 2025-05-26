@@ -53,7 +53,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.Request;
@@ -187,7 +187,7 @@ public class ResponseStoreResource {
     if (_responseStore.exists(requestId)) {
       CursorResponse response = _responseStore.readResponse(requestId);
       AccessControl accessControl = _accessControlFactory.create();
-      TableAuthorizationResult result = accessControl.authorize(
+      MultiTableAuthResult result = accessControl.authorize(
           PinotClientRequest.makeHttpIdentity(requestContext),
           response.getTablesQueried());
       if (!result.hasAccess()) {

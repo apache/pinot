@@ -23,7 +23,8 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResult;
+import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -49,8 +50,8 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
-      return TableAuthorizationResult.success();
+    public MultiTableAuthResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+      return MultiTableAuthResultImpl.success();
     }
   }
 }
