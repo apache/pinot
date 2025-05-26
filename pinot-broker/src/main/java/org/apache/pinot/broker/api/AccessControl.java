@@ -26,7 +26,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.MultiTableAuthResult;
-import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
@@ -107,19 +107,19 @@ public interface AccessControl extends FineGrainedAccessControl {
 
   /**
    * Verify access control on pinot tables.
-   * The default implementation returns a {@link MultiTableAuthResultImpl} with the result of the hasAccess() of the
+   * The default implementation returns a {@link TableAuthorizationResult} with the result of the hasAccess() of the
    * implementation
    *
    * @param requesterIdentity requester identity
    * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
    *
-   * @return {@link MultiTableAuthResultImpl} with the result of the access control check
+   * @return {@link TableAuthorizationResult} with the result of the access control check
    */
   default MultiTableAuthResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
-    return hasAccess(requesterIdentity, tables) ? MultiTableAuthResultImpl.success()
-        : new MultiTableAuthResultImpl(tables);
+    return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
+        : new TableAuthorizationResult(tables);
   }
 
   default AuthorizationResult authorize(RequesterIdentity requesterIdentity, String table) {

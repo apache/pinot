@@ -55,7 +55,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.MultiTableAuthResult;
-import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
@@ -236,9 +236,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     failedTables.addAll(tableAuthorizationResult.getFailedTables());
 
     if (!failedTables.isEmpty()) {
-      tableAuthorizationResult = new MultiTableAuthResultImpl(failedTables);
+      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
     } else {
-      tableAuthorizationResult = MultiTableAuthResultImpl.success();
+      tableAuthorizationResult = TableAuthorizationResult.success();
     }
 
     if (!tableAuthorizationResult.hasAccess()) {

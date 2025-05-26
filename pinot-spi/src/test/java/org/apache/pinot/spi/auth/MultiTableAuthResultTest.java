@@ -31,14 +31,14 @@ public class MultiTableAuthResultTest {
   public void testParameterizedConstructor() {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
-    MultiTableAuthResult result = new MultiTableAuthResultImpl(failedTables);
+    MultiTableAuthResult result = new TableAuthorizationResult(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertTrue(result.getFailureMessage().contains("table1"));
   }
 
   @Test
   public void testAddFailedTable() {
-    MultiTableAuthResult result = new MultiTableAuthResultImpl(Set.of("table1"));
+    MultiTableAuthResult result = new TableAuthorizationResult(Set.of("table1"));
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1]");
   }
@@ -48,20 +48,20 @@ public class MultiTableAuthResultTest {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
     failedTables.add("table2");
-    MultiTableAuthResult result = new MultiTableAuthResultImpl(failedTables);
+    MultiTableAuthResult result = new TableAuthorizationResult(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailedTables(), failedTables);
   }
 
   @Test
   public void testGetFailureMessage() {
-    MultiTableAuthResult result = new MultiTableAuthResultImpl(Set.of("table1", "table2"));
+    MultiTableAuthResult result = new TableAuthorizationResult(Set.of("table1", "table2"));
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 
   @Test
   public void testNoFailureResult() {
-    MultiTableAuthResult result = MultiTableAuthResultImpl.success();
+    MultiTableAuthResult result = TableAuthorizationResult.success();
     Assert.assertTrue(result.hasAccess());
     Assert.assertEquals("", result.getFailureMessage());
   }

@@ -30,20 +30,20 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 
-public class MultiTableAuthResultImpl implements MultiTableAuthResult {
+public class TableAuthorizationResult implements MultiTableAuthResult {
 
-  private static final MultiTableAuthResult SUCCESS = new MultiTableAuthResultImpl(Map.of());
+  private static final MultiTableAuthResult SUCCESS = new TableAuthorizationResult(Map.of());
 
   private final Map<String, Boolean> _authResult;
   private final Set<String> _failedTables;
 
-  public MultiTableAuthResultImpl(Map<String, Boolean> authResult) {
+  public TableAuthorizationResult(Map<String, Boolean> authResult) {
     _authResult = authResult;
     _failedTables =
         _authResult.entrySet().stream().filter(e -> !e.getValue()).map(Map.Entry::getKey).collect(Collectors.toSet());
   }
 
-  public MultiTableAuthResultImpl(Set<String> failedTables) {
+  public TableAuthorizationResult(Set<String> failedTables) {
     Map<String, Boolean> authResult = new HashMap<>();
     for (String tableName : failedTables) {
       authResult.put(tableName, false);

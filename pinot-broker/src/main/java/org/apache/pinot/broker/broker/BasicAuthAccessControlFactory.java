@@ -35,7 +35,7 @@ import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.MultiTableAuthResult;
-import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -108,7 +108,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (tables == null || tables.isEmpty()) {
-        return MultiTableAuthResultImpl.success();
+        return TableAuthorizationResult.success();
       }
       BasicAuthPrincipal principal = principalOpt.get();
       Set<String> failedTables = new HashSet<>();
@@ -118,9 +118,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         }
       }
       if (failedTables.isEmpty()) {
-        return MultiTableAuthResultImpl.success();
+        return TableAuthorizationResult.success();
       }
-      return new MultiTableAuthResultImpl(failedTables);
+      return new TableAuthorizationResult(failedTables);
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

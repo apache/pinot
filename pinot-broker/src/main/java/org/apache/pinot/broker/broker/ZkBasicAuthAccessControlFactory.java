@@ -40,7 +40,7 @@ import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.MultiTableAuthResult;
-import org.apache.pinot.spi.auth.MultiTableAuthResultImpl;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -107,7 +107,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         throw new NotAuthorizedException("Basic");
       }
       if (tables == null || tables.isEmpty()) {
-        return MultiTableAuthResultImpl.success();
+        return TableAuthorizationResult.success();
       }
 
       ZkBasicAuthPrincipal principal = principalOpt.get();
@@ -118,9 +118,9 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         }
       }
       if (failedTables.isEmpty()) {
-        return MultiTableAuthResultImpl.success();
+        return TableAuthorizationResult.success();
       }
-      return new MultiTableAuthResultImpl(failedTables);
+      return new TableAuthorizationResult(failedTables);
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
