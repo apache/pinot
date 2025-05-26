@@ -1621,14 +1621,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _streamPatitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMaps(_tableConfig)
-        .get(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId)));
+    _streamConfig = IngestionConfigUtils.getStreamConfigFromStreamConfigList(
+        _partitionGroupId, llcSegmentName.getTopicName(), IngestionConfigUtils.getStreamConfigs(_tableConfig));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
+        new PartitionGroupConsumptionStatus(llcSegmentName.getTopicName(), _partitionGroupId,
+            llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
