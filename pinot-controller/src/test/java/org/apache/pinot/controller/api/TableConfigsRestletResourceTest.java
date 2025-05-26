@@ -637,7 +637,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // Delete table should fail because it is referenced by a logical table
     String msg = Assert.expectThrows(
         IOException.class, () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName))).getMessage();
-    Assert.assertTrue(msg.contains("Cannot delete table config: " + tableName + " because it is referenced in logical table: " + logicalTableName), msg);
+    Assert.assertTrue(msg.contains("Cannot delete table config: " + tableName
+        + " because it is referenced in logical table: " + logicalTableName), msg);
 
     //  Delete logical table
     String deleteLogicalTableUrl = urlBuilder.forLogicalTableDelete(logicalTableName);

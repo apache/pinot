@@ -428,11 +428,11 @@ public class PinotTableRestletResource {
           ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
       for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
         // tableName should neither be the ref offline nor ref realtime table name in the logical table config.
-        if (tableName.equals(logicalTableConfig.getRefOfflineTableName()) ||
-            tableName.equals(logicalTableConfig.getRefRealtimeTableName())) {
+        if (tableName.equals(logicalTableConfig.getRefOfflineTableName())
+            || tableName.equals(logicalTableConfig.getRefRealtimeTableName())) {
           throw new ControllerApplicationException(LOGGER,
-              "Cannot delete table '" + tableName + "' because it is referenced in logical table: " + logicalTableConfig.getTableName(),
-              Response.Status.CONFLICT);
+              "Cannot delete table '" + tableName + "' because it is referenced in logical table: "
+                  + logicalTableConfig.getTableName(), Response.Status.CONFLICT);
         }
       }
 
