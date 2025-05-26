@@ -374,6 +374,7 @@ const encodeString = (str: string) => {
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes < 0) return 'N/A';
   if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
