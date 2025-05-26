@@ -36,7 +36,7 @@ import isEmpty from "lodash/isEmpty";
  */
 export const VisualizeQueryStageStats = ({ stageStats }) => {
   const [simpleMode, setSimpleMode] = useState(true);
-  const { nodes, edges } = generateFlowElements(stageStats, simpleMode); // Generate nodes and edges from input data
+  const { nodes, edges } = useMemo(() => generateFlowElements(stageStats, simpleMode), [stageStats, simpleMode]); // Generate nodes and edges from input data
   
   if(isEmpty(stageStats)) {
     return (
