@@ -31,8 +31,17 @@ public interface MultiTableAuthResult {
    */
   boolean hasAccess();
 
+  /**
+   * Checks auth status of a single table.
+   * @param tableName the table name.
+   * @return empty optional if that table is not present, optional of the auth status otherwise
+   */
   Optional<Boolean> hasAccess(String tableName);
 
+  /**
+   * Returns the set of tables that failed auth.
+   * @return the set of tables that failed auth
+   */
   Set<String> getFailedTables();
 
   /**
