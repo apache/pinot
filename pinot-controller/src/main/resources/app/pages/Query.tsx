@@ -644,8 +644,8 @@ const QueryPage = () => {
                       <Box m={"16px"}></Box>
 
                       {showErrorType === ErrorViewType.EXCEPTION && (
-                          resultError.map((error) => (
-                              <Box style={{paddingBottom: "10px"}}>
+                          resultError.map((error, index) => (
+                              <Box key={error.errorCode ? error.errorCode : `error-${index}`} style={{paddingBottom: "10px"}}>
                                 <Alert className={classes.sqlError} severity="error">
                                   {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
                                   {error.message}
