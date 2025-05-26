@@ -116,6 +116,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
@@ -422,6 +423,19 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+      // Validate the table is not referenced in any logical table config.
+      List<LogicalTableConfig> allLogicalTableConfigs =
+          ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+      for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+        // tableName should neither be the ref offline nor ref realtime table name in the logical table config.
+        if (tableName.equals(logicalTableConfig.getRefOfflineTableName()) ||
+            tableName.equals(logicalTableConfig.getRefRealtimeTableName())) {
+          throw new ControllerApplicationException(LOGGER,
+              "Cannot delete table '" + tableName + "' because it is referenced in logical table: " + logicalTableConfig.getTableName(),
+              Response.Status.CONFLICT);
+        }
+      }
+
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);

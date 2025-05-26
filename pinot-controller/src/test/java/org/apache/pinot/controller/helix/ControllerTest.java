@@ -96,6 +96,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
@@ -1235,6 +1236,14 @@ public class ControllerTest {
     assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getAllTables()));
     // No pre-existing schemas
     assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getSchemaNames()));
+  }
+
+  @DataProvider
+  public Object[][] tableTypeProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
   }
 
   /**

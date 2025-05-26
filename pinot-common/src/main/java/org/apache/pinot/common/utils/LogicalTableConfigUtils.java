@@ -170,6 +170,18 @@ public class LogicalTableConfigUtils {
           "Invalid logical table. Reason: 'refOfflineTableName' should not be null or empty when offline table exists");
     }
 
+    // validate ref offline table name is null when offline tables is empty
+    if (offlineTableNames.isEmpty() && !StringUtils.isEmpty(logicalTableConfig.getRefOfflineTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refOfflineTableName' should be null or empty when offline tables do not exist");
+    }
+
+    // validate ref realtime table name is null when realtime tables is empty
+    if (realtimeTableNames.isEmpty() && !StringUtils.isEmpty(logicalTableConfig.getRefRealtimeTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refRealtimeTableName' should be null or empty when realtime tables do not exist");
+    }
+
     // validate ref realtime table name is not null or empty when realtime tables exists
     if (!realtimeTableNames.isEmpty() && StringUtils.isEmpty(logicalTableConfig.getRefRealtimeTableName())) {
       throw new IllegalArgumentException(
