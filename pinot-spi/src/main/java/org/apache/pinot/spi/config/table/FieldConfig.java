@@ -74,6 +74,10 @@ public class FieldConfig extends BaseJsonConfig {
 
   private final String _name;
   private final EncodingType _encodingType;
+  /**
+   * @deprecated Use {@link #_indexes} instead.
+   */
+  @Deprecated
   private final List<IndexType> _indexTypes;
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
@@ -182,6 +186,10 @@ public class FieldConfig extends BaseJsonConfig {
     return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }
 
+  /**
+   * @deprecated Use {@link #getIndexes()} instead.
+   */
+  @Deprecated
   public List<IndexType> getIndexTypes() {
     return _indexTypes;
   }
@@ -212,6 +220,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static class Builder {
     private String _name;
     private EncodingType _encodingType;
+    @Deprecated
     private List<IndexType> _indexTypes;
     private JsonNode _indexes;
     private CompressionCodec _compressionCodec;
@@ -249,6 +258,7 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
+    @Deprecated
     public Builder withIndexTypes(List<IndexType> indexTypes) {
       _indexTypes = indexTypes;
       return this;

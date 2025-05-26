@@ -1324,6 +1324,25 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(),
           "Cannot disable forward index for column intCol, as the table type is REALTIME.");
     }
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs)
+        .build();
+    try {
+      ObjectNode invertedIndexProps = JsonNodeFactory.instance.objectNode();
+      invertedIndexProps.put("enabled", true);
+      ObjectNode indexNode = JsonNodeFactory.instance.objectNode();
+      indexNode.set("inverted", invertedIndexProps);
+      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT,
+          List.of(FieldConfig.IndexType.TEXT), null, null, indexNode, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for having inverted index with RAW encoding type.");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create inverted index on column: myCol1, it can only be applied to dictionary encoded columns");
+    }
   }
 
   @Test
