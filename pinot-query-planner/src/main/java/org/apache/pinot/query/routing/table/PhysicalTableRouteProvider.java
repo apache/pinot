@@ -45,7 +45,6 @@ public class PhysicalTableRouteProvider extends ImplicitHybridTableRouteProvider
   @Override
   public void calculateRoutes(TableRouteInfo tableRouteInfo, RoutingManager routingManager,
       BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest, long requestId) {
-    assert (tableRouteInfo.isExists());
     String offlineTableName = tableRouteInfo.getOfflineTableName();
     String realtimeTableName = tableRouteInfo.getRealtimeTableName();
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
