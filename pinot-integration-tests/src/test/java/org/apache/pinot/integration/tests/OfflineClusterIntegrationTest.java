@@ -4063,21 +4063,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testSegmentReload() {
-    // Test reload of segments
-    String tableName = getTableName();
-    String sqlQuery = "SELECT count(*) FROM " + tableName;
-    JsonNode response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(response.get("numRowsResultSet").asInt(), 1);
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ROWS);
+    try {
+      // Reload a single segment in the offline table
+      String segmentName = listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0);
+      String response = reloadOfflineSegment(DEFAULT_TABLE_NAME + "_OFFLINE", segmentName, true);
+      JsonNode responseJson = JsonUtils.stringToJsonNode(response);
 
-    // Reload the segments
-    reloadAllSegments(tableName, false, NUM_ROWS);
-
-    // Test query again
-    response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(response.get("numRowsResultSet").asInt(), 1);
-    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_ROWS);
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      String jobId = statusString.substring(startIdx, endIdx).trim();
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return isReloadJobCompleted(jobId);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 600_000L, "Reload job did not complete in 10 minutes");
+    } catch (Exception e) {
+      fail("Segment reload failed with exception: " + e.getMessage());
+    }
   }
 }

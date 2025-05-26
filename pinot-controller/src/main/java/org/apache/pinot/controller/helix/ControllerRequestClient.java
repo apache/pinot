@@ -245,7 +245,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
-              new URI(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)), null, _headers));
+        new URI(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)), null, _headers));
       return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
