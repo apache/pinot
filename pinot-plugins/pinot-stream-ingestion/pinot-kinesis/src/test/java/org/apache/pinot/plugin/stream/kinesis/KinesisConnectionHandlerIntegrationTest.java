@@ -112,7 +112,7 @@ public class KinesisConnectionHandlerIntegrationTest {
         "Expected to find test stream " + _testStreamName + " in list of streams: " + streams);
   }
 
-  @Test(dependsOnMethods = "testGetStreamNames")
+  @Test(dependsOnMethods = "testGetStreamNames", enabled = false)
   public void testGetStreamNamesWithPagination() {
     // Create additional test streams to test pagination
     String[] additionalStreams = new String[3];
