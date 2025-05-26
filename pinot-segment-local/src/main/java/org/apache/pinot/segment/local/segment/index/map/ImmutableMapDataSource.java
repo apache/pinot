@@ -41,15 +41,12 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
 
   public ImmutableMapDataSource(ColumnMetadata columnMetadata, ColumnIndexContainer columnIndexContainer) {
     super(new ImmutableMapDataSourceMetadata(columnMetadata), columnIndexContainer);
-    MapIndexReader mapIndexReader = getMapIndex();
-    if (mapIndexReader == null) {
-      // Fallback to use forward index
-      ForwardIndexReader<?> forwardIndex = getForwardIndex();
-      if (forwardIndex instanceof MapIndexReader) {
-        mapIndexReader = (MapIndexReader) forwardIndex;
-      } else {
-        mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
-      }
+    MapIndexReader mapIndexReader;
+    ForwardIndexReader<?> forwardIndex = getForwardIndex();
+    if (forwardIndex instanceof MapIndexReader) {
+      mapIndexReader = (MapIndexReader) forwardIndex;
+    } else {
+      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
     }
     _mapIndexReader = mapIndexReader;
   }

@@ -42,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -98,6 +99,8 @@ public class QueryContext {
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
+  // Latest table schema at query time
+  private Schema _schema;
   // End time in milliseconds for the query
   private long _endTimeMs;
   // Whether to enable prefetch for the query
@@ -312,6 +315,14 @@ public class QueryContext {
    */
   public Set<String> getColumns() {
     return _columns;
+  }
+
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  public void setSchema(Schema schema) {
+    _schema = schema;
   }
 
   public long getEndTimeMs() {
