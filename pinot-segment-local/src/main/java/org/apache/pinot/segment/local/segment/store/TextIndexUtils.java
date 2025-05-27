@@ -36,6 +36,7 @@ import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -119,12 +120,16 @@ public class TextIndexUtils {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
   }
 
-  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
+  public static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
     if (columnProperties == null) {
       return Collections.emptyList();
     }
-    String includeWords = columnProperties.getOrDefault(stopWordKey, "");
-    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR)).map(String::trim)
+    String includeWords = columnProperties.get(stopWordKey);
+    if (includeWords == null) {
+      includeWords = "";
+    }
+    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
+        .map(String::trim)
         .collect(Collectors.toList());
   }
 
@@ -181,6 +186,63 @@ public class TextIndexUtils {
     // Return a new instance of custom lucene analyzer class
     return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
         .newInstance(argValues.toArray(new Object[0]));
+  }
+
+  public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
+      throws ReflectiveOperationException {
+    String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
+    List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
+    List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
+
+    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
+        || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
+        && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
+      // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
+      // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
+      List<String> stopWordsInclude = firstNotNull(override.getStopWordsInclude(), config.getStopWordsInclude());
+      List<String> stopWordsExclude = firstNotNull(override.getStopWordsExclude(), config.getStopWordsExclude());
+      Boolean isCaseSensitive = firstNotNull(override.isCaseSensitive(), config.isCaseSensitive());
+      return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
+          stopWordsInclude, stopWordsExclude, isCaseSensitive);
+    }
+
+    // Custom analyzer + custom configs via reflection
+    if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgTypes.size()) {
+      throw new ReflectiveOperationException("Mismatch of the number of analyzer arguments and arguments types.");
+    }
+
+    // Generate args type list
+    List<Class<?>> argClasses = new ArrayList<>();
+    for (String argType : luceneAnalyzerClassArgTypes) {
+      argClasses.add(parseSupportedTypes(argType));
+    }
+
+    // Best effort coercion to the analyzer argument type
+    // Note only a subset of class types is supported, unsupported ones can be added in the future
+    List<Object> argValues = new ArrayList<>();
+    for (int i = 0; i < luceneAnalyzerClassArgs.size(); i++) {
+      argValues.add(parseSupportedTypeValues(luceneAnalyzerClassArgs.get(i), argClasses.get(i)));
+    }
+
+    // Initialize the custom analyzer class with custom analyzer args
+    Class<?> luceneAnalyzerClass = Class.forName(luceneAnalyzerClassName);
+    if (!Analyzer.class.isAssignableFrom(luceneAnalyzerClass)) {
+      String exceptionMessage = "Custom analyzer must be a child of " + Analyzer.class.getCanonicalName();
+      LOGGER.error(exceptionMessage);
+      throw new ReflectiveOperationException(exceptionMessage);
+    }
+
+    // Return a new instance of custom lucene analyzer class
+    return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
+        .newInstance(argValues.toArray(new Object[0]));
+  }
+
+  private static <T> T firstNotNull(T v1, T v2) {
+    if (v1 != null) {
+      return v1;
+    }
+
+    return v2;
   }
 
   /**

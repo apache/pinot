@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -109,7 +110,7 @@ public class TableIndexingTest {
   private void createTestCases() {
     String[] indexTypes = {
         "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-        "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
+        "native_text_index", "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
     };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
@@ -383,6 +384,20 @@ public class TableIndexingTest {
               }
             ] */
           indexTypes.add(FieldConfig.IndexType.TEXT);
+          break;
+        case "multi_col_text_index":
+             /* star tree
+              "tableIndexConfig": {
+                "multiColumnTextIndexConfig": {
+                  "columns": ["text_col_1"]
+                  "properties": {
+                  ...
+                  }
+                },
+              }
+             */
+
+          idxCfg.setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of(field.getName())));
           break;
         case "range_index":
             /* range index (supported for dictionary encoded columns of any type as well as raw encoded columns
@@ -706,6 +721,14 @@ public class TableIndexingTest {
       }
     }
     stats.put("startree_index", starTrees);
+
+    int multiColCount = 0;
+    if (segment.getSegmentMetadata().getMultiColumnTextMetadata() != null &&
+        segment.getSegmentMetadata().getMultiColumnTextMetadata().getColumns().contains(columnName)) {
+      multiColCount = 1;
+    }
+
+    stats.put("multi_col_text_index", multiColCount);
     return stats;
   }
 }

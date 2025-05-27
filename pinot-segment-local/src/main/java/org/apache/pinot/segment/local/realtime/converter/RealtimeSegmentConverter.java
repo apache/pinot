@@ -112,6 +112,7 @@ public class RealtimeSegmentConverter {
       if (!_enableColumnMajor) {
         driver.build();
       } else {
+        //TODO: does it work with multi columns ? Can we copy text index as is instead ?
         driver.buildByColumn(_realtimeSegmentImpl);
       }
     }

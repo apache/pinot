@@ -22,9 +22,12 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
@@ -41,17 +44,19 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -61,23 +66,88 @@ import org.slf4j.LoggerFactory;
  * This is used to read/search the Lucene text index.
  * When {@link ImmutableSegmentLoader} loads the segment,
  * it also loads (mmaps) the Lucene text index if the segment has TEXT column(s).
+ *
+ * This class is a version of LuceneTestIndexReader adapted to handling multiple columns.
  */
-public class LuceneTextIndexReader implements TextIndexReader {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexReader.class);
+public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexReader.class);
+  public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
 
+  private final List<String> _columns;
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  private final Map<String, ColumnConfig> _perColumnConfigs;
 
-  public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
-    _column = column;
+  /* Per-column text configuration that overrides top-level configuration. */
+  public static class ColumnConfig {
+    private final String _queryParserClass;
+    private final Constructor<QueryParserBase> _queryParserClassConstructor;
+    private final Boolean _useANDForMultiTermQueries;
+    private final Boolean _enablePrefixSuffixMatchingInPhraseQueries;
+    private final List<String> _stopWordsInclude;
+    private final List<String> _stopWordsExclude;
+    private final Boolean _isCaseSensitive;
+
+    public ColumnConfig(String queryParserClass, Constructor<QueryParserBase> queryParserClassConstructor,
+        Boolean useANDForMultiTermQueries, Boolean enablePrefixSuffixMatchingInPhraseQueries,
+        List<String> stopWordsInclude, List<String> stopWordsExclude, Boolean isCaseSensitive) {
+      _queryParserClass = queryParserClass;
+      _queryParserClassConstructor = queryParserClassConstructor;
+      _useANDForMultiTermQueries = useANDForMultiTermQueries;
+      _enablePrefixSuffixMatchingInPhraseQueries = enablePrefixSuffixMatchingInPhraseQueries;
+      _stopWordsInclude = stopWordsInclude;
+      _stopWordsExclude = stopWordsExclude;
+      _isCaseSensitive = isCaseSensitive;
+    }
+
+    public boolean usesCustomAnalyzer() {
+      return _stopWordsExclude != null || _stopWordsInclude != null;
+    }
+
+    public String getQueryParserClass() {
+      return _queryParserClass;
+    }
+
+    public Constructor<QueryParserBase> getQueryParserClassConstructor() {
+      return _queryParserClassConstructor;
+    }
+
+    public Boolean getUseANDForMultiTermQueries() {
+      return _useANDForMultiTermQueries;
+    }
+
+    public Boolean getEnablePrefixSuffixMatchingInPhraseQueries() {
+      return _enablePrefixSuffixMatchingInPhraseQueries;
+    }
+
+    public List<String> getStopWordsInclude() {
+      return _stopWordsInclude;
+    }
+
+    public List<String> getStopWordsExclude() {
+      return _stopWordsExclude;
+    }
+
+    public Boolean isCaseSensitive() {
+      return _isCaseSensitive;
+    }
+  }
+
+  public MultiColumnLuceneTextIndexReader(
+      List<String> columns,
+      File indexDir,
+      int numDocs,
+      Map<String, String> sharedConfig,
+      Map<String, Map<String, String>> perColumnConfig) {
+    _columns = columns;
+    TextIndexConfig config = new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(sharedConfig).build();
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
@@ -102,33 +172,98 @@ public class LuceneTextIndexReader implements TextIndexReader {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
       }
 
-      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
-      _analyzer = TextIndexUtils.getAnalyzer(config);
+      _docIdTranslator = prepareDocIdTranslator(indexDir, _columns, numDocs, _indexSearcher, config, indexFile);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
-      LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
+      _perColumnConfigs = buildColumnConfigs(perColumnConfig);
+
+      Map<String, ColumnConfig> cfgs = _perColumnConfigs;
+      _analyzer = buildAnalyzer(config, cfgs);
+
+      LOGGER.info("Successfully read lucene index for {} from {}", _columns, indexDir);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", columns,
           e.getMessage());
       throw new RuntimeException(e);
     }
   }
 
-  /**
-   * As part of loading the segment in ImmutableSegmentLoader,
-   * we load the text index (per column if it exists) and store
-   * the reference in {@link PhysicalColumnIndexContainer}
-   * similar to how it is done for other types of indexes.
-   *
-   * @param column   column name
-   * @param indexDir segment index directory
-   * @param numDocs  number of documents in the segment
-   */
-  public LuceneTextIndexReader(String column, File indexDir, int numDocs,
-      @Nullable Map<String, String> textIndexProperties) {
-    this(column, indexDir, numDocs,
-        new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(textIndexProperties).build());
+  public static Analyzer buildAnalyzer(TextIndexConfig config, Map<String, ColumnConfig> colConfigs)
+      throws ReflectiveOperationException {
+    Analyzer analyzer = TextIndexUtils.getAnalyzer(config);
+    HashMap<String, Analyzer> perColumnAnalyzers = null;
+    for (Map.Entry<String, ColumnConfig> entry : colConfigs.entrySet()) {
+      ColumnConfig colConfig = entry.getValue();
+      if (colConfig.usesCustomAnalyzer()) {
+        Analyzer colAnalyzer = TextIndexUtils.getAnalyzer(config, colConfig);
+
+        if (perColumnAnalyzers == null) {
+          perColumnAnalyzers = new HashMap<>();
+        }
+
+        perColumnAnalyzers.put(entry.getKey(), colAnalyzer);
+      }
+    }
+
+    if (perColumnAnalyzers != null) {
+      return new PerFieldAnalyzerWrapper(analyzer, perColumnAnalyzers);
+    } else {
+      return analyzer;
+    }
+  }
+
+  public static Map<String, ColumnConfig> buildColumnConfigs(Map<String, Map<String, String>> perColumnConfig)
+      throws ReflectiveOperationException {
+    Map<String, ColumnConfig> perColumnConfigs;
+    if (perColumnConfig == null || perColumnConfig.isEmpty()) {
+      perColumnConfigs = Collections.emptyMap();
+    } else {
+      perColumnConfigs = new HashMap<>(perColumnConfig.size());
+      for (Map.Entry<String, Map<String, String>> entry : perColumnConfig.entrySet()) {
+        String column = entry.getKey();
+        Map<String, String> columnProps = entry.getValue();
+
+        String parserClass = columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
+        Constructor<QueryParserBase> parserConstructor =
+            parserClass != null ? TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(parserClass)
+                : null;
+        Boolean useAnd = getBoolean(columnProps, FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES);
+        Boolean enablePhrase = getBoolean(columnProps, FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES);
+        List<String> includeKey = extractWords(columnProps, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
+        List<String> excludeKey = extractWords(columnProps, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
+        Boolean isCaseSensitive = getBoolean(columnProps, FieldConfig.TEXT_INDEX_IS_CASE_SENSITIVE_KEY);
+
+        ColumnConfig columnConfig =
+            new ColumnConfig(parserClass, parserConstructor, useAnd, enablePhrase, includeKey, excludeKey,
+                isCaseSensitive);
+        perColumnConfigs.put(column, columnConfig);
+      }
+    }
+    return perColumnConfigs;
+  }
+
+  private static List<String> extractWords(Map<String, String> properties, String key) {
+    if (properties.get(key) != null) {
+      return TextIndexUtils.parseEntryAsString(properties, key);
+    }
+
+    return null;
+  }
+
+  private static Boolean getBoolean(Map<String, String> map, String key) {
+    String value = map.get(key);
+    if (value == null) {
+      return null;
+    }
+
+    return Boolean.valueOf(value);
+  }
+
+  public MultiColumnLuceneTextIndexReader(SegmentMetadata metadata) {
+    this(metadata.getMultiColumnTextMetadata().getColumns(), metadata.getIndexDir(), metadata.getTotalDocs(),
+        metadata.getMultiColumnTextMetadata().getProperties(),
+        metadata.getMultiColumnTextMetadata().getPerColumnProperties());
   }
 
   /**
@@ -147,9 +282,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
    */
   private File getTextIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
-    File file = SegmentDirectoryPaths.findTextIndexIndexFile(segmentIndexDir, _column);
+    File file =
+        SegmentDirectoryPaths.findTextIndexIndexFile(segmentIndexDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
     if (file == null) {
-      throw new IllegalStateException("Failed to find text index file for column: " + _column);
+      throw new IllegalStateException("Failed to find multi-column text index file for columns: " + _columns);
     }
     return file;
   }
@@ -159,35 +295,62 @@ public class LuceneTextIndexReader implements TextIndexReader {
     throw new UnsupportedOperationException("");
   }
 
-  @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to query!");
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(String column, String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
+      Constructor<QueryParserBase> queryParserClassConstructor = _queryParserClassConstructor;
+      String queryParserClass = _queryParserClass;
+      boolean enablePrefixSuffixMatchingInPhraseQueries = _enablePrefixSuffixMatchingInPhraseQueries;
+      boolean useANDForMultiTermQueries = _useANDForMultiTermQueries;
+
+      ColumnConfig columnConfig = _perColumnConfigs.get(column);
+      if (columnConfig != null) {
+        if (columnConfig._queryParserClassConstructor != null) {
+          queryParserClassConstructor = columnConfig._queryParserClassConstructor;
+        }
+        if (columnConfig._queryParserClass != null) {
+          queryParserClass = columnConfig._queryParserClass;
+        }
+        if (columnConfig._enablePrefixSuffixMatchingInPhraseQueries != null) {
+          enablePrefixSuffixMatchingInPhraseQueries = columnConfig._enablePrefixSuffixMatchingInPhraseQueries;
+        }
+        if (columnConfig._useANDForMultiTermQueries != null) {
+          useANDForMultiTermQueries = columnConfig._useANDForMultiTermQueries;
+        }
+      }
+
       // Lucene query parsers are generally stateful and a new instance must be created per query.
-      QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+      QueryParserBase parser = queryParserClassConstructor.newInstance(column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
+
+      if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
+          && enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser") && _useANDForMultiTermQueries) {
+      if (queryParserClass.equals(CLASSIC_QUERY_PARSER) && useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
+      if (queryParserClass.equals(CLASSIC_QUERY_PARSER)
+          && enablePrefixSuffixMatchingInPhraseQueries) {
         query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
       }
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
       String msg =
-          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
+          "Caught exception while searching the text index for columns: " + _columns + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
   }
+
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that
@@ -204,7 +367,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     _analyzer.close();
   }
 
-  DocIdTranslator prepareDocIdTranslator(File segmentIndexDir, String column, int numDocs,
+  DocIdTranslator prepareDocIdTranslator(File segmentIndexDir, List<String> columns, int numDocs,
       IndexSearcher indexSearcher, TextIndexConfig config, File indexDir)
       throws IOException {
     if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.Skip) {
@@ -214,11 +377,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
     int length = Integer.BYTES * numDocs;
     File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-        column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME
+            + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     // The mapping is local to a segment. It is created on the server during segment load.
     // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
     // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
-    String desc = "Text index docId mapping buffer: " + column;
+    String desc = "Text index docId mapping buffer: " + columns;
     PinotDataBuffer buffer = null;
 
     try {
@@ -303,7 +467,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
 
       throw new RuntimeException(
-          "Caught exception while building doc id mapping for text index column: " + column, e);
+          "Caught exception while building doc id mapping for text index columns: " + columns, e);
     }
+  }
+
+  @Override
+  public boolean isMultiColumn() {
+    return true;
   }
 }

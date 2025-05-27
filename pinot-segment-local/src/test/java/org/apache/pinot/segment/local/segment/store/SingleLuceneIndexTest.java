@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,7 +26,9 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -53,17 +56,18 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
   public void testIndexWithMultipleColumns()
       throws IOException {
     ArrayList<String> columns = new ArrayList<>();
+    BooleanArrayList columnsSV = new BooleanArrayList();
+
     for (int i = 0; i < 200; i++) {
       columns.add("column_" + i);
+      columnsSV.add(true);
     }
 
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
-    try (MultiColumnLuceneTextIndexCreator creator = new MultiColumnLuceneTextIndexCreator(columns, TEMP_DIR, true,
-        false, null, null,
-        config)) {
+    MultiColumnTextIndexConfig config = new MultiColumnTextIndexConfig(columns);
+    try (MultiColumnLuceneTextIndexCreator creator = new MultiColumnLuceneTextIndexCreator(columns, columnsSV, TEMP_DIR,
+        true, false, null, null, config)) {
 
-      ArrayList<String> values = new ArrayList<>();
+      ArrayList<Object> values = new ArrayList<>();
       for (int row = 0; row < 1000; row++) {
         values.clear();
         for (int col = 0; col < columns.size(); col++) {
@@ -74,8 +78,8 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
 
       creator.seal();
       ArrayList<String> indexFiles = getIndexFiles();
-      Assert.assertEquals(indexFiles.size(), 5);
       logFiles(indexFiles);
+      Assert.assertEquals(indexFiles.size(), 5);
     }
   }
 
@@ -91,21 +95,18 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
 
     try {
-      for (int row = 0; row < 1000; row++) {
-        for (int col = 0; col < creators.size(); col++) {
-          creators.get(col).add("row: " + row + "col: " + col + " value: " + (row * col));
-        }
-      }
-
       for (int col = 0; col < creators.size(); col++) {
-        creators.get(col).seal();
+        LuceneTextIndexCreator creator = creators.get(col);
+        for (int row = 0; row < 1000; row++) {
+          creator.add("row: " + row + "col: " + col + " value: " + (row * col));
+        }
+        creator.seal();
       }
 
       ArrayList<String> indexFiles = getIndexFiles();
-      Assert.assertEquals(indexFiles.size(), 1000);
       logFiles(indexFiles);
+      Assert.assertEquals(indexFiles.size(), 1000);
     } finally {
-
       for (int col = 0; col < creators.size(); col++) {
         creators.get(col).close();
       }

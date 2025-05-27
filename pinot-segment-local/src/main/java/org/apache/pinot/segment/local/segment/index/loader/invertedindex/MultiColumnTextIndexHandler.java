@@ -36,28 +36,28 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
+import it.unimi.dsi.fastutil.booleans.BooleanList;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
@@ -83,19 +83,25 @@ import org.slf4j.LoggerFactory;
  * forward index for the new column. Read the forward index to create text index.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class TextIndexHandler extends BaseIndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
+public class MultiColumnTextIndexHandler extends BaseIndexHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnTextIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;
+  private final MultiColumnTextIndexConfig _textIndexConfig;
 
-  public TextIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
+  public MultiColumnTextIndexHandler(
+      SegmentDirectory segmentDirectory,
+      Map<String, FieldIndexConfigs> fieldIndexConfigs,
+      MultiColumnTextIndexConfig textIndexConfig,
       @Nullable TableConfig tableConfig) {
     super(segmentDirectory, fieldIndexConfigs, tableConfig);
     _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.text(), _fieldIndexConfigs);
+    _textIndexConfig = textIndexConfig;
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+    /* Unused TODO: maybe move comparison logic here from SegmentPreProcessor
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
@@ -113,13 +119,14 @@ public class TextIndexHandler extends BaseIndexHandler {
         LOGGER.info("Need to create new text index for segment: {}, column: {}", segmentName, column);
         return true;
       }
-    }
+    }*/
     return false;
   }
 
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
+    /*
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
@@ -130,12 +137,39 @@ public class TextIndexHandler extends BaseIndexHandler {
         segmentWriter.removeIndex(column, StandardIndexes.text());
         LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
       }
+    }*/
+
+    // maybe use later
+    //List<ColumnMetadata> columnMetadata = new ArrayList<>(_textIndexConfig.getColumns().size());
+
+    /*public MultiColumnLuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
+    this(List.of(context.getFieldSpec().getName()), context.getIndexDir(), context.isTextCommitOnClose(),
+        context.isRealtimeConversion(), context.getConsumerDir(), context.getImmutableToMutableIdMap(), indexConfig);
+  }*/
+
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
+        _segmentDirectory.getSegmentMetadata().getVersion());
+
+    BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
+    for (String column : _textIndexConfig.getColumns()) {
+      ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      columnsSV.add(metadata.isSingleValue());
     }
-    for (String column : columnsToAddIdx) {
-      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (shouldCreateTextIndex(columnMetadata)) {
-        createTextIndexForColumn(segmentWriter, columnMetadata);
+
+    //TODO: check actual arguments
+    try (MultiColumnLuceneTextIndexCreator creator =
+        new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
+            null, null, _textIndexConfig)) {
+
+      for (String column : _textIndexConfig.getColumns()) {
+        ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (shouldCreateTextIndex(metadata)) {
+          createTextIndexForColumn(segmentWriter, metadata, creator);
+        }
       }
+
+      creator.seal();
     }
   }
 
@@ -160,9 +194,9 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
+      MultiColumnLuceneTextIndexCreator creator)
       throws Exception {
-    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     int numDocs = columnMetadata.getTotalDocs();
@@ -171,47 +205,44 @@ public class TextIndexHandler extends BaseIndexHandler {
     // Create a temporary forward index if it is disabled and does not exist
     columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
+    LOGGER.info("Adding column: {} to multi-column text index in segment: {}, hasDictionary: {}", columnName,
+        segmentName,
         hasDictionary);
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
-        _segmentDirectory.getSegmentMetadata().getVersion());
+
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withColumnMetadata(columnMetadata)
-        .withIndexDir(segmentDirectory)
-        .withTextCommitOnClose(true)
-        .build();
-    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
-
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       if (columnMetadata.isSingleValue()) {
-        processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+        processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, creator, numDocs,
             columnMetadata);
       } else {
-        processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+        processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, creator, numDocs,
             columnMetadata);
       }
-      textIndexCreator.seal();
     }
 
-    LOGGER.info("Created text index for column: {} in segment: {}", columnName, segmentName);
+    LOGGER.info("Added column: {} to multi-column text index in segment: {}", columnName, segmentName);
   }
 
-  private void processSVField(SegmentDirectory.Writer segmentWriter, boolean hasDictionary,
-      ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
-      int numDocs, ColumnMetadata columnMetadata)
+  private void processSVField(
+      SegmentDirectory.Writer segmentWriter,
+      boolean hasDictionary,
+      ForwardIndexReader forwardIndexReader,
+      ForwardIndexReaderContext readerContext,
+      MultiColumnLuceneTextIndexCreator textIndexCreator,
+      int numDocs,
+      ColumnMetadata columnMetadata)
       throws IOException {
+    final String columnName = columnMetadata.getColumnName();
+
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
       for (int docId = 0; docId < numDocs; docId++) {
-        textIndexCreator.add(forwardIndexReader.getString(docId, readerContext));
+        textIndexCreator.add(columnName, forwardIndexReader.getString(docId, readerContext));
       }
     } else {
       // text index on dictionary encoded SV column
@@ -220,22 +251,25 @@ public class TextIndexHandler extends BaseIndexHandler {
       try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
         for (int docId = 0; docId < numDocs; docId++) {
           int dictId = forwardIndexReader.getDictId(docId, readerContext);
-          textIndexCreator.add(dictionary.getStringValue(dictId));
+          textIndexCreator.add(columnName, dictionary.getStringValue(dictId));
         }
       }
     }
   }
 
   private void processMVField(SegmentDirectory.Writer segmentWriter, boolean hasDictionary,
-      ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext, TextIndexCreator textIndexCreator,
+      ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext,
+      MultiColumnLuceneTextIndexCreator textIndexCreator,
       int numDocs, ColumnMetadata columnMetadata)
       throws IOException {
+    final String columnName = columnMetadata.getColumnName();
+
     if (!hasDictionary) {
       // text index on raw column, just read the raw forward index
       String[] valueBuffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
       for (int docId = 0; docId < numDocs; docId++) {
         int length = forwardIndexReader.getStringMV(docId, valueBuffer, readerContext);
-        textIndexCreator.add(valueBuffer, length);
+        textIndexCreator.add(columnName, valueBuffer, length);
       }
     } else {
       // text index on dictionary encoded MV column
@@ -250,7 +284,7 @@ public class TextIndexHandler extends BaseIndexHandler {
           for (int i = 0; i < length; i++) {
             valueBuffer[i] = dictionary.getStringValue(dictIdBuffer[i]);
           }
-          textIndexCreator.add(valueBuffer, length);
+          textIndexCreator.add(columnName, valueBuffer, length);
         }
       }
     }
