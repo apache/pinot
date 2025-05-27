@@ -631,7 +631,7 @@ public class PinotSegmentRestletResource {
       @Nullable String instanceName) {
     if (segmentNames == null) {
       // instanceName can be null or not null, and this method below can handle both cases.
-      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName, true);
     }
     // Skip servers and segments not involved in the segment reloading job.
     List<String> segmnetNameList = new ArrayList<>();
