@@ -265,9 +265,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
 
-      //hardcoding the row filter here, should be populated from the auth result
-      compiledQuery.getPlannerContext().getOptions().put("rowFilters", "ArrDelay > 50");
-
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
@@ -323,7 +320,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
               sb.append(" AND ");
             }
           }
-          compiledQuery.getOptions().put(tableName, sb.toString());
+          String key = String.format("%s-%s",CommonConstants.RLS_FILTERS,tableName);
+          compiledQuery.getOptions().put(key, sb.toString());
         }
       }
     }

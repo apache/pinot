@@ -926,7 +926,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           sb.append(" AND ");
         }
       }
-      queryOptions.put("rowFilters", sb.toString());
+      queryOptions.put(tableName, sb.toString());
       pinotQuery.setQueryOptions(queryOptions);
 
       CalciteSqlParser.queryRewrite(pinotQuery);
