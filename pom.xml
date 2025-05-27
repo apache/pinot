@@ -295,8 +295,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.posix.version>2.27ea1</openhft.posix.version>
-    <openhft.chronicle-core.version>2.27ea3</openhft.chronicle-core.version>
+    <openhft.chronicle-bom.version>2.27ea42</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.9</maven.version>
     <plexus-utils.version>4.0.2</plexus-utils.version>
@@ -1620,7 +1619,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-bom</artifactId>
-        <version>${openhft.chronicle-core.version}</version>
+        <version>${openhft.chronicle-bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
