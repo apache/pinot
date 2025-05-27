@@ -22,6 +22,7 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +55,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class TenantRebalancerTest extends ControllerTest {
@@ -140,6 +143,122 @@ public class TenantRebalancerTest extends ControllerTest {
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
+    for (int i = 0; i < numServers + numServersToAdd; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testAllowAndBlockTables()
+      throws Exception {
+    int numServers = 3;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+    }
+
+    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+
+    // tag all servers and brokers to test tenant
+    addTenantTagToInstances(TENANT_NAME);
+
+    // create 2 schemas
+    addDummySchema(RAW_TABLE_NAME_A);
+    addDummySchema(RAW_TABLE_NAME_B);
+
+    // create 2 tables, one on each of test tenant and default tenant
+    createTableWithSegments(RAW_TABLE_NAME_A, TENANT_NAME);
+    createTableWithSegments(RAW_TABLE_NAME_B, TENANT_NAME);
+
+    // Add 3 more servers which will be tagged to default tenant
+    int numServersToAdd = 3;
+    for (int i = 0; i < numServersToAdd; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + (numServers + i), true);
+    }
+
+    addTenantTagToInstances(TENANT_NAME);
+
+    // rebalance the tables on test tenant
+    TenantRebalanceConfig config = new TenantRebalanceConfig();
+    config.setTenantName(TENANT_NAME);
+    config.setVerboseResult(true);
+    config.setDryRun(true);
+
+    // leave allow and block tables empty
+    config.setAllowTables(Collections.emptySet());
+    config.setBlockTables(Collections.emptySet());
+
+    TenantRebalanceResult tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    RebalanceResult rebalanceResultA = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
+    RebalanceResult rebalanceResultB = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
+
+    assertNotNull(rebalanceResultA);
+    assertNotNull(rebalanceResultB);
+
+    assertEquals(rebalanceResultA.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResultB.getStatus(), RebalanceResult.Status.DONE);
+
+    // block table B
+    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+
+    tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    rebalanceResultA = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
+    rebalanceResultB = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
+
+    assertNotNull(rebalanceResultA);
+    assertNull(rebalanceResultB);
+    assertEquals(rebalanceResultA.getStatus(), RebalanceResult.Status.DONE);
+
+    // allow all tables explicitly, block table B, this should result the same as above case
+    Set<String> allowTables = new HashSet<>();
+    allowTables.add(OFFLINE_TABLE_NAME_A);
+    allowTables.add(OFFLINE_TABLE_NAME_B);
+    config.setAllowTables(allowTables);
+    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+
+    tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    rebalanceResultA = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
+    rebalanceResultB = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
+
+    assertNotNull(rebalanceResultA);
+    assertNull(rebalanceResultB);
+    assertEquals(rebalanceResultA.getStatus(), RebalanceResult.Status.DONE);
+
+    // allow table B
+    config.setAllowTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setBlockTables(Collections.emptySet());
+
+    tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    rebalanceResultA = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
+    rebalanceResultB = tenantRebalanceResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
+
+    assertNull(rebalanceResultA);
+    assertNotNull(rebalanceResultB);
+
+    assertEquals(rebalanceResultB.getStatus(), RebalanceResult.Status.DONE);
+
+    // allow table B, also block table B
+    config.setAllowTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+
+    tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    assertTrue(tenantRebalanceResult.getRebalanceTableResults().isEmpty());
+
+    // allow a non-existing table
+    config.setAllowTables(Collections.singleton("TableDoesNotExist_OFFLINE"));
+    config.setBlockTables(Collections.emptySet());
+
+    tenantRebalanceResult = tenantRebalancer.rebalance(config);
+
+    assertTrue(tenantRebalanceResult.getRebalanceTableResults().isEmpty());
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
+
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
     }

@@ -108,15 +108,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TENANT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
@@ -308,8 +311,10 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.READ)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the instance partitions of a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
-      @ApiResponse(code = 404, message = "Instance partitions not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")
+  })
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -337,9 +342,11 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update an instance partition for a server type in a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
       @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
-      @ApiResponse(code = 500, message = "Error updating the tenant")})
+      @ApiResponse(code = 500, message = "Error updating the tenant")
+  })
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -682,12 +689,12 @@ public class PinotTenantRestletResource {
       @DefaultValue("1")
       @QueryParam("degreeOfParallelism") int degreeOfParallelism,
       @ApiParam(value =
-          "Comma separated list of tables that are allowed in this tenant rebalance job. Leave blank to allow all "
-              + "tables from the tenant")
+          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are allowed in this tenant rebalance"
+              + " job. Leave blank to allow all tables from the tenant")
       @QueryParam("allowTables") @DefaultValue("") String allowTables,
       @ApiParam(value =
-          "Comma separated list of tables that are blocked in this tenant rebalance job. These table will be removed "
-              + "from allowTables")
+          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are blocked in this tenant rebalance"
+              + " job. These table will be removed from allowTables")
       @QueryParam("blockTables") @DefaultValue("") String blockTables,
       @ApiParam(value = "Show full rebalance results of each table in the response") @DefaultValue("false")
       @QueryParam("verboseResult") boolean verboseResult,
