@@ -26,12 +26,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -42,6 +42,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.assertj.core.api.Assertions;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -191,29 +193,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares against its desired exceptions.
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithExceptionMsgChecker(String sql, String expectedError) {
+  public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
     try {
       // query pinot
-      ResultTable resultTable = queryRunner(sql, false).getResultTable();
+      QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
+      if (queryResult.getProcessingException() != null) {
+        throw new RuntimeException(queryResult.getProcessingException().getMessage());
+      }
+      ResultTable resultTable = queryResult.getResultTable();
       Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
-      // NOTE: The actual message is (usually) something like:
-      //   Received error query execution result block: {200=QueryExecutionError:
-      //   Query execution error on: Server_localhost_12345
-      //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
-      //   In some cases there is no prefix.
       String exceptionMessage = e.getMessage();
-      boolean isFromQueryDispatcher = Pattern.compile("^Received \\d+ errors? from servers?.*", Pattern.MULTILINE)
-          .matcher(exceptionMessage)
-          .find();
-      Assert.assertTrue(
-          exceptionMessage.startsWith("Error occurred during stage submission")
-              || exceptionMessage.equals(expectedError)
-              || isFromQueryDispatcher,
-          "Exception message didn't start with proper heading: " + exceptionMessage);
-      Assert.assertTrue(exceptionMessage.contains(expectedError),
-          "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
+      Assertions.assertThat(exceptionMessage)
+          .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
+          .contains(expectedError);
     }
   }
 
