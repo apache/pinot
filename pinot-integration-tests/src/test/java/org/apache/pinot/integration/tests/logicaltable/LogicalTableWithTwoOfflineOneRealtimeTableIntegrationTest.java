@@ -76,6 +76,6 @@ public class LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest extends B
     logicalTableConfig.getTimeBoundaryConfig().setParameters(parameters);
     logicalTableConfig.setQueryConfig(null);
 
-    updateLogicalTableConfig(logicalTableConfig.getTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
   }
 }
