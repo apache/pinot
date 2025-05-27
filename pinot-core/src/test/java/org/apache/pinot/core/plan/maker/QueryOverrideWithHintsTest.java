@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -80,6 +81,11 @@ public class QueryOverrideWithHintsTest {
 
     @Override
     public List<StarTreeV2> getStarTrees() {
+      return null;
+    }
+
+    @Override
+    public TextIndexReader getMultiColumnTextIndex() {
       return null;
     }
 

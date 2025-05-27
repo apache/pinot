@@ -20,7 +20,10 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
+import it.unimi.dsi.fastutil.booleans.BooleanList;
 import it.unimi.dsi.fastutil.ints.IntArrays;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -55,6 +58,7 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutabl
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.MultiColumnRealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -90,11 +94,13 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -183,6 +189,10 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
+  // TODO: switch to interface
+  private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
+  private final Object2IntOpenHashMap _multiColumnPos;
+  private final List<Object> _multiColumnValues;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -289,8 +299,13 @@ public class MutableSegmentImpl implements MutableSegment {
           Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
       MutableIndexContext context =
-          MutableIndexContext.builder().withFieldSpec(fieldSpec).withMemoryManager(_memoryManager)
-              .withDictionary(isDictionary).withCapacity(_capacity).offHeap(_offHeap).withSegmentName(_segmentName)
+          MutableIndexContext.builder()
+              .withFieldSpec(fieldSpec)
+              .withMemoryManager(_memoryManager)
+              .withDictionary(isDictionary)
+              .withCapacity(_capacity)
+              .offHeap(_offHeap)
+              .withSegmentName(_segmentName)
               .withEstimatedCardinality(_statsHistory.getEstimatedCardinality(column))
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
@@ -418,6 +433,33 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertConsistencyMode = null;
       _validDocIds = null;
       _queryableDocIds = null;
+    }
+
+    MultiColumnTextIndexConfig textConfig = config.getMultiColIndexConfig();
+    if (textConfig != null) {
+      List<String> textColumns = textConfig.getColumns();
+      BooleanList columnsSV = new BooleanArrayList(textColumns.size());
+      Schema schema = config.getSchema();
+      for (String column : textColumns) {
+        DataType dataType = schema.getFieldSpecFor(column).getDataType();
+        if (dataType.getStoredType() != FieldSpec.DataType.STRING) {
+          throw new IllegalStateException(
+              "Multi-column text index is currently only supported on STRING type columns! Found column: " + column
+                  + " of type: " + dataType);
+        }
+
+        columnsSV.add(schema.getFieldSpecFor(column).isSingleValueField());
+      }
+
+      _multiColumnTextIndex =
+          new MultiColumnRealtimeLuceneTextIndex(textColumns, columnsSV, _consumerDir, config.getSegmentName(),
+              textConfig);
+      _multiColumnPos = _multiColumnTextIndex.getMapping();
+      _multiColumnValues = new ArrayList<>(_multiColumnPos.size());
+    } else {
+      _multiColumnTextIndex = null;
+      _multiColumnPos = null;
+      _multiColumnValues = null;
     }
   }
 
@@ -866,6 +908,13 @@ public class MutableSegmentImpl implements MutableSegment {
             }
           }
         }
+
+        if (_multiColumnValues != null) {
+          int pos = _multiColumnPos.getInt(column);
+          if (pos > -1) {
+            _multiColumnValues.set(pos, (String) value);
+          }
+        }
       } else {
         // Multi-value column
 
@@ -882,7 +931,19 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
         indexContainer._valuesInfo.updateMVNumValues(values.length);
+
+        if (_multiColumnValues != null) {
+          int pos = _multiColumnPos.getInt(column);
+          if (pos > -1) {
+            _multiColumnValues.set(pos, value);
+          }
+        }
       }
+    }
+
+    if (_multiColumnTextIndex != null) {
+      _multiColumnTextIndex.add(_multiColumnValues);
+      Collections.fill(_multiColumnValues, null);
     }
   }
 
@@ -1069,6 +1130,12 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;
+  }
+
+  @Nullable
+  @Override
+  public TextIndexReader getMultiColumnTextIndex() {
+    return _multiColumnTextIndex;
   }
 
   @Nullable

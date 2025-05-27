@@ -58,6 +58,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }
     TextIndexReader indexReader = dataSource.getTextIndex();
+    // TODO: find path to index segment
     if (indexReader == null) {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }

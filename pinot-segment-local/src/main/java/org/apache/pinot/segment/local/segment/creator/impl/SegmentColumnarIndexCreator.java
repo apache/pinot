@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +39,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
@@ -58,8 +61,10 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -105,6 +110,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private File _indexDir;
   private int _totalDocs;
   private int _docIdCounter;
+
+  private MultiColumnLuceneTextIndexCreator _multiColTextIndexCreator;
+  private List<Object> _multiColumnValues;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -237,6 +245,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         LOGGER.info("Column: {} is not nullable", columnName);
       }
     }
+
+    if (_config.getMultiColumnTextIndexConfig() != null) {
+      MultiColumnTextIndexConfig mcTextConfig = _config.getMultiColumnTextIndexConfig();
+      BooleanArrayList columnsSV = new BooleanArrayList();
+      for (String col : mcTextConfig.getColumns()) {
+        columnsSV.add(schema.getFieldSpecFor(col).isSingleValueField());
+      }
+      _multiColTextIndexCreator =
+          new MultiColumnLuceneTextIndexCreator(mcTextConfig.getColumns(),
+              columnsSV, _indexDir, true, segmentCreationSpec.isRealtimeConversion(),
+              segmentCreationSpec.getConsumerDir(), immutableToMutableIdMap, mcTextConfig);
+      _multiColumnValues = new ArrayList<>(mcTextConfig.getColumns().size());
+    } else {
+      _multiColTextIndexCreator = null;
+      _multiColumnValues = null;
+    }
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -347,6 +371,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (row.isNullValue(entry.getKey())) {
         entry.getValue().setNull(_docIdCounter);
       }
+    }
+
+    if (_multiColTextIndexCreator != null) {
+      for (String col : _config.getMultiColumnTextIndexConfig().getColumns()) {
+        Object value = row.getValue(col); //TODO: what about nulls ?
+        _multiColumnValues.add(value);
+      }
+      _multiColTextIndexCreator.add(_multiColumnValues);
+      _multiColumnValues.clear();
     }
 
     _docIdCounter++;
@@ -472,6 +505,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         creator.seal();
       }
     }
+    if (_multiColTextIndexCreator != null) {
+      _multiColTextIndexCreator.seal();
+    }
     writeMetadata();
   }
 
@@ -572,6 +608,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (segmentZKPropsConfig != null) {
       properties.setProperty(Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
+    }
+
+    if (_multiColTextIndexCreator != null) {
+      MultiColumnTextIndexConfig multiConfig = _config.getMultiColumnTextIndexConfig();
+
+      MultiColumnTextMetadata.writeMetadata(properties, MultiColumnTextMetadata.VERSION_1, multiConfig.getColumns(),
+          multiConfig.getProperties(), multiConfig.getPerColumnProperties());
     }
 
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
@@ -741,10 +784,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    List<IndexCreator> creators =
+    List<Closeable> creators =
         _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
     creators.addAll(_nullValueVectorCreatorMap.values());
     creators.addAll(_dictionaryCreatorMap.values());
+    if (_multiColTextIndexCreator != null) {
+      creators.add(_multiColTextIndexCreator);
+    }
     FileUtils.close(creators);
   }
 }

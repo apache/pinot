@@ -1,0 +1,269 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.spi.index.multicolumntext;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.spi.config.table.FieldConfig;
+
+import static org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants.MetadataKey.*;
+import static org.apache.pinot.spi.config.table.FieldConfig.*;
+
+
+/**
+ * Multi-column metadata as read from metadata.properties file.
+ */
+public class MultiColumnTextMetadata {
+
+  public static final int VERSION_1 = 1;
+
+  private final int _version;
+  private final List<String> _columns;
+  private final Map<String, String> _properties;
+  private final Map<String, Map<String, String>> _perColumnProperties;
+
+  // keys allowed in per-column properties
+  private static final List<String> PER_COLUMN_PROPERTIES = List.of(
+      TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS,
+      TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES,
+      TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES,
+      TEXT_INDEX_STOP_WORD_INCLUDE_KEY,
+      TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
+
+  public MultiColumnTextMetadata(Configuration config) {
+    _version = config.getInt(INDEX_VERSION);
+    _columns = Arrays.asList(config.getStringArray(COLUMNS));
+
+    Configuration sharedProps = config.subset(PROPERTY_SUBSET);
+    if (sharedProps != null && !sharedProps.isEmpty()) {
+      _properties = new HashMap<>();
+
+      setProperty(sharedProps, TEXT_FST_TYPE);
+      setProperty(sharedProps, TEXT_INDEX_NO_RAW_DATA);
+      setProperty(sharedProps, TEXT_INDEX_RAW_VALUE);
+      setProperty(sharedProps, TEXT_INDEX_ENABLE_QUERY_CACHE);
+      setProperty(sharedProps, TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES);
+      setArrayProperty(sharedProps, TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
+      setArrayProperty(sharedProps, TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_USE_COMPOUND_FILE);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_ANALYZER_CLASS);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
+      setProperty(sharedProps, TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY);
+      setProperty(sharedProps, TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE);
+    } else {
+      _properties = Collections.emptyMap();
+    }
+
+    Map<String, Map<String, String>> perColumnProps = null;
+    Configuration columnConfigs = config.subset(COLUMN);
+    Iterator<String> keysIterator = columnConfigs.getKeys();
+    while (keysIterator.hasNext()) {
+      String key = keysIterator.next();
+      int idx = key.indexOf('.' + PROPERTY + ".");
+      if (idx < 0) {
+        continue;
+      }
+      String column = key.substring(0, idx);
+      if (!_columns.contains(column)) {
+        continue;
+      }
+      String property = key.substring(idx + ("." + PROPERTY + ".").length());
+      if (!PER_COLUMN_PROPERTIES.contains(property)) {
+        continue;
+      }
+
+      if (perColumnProps == null) {
+        perColumnProps = new HashMap<>();
+      }
+
+      String value = columnConfigs.getString(key);
+
+      if (value == null) {
+        continue;
+      }
+
+      Map<String, String> targetMap = perColumnProps.get(column);
+      if (targetMap == null) {
+        targetMap = new HashMap<>();
+        perColumnProps.put(column, targetMap);
+      }
+      targetMap.put(property, value);
+    }
+
+    if (perColumnProps == null) {
+      perColumnProps = Collections.emptyMap();
+    }
+    _perColumnProperties = perColumnProps;
+  }
+
+  private void setProperty(Map<String, Map<String, String>> target, String column, String key, Configuration source) {
+    String value = source.getString(key);
+    if (value != null) {
+      Map<String, String> targetMap = target.get(column);
+      if (targetMap == null) {
+        targetMap = new HashMap<>();
+        target.put(column, targetMap);
+      }
+      targetMap.put(key, value);
+    }
+  }
+
+  private void setProperty(Configuration from, String key) {
+    if (from.containsKey(key)) {
+      _properties.put(key, from.getString(key));
+    }
+  }
+
+  private void setArrayProperty(Configuration from, String key) {
+    if (from.containsKey(key)) {
+      String[] words = from.getStringArray(key);
+      String value;
+      if (words == null || words.length == 0) {
+        value = null;
+      } else {
+        value = String.join(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR, words);
+      }
+      _properties.put(key, value);
+    }
+  }
+
+  public static void writeMetadata(Configuration target,
+      int version,
+      List<String> columns,
+      Map<String, String> textProps,
+      Map<String, Map<String, String>> perColumnProperties) {
+    target.setProperty(ROOT_PREFIX + INDEX_VERSION, version);
+    target.setProperty(ROOT_PREFIX + COLUMNS, columns);
+
+    if (textProps != null) {
+      //setProperty(target, TEXT_FST_TYPE, FSTType.LUCENE);
+      setProperty(target, TEXT_INDEX_NO_RAW_DATA, textProps);
+      setProperty(target, TEXT_INDEX_RAW_VALUE, textProps);
+      setProperty(target, TEXT_INDEX_ENABLE_QUERY_CACHE, textProps);
+      setProperty(target, TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, textProps);
+      setProperty(target, TEXT_INDEX_STOP_WORD_INCLUDE_KEY, textProps);
+      setProperty(target, TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_USE_COMPOUND_FILE, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_ANALYZER_CLASS, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, textProps);
+      setProperty(target, TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY, textProps);
+      setProperty(target, TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, textProps);
+    }
+
+    if (perColumnProperties != null) {
+      for (Map.Entry<String, Map<String, String>> entry : perColumnProperties.entrySet()) {
+        String column = entry.getKey();
+        if (column == null || column.length() == 0 || !columns.contains(column)) {
+          continue;
+        }
+
+        Map<String, String> props = entry.getValue();
+        for (String property : PER_COLUMN_PROPERTIES) {
+          setProperty(target, column, property, props);
+        }
+//        setProperty(target, column, TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, props);
+//        setProperty(target, column, TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, props);
+//        setProperty(target, column, TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, props);
+//        setProperty(target, column, TEXT_INDEX_STOP_WORD_INCLUDE_KEY, props);
+//        setProperty(target, column, TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, props);
+      }
+    }
+  }
+
+  // compares PER_COLUMN_PROPERTIES only, ignores everything else
+  public static boolean equals(Map<String, Map<String, String>> props1, Map<String, Map<String, String>> props2) {
+    return filter(props1).equals(filter(props1));
+  }
+
+  private static Map<String, Map<String, String>> filter(Map<String, Map<String, String>> allColumnProps) {
+    if (allColumnProps == null || allColumnProps.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    Map<String, Map<String, String>> filteredProps1 = new HashMap<>(allColumnProps.size());
+    for (Map.Entry<String, Map<String, String>> columnEntry : filteredProps1.entrySet()) {
+      String column = columnEntry.getKey();
+      Map<String, String> columnProps = columnEntry.getValue();
+      if (columnProps == null || columnProps.isEmpty()) {
+        continue;
+      }
+
+      HashMap<String, String> filteredProps = null;
+
+      for (String key : columnProps.keySet()) {
+        if (PER_COLUMN_PROPERTIES.contains(key)) {
+          if (filteredProps == null) {
+            filteredProps = new HashMap<>();
+          }
+
+          filteredProps.put(key, columnProps.get(key));
+        }
+      }
+
+      if (filteredProps != null) {
+        filteredProps1.put(column, filteredProps);
+      }
+    }
+
+    return filteredProps1;
+  }
+
+  private static void setProperty(Configuration target, String column, String key, Map<String, String> source) {
+    String value = source.get(key);
+    if (value != null) {
+      target.setProperty(COLUMN_PREFIX + column + "." + PROPERTY_SUFFIX + key, value);
+    }
+  }
+
+  private static void setProperty(Configuration target, String key, Map<String, String> source) {
+    String value = source.get(key);
+    if (value != null) {
+      target.setProperty(PROPERTY_PREFIX + key, value);
+    }
+  }
+
+  public Map<String, String> getProperties() {
+    return _properties;
+  }
+
+  public Map<String, Map<String, String>> getPerColumnProperties() {
+    return _perColumnProperties;
+  }
+
+  public List<String> getColumns() {
+    return _columns;
+  }
+}

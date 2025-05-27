@@ -13,7 +13,10 @@
     "loadMode": "MMAP",
     "noDictionaryColumns": ["Text"],
     "invertedIndexColumns": [
-    ]
+    ],
+    "multiColumnTextIndexConfig": {
+      "columns": ["UserId", "ProductId", "Summary"]
+    }
   },
   "metadata": {
     "customConfigs": {
