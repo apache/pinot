@@ -149,7 +149,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return UUID.randomUUID().toString();
   }
 
-  private Set<String> getTenantTables(String tenantName) {
+  public Set<String> getTenantTables(String tenantName) {
     Set<String> tables = new HashSet<>();
     for (String table : _pinotHelixResourceManager.getAllTables()) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);

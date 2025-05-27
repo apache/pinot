@@ -21,20 +21,29 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -43,6 +52,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -67,7 +77,7 @@ public class TenantRebalancerTest extends ControllerTest {
   }
 
   @Test
-  public void testRebalance()
+  public void testRebalanceBasic()
       throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
@@ -127,6 +137,93 @@ public class TenantRebalancerTest extends ControllerTest {
     Map<String, Map<String, String>> externalView =
         _helixResourceManager.getTableExternalView(OFFLINE_TABLE_NAME_A).getRecord().getMapFields();
     assertEquals(idealState, externalView);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
+    for (int i = 0; i < numServers + numServersToAdd; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testGetTenantTables()
+      throws Exception {
+    int numServers = 1;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+    }
+    final String tenantName = "testGetTenantTablesTenant";
+    addTenantTagToInstances(tenantName);
+    final String tableNameA = "testGetTenantTables_table_A";
+    final String tableNameB = "testGetTenantTables_table_B";
+    final String tableNameC = "testGetTenantTables_table_C";
+    final String tableNameD = "testGetTenantTables_table_D";
+    final String tableNameE = "testGetTenantTables_table_E";
+    addDummySchema(tableNameA);
+    addDummySchema(tableNameB);
+    addDummySchema(tableNameC);
+    addDummySchema(tableNameD);
+    addDummySchema(tableNameE);
+
+    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+
+    // table A set tenantConfig.tenants.server to tenantName
+    // SHOULD be selected as tenant's table
+    TableConfig tableConfigA = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameA)
+        .setServerTenant(tenantName).setBrokerTenant(DEFAULT_TENANT_NAME).build();
+    // table B set tenantConfig.tagOverrideConfig.realtimeConsuming to tenantName
+    // SHOULD be selected as tenant's table
+    TableConfig tableConfigB = new TableConfigBuilder(TableType.REALTIME).setTableName(tableNameB)
+        .setServerTenant(DEFAULT_TENANT_NAME)
+        .setBrokerTenant(DEFAULT_TENANT_NAME)
+        .setTagOverrideConfig(new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(tenantName), null))
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .build();
+    // table C set instanceAssignmentConfigMap.OFFLINE.tagPoolConfig.tag to tenantName
+    // SHOULD be selected as tenant's table
+    TableConfig tableConfigC = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameC)
+        .setServerTenant(DEFAULT_TENANT_NAME)
+        .setBrokerTenant(DEFAULT_TENANT_NAME)
+        .setInstanceAssignmentConfigMap(
+            Collections.singletonMap("OFFLINE", new InstanceAssignmentConfig(
+                new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenantName), false, 0, null), null,
+                new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 0, 0, false, null), null, true
+            ))).build();
+    // table D set tierConfigList[0].serverTag to tenantName
+    // SHOULD be selected as tenant's table
+    TableConfig tableConfigD = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameD)
+        .setServerTenant(DEFAULT_TENANT_NAME)
+        .setBrokerTenant(DEFAULT_TENANT_NAME)
+        .setTierConfigList(Collections.singletonList(
+            new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE,
+                TagNameUtils.getOfflineTagForTenant(tenantName), null, null))).build();
+    // table E set to default tenant
+    // SHOULD NOT be selected as tenant's table
+    TableConfig tableConfigE = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameE)
+        .setServerTenant(DEFAULT_TENANT_NAME).setBrokerTenant(DEFAULT_TENANT_NAME).setNumReplicas(NUM_REPLICAS).build();
+    // Create the table
+    _helixResourceManager.addTable(tableConfigA);
+    _helixResourceManager.addTable(tableConfigB);
+    _helixResourceManager.addTable(tableConfigC);
+    _helixResourceManager.addTable(tableConfigD);
+    _helixResourceManager.addTable(tableConfigE);
+    Set<String> tenantTables = tenantRebalancer.getTenantTables(tenantName);
+    assertEquals(tenantTables.size(), 4);
+    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameA)));
+    assertTrue(tenantTables.contains(TableNameBuilder.REALTIME.tableNameWithType(tableNameB)));
+    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameC)));
+    assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameD)));
+    assertFalse(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameE)));
+
+    _helixResourceManager.deleteOfflineTable(tableNameA);
+    _helixResourceManager.deleteRealtimeTable(tableNameB);
+    _helixResourceManager.deleteOfflineTable(tableNameC);
+    _helixResourceManager.deleteOfflineTable(tableNameD);
+    _helixResourceManager.deleteOfflineTable(tableNameE);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
   }
 
   private boolean waitForCompletion(String jobId) {
@@ -175,11 +272,13 @@ public class TenantRebalancerTest extends ControllerTest {
 
   private void addTenantTagToInstances(String testTenant) {
     String offlineTag = TagNameUtils.getOfflineTagForTenant(testTenant);
+    String realtimeTag = TagNameUtils.getRealtimeTagForTenant(testTenant);
     String brokerTag = TagNameUtils.getBrokerTagForTenant(testTenant);
     _helixResourceManager.getAllInstances().forEach(instance -> {
       List<String> existingTags = _helixResourceManager.getHelixInstanceConfig(instance).getTags();
       if (instance.startsWith(SERVER_INSTANCE_ID_PREFIX)) {
         existingTags.add(offlineTag);
+        existingTags.add(realtimeTag);
       } else if (instance.startsWith(BROKER_INSTANCE_ID_PREFIX)) {
         existingTags.add(brokerTag);
       }
