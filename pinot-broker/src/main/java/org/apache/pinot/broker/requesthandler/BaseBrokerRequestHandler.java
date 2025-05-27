@@ -285,7 +285,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @return true if the query was successfully cancelled, false otherwise.
    */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
-      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());

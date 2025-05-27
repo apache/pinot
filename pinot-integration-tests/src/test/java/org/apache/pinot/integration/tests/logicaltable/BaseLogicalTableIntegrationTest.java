@@ -324,16 +324,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return LogicalTableConfig.fromString(resp);
   }
 
-  protected void updateLogicalTableConfig(String logicalTableName, LogicalTableConfig logicalTableConfig)
-      throws IOException {
-    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
-    String resp =
-        ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
-
-    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + getLogicalTableName()
-        + " logical table successfully updated.\"}");
-  }
-
   protected void deleteLogicalTable()
       throws IOException {
     String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(getLogicalTableName());
@@ -448,7 +438,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryConfig queryConfig = new QueryConfig(null, false, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
 
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
@@ -460,7 +450,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     queryConfig = new QueryConfig(null, true, null, null, null, null);
 
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
 
     // grpc and http throw different exceptions. So only check error message.
     Exception athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
@@ -468,7 +458,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
     // Remove query config
     logicalTableConfig.setQueryConfig(null);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
 
     athrows = expectThrows(Exception.class, () -> postQuery(groovyQuery));
     assertTrue(athrows.getMessage().contains("Groovy transform functions are disabled for queries"));
@@ -482,7 +472,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryConfig queryConfig = new QueryConfig(null, null, null, null, 100L, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
 
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
@@ -492,7 +482,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(null, null, null, null, 1000000L, null);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
@@ -500,7 +490,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     //Reset to null.
     queryConfig = new QueryConfig(null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
@@ -514,7 +504,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryConfig queryConfig = new QueryConfig(null, null, null, null, null, 1000L);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
     assertTrue(!exceptions.isEmpty()
@@ -523,7 +513,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(null, null, null, null, null, 1000000L);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
@@ -531,7 +521,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     //Reset to null.
     queryConfig = new QueryConfig(null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
@@ -544,7 +534,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     QueryConfig queryConfig = new QueryConfig(1L, null, null, null, null, null);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig(getLogicalTableName());
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
     assertTrue(
@@ -555,7 +545,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
@@ -563,7 +553,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     //Reset to null.
     queryConfig = new QueryConfig(null, null, null, null, null, null);
     logicalTableConfig.setQueryConfig(queryConfig);
-    updateLogicalTableConfig(getLogicalTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
