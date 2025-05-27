@@ -150,7 +150,7 @@
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.21.0</swagger-ui.version>
+    <swagger-ui.version>5.22.0</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -162,7 +162,7 @@
     <dynatrace.hash4j.version>0.22.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.32</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
     <zstd-jni.version>1.5.7-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.48</aws.sdk.version>
+    <aws.sdk.version>2.31.50</aws.sdk.version>
     <azure.sdk.version>1.2.34</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -185,7 +185,7 @@
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
-    <scala-xml.version>2.3.0</scala-xml.version>
+    <scala-xml.version>2.4.0</scala-xml.version>
     <fmpp.version>0.9.16</fmpp.version>
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
@@ -197,7 +197,7 @@
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.1</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
-    <pulsar.version>4.0.4</pulsar.version>
+    <pulsar.version>4.0.5</pulsar.version>
     <flink.version>1.20.1</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -233,13 +233,13 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.4.4</httpclient5.version>
+    <httpclient5.version>5.5</httpclient5.version>
     <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.72.0</grpc.version>
-    <google.cloud.libraries.version>26.60.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.61.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.38.0</google.errorprone.version>
