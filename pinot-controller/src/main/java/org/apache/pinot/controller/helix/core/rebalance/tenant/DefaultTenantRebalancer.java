@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -182,7 +183,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     }
   }
 
-  private ConcurrentLinkedQueue<String> createTableQueue(TenantRebalanceConfig config,
+   @VisibleForTesting
+   ConcurrentLinkedQueue<String> createTableQueue(TenantRebalanceConfig config,
       Map<String, RebalanceResult> dryRunResults) {
     Queue<String> firstQueue = new LinkedList<>();
     Queue<String> queue = new LinkedList<>();

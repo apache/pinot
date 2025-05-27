@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +36,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -45,6 +47,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -271,8 +275,7 @@ public class TenantRebalancerTest extends ControllerTest {
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
-    final String tenantName = "testGetTenantTablesTenant";
-    addTenantTagToInstances(tenantName);
+    addTenantTagToInstances(TENANT_NAME);
     final String tableNameA = "testGetTenantTables_table_A";
     final String tableNameB = "testGetTenantTables_table_B";
     final String tableNameC = "testGetTenantTables_table_C";
@@ -289,13 +292,13 @@ public class TenantRebalancerTest extends ControllerTest {
     // table A set tenantConfig.tenants.server to tenantName
     // SHOULD be selected as tenant's table
     TableConfig tableConfigA = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameA)
-        .setServerTenant(tenantName).setBrokerTenant(DEFAULT_TENANT_NAME).build();
+        .setServerTenant(TENANT_NAME).setBrokerTenant(DEFAULT_TENANT_NAME).build();
     // table B set tenantConfig.tagOverrideConfig.realtimeConsuming to tenantName
     // SHOULD be selected as tenant's table
     TableConfig tableConfigB = new TableConfigBuilder(TableType.REALTIME).setTableName(tableNameB)
         .setServerTenant(DEFAULT_TENANT_NAME)
         .setBrokerTenant(DEFAULT_TENANT_NAME)
-        .setTagOverrideConfig(new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(tenantName), null))
+        .setTagOverrideConfig(new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), null))
         .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
         .build();
     // table C set instanceAssignmentConfigMap.OFFLINE.tagPoolConfig.tag to tenantName
@@ -305,7 +308,7 @@ public class TenantRebalancerTest extends ControllerTest {
         .setBrokerTenant(DEFAULT_TENANT_NAME)
         .setInstanceAssignmentConfigMap(
             Collections.singletonMap("OFFLINE", new InstanceAssignmentConfig(
-                new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tenantName), false, 0, null), null,
+                new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
                 new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 0, 0, false, null), null, true
             ))).build();
     // table D set tierConfigList[0].serverTag to tenantName
@@ -316,7 +319,7 @@ public class TenantRebalancerTest extends ControllerTest {
         .setTierConfigList(Collections.singletonList(
             new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
                 TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                TagNameUtils.getOfflineTagForTenant(tenantName), null, null))).build();
+                TagNameUtils.getOfflineTagForTenant(TENANT_NAME), null, null))).build();
     // table E set to default tenant
     // SHOULD NOT be selected as tenant's table
     TableConfig tableConfigE = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameE)
@@ -327,7 +330,7 @@ public class TenantRebalancerTest extends ControllerTest {
     _helixResourceManager.addTable(tableConfigC);
     _helixResourceManager.addTable(tableConfigD);
     _helixResourceManager.addTable(tableConfigE);
-    Set<String> tenantTables = tenantRebalancer.getTenantTables(tenantName);
+    Set<String> tenantTables = tenantRebalancer.getTenantTables(TENANT_NAME);
     assertEquals(tenantTables.size(), 4);
     assertTrue(tenantTables.contains(TableNameBuilder.OFFLINE.tableNameWithType(tableNameA)));
     assertTrue(tenantTables.contains(TableNameBuilder.REALTIME.tableNameWithType(tableNameB)));
@@ -341,6 +344,90 @@ public class TenantRebalancerTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(tableNameD);
     _helixResourceManager.deleteOfflineTable(tableNameE);
     for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  @Test
+  public void testCreateTableQueue()
+      throws Exception {
+    int numServers = NUM_REPLICAS + 1;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+    }
+
+    DefaultTenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+
+    // tag all servers and brokers to test tenant
+    addTenantTagToInstances(TENANT_NAME);
+
+    // create a schema
+    addDummySchema(RAW_TABLE_NAME_A);
+    addDummySchema(RAW_TABLE_NAME_B);
+
+    // create a table on test tenant
+    createTableWithSegments(RAW_TABLE_NAME_A, TENANT_NAME);
+    createDimTableWithSegments(RAW_TABLE_NAME_B, TENANT_NAME);
+
+    // Add 3 more servers which will be tagged to default tenant
+    int numServersToAdd = 3;
+    for (int i = 0; i < numServersToAdd; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + (numServers + i), true);
+    }
+    addTenantTagToInstances(TENANT_NAME);
+
+    // rebalance the tables on test tenant, this should be a pure scale out
+    TenantRebalanceConfig config = new TenantRebalanceConfig();
+    config.setTenantName(TENANT_NAME);
+    config.setVerboseResult(true);
+    config.setDryRun(true);
+    TenantRebalanceResult dryRunResult = tenantRebalancer.rebalance(config);
+
+    RebalanceSummaryResult.ServerInfo serverInfo =
+        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+    assertEquals(serverInfo.getServersAdded().size(), 3);
+    assertEquals(serverInfo.getServersRemoved().size(), 0);
+
+    Queue<String> tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+    // Dimension Table B should be rebalance first since it is a dim table, and we're doing scale out
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
+
+    // untag server 0, now the rebalance is not a pure scale in/out
+    _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + 0, "", false);
+    dryRunResult = tenantRebalancer.rebalance(config);
+
+    serverInfo =
+        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+    assertEquals(serverInfo.getServersAdded().size(), 3);
+    assertEquals(serverInfo.getServersRemoved().size(), 1);
+
+    tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+    // Dimension table B should be rebalance first in this case. (it does not matter whether dimension tables are
+    // rebalanced first or last in this case, simply because we defaulted it to be first while non-pure scale in/out)
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
+
+    // untag the added servers, now the rebalance is a pure scale in
+    for (int i = numServers; i < numServers + numServersToAdd; i++) {
+      _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + i, "", false);
+    }
+    dryRunResult = tenantRebalancer.rebalance(config);
+
+    serverInfo =
+        dryRunResult.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B).getRebalanceSummaryResult().getServerInfo();
+    assertEquals(serverInfo.getServersAdded().size(), 0);
+    assertEquals(serverInfo.getServersRemoved().size(), 1);
+
+    tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+    // Dimension table B should be rebalance last in this case
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
+    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
+
+    for (int i = 0; i < numServers + numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
     }
   }
@@ -378,6 +465,21 @@ public class TenantRebalancerTest extends ControllerTest {
       throws IOException {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
         .setServerTenant(tenant).setBrokerTenant(tenant).setNumReplicas(NUM_REPLICAS).build();
+    // Create the table
+    _helixResourceManager.addTable(tableConfig);
+    // Add the segments
+    int numSegments = 10;
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(offlineTableName,
+          SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, "segment_" + i), null);
+    }
+  }
+
+  private void createDimTableWithSegments(String rawTableName, String tenant)
+      throws IOException {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+        .setServerTenant(tenant).setBrokerTenant(tenant).setIsDimTable(true).build();
     // Create the table
     _helixResourceManager.addTable(tableConfig);
     // Add the segments
