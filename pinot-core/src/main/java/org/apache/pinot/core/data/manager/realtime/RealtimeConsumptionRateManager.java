@@ -59,7 +59,7 @@ public class RealtimeConsumptionRateManager {
 
   private static final String SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME =
       ServerMeter.REALTIME_ROWS_CONSUMED.getMeterName();
-  private ConsumptionRateLimiter _serverRateLimiter = NOOP_RATE_LIMITER;
+  private volatile ConsumptionRateLimiter _serverRateLimiter = NOOP_RATE_LIMITER;
 
   // stream config object is required for fetching the partition count from the stream
   private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap;
@@ -87,15 +87,23 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
+    _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
+    return _serverRateLimiter;
+  }
+
+  public void updateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+    _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
+  }
+
+  private ConsumptionRateLimiter createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     if (serverRateLimit > 0) {
       LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
       MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
-      _serverRateLimiter = new RateLimiterImpl(serverRateLimit, metricEmitter);
+      return new RateLimiterImpl(serverRateLimit, metricEmitter);
     } else {
       LOGGER.info("ConsumptionRateLimiter is disabled");
-      _serverRateLimiter = NOOP_RATE_LIMITER;
+      return NOOP_RATE_LIMITER;
     }
-    return _serverRateLimiter;
   }
 
   public ConsumptionRateLimiter getServerRateLimiter() {
