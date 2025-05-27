@@ -313,9 +313,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControl accessControl = _accessControlFactory.create();
       MultiTableRowColAuthResult rowColFilters = accessControl.getRowColFilters(requesterIdentity, tables);
       for (String tableName : tables) {
-        Optional<List<String>> rlsFilterForTable = rowColFilters.getRLSFilterForTable(tableName);
-        if (rlsFilterForTable.isPresent()) {
-
+        Optional<List<String>> rlsFilterForTableMaybe = rowColFilters.getRLSFilterForTable(tableName);
+        if (rlsFilterForTableMaybe.isPresent()) {
+          List<String> rowFilters = rlsFilterForTableMaybe.get();
+          StringBuilder sb = new StringBuilder();
+          for (int i = 0; i < rowFilters.size(); i++) {
+            sb.append(rowFilters.get(i));
+            if (i < rowFilters.size() - 1) {
+              sb.append(" AND ");
+            }
+          }
+          compiledQuery.getOptions().put(tableName, sb.toString());
         }
       }
     }

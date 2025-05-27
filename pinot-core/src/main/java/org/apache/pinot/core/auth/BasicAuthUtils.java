@@ -94,7 +94,7 @@ public final class BasicAuthUtils {
       }
 
       return new BasicAuthPrincipal(name, org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password),
-          tables, excludeTables, permissions, tableRlsFilters); // Pass Map<String, List<String>>
+          tables, excludeTables, permissions, tableRlsFilters, Map.of(), Map.of()); // Pass Map<String, List<String>>
     }).collect(Collectors.toList());
   }
 
@@ -118,7 +118,7 @@ public final class BasicAuthUtils {
       //todo: handle rls filters properly
       return new ZkBasicAuthPrincipal(name,
           org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
-          tables, excludeTables, permissions, Map.of());
+          tables, excludeTables, permissions, Map.of(), Map.of(), Map.of());
     }).collect(Collectors.toList());
   }
 

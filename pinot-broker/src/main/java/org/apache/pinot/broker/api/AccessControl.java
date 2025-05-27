@@ -136,7 +136,12 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @return {@link TableRowColAuthResult} with the result of the access control check
    */
   default TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
-    return TableRowColAuthResultImpl.noRowColFilters();
+    if (table.equals("upsertMeetupRsvp")) {
+      return new TableRowColAuthResultImpl(List.of("event_id < 50"), List.of(), List.of());
+    } else if (table.equals("upsertPartialMeetupRsvp")) {
+      return new TableRowColAuthResultImpl(List.of("event_id > 50"), List.of(), List.of());
+    }
+    return TableRowColAuthResultImpl.unrestricted();
   }
 
   /**

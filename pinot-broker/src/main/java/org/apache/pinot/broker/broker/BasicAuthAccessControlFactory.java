@@ -151,22 +151,26 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (table == null) {
-        return TableRowColAuthResultImpl.noRowColFilters();
+        return TableRowColAuthResultImpl.unrestricted();
       }
+
+//      TableRowColAuthResultImpl.TableRowColAuthResultImplBuilder builder = TableRowColAuthResultImpl.builder();
 
       BasicAuthPrincipal principal = principalOpt.get();
 
-      if (principal.hasTable(table)) {
-        Optional<List<String>> rlsFilters = principal.getRLSFilters(table);
-        if (rlsFilters.isPresent()) {
-          return new TableRowColAuthResultImpl(rlsFilters.get());
-        } else {
-          return TableRowColAuthResultImpl.noRowColFilters();
-        }
-      }
-      //if the principal does not have the table. Ideally, this check should be done before fetching the row/col
-      // filters so the control flow should never reach here
-      throw new IllegalArgumentException("Table: " + table + " not authorized for principal: " + principal.getName());
+      //precondition: The principal should have the table.
+      Preconditions.checkArgument(principal.hasTable(table),
+          "Principal: " + principal.getName() + " does not have access to table: " + table);
+
+      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
+      Optional<List<String>> visibleColsMaybe = principal.getVisibleCols(table);
+      Optional<List<String>> maskedColsMaybe = principal.getMaskedCols(table);
+
+//      rlsFiltersMaybe.ifPresent(builder::_rlsFilters);
+//      visibleColsMaybe.ifPresent(builder::_visibleCols);
+//      maskedColsMaybe.ifPresent(builder::_maskedCols);
+
+      return null;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
@@ -176,8 +180,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
       Optional<BasicAuthPrincipal> principalOpt =
           tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-              .map(_token2principal::get).filter(Objects::nonNull)
-              .findFirst();
+              .map(_token2principal::get).filter(Objects::nonNull).findFirst();
       return principalOpt;
     }
   }

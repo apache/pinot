@@ -66,7 +66,7 @@ import org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQuer
 import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
-import org.apache.pinot.sql.parsers.rewriter.RowFiltersRewriter;
+import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 
 
 public class ServerPlanRequestUtils {
@@ -76,7 +76,7 @@ public class ServerPlanRequestUtils {
   private static final int DEFAULT_LEAF_NODE_LIMIT = Integer.MAX_VALUE;
   private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(PredicateComparisonRewriter.class.getName(),
-          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RowFiltersRewriter.class.getName());
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName());
   private static final List<QueryRewriter> QUERY_REWRITERS =
       new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();

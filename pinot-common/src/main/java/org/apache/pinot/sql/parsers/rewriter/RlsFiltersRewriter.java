@@ -10,7 +10,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
-public class RowFiltersRewriter implements QueryRewriter {
+public class RlsFiltersRewriter implements QueryRewriter {
 
   private static final String ROW_FILTERS = "rowFilters";
 
