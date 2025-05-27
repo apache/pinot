@@ -72,19 +72,8 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
       InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
     int numPartitions = instancePartitions.getNumPartitions();
     checkReplication(instancePartitions, _replication, _tableName);
-    int partitionId;
-    if (_partitionColumn == null || numPartitions == 1) {
-      partitionId = 0;
-    } else {
-      // Uniformly spray the segment partitions over the instance partitions
-      if (_tableConfig.getTableType() == TableType.OFFLINE) {
-        partitionId = SegmentAssignmentUtils
-            .getOfflineSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      } else {
-        partitionId = SegmentAssignmentUtils
-            .getRealtimeSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      }
-    }
+    int partitionId = SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableName,
+        _tableConfig.getTableType(), _helixManager, numPartitions, _partitionColumn) % numPartitions;
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
 
@@ -96,7 +85,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
 
     checkReplication(instancePartitions, _replication, _tableName);
 
-    if (_partitionColumn == null || numPartitions == 1) {
+    if (numPartitions == 1) {
       // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
       //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the
       //       table name hash as the random seed for the shuffle so that the result is deterministic.

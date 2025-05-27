@@ -542,9 +542,19 @@ public class TableRebalancer {
         if (segmentsToMoveChanged) {
           try {
             // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-            instancePartitionsMap =
-                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false,
-                    minimizeDataMovement, tableRebalanceLogger).getLeft();
+            Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
+                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
+                    tableRebalanceLogger);
+            instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
+            instancePartitionsUnchanged = instancePartitionsMapAndUnchanged.getRight();
+            // If the instance partitions have changed, clear the segmentPartitionIdMap as the number of partitions
+            // may have changed, resulting in a different partitionId calculation. This change will only make a
+            // difference for the scenario when it was changed from or to 1 partition. The numPartitions is not used
+            // otherwise.
+            if (!instancePartitionsUnchanged) {
+              LOGGER.info("Clear the cached segmentPartitionIdMap as the instance partitions has changed");
+              segmentPartitionIdMap.clear();
+            }
             tierToInstancePartitionsMap =
                 getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
                     minimizeDataMovement, tableRebalanceLogger).getLeft();
@@ -1781,44 +1791,38 @@ public class TableRebalancer {
             segmentName, _tableNameWithType);
       } else {
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
-        if (tableType == TableType.OFFLINE) {
-          InstancePartitions instancePartitions = _instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
-          assert instancePartitions != null;
-          if (_partitionColumn == null || instancePartitions.getNumPartitions() == 1) {
-            // Fallback to partitionId 0, in this case batching will not be possible so we will fall back to a full
-            // rebalance without batching
-            partitionId = 0;
-          } else {
-            // This is how partitionId is calculated for OFFLINE tables
-            partitionId = SegmentAssignmentUtils.getOfflineSegmentPartitionId(segmentName, _tableNameWithType,
-                _helixManager, _partitionColumn);
-          }
+        if (tableType == TableType.REALTIME
+            && (isConsuming || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED))) {
+          // This is how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
+          // instance partitions in RealtimeSegmentAssignment
+          partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
+              _helixManager, _partitionColumn);
         } else {
-          if (isConsuming || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED)) {
-            // This is how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
-            // instance partitions in RealtimeSegmentAssignment
-            partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
-                _helixManager, _partitionColumn);
-          } else {
-            // This is how partitionId is calculated for ONLINE segments when COMPLETED instance partitions exist
-            // in RealtimeSegmentAssignment
-            InstancePartitions instancePartitions = _instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
-            assert instancePartitions != null;
-            if (_partitionColumn == null || instancePartitions.getNumPartitions() == 1) {
-              // Fallback to partitionId 0, in this case batching will not be possible so we will fall back to a full
-              // rebalance without batching
-              partitionId = 0;
-            } else {
-              // This is how partitionId is calculated for REALTIME tables if a partition column exists and if the
-              // COMPLETED instance partitions has more than 1 partition
-              partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
-                  _helixManager, _partitionColumn);
-            }
-          }
+          // This is how partitionId is calculated for OFFLINE and REALTIME tables with COMPLETED instance partitions
+          int numPartitions = getNumPartitionsFromInstancePartitions(tableType, isConsuming, _instancePartitionsMap);
+          partitionId = SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableNameWithType,
+              tableType, _helixManager, numPartitions, _partitionColumn);
         }
       }
       return partitionId;
     }
+  }
+
+  private static int getNumPartitionsFromInstancePartitions(TableType tableType, boolean isConsuming,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    int numPartitions;
+    if (tableType == TableType.OFFLINE) {
+      InstancePartitions instancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
+      assert instancePartitions != null;
+      numPartitions = instancePartitions.getNumPartitions();
+    } else {
+      InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
+      assert consumingInstancePartitions != null;
+      InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
+      numPartitions = isConsuming || completedInstancePartitions == null
+          ? consumingInstancePartitions.getNumPartitions() : completedInstancePartitions.getNumPartitions();
+    }
+    return numPartitions;
   }
 
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
