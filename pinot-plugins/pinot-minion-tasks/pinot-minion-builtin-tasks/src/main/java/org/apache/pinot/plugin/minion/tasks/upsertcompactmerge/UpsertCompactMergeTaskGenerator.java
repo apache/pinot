@@ -39,7 +39,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -213,47 +212,30 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         }
         // there are no groups with more than 1 segment to merge
         // TODO this can be later removed if we want to just do single-segment compaction from this task
-        boolean groupSelected = false;
-        for (List<SegmentMergerMetadata> group : groups) {
-          if (group.size() <= 1) {
-            continue;
-          }
-          List<String> segmentNames =
-              group.stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList());
-          // Skip group if the newest segment (highest creation time) is an UploadedRealtimeSegment
-          // Reason: If the newest segment is already a compacted (UploadedRealtimeSegment), due to tie-breaker logic
-          // in addOrReplace, the compaction will not be effective (the existing UploadedRealtimeSegment will be preferred for primary key).
-          // To avoid unnecessary compaction work, skip this group and try the next.
-          SegmentMergerMetadata newestSegment = group.stream()
-              .max(Comparator.comparingLong(x -> x.getSegmentZKMetadata().getCreationTime()))
-              .orElse(null);
-          if (newestSegment != null && UploadedRealtimeSegmentName.of(newestSegment.getSegmentZKMetadata().getSegmentName()) != null) {
-            LOGGER.info("Skipping compaction group for partition {} because the newest segment {} is an UploadedRealtimeSegment.", entry.getKey(), newestSegment.getSegmentZKMetadata().getSegmentName());
-            continue;
-          }
-          //get max creation time for the segments across all servers. This will be used as the creation time of the
-          // merge segment
-          Long maxCreationTimeMillis =
-              getMaxCreationTimeMillis(tableNameWithType, segmentNames, serverToSegments, serverToEndpoints,
-                  serverSegmentMetadataReader);
-          Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, segmentNames));
-          configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(group));
-          configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-          configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(group));
-          configs.put(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, String.valueOf(
-              Long.parseLong(
-                  taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
-                      String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT)))));
-          configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY,
-              String.valueOf(maxCreationTimeMillis));
-          pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, configs));
-          numTasks++;
-          groupSelected = true;
-          break;
+        if (groups.get(0).size() <= 1) {
+          continue;
         }
-        if (!groupSelected) {
-          LOGGER.info("No suitable compaction group found for partition {} after checking all groups for {}", entry.getKey(), tableNameWithType);
-        }
+        // TODO see if multiple groups of same partition can be added
+
+        List<String> segmentNames =
+            groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList());
+        //get max creation time for the segments across all servers. This will be used as the creation time of the
+        // merge segment
+        Long maxCreationTimeMillis =
+            getMaxCreationTimeMillis(tableNameWithType, segmentNames, serverToSegments, serverToEndpoints,
+                serverSegmentMetadataReader);
+        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, segmentNames));
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
+        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, String.valueOf(
+            Long.parseLong(
+                taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
+                    String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT)))));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY,
+            String.valueOf(maxCreationTimeMillis));
+        pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, configs));
+        numTasks++;
       }
       LOGGER.info("Finished generating {} tasks configs for table: {}", numTasks, tableNameWithType);
     }
@@ -331,9 +313,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
             continue;
           }
           double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
-          segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>())
-              .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs,
-                  expectedSegmentSizeAfterCompaction));
+          segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>()).add(
+              new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs, expectedSegmentSizeAfterCompaction));
         }
         break;
       }
@@ -458,11 +439,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   @Override
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME, "%s only supports realtime tables!",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check upsert enabled
-    Preconditions.checkState(tableConfig.isUpsertEnabled(),
-        "Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for %s",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check snapshot enabled
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
