@@ -645,18 +645,20 @@ public class QueryDispatcher {
     if (block.isError()) {
       Map<QueryErrorCode, String> queryExceptions = ((ErrorMseBlock) block).getErrorMessages();
 
+      String errorMessage;
+      Map.Entry<QueryErrorCode, String> error;
       if (queryExceptions.size() == 1) {
-        Map.Entry<QueryErrorCode, String> error = queryExceptions.entrySet().iterator().next();
-        QueryErrorCode errorCode = error.getKey();
-        throw errorCode.asException("Received 1 error from servers: " + error.getValue());
+        error = queryExceptions.entrySet().iterator().next();
+        errorMessage = "Received 1 error from servers: " + error.getValue();
       } else {
-        Map.Entry<QueryErrorCode, String> highestPriorityError = queryExceptions.entrySet().stream()
+        error = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
-        throw highestPriorityError.getKey()
-            .asException("Received " + queryExceptions.size() + " errors from servers. "
-                + "The one with highest priority is: " + highestPriorityError.getValue());
+        errorMessage = "Received " + queryExceptions.size() + " errors from servers. "
+                + "The one with highest priority is: " + error.getValue();
       }
+      QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);
+      return new QueryResult(processingEx, queryStats, System.currentTimeMillis() - startTimeMs);
     }
     assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
