@@ -369,8 +369,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
     CompileResult compileResult =
-          compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
-              accessControl);
+        compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
+            accessControl);
 
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
       /*
@@ -409,8 +409,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS
-      if (hasExceededQPSQuota(database, physicalTableNames, requestContext)) {
-        String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      if (!_queryQuotaManager.acquireDatabase(database)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+        return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+      }
+      if (!_queryQuotaManager.acquireLogicalTable(tableName)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for table: %s.", requestId, query, tableName);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
 
@@ -818,9 +827,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
         return new CompileResult(new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
             "It seems that the query is only supported by the multi-stage query engine, please retry the query "
-                    + "using "
-                    + "the multi-stage query engine "
-                    + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)"));
+                + "using "
+                + "the multi-stage query engine "
+                + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)"));
       } else {
         return new CompileResult(
             new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()));

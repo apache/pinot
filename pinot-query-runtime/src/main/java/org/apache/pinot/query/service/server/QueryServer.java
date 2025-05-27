@@ -397,17 +397,18 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    CompletableFuture.runAsync(() -> submitTimeSeriesInternal(request, responseObserver), _timeSeriesExecutorService);
+    try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.open();
+        QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
+      // TODO: populate the thread context with TSE information
+      QueryThreadContext.setQueryEngine("tse");
+
+      CompletableFuture.runAsync(() -> submitTimeSeriesInternal(request, responseObserver), _timeSeriesExecutorService);
+    }
   }
 
   private void submitTimeSeriesInternal(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      // TODO: populate the thread context with TSE information
-      QueryThreadContext.setQueryEngine("tse");
-      _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), request.getMetadataMap(), responseObserver);
-    }
+    _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), request.getMetadataMap(), responseObserver);
   }
 
   /// Executes a cancel request.
