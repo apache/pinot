@@ -773,7 +773,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Enable Server level realtime ingestion rate limier
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
-    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener = new ServerRateLimitConfigChangeListener(serverMetrics);
+    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
+        new ServerRateLimitConfigChangeListener(serverMetrics);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
 
     // Start the query server after finishing the service status check. If the query server is started before all the
