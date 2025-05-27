@@ -92,6 +92,8 @@ public class RealtimeConsumptionRateManager {
   }
 
   public void updateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+    LOGGER.info("Updating serverRateLimiter to new rate limit: {}, Prev serverRateLimiter: {}", serverRateLimit,
+        _serverRateLimiter);
     _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
   }
 
@@ -198,6 +200,15 @@ public class RealtimeConsumptionRateManager {
     @VisibleForTesting
     double getRate() {
       return _rate;
+    }
+
+    @Override
+    public String toString() {
+      return "RateLimiterImpl{"
+          + "_rate=" + _rate
+          + ", _rateLimiter=" + _rateLimiter
+          + ", _metricEmitter=" + _metricEmitter
+          + '}';
     }
   }
 

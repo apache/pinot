@@ -45,8 +45,14 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
     // Init serverRateLimit as default in-case serverRateLimit config is deleted from cluster configs.
     double serverRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
     if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
-      serverRateLimit =
-          Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+      try {
+        serverRateLimit =
+            Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change.",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT), e);
+        return;
+      }
     }
     RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(serverRateLimit, _serverMetrics);
   }
