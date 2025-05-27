@@ -16,33 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.map;
+package org.apache.pinot.integration.tests.logicaltable;
 
+import java.io.File;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexHandler;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.TableConfig;
 
 
-public class MapIndexHandler implements IndexHandler {
-  public MapIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      TableConfig tableConfig) {
+public class LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest extends BaseLogicalTableIntegrationTest {
+
+  @Override
+  protected List<String> getOfflineTableNames() {
+    return List.of("o_1");
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
+  protected List<String> getRealtimeTableNames() {
+    return List.of("r_1");
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
-      throws Exception {
-    return false;
-  }
-
-  @Override
-  public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-      throws Exception {
+  protected Map<String, List<File>> getRealtimeTableDataFiles() {
+    // Overlapping data files for the hybrid table
+    return distributeFilesToTables(getRealtimeTableNames(),
+        _avroFiles.subList(_avroFiles.size() - 4, _avroFiles.size()));
   }
 }

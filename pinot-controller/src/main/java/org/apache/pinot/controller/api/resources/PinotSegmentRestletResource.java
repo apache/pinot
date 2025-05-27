@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -558,9 +559,19 @@ public class PinotSegmentRestletResource {
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
-        List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
-            SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
+        List<String> segmentsForServer = serverToSegments.get(server);
+        StringBuilder encodedSegmentsBuilder = new StringBuilder();
+        if (!segmentsForServer.isEmpty()) {
+          Iterator<String> segmentIterator = segmentsForServer.iterator();
+          // Append first segment without a leading separator
+          encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
+          // Append remaining segments, each prefixed by the separator
+          while (segmentIterator.hasNext()) {
+            encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
+                                  .append(URIUtils.encode(segmentIterator.next()));
+          }
+        }
+        reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }

@@ -16,19 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.query.timeboundary;
 
-package org.apache.pinot.segment.local.segment.index.map;
+import org.testng.annotations.Test;
 
-import com.google.auto.service.AutoService;
-import org.apache.pinot.segment.spi.index.IndexPlugin;
+import static org.testng.Assert.assertTrue;
 
 
-@AutoService(IndexPlugin.class)
-public class MapIndexPlugin implements IndexPlugin<MapIndexType> {
-  public static final MapIndexType INSTANCE = new MapIndexType();
+public class TimeBoundaryStrategyServiceTest {
 
-  @Override
-  public MapIndexType getIndexType() {
-    return INSTANCE;
+  @Test(expectedExceptions = IllegalArgumentException.class,
+        expectedExceptionsMessageRegExp = "No TimeBoundaryStrategy found for name: invalidStrategy")
+  public void testInvalidTimeBoundaryStrategy() {
+    TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy("invalidStrategy");
+  }
+
+  @Test
+  public void testMinTimeBoundaryStrategy() {
+    TimeBoundaryStrategy timeBoundaryStrategy = TimeBoundaryStrategyService.getInstance()
+        .getTimeBoundaryStrategy("min");
+    assertTrue(timeBoundaryStrategy instanceof MinTimeBoundaryStrategy, "Expected MinTimeBoundaryStrategy instance");
   }
 }

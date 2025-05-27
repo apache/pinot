@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,9 +58,9 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -288,16 +287,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   /**
-   * Helper method to add the physical columns from source list to destination collection.
+   * Helper method to add the physical columns from source list to destination set.
    */
-  private static void addPhysicalColumns(List src, Collection<String> dest) {
+  private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
       String column = o.toString();
-      if (!column.isEmpty() && !dest.contains(column)) {
-        // Skip virtual columns starting with '$', but keep time column with granularity as physical column
-        if (column.charAt(0) == '$' && !TimestampIndexUtils.isValidColumnWithGranularity(column)) {
-          continue;
-        }
+      if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
+        // NOTE:
+        //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform
+        //   this extra check to handle historical bad segments.
+        // TODO:
+        //   We need a better way to identify virtual columns. This info is currently missing from the metadata file.
+        //   Virtual column is a column with virtual column provider configured in the schema.
         dest.add(column);
       }
     }
