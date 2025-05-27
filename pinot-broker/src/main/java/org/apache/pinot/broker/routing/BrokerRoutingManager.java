@@ -66,6 +66,8 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -437,10 +439,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
     Preconditions.checkArgument(timeBoundaryConfig.getBoundaryStrategy().equals("min"),
         "Invalid time boundary strategy: %s", timeBoundaryConfig.getBoundaryStrategy());
-    List<String> includedTables =
-        (List<String>) timeBoundaryConfig.getParameters().getOrDefault("includedTables", List.of());
+    TimeBoundaryStrategy timeBoundaryStrategy =
+        TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(timeBoundaryConfig.getBoundaryStrategy());
+    List<String> timeBoundaryTableNames = timeBoundaryStrategy.getTimeBoundaryTableNames(logicalTableConfig);
 
-    for (String tableNameWithType : includedTables) {
+    for (String tableNameWithType : timeBoundaryTableNames) {
       Preconditions.checkArgument(TableNameBuilder.isOfflineTableResource(tableNameWithType),
           "Invalid table in the time boundary config: %s", tableNameWithType);
       try {
@@ -650,6 +653,44 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     } else {
       LOGGER.warn("Routing does not exist for table: {}, skipping removing routing", tableNameWithType);
+    }
+  }
+
+  public synchronized void removeRoutingForLogicalTable(String logicalTableName) {
+    LOGGER.info("Removing time boundary manager for logical table: {}", logicalTableName);
+    LogicalTableConfig logicalTableConfig =
+        ZKMetadataProvider.getLogicalTableConfig(_propertyStore, logicalTableName);
+    Preconditions.checkState(logicalTableConfig != null, "Failed to find logical table config for: %s",
+        logicalTableName);
+    if (!logicalTableConfig.isHybridLogicalTable()) {
+      LOGGER.info("Skip removing time boundary manager for non hybrid logical table: {}", logicalTableName);
+      return;
+    }
+    String strategy = logicalTableConfig.getTimeBoundaryConfig().getBoundaryStrategy();
+    TimeBoundaryStrategy timeBoundaryStrategy =
+        TimeBoundaryStrategyService.getInstance().getTimeBoundaryStrategy(strategy);
+    List<String> timeBoundaryTableNames = timeBoundaryStrategy.getTimeBoundaryTableNames(logicalTableConfig);
+    for (String tableNameWithType : timeBoundaryTableNames) {
+
+      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+        LOGGER.info("Skipping removing time boundary manager for real-time table: {}", tableNameWithType);
+        continue;
+      }
+
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      if (_routingEntryMap.containsKey(realtimeTableName)) {
+        LOGGER.info("Skipping removing time boundary manager for hybrid physical table: {}", rawTableName);
+        continue;
+      }
+
+      RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+      if (routingEntry != null) {
+        routingEntry.setTimeBoundaryManager(null);
+        LOGGER.info("Removed time boundary manager for table: {}", tableNameWithType);
+      } else {
+        LOGGER.warn("Routing does not exist for table: {}, skipping", tableNameWithType);
+      }
     }
   }
 

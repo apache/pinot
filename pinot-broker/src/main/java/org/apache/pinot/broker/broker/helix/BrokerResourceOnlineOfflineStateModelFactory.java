@@ -101,8 +101,13 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       String physicalOrLogicalTable = message.getPartitionName();
       LOGGER.info("Processing transition from ONLINE to OFFLINE for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.removeRouting(physicalOrLogicalTable);
-        _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        } else {
+          _routingManager.removeRouting(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from ONLINE to OFFLINE for table: {}",
             physicalOrLogicalTable, e);
@@ -120,8 +125,13 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       String physicalOrLogicalTable = message.getPartitionName();
       LOGGER.info("Processing transition from ONLINE to DROPPED for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.removeRouting(physicalOrLogicalTable);
-        _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        } else {
+          _routingManager.removeRouting(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from ONLINE to DROPPED for table: {}",
             physicalOrLogicalTable, e);
