@@ -32,7 +32,7 @@ public class RebalanceConfig {
   public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
   public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
 
-  // Whether to rebalance table in dry-run mode. Set default to true in API model to avoid accidental rebalance.
+  // Whether to rebalance table in dry-run mode.
   @JsonProperty("dryRun")
   @ApiModelProperty(example = "true")
   private boolean _dryRun = false;
