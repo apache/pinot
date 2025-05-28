@@ -309,20 +309,20 @@ public class QueryLogger {
         builder.append(params._queryEngine.getName());
       }
     },
-    OFFLINE_THREAD_MEM_ALLOCATED_BYTES("offlineThreadMemAllocatedBytes(total/thread/resSer)", ':') {
+    OFFLINE_MEM_ALLOCATED_BYTES("offlineMemAllocatedBytes(total/thread/resSer)", ':') {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getOfflineTotalMemAllocatedBytes()).append('/')
             .append(params._response.getOfflineThreadMemAllocatedBytes()).append('/')
-            .append(params._response.getOfflineResponseSerMemAllocatedBytes()).append('/');
+            .append(params._response.getOfflineResponseSerMemAllocatedBytes());
       }
     },
-    REALTIME_THREAD_MEM_ALLOCATED_BYTES("realtimeThreadMemAllocatedBytes(total/thread/resSer)", ':') {
+    REALTIME_MEM_ALLOCATED_BYTES("realtimeMemAllocatedBytes(total/thread/resSer)", ':') {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.getRealtimeTotalMemAllocatedBytes()).append('/')
             .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
-            .append(params._response.getRealtimeResponseSerMemAllocatedBytes()).append('/');
+            .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
       }
     };
 
