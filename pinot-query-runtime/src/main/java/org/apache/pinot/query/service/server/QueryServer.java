@@ -355,7 +355,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// Remember that in case of error some stages may have been explained and some not.
   private void explainInternal(Worker.QueryRequest request, StreamObserver<Worker.ExplainResponse> responseObserver,
       Map<String, String> reqMetadata) {
-    try (QueryThreadContext.CloseableContext qTlClosable = openFromRequestMetadata(_instanceId, reqMetadata);
+    try (QueryThreadContext.CloseableContext qTlClosable
+        = QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // Explain the stage for each worker
       BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
