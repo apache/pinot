@@ -172,7 +172,49 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return mseBlock;
   }
 
-  protected abstract void buildRightTable();
+  protected void buildRightTable() {
+    LOGGER.trace("Building right table for join operator");
+    long startTime = System.currentTimeMillis();
+    int numRows = 0;
+    MseBlock rightBlock = _rightInput.nextBlock();
+    while (rightBlock.isData()) {
+      List<Object[]> rows = ((MseBlock.Data) rightBlock).asRowHeap().getRows();
+      // Row based overflow check.
+      if (rows.size() + numRows > _maxRowsInJoin) {
+        if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+          throwForJoinRowLimitExceeded(
+              "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
+        } else {
+          // Just fill up the buffer.
+          int remainingRows = _maxRowsInJoin - numRows;
+          rows = rows.subList(0, remainingRows);
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
+          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
+          _rightInput.earlyTerminate();
+        }
+      }
+
+      addRowsToRightTable(rows);
+      numRows += rows.size();
+      sampleAndCheckInterruption();
+      rightBlock = _rightInput.nextBlock();
+    }
+
+    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
+    } else {
+      _isRightTableBuilt = true;
+      finishBuildingRightTable();
+    }
+
+    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
+    LOGGER.trace("Finished building right table for join operator");
+  }
+
+  protected abstract void addRowsToRightTable(List<Object[]> rows);
+
+  protected abstract void finishBuildingRightTable();
 
   protected MseBlock buildJoinedDataBlock() {
     LOGGER.trace("Building joined data block for join operator");
@@ -240,7 +282,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   protected boolean needUnmatchedLeftRows() {
-    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
+    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL || _joinType == JoinRelType.LEFT_ASOF;
   }
 
   protected void earlyTerminateLeftInput() {
