@@ -170,6 +170,7 @@ public final class TableConfigUtils {
       validateFieldConfigList(tableConfig, schema);
       validateInstancePartitionsTypeMapConfig(tableConfig);
       validatePartitionedReplicaGroupInstance(tableConfig);
+      validateInstanceAssignmentConfigs(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
@@ -910,6 +911,25 @@ public final class TableConfigUtils {
       boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
       Preconditions.checkState(isNullReplicaGroupPartitionConfig,
           "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
+    }
+  }
+
+  @VisibleForTesting
+  static void validateInstanceAssignmentConfigs(TableConfig tableConfig) {
+    if (tableConfig.getInstanceAssignmentConfigMap() == null) {
+      return;
+    }
+    for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+      if (instanceAssignmentConfig.getPartitionSelector()
+          == InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR) {
+        Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for REALTIME tables");
+        Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased(),
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based partitioning");
+        Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumPartitions() == 0,
+            "numPartitions should not be explicitly set when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR");
+      }
+      // TODO: Add more validations for other partition selectors here
     }
   }
 
