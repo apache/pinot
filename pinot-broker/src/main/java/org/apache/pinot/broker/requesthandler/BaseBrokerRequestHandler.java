@@ -128,7 +128,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_brokerId)) {
       QueryThreadContext.setStartTimeMs(requestContext.getRequestArrivalTimeMillis());
       requestContext.setBrokerId(_brokerId);
       QueryThreadContext.setBrokerId(_brokerId);

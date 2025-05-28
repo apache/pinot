@@ -46,6 +46,10 @@ import org.apache.pinot.segment.spi.memory.PinotOutputStream;
  */
 public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
+  private static final int STAGE_ID_FAKE_ERROR_CODE = -1;
+  private static final int WORKER_ID_FAKE_ERROR_CODE = -2;
+  private static final int SERVER_ID_FAKE_ERROR_CODE = -3;
+
   private final PagedPinotOutputStream.PageAllocator _allocator;
 
   public ZeroCopyDataBlockSerde() {
@@ -114,11 +118,36 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       return;
     }
 
-    into.writeInt(errCodeToExceptionMap.size());
+    // We add 3 fake error codes to the map to store stage, worker and server ID.
+    // These fake error codes are only used in the serialized format.
+    // When deserialized, the returned datablock will not contain these fake error codes.
+    into.writeInt(errCodeToExceptionMap.size() + 3);
     for (Map.Entry<Integer, String> entry : errCodeToExceptionMap.entrySet()) {
       into.writeInt(entry.getKey());
       into.writeInt4String(entry.getValue());
     }
+    int stage;
+    int worker;
+    String serverId;
+    if (dataBlock instanceof MetadataBlock) {
+      MetadataBlock metablock = (MetadataBlock) dataBlock;
+      stage = metablock.getStage();
+      worker = metablock.getWorker();
+      serverId = metablock.getServerId() != null ? metablock.getServerId() : "";
+    } else {
+      stage = -1; // Default value when not initialized
+      worker = -1; // Default value when not initialized
+      serverId = ""; // Default value when not initialized
+    }
+    // Add fake error codes for stage, worker and server ID
+    into.writeInt(STAGE_ID_FAKE_ERROR_CODE);
+    into.writeInt4String(String.valueOf(stage));
+
+    into.writeInt(WORKER_ID_FAKE_ERROR_CODE);
+    into.writeInt4String(String.valueOf(worker));
+
+    into.writeInt(SERVER_ID_FAKE_ERROR_CODE);
+    into.writeInt4String(serverId);
   }
 
   private static void serializeDictionary(DataBlock dataBlock, PinotOutputStream into)
@@ -202,7 +231,14 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
         case METADATA: {
           Map<Integer, String> exceptions = deserializeExceptions(stream, header);
           if (!exceptions.isEmpty()) {
-            return MetadataBlock.newError(exceptions);
+            // Remove the fake error codes that we added during serialization
+            // and transform them into stageId, workerId and serverId
+            String stageIdStr = exceptions.remove(STAGE_ID_FAKE_ERROR_CODE);
+            int stageId = stageIdStr != null ? Integer.parseInt(stageIdStr) : -1;
+            String workerIdStr = exceptions.remove(WORKER_ID_FAKE_ERROR_CODE);
+            int workerId = workerIdStr != null ? Integer.parseInt(workerIdStr) : -1;
+            String serverId = exceptions.remove(SERVER_ID_FAKE_ERROR_CODE);
+            return MetadataBlock.newError(stageId, workerId, serverId, exceptions);
           } else {
             List<DataBuffer> metadata = deserializeMetadata(buffer, header);
             return new MetadataBlock(metadata);

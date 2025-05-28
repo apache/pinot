@@ -161,7 +161,7 @@ public class LeafOperator extends MultiStageOperator {
     // Terminate when receiving exception block
     Map<Integer, String> exceptions = _exceptions;
     if (exceptions != null) {
-      return new ErrorMseBlock(QueryErrorCode.fromKeyMap(exceptions));
+      return ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions));
     }
     if (resultsBlock == LAST_RESULTS_BLOCK) {
       return SuccessMseBlock.INSTANCE;

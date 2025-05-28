@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.datablock;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +34,12 @@ import org.slf4j.LoggerFactory;
 public class MetadataBlock extends BaseDataBlock {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBlock.class);
-  @VisibleForTesting
-  static final int VERSION = 2;
   @Nullable
   private List<DataBuffer> _statsByStage;
+  private final int _stage;
+  private final int _worker;
+  @Nullable
+  private final String _serverId;
 
   private MetadataBlock() {
     this(Collections.emptyList());
@@ -48,16 +49,17 @@ public class MetadataBlock extends BaseDataBlock {
     return new MetadataBlock();
   }
 
-  public static MetadataBlock newError(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock();
+  public static MetadataBlock newError(int stage, int worker, String serverId, Map<Integer, String> exceptions) {
+    MetadataBlock errorBlock = new MetadataBlock(stage, worker, serverId);
     for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
       errorBlock.addException(exception.getKey(), exception.getValue());
     }
     return errorBlock;
   }
 
-  public static MetadataBlock newErrorWithStats(Map<Integer, String> exceptions, List<DataBuffer> statsByStage) {
-    MetadataBlock errorBlock = newError(exceptions);
+  public static MetadataBlock newErrorWithStats(int stage, int worker, @Nullable String serverId,
+      Map<Integer, String> exceptions, List<DataBuffer> statsByStage) {
+    MetadataBlock errorBlock = newError(stage, worker, serverId, exceptions);
     errorBlock._statsByStage = statsByStage;
     return errorBlock;
   }
@@ -69,6 +71,17 @@ public class MetadataBlock extends BaseDataBlock {
   public MetadataBlock(List<DataBuffer> statsByStage) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
+    _stage = -1;
+    _worker = -1;
+    _serverId = null;
+  }
+
+  private MetadataBlock(int stage, int worker, @Nullable String serverId) {
+    super(0, null, new String[0], new byte[0], new byte[0]);
+    _statsByStage = Collections.emptyList();
+    _stage = stage;
+    _worker = worker;
+    _serverId = serverId;
   }
 
   public MetadataBlockType getType() {
@@ -99,6 +112,19 @@ public class MetadataBlock extends BaseDataBlock {
   @Override
   protected int getFixDataSize() {
     return 0;
+  }
+
+  public int getStage() {
+    return _stage;
+  }
+
+  public int getWorker() {
+    return _worker;
+  }
+
+  @Nullable
+  public String getServerId() {
+    return _serverId;
   }
 
   public enum MetadataBlockType {

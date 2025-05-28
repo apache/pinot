@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -124,6 +125,13 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  private String _instanceId;
+
+  @PostConstruct
+  public void init() {
+    _instanceId = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, "unknownBroker");
+  }
 
   @GET
   @ManagedAsync
@@ -411,7 +419,7 @@ public class PinotClientRequest {
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_instanceId)) {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient) {
         long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
