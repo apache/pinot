@@ -3904,7 +3904,7 @@ public class PinotHelixResourceManager {
     ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     if (segmentMetadataZNRecord == null) {
       LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
-      return null;
+      return false;
     }
     Tier targetTier = null;
     for (Tier tier : sortedTiers) {
@@ -3933,6 +3933,9 @@ public class PinotHelixResourceManager {
     }
     // Update the tier in segment ZK metadata and write it back to ZK.
     segmentZKMetadata.setTier(targetTierName);
+
+    // Return zk updates back to ZKOperator. This will be used to avoid double updates to zk on a segment when
+    // enableParallelPushProtection is set to true when processing new segments.
     return updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
   }
 
