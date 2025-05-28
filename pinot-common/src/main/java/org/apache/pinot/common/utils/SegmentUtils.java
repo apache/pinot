@@ -34,6 +34,7 @@ public class SegmentUtils {
   }
 
   // Returns the partition id of a realtime segment based segment name and segment metadata info retrieved via Helix.
+  // Can return null if the partitionId is not found based on the above
   // Important: The method is costly because it may read data from zookeeper. Do not use it in any query execution
   // path.
   @Nullable

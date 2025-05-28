@@ -450,6 +450,15 @@ public class SegmentAssignmentUtils {
 
   /**
    * Return the partitionId for an OFFLINE or COMPLETED instance partitions of a REALTIME table with relocation enabled
+   * The partitionId will be calculated as:
+   * <ul>
+   *   <li>
+   *     1. If numPartitions = 1, return partitionId = 0
+   *   </li>
+   *   <li>
+   *     2. Otherwise, fallback to either the OFFLINE or REALTIME partitionId calculation logic
+   *   </li>
+   * </ul>
    */
   public static int getOfflineOrCompletedPartitionId(String segmentName, String tableName, TableType tableType,
       HelixManager helixManager, int numPartitions, @Nullable String partitionColumn) {
@@ -471,6 +480,16 @@ public class SegmentAssignmentUtils {
 
   /**
    * Returns a partition id for offline table
+   * The partitionId will be calculated as:
+   * <ul>
+   *   <li>
+   *     1. If partitionColumn == null, return a default partitionId calculated based on the hashCode of the segmentName
+   *   </li>
+   *   <li>
+   *     2. Otherwise, fetch the partitionMetadata from the SegmentZkMetadata related to the partitionColumn and return
+   *        that as the partitionId
+   *   </li>
+   * </ul>
    */
   public static int getOfflineSegmentPartitionId(String segmentName, String offlineTableName, HelixManager helixManager,
       @Nullable String partitionColumn) {
@@ -528,6 +547,19 @@ public class SegmentAssignmentUtils {
 
   /**
    * Returns a partition id for realtime table
+   * The partitionId will be calculated as:
+   * <ul>
+   *   <li>
+   *     1. Try to fetch the partitionId based on the segmentName
+   *   </li>
+   *   <li>
+   *     2. Otherwise, try to fetch the partitionId from the SegmentZkMetadata using the partitionColumn
+   *   </li>
+   *   <li>
+   *     3. Otherwise, if the returned segmentPartitionId = null, return a default partitionId calculated based on the
+   *        hashCode of the segmentName
+   *   </li>
+   * </ul>
    */
   public static int getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
       HelixManager helixManager, @Nullable String partitionColumn) {
