@@ -2972,7 +2972,8 @@ public class PinotHelixResourceManager {
             instanceFailedList = new ArrayList<>();
           }
           instanceFailedList.add(instance);
-          LOGGER.error("Failed to reset segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance, e);
+          LOGGER.error("Failed to reset segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
+              instance, e);
         }
       }
     }
