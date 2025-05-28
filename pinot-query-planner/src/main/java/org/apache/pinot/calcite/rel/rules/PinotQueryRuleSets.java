@@ -36,7 +36,7 @@ public class PinotQueryRuleSets {
   //@formatter:off
   public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
-      PinotFilterIntoJoinRule.INSTANCE,
+      PinotFilterIntoJoinRule.INSTANCE, // this is modified to enable smart mode to simplify outer join
       // push filter through an aggregation
       CoreRules.FILTER_AGGREGATE_TRANSPOSE,
       // push filter through set operation
@@ -49,7 +49,7 @@ public class PinotQueryRuleSets {
       // push a filter past a project
       CoreRules.FILTER_PROJECT_TRANSPOSE,
       // push parts of the join condition to its inputs
-      PinotJoinConditionPushRule.INSTANCE,
+      PinotJoinConditionPushRule.INSTANCE, // this is modified to enable smart mode to simplify outer join
       // remove identity project
       CoreRules.PROJECT_REMOVE,
 
@@ -57,6 +57,19 @@ public class PinotQueryRuleSets {
       CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
       // push project through WINDOW
       CoreRules.PROJECT_WINDOW_TRANSPOSE,
+
+      // aggregate join remove
+      CoreRules.AGGREGATE_JOIN_REMOVE,
+      // remove aggregation if it does not aggregate and input is already distinct
+      CoreRules.AGGREGATE_REMOVE,
+      // also push aggregate function through join
+      CoreRules.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
+      // aggregate union rule
+      CoreRules.AGGREGATE_UNION_AGGREGATE,
+      // push aggregate through join
+      // this one won't be useful because it requires empty aggCalls,
+      // these will be removed by AGGREGATE_REMOVE
+      CoreRules.AGGREGATE_JOIN_TRANSPOSE,
 
       // literal rules
       // TODO: Revisit and see if they can be replaced with
@@ -70,6 +83,7 @@ public class PinotQueryRuleSets {
 
       // join rules
       CoreRules.JOIN_PUSH_EXPRESSIONS,
+      CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES,
 
       // join and semi-join rules
       CoreRules.PROJECT_TO_SEMI_JOIN,
@@ -77,13 +91,6 @@ public class PinotQueryRuleSets {
 
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
-
-      // remove aggregation if it does not aggregate and input is already distinct
-      CoreRules.AGGREGATE_REMOVE,
-      // push aggregate through join
-      CoreRules.AGGREGATE_JOIN_TRANSPOSE,
-      // aggregate union rule
-      CoreRules.AGGREGATE_UNION_AGGREGATE,
 
       // reduce SUM and AVG
       // TODO: Consider not reduce at all.

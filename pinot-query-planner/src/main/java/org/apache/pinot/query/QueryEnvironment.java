@@ -94,6 +94,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -117,6 +119,7 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
 
   static {
     // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
@@ -394,16 +397,20 @@ public class QueryEnvironment {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
       }
       RelNode rootNode = relRoot.rel;
+      LOGGER.info("[QueryEnvironment] Logical plan after parsing: \n{}", RelOptUtil.toString(rootNode));
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
         RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
         rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+        LOGGER.info("[QueryEnvironment] Logical plan after decorr: \n{}", RelOptUtil.toString(rootNode));
       } catch (Throwable e) {
         throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
       }
       try {
         rootNode = converter.trimUnusedFields(false, rootNode);
+        // TODO: log parsed output here
+        LOGGER.info("[QueryEnvironment] Logical plan after decorr & trim: \n{}", RelOptUtil.toString(rootNode));
       } catch (Throwable e) {
         throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
       }
@@ -475,13 +482,16 @@ public class QueryEnvironment {
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
+    // first prune unnecessary nodes, this benefits matching of rules
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+
+    // ----
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
-    // ----
     // Pushdown filters using a single HepInstruction.
     hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
 
@@ -502,7 +512,7 @@ public class QueryEnvironment {
       boolean usePhysicalOptimizer) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
-    // Set the match order as BOTTOM_UP.
+    // Set the match order as BOTTOM_UP. this might introduce a bit more optimizing overhead
     hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
 
     // ----
