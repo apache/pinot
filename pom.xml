@@ -185,7 +185,7 @@
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
-    <scala-xml.version>2.3.0</scala-xml.version>
+    <scala-xml.version>2.4.0</scala-xml.version>
     <fmpp.version>0.9.16</fmpp.version>
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>

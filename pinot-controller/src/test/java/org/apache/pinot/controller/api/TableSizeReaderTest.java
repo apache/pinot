@@ -61,6 +61,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -226,12 +228,12 @@ public class TableSizeReaderTest {
       throws InvalidConfigException {
     TableSizeReader reader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
-    assertNull(reader.getTableSizeDetails("mytable", 5000));
+    assertNull(reader.getTableSizeDetails("mytable", 5000, true));
   }
 
   private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
       throws InvalidConfigException {
-    when(_helix.getServerToSegmentsMap(anyString())).thenAnswer(new Answer<Object>() {
+    when(_helix.getServerToSegmentsMap(anyString(), any(), anyBoolean())).thenAnswer(new Answer<Object>() {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return subsetOfServerSegments(servers);
@@ -247,7 +249,7 @@ public class TableSizeReaderTest {
 
     TableSizeReader reader = new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix,
         _leadControllerManager);
-    return reader.getTableSizeDetails(table, TIMEOUT_MSEC);
+    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true);
   }
 
   private Map<String, List<String>> segmentToServers(final String... servers) {

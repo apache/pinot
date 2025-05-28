@@ -42,7 +42,7 @@ public class WorkerQueryServer {
     _queryServicePort = _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(_configuration, instanceDataManager, tlsConfig, sendStats::getSendStats);
+    queryRunner.init(_configuration, instanceDataManager, tlsConfig, sendStats::isSendStats);
     _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, configuration);
   }
 

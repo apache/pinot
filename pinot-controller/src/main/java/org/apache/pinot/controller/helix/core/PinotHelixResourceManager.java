@@ -3274,16 +3274,27 @@ public class PinotHelixResourceManager {
    * the ideal state because they are not supposed to be served.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
-    return getServerToSegmentsMap(tableNameWithType, null);
+    return getServerToSegmentsMap(tableNameWithType, null, true);
   }
 
-  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer) {
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer,
+      boolean includeReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+
+    Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+    Set<String> segments = idealStateMap.keySet();
+
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage = SegmentLineageAccessHelper
+          .getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segmentName = entry.getKey();
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         String server = instanceStateEntry.getKey();
