@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -685,28 +686,37 @@ public class PinotTenantRestletResource {
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true)
-      @DefaultValue("1")
-      @QueryParam("degreeOfParallelism") int degreeOfParallelism,
+      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true, example = "1")
+      @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
       @ApiParam(value =
           "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are allowed in this tenant rebalance"
-              + " job. Leave blank to allow all tables from the tenant")
-      @QueryParam("allowTables") @DefaultValue("") String allowTables,
+              + " job. Leave blank to allow all tables from the tenant", example = "")
+      @QueryParam("allowTables") String allowTables,
       @ApiParam(value =
           "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are blocked in this tenant rebalance"
-              + " job. These table will be removed from allowTables")
-      @QueryParam("blockTables") @DefaultValue("") String blockTables,
-      @ApiParam(value = "Show full rebalance results of each table in the response") @DefaultValue("false")
-      @QueryParam("verboseResult") boolean verboseResult,
+              + " job. These table will be removed from allowTables", example = "")
+      @QueryParam("blockTables") String blockTables,
+      @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
+      @QueryParam("verboseResult") Boolean verboseResult,
       @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
       TenantRebalanceConfig config) {
     // TODO decide on if the tenant rebalance should be database aware or not
     config.setTenantName(tenantName);
-    // Query params should override the config provided in the body
-    config.setAllowTables(new HashSet<>(Arrays.asList(StringUtil.split(allowTables, ',', 0))));
-    config.setBlockTables(new HashSet<>(Arrays.asList(StringUtil.split(blockTables, ',', 0))));
-    config.setDegreeOfParallelism(degreeOfParallelism);
-    config.setVerboseResult(verboseResult);
+    // Query params should override the config provided in the body, if present
+    if (degreeOfParallelism != null) {
+      config.setDegreeOfParallelism(degreeOfParallelism);
+    }
+    if (verboseResult != null) {
+      config.setVerboseResult(verboseResult);
+    }
+    if (allowTables != null) {
+      config.setAllowTables(Arrays.stream(StringUtil.split(allowTables, ',', 0)).map(String::strip).collect(
+          Collectors.toSet()));
+    }
+    if (blockTables != null) {
+      config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0)).map(String::strip).collect(
+          Collectors.toSet()));
+    }
     return _tenantRebalancer.rebalance(config);
   }
 
