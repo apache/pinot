@@ -2570,10 +2570,11 @@ public class PinotHelixResourceManager {
         "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
-    assignTableSegment(tableNameWithType, segmentName, false);
+    assignTableSegment(tableNameWithType, segmentName);
   }
 
-  public void assignTableSegment(String tableNameWithType, String segmentName, Boolean enableParallelPushProtection) {
+  public Boolean assignTableSegment(String tableNameWithType, String segmentName) {
+    Boolean segmentZkUpdated = false;
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
 
@@ -2591,7 +2592,7 @@ public class PinotHelixResourceManager {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
 
         // Update segment tier to support direct assignment for multiple data directories
-        updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, enableParallelPushProtection);
+        segmentZkUpdated = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
 
         InstancePartitions tierInstancePartitions =
             TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
@@ -2624,6 +2625,7 @@ public class PinotHelixResourceManager {
         return idealState;
       });
       LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
+      return segmentZkUpdated;
     } catch (Exception e) {
       LOGGER.error(
           "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
@@ -2639,8 +2641,8 @@ public class PinotHelixResourceManager {
   }
 
   // Assign a list of segments in batch mode
-  public void assignTableSegments(String tableNameWithType, List<String> segmentNames,
-      Boolean enableParallelPushProtection) {
+  public Map<String, Boolean> assignTableSegments(String tableNameWithType, List<String> segmentNames) {
+    Map<String, Boolean> segmentZKMetadataUpdated = new HashMap<>();
     Map<String, String> segmentZKMetadataPathMap = new HashMap<>();
     for (String segmentName : segmentNames) {
       String segmentZKMetadataPath =
@@ -2661,7 +2663,8 @@ public class PinotHelixResourceManager {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
         for (String segmentName : segmentNames) {
           // Update segment tier to support direct assignment for multiple data directories
-          updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, enableParallelPushProtection);
+          Boolean zkUpdated = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+          segmentZKMetadataUpdated.put(segmentName, zkUpdated);
           InstancePartitions tierInstancePartitions =
               TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                   _helixZkManager);
@@ -2698,6 +2701,7 @@ public class PinotHelixResourceManager {
       });
       LOGGER.info("Added {} segments: {} to IdealState for table: {} in {} ms", segmentNames.size(), segmentNames,
           tableNameWithType, System.currentTimeMillis() - segmentAssignmentStartMs);
+      return segmentZKMetadataUpdated;
     } catch (Exception e) {
       LOGGER.error(
           "Caught exception while adding segments: {} to IdealState for table: {}, deleting segments ZK metadata",
@@ -3851,7 +3855,7 @@ public class PinotHelixResourceManager {
         rebalanceJobId, tableNameWithType, sortedTiers);
     Map<String, Set<String>> tierToSegmentsMap = new HashMap<>();
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
-      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers, false);
+      String tier = updateAndGetSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
       if (tier != null) {
         tierToSegmentsMap.computeIfAbsent(tier, t -> new HashSet<>()).add(segmentName);
       }
@@ -3859,8 +3863,7 @@ public class PinotHelixResourceManager {
     return tierToSegmentsMap;
   }
 
-  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers,
-      Boolean enableParallelPushProtection) {
+  private String updateAndGetSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
     ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     if (segmentMetadataZNRecord == null) {
       LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
@@ -3893,10 +3896,44 @@ public class PinotHelixResourceManager {
     }
     // Update the tier in segment ZK metadata and write it back to ZK.
     segmentZKMetadata.setTier(targetTierName);
-    if (!enableParallelPushProtection) {
-      updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
-    }
+    updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
     return targetTierName;
+  }
+
+  private Boolean updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+    ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+    if (segmentMetadataZNRecord == null) {
+      LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+      return null;
+    }
+    Tier targetTier = null;
+    for (Tier tier : sortedTiers) {
+      TierSegmentSelector tierSegmentSelector = tier.getSegmentSelector();
+      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentName)) {
+        targetTier = tier;
+        break;
+      }
+    }
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+    String targetTierName = null;
+    if (targetTier == null) {
+      if (segmentZKMetadata.getTier() == null) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
+        return false;
+      }
+      LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
+    } else {
+      targetTierName = targetTier.getName();
+      if (targetTierName.equals(segmentZKMetadata.getTier())) {
+        LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
+            targetTierName);
+        return false;
+      }
+      LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
+    }
+    // Update the tier in segment ZK metadata and write it back to ZK.
+    segmentZKMetadata.setTier(targetTierName);
+    return updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
   }
 
   /**

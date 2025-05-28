@@ -583,10 +583,9 @@ public class ZKOperator {
         throw e;
       }
     }
-
+    Boolean zkMetadataUpdated = false;
     try {
-      _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName(),
-          enableParallelPushProtection);
+      zkMetadataUpdated = _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
@@ -596,7 +595,7 @@ public class ZKOperator {
       throw e;
     }
 
-    if (enableParallelPushProtection) {
+    if (enableParallelPushProtection && !zkMetadataUpdated) {
       // Release lock. Expected version will be 0 as we hold a lock and no updates could take place meanwhile.
       newSegmentZKMetadata.setSegmentUploadStartTime(-1);
       if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, 0)) {
@@ -675,9 +674,9 @@ public class ZKOperator {
         }
       }
     }
-
+    Map<String, Boolean> zkMetadataUpdated;
     try {
-      _pinotHelixResourceManager.assignTableSegments(tableNameWithType, segmentNames, enableParallelPushProtection);
+      zkMetadataUpdated = _pinotHelixResourceManager.assignTableSegments(tableNameWithType, segmentNames);
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
@@ -690,7 +689,8 @@ public class ZKOperator {
     for (Map.Entry<String, SegmentZKMetadata> segmentZKMetadataEntry: segmentZKMetadataMap.entrySet()) {
       SegmentZKMetadata newSegmentZKMetadata = segmentZKMetadataEntry.getValue();
       String segmentName = segmentZKMetadataEntry.getKey();
-      if (enableParallelPushProtection) {
+      if (enableParallelPushProtection && (!zkMetadataUpdated.containsKey(segmentName) || !zkMetadataUpdated.get(
+          segmentName))) {
         // Release lock. Expected version will be 0 as we hold a lock and no updates could take place meanwhile.
         newSegmentZKMetadata.setSegmentUploadStartTime(-1);
         if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, 0)) {
