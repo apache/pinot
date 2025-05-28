@@ -106,7 +106,8 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
 
     // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for
     SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
-        new SegmentAssignmentUtils.TierSegmentAssignment(_tableNameWithType, sortedTiers, currentAssignment);
+        new SegmentAssignmentUtils.TierSegmentAssignment(_helixManager, _tableNameWithType, sortedTiers,
+            currentAssignment);
     Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
         tierSegmentAssignment.getTierNameToSegmentAssignmentMap();
 
