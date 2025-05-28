@@ -1297,9 +1297,16 @@ public final class TableConfigUtils {
       validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
 
       // Validate bloom filter is not added to boolean column
-      if (fieldConfig.getIndexes() != null && fieldConfig.getIndexes().has("bloom")) {
-        Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
-          "Cannot create a bloom filter on boolean column " + columnName);
+      if (fieldConfig.getIndexes() != null) {
+        if (fieldConfig.getIndexes().has("bloom")) {
+          Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
+              "Cannot create a bloom filter on boolean column " + columnName);
+        }
+        if (fieldConfig.getIndexes().has("inverted")) {
+          Preconditions.checkState(fieldConfig.getEncodingType() == EncodingType.DICTIONARY,
+              "Cannot create inverted index on column: %s, it can only be applied to dictionary encoded columns",
+              columnName);
+        }
       }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
