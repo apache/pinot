@@ -3061,7 +3061,8 @@ public class PinotHelixResourceManager {
    * This util is similar to {@link HelixAdmin#resetPartition(String, String, String, List)}.
    * However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
    */
-  private void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+  @VisibleForTesting
+  void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
     LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
         resetPartitionNames == null ? "NULL" : resetPartitionNames, resourceName, instanceName, _helixClusterName);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
