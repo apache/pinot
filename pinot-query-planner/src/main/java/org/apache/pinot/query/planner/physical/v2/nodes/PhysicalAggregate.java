@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
@@ -51,7 +52,7 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
   public PhysicalAggregate(RelOptCluster cluster, RelTraitSet traitSet, List<RelHint> hints,
       ImmutableBitSet groupSet, @Nullable List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls,
       int nodeId, PRelNode pRelInput, @Nullable PinotDataDistribution pinotDataDistribution, boolean leafStage,
-      AggregateNode.AggType aggType, boolean leafReturnFinalResult, List<RelFieldCollation> collations,
+      AggregateNode.AggType aggType, boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations,
       int limit) {
     super(cluster, traitSet, hints, pRelInput.unwrap(), groupSet, groupSets, aggCalls);
     _nodeId = nodeId;
@@ -60,7 +61,7 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
     _leafStage = leafStage;
     _aggType = aggType;
     _leafReturnFinalResult = leafReturnFinalResult;
-    _collations = collations;
+    _collations = collations == null ? List.of() : collations;
     _limit = limit;
   }
 
@@ -114,6 +115,16 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
         _collations, _limit);
   }
 
+  @Override
+  public RelWriter explainTerms(RelWriter pw) {
+    RelWriter relWriter = super.explainTerms(pw);
+    relWriter.item("aggType", _aggType);
+    relWriter.itemIf("leafReturnFinalResult", true, _leafReturnFinalResult);
+    relWriter.itemIf("collations", _collations, !_collations.isEmpty());
+    relWriter.itemIf("limit", _limit, _limit > 0);
+    return relWriter;
+  }
+
   public AggregateNode.AggType getAggType() {
     return _aggType;
   }
@@ -128,5 +139,11 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
 
   public int getLimit() {
     return _limit;
+  }
+
+  public PhysicalAggregate withLimit(int newLimit) {
+    return new PhysicalAggregate(getCluster(), getTraitSet(), getHints(), groupSet, groupSets, aggCalls, _nodeId,
+        _pRelInputs.get(0), _pinotDataDistribution, _leafStage, _aggType, _leafReturnFinalResult, _collations,
+        newLimit);
   }
 }

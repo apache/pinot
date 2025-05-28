@@ -73,6 +73,7 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
         + "&bootstrap=" + rebalanceConfig.isBootstrap() + "&downtime=" + rebalanceConfig.isDowntime()
         + "&minAvailableReplicas=" + rebalanceConfig.getMinAvailableReplicas()
         + "&bestEfforts=" + rebalanceConfig.isBestEfforts()
+        + "&batchSizePerServer=" + rebalanceConfig.getBatchSizePerServer()
         + "&externalViewCheckIntervalInMs=" + rebalanceConfig.getExternalViewCheckIntervalInMs()
         + "&externalViewStabilizationTimeoutInMs=" + rebalanceConfig.getExternalViewStabilizationTimeoutInMs()
         + "&updateTargetTier=" + rebalanceConfig.isUpdateTargetTier()

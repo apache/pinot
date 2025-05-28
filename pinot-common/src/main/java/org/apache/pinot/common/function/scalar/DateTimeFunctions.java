@@ -20,6 +20,8 @@ package org.apache.pinot.common.function.scalar;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
@@ -410,6 +412,34 @@ public class DateTimeFunctions {
     long[] results = new long[days.length];
     for (int i = 0; i < days.length; i++) {
       results[i] = fromEpochDaysBucket(days[i], bucket);
+    }
+    return results;
+  }
+
+  @ScalarFunction
+  public static long fromIso8601(String iso8601) {
+    return OffsetDateTime.parse(iso8601).toInstant().toEpochMilli();
+  }
+
+  @ScalarFunction
+  public static long[] fromIso8601MV(String[] iso8601) {
+    long[] results = new long[iso8601.length];
+    for (int i = 0; i < iso8601.length; i++) {
+      results[i] = fromIso8601(iso8601[i]);
+    }
+    return results;
+  }
+
+  @ScalarFunction
+  public static String toIso8601(long millis) {
+    return Instant.ofEpochMilli(millis).toString();
+  }
+
+  @ScalarFunction
+  public static String[] toIso8601MV(long[] millis) {
+    String[] results = new String[millis.length];
+    for (int i = 0; i < millis.length; i++) {
+      results[i] = toIso8601(millis[i]);
     }
     return results;
   }

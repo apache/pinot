@@ -677,7 +677,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
             segmentDownloadThrottler);
 
-    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf);
+    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
         sendStatsPredicate);
@@ -719,11 +719,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
 
-    LOGGER.info("Initializing and registering the SendStatsPredicate");
-    try {
-      _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
-    } catch (Exception e) {
-      LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
+    if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
+      LOGGER.info("Initializing and registering the SendStatsPredicate");
+      try {
+        _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
+      } catch (Exception e) {
+        LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
+      }
     }
 
     // Start restlet server for admin API endpoint

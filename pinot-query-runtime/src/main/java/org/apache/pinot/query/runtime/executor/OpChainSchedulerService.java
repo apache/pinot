@@ -75,8 +75,6 @@ public class OpChainSchedulerService {
   }
 
   public void register(OpChain operatorChain) {
-    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
-
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -114,6 +112,7 @@ public class OpChainSchedulerService {
         }
       }
     });
+    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 

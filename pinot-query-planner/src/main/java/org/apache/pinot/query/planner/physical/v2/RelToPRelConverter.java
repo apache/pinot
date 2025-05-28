@@ -94,9 +94,11 @@ public class RelToPRelConverter {
     } else if (relNode instanceof PinotLogicalAggregate) {
       Preconditions.checkState(inputs.size() == 1, "Expected exactly 1 input of agg. Found: %s", inputs);
       PinotLogicalAggregate aggRel = (PinotLogicalAggregate) relNode;
+      // Use AggType.DIRECT here because at this point aggregation split hasn't happened yet.
+      AggregateNode.AggType aggType = AggregateNode.AggType.DIRECT;
       return new PhysicalAggregate(aggRel.getCluster(), aggRel.getTraitSet(), aggRel.getHints(), aggRel.getGroupSet(),
           aggRel.getGroupSets(), aggRel.getAggCallList(), nodeIdGenerator.get(), inputs.get(0), null, false,
-          AggregateNode.AggType.DIRECT, false, List.of(), 0);
+          aggType, aggRel.isLeafReturnFinalResult(), aggRel.getCollations(), aggRel.getLimit());
     } else if (relNode instanceof Join) {
       Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
       Join join = (Join) relNode;

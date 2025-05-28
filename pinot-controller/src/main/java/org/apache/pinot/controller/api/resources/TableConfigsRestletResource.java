@@ -166,8 +166,8 @@ public class TableConfigsRestletResource {
         throw new NotFoundException(
             String.format("Schema does not exist for table %s Use POST to create it first.", tableName));
       }
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false, false);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false, false);
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
