@@ -21,9 +21,9 @@ package org.apache.pinot.broker.grpc;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Map;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 

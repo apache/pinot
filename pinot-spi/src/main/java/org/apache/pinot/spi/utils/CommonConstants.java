@@ -22,6 +22,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -497,6 +498,12 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        /**
+         * This will help in getting accurate and correct result for queries
+         * with group by and limit but  without order by
+         */
+        public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
+
         /** Number of threads used in the final reduce.
          * This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
          * aggregation functions. */
@@ -906,15 +913,47 @@ public class CommonConstants {
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
 
     // TODO: Merge this with "mse"
+    /**
+     * The ExecutorServiceProvider to use for execution threads, which are the ones that execute
+     * MultiStageOperators (and SSE operators in the leaf stages).
+     *
+     * It is recommended to use cached. In case fixed is used, it should use a large enough number of threads or
+     * parent operators may consume all threads.
+     * In Java 21 or newer, virtual threads are a good solution. Although Apache Pinot doesn't include this option yet,
+     * it is trivial to implement that plugin.
+     *
+     * See QueryRunner
+     */
     public static final String MULTISTAGE_EXECUTOR = "multistage.executor";
     public static final String MULTISTAGE_EXECUTOR_CONFIG_PREFIX =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MULTISTAGE_EXECUTOR;
     public static final String DEFAULT_MULTISTAGE_EXECUTOR_TYPE = "cached";
+    /**
+     * The ExecutorServiceProvider to be used for submission threads, which are the ones
+     * that receive requests in protobuf and transform them into MultiStageOperators.
+     *
+     * It is recommended to use a fixed thread pool, given submission code should not block.
+     *
+     * See QueryServer
+     */
+    public static final String MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + "multistage.submission";
+    public static final String DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE = "fixed";
     @Deprecated
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
     @Deprecated
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
 
+    /**
+     * The ExecutorServiceProvider to be used for timeseries threads.
+     *
+     * It is recommended to use a cached thread pool, given timeseries endpoints are blocking.
+     *
+     * See QueryServer
+     */
+    public static final String MULTISTAGE_TIMESERIES_EXEC_CONFIG_PREFIX =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + "timeseries";
+    public static final String DEFAULT_TIMESERIES_EXEC_CONFIG_PREFIX = "cached";
     /* End of query executor related configs */
 
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
@@ -1407,6 +1446,7 @@ public class CommonConstants {
       public static final String DOCID = "$docId";
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
     }
   }
 

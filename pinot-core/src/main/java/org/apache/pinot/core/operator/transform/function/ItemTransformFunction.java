@@ -105,7 +105,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
-    return transformToIntValuesSV(valueBlock);
+    return valueBlock.getBlockValueSet(_keyPath).getDictionaryIdsSV();
   }
 
   @Override

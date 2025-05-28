@@ -21,6 +21,7 @@ package org.apache.pinot.server.access;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
 /**

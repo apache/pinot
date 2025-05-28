@@ -16,14 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.map;
+package org.apache.pinot.spi.data;
 
-import java.io.File;
-import org.apache.pinot.segment.spi.index.creator.MapIndexCreator;
-import org.apache.pinot.spi.config.table.MapIndexConfig;
+import java.util.Map;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public abstract class BaseMapIndexCreator implements MapIndexCreator {
-  public BaseMapIndexCreator(File indexDir, String name, MapIndexConfig indexConfig) {
+public class TimeBoundaryConfig extends BaseJsonConfig {
+  private String _boundaryStrategy;
+  private Map<String, Object> _parameters;
+
+  public TimeBoundaryConfig() {
+  }
+
+  public TimeBoundaryConfig(String boundaryStrategy, Map<String, Object> parameters) {
+    _boundaryStrategy = boundaryStrategy;
+    _parameters = parameters;
+  }
+
+  public String getBoundaryStrategy() {
+    return _boundaryStrategy;
+  }
+
+  public void setBoundaryStrategy(String boundaryStrategy) {
+    _boundaryStrategy = boundaryStrategy;
+  }
+
+  public Map<String, Object> getParameters() {
+    return _parameters;
+  }
+
+  public void setParameters(Map<String, Object> parameters) {
+    _parameters = parameters;
   }
 }

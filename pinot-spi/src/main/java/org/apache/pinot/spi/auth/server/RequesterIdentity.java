@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.access;
+package org.apache.pinot.spi.auth.server;
 
 public abstract class RequesterIdentity {
 }

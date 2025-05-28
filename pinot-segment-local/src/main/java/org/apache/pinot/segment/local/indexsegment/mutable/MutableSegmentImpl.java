@@ -1045,18 +1045,23 @@ public class MutableSegmentImpl implements MutableSegment {
     return physicalColumnNames;
   }
 
+  @Nullable
   @Override
-  public DataSource getDataSource(String column) {
+  public DataSource getDataSourceNullable(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
     if (indexContainer != null) {
       // Physical column
       return indexContainer.toDataSource();
-    } else {
+    }
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    if (fieldSpec != null && fieldSpec.isVirtualColumn()) {
       // Virtual column
       return SegmentPreloadUtils.getVirtualDataSource(_schema, _realtimeTableName, column, _numDocsIndexed);
     }
+    return null;
   }
 
+  @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;

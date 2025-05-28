@@ -311,6 +311,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
   }
 
+  @Nullable
+  @Override
+  public DataSource getDataSourceNullable(String column) {
+    return _dataSources.get(column);
+  }
+
+  @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return _starTreeIndexContainer != null ? _starTreeIndexContainer.getStarTrees() : null;

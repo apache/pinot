@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -2150,6 +2151,8 @@ public class PinotHelixResourceManager {
       updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
     }
 
+    sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
+
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
   }
 
@@ -3172,6 +3175,27 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
+    LogicalTableConfigRefreshMessage refreshMessage = new LogicalTableConfigRefreshMessage(logicalTableName);
+
+    // Send logical table config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setPartition(logicalTableName);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, refreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} logical table config refresh messages to brokers for table: {}", numMessagesSent,
+          logicalTableName);
+    } else {
+      LOGGER.warn("No logical table config refresh message sent to brokers for table: {}", logicalTableName);
+    }
+  }
+
   private void sendApplicationQpsQuotaRefreshMessage(String appName) {
     ApplicationQpsQuotaRefreshMessage message = new ApplicationQpsQuotaRefreshMessage(appName);
 
@@ -3250,16 +3274,27 @@ public class PinotHelixResourceManager {
    * the ideal state because they are not supposed to be served.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
-    return getServerToSegmentsMap(tableNameWithType, null);
+    return getServerToSegmentsMap(tableNameWithType, null, true);
   }
 
-  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer) {
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer,
+      boolean includeReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+
+    Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+    Set<String> segments = idealStateMap.keySet();
+
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage = SegmentLineageAccessHelper
+          .getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segmentName = entry.getKey();
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         String server = instanceStateEntry.getKey();
