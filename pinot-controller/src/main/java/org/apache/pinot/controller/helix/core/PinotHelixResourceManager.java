@@ -2574,7 +2574,7 @@ public class PinotHelixResourceManager {
   }
 
   public Boolean assignTableSegment(String tableNameWithType, String segmentName) {
-    Boolean segmentZkUpdated = false;
+    Boolean segmentZkMetadataUpdated = false;
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
 
@@ -2592,7 +2592,7 @@ public class PinotHelixResourceManager {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
 
         // Update segment tier to support direct assignment for multiple data directories
-        segmentZkUpdated = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+        segmentZkMetadataUpdated = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
 
         InstancePartitions tierInstancePartitions =
             TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
@@ -2625,7 +2625,7 @@ public class PinotHelixResourceManager {
         return idealState;
       });
       LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
-      return segmentZkUpdated;
+      return segmentZkMetadataUpdated;
     } catch (Exception e) {
       LOGGER.error(
           "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",

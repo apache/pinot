@@ -583,9 +583,9 @@ public class ZKOperator {
         throw e;
       }
     }
-    Boolean zkMetadataUpdated = false;
+    Boolean segmentZkMetadataUpdated = false;
     try {
-      zkMetadataUpdated = _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
+      segmentZkMetadataUpdated = _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
     } catch (Exception e) {
       // assignTableSegment removes the zk entry.
       // Call deleteSegment to remove the segment from permanent location if needed.
@@ -595,7 +595,7 @@ public class ZKOperator {
       throw e;
     }
 
-    if (enableParallelPushProtection && !zkMetadataUpdated) {
+    if (enableParallelPushProtection && !segmentZkMetadataUpdated) {
       // Release lock. Expected version will be 0 as we hold a lock and no updates could take place meanwhile.
       newSegmentZKMetadata.setSegmentUploadStartTime(-1);
       if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, newSegmentZKMetadata, 0)) {
