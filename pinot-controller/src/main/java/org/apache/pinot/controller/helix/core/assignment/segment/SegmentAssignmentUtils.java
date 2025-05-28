@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntIntMutablePair;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
@@ -572,7 +573,8 @@ public class SegmentAssignmentUtils {
     return segmentPartitionId;
   }
 
-  private static int getDefaultPartitionId(String segmentName) {
+  @VisibleForTesting
+  static int getDefaultPartitionId(String segmentName) {
     // A random, but consistent, partition id is calculated based on the hash code of the segment name.
     // Note that '% 10K' is used to prevent having partition ids with large value which will be problematic later in
     // instance assignment formula.
