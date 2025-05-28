@@ -51,10 +51,14 @@ public final class BasicAuthUtils {
    * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
    * .principals".
    *
-   * Example RLS config:
-   * controller.admin.access.control.principals.user1.tables = tableA,tableB
-   * controller.admin.access.control.principals.user1.tableA.rlsFilter = "columnX > 100, columnType = 'TYPE_A'"
-   * controller.admin.access.control.principals.user1.tableB.rlsFilter = "columnY = 'test'"
+   * <pre>
+   *     Example:
+   *     my.prefix.access.control.principals=admin123,user456
+   *     my.prefix.access.control.principals.admin123.password=verysecret
+   *     my.prefix.access.control.principals.user456.password=kindasecret
+   *     my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
+   *     my.prefix.access.control.principals.user456.permissions=read,update
+   * </pre>
    *
    * @param configuration pinot configuration
    * @param prefix configuration namespace
@@ -99,34 +103,36 @@ public final class BasicAuthUtils {
   }
 
   public static List<ZkBasicAuthPrincipal> extractBasicAuthPrincipals(List<UserConfig> userConfigList) {
-    return userConfigList.stream().map(user -> {
-      String name = user.getUserName().trim();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid username", name);
-      String password = user.getPassword().trim();
-      Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
-      String component = user.getComponentType().toString();
-      String role = user.getRoleType().toString();
+    return userConfigList.stream()
+        .map(user -> {
+          String name = user.getUserName().trim();
+          Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid username", name);
+          String password = user.getPassword().trim();
+          Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
+          String component = user.getComponentType().toString();
+          String role = user.getRoleType().toString();
 
-      Set<String> tables = Optional.ofNullable(user.getTables()).orElseGet(() -> Collections.emptyList()).stream()
-          .collect(Collectors.toSet());
-      Set<String> excludeTables =
-          Optional.ofNullable(user.getExcludeTables()).orElseGet(() -> Collections.emptyList()).stream()
+          Set<String> tables = Optional.ofNullable(user.getTables())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().collect(Collectors.toSet());
+          Set<String> excludeTables = Optional.ofNullable(user.getExcludeTables())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().collect(Collectors.toSet());
+          Set<String> permissions = Optional.ofNullable(user.getPermissios())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
-      Set<String> permissions =
-          Optional.ofNullable(user.getPermissios()).orElseGet(() -> Collections.emptyList()).stream()
-              .map(x -> x.toString()).collect(Collectors.toSet());
-      //todo: handle rls filters properly
-      return new ZkBasicAuthPrincipal(name,
-          org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
-          tables, excludeTables, permissions, Map.of(), Map.of(), Map.of());
-    }).collect(Collectors.toList());
+          //todo: Handle RLS filters properly
+          return new ZkBasicAuthPrincipal(name,
+              org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
+              tables, excludeTables, permissions, Map.of(), Map.of(), Map.of());
+        }).collect(Collectors.toList());
   }
 
   private static Set<String> extractSet(PinotConfiguration configuration, String key) {
     String input = configuration.getProperty(key);
     if (StringUtils.isNotBlank(input) && !ALL.equals(input)) {
-      return Arrays.stream(input.split(",")).map(String::trim).filter(StringUtils::isNotBlank)
-          .collect(Collectors.toSet());
+      return Arrays.stream(input.split(",")).map(String::trim).collect(Collectors.toSet());
     }
     return Collections.emptySet();
   }
