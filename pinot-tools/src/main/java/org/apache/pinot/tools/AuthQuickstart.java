@@ -65,7 +65,7 @@ public class AuthQuickstart extends Quickstart {
     properties.put("pinot.broker.access.control.principals.tableonly.password", "secrettoo");
     properties.put("pinot.broker.access.control.principals.tableonly.tables", "baseballStats");
     properties.put("pinot.broker.access.control.principals.user.tables", "clickstreamFunnel");
-    properties.put("pinot.broker.access.control.principals.user.clickstreamFunnel.rls", "UserId = '123'");
+    properties.put("pinot.broker.access.control.principals.user.clickstreamFunnel.rls", "user_id = '123'");
 
     // server
     properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");

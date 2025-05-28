@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.auth;
 
+import java.util.List;
+
+
 public interface AuthorizationResult {
 
   /**
@@ -33,4 +36,5 @@ public interface AuthorizationResult {
    * @return A string containing the failure message if access is denied, otherwise an empty string or null.
    */
   String getFailureMessage();
+
 }

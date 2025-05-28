@@ -310,14 +310,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControl accessControl = _accessControlFactory.create();
       MultiTableRowColAuthResult rowColFilters = accessControl.getRowColFilters(requesterIdentity, tables);
       for (String tableName : tables) {
-        Optional<List<String>> rlsFilterForTableMaybe = rowColFilters.getRLSFilterForTable(tableName);
+        Optional<Map<String, List<String>>> rlsFilterForTableMaybe = rowColFilters.getRLSFilterForTable(tableName);
         if (rlsFilterForTableMaybe.isPresent()) {
-          List<String> rowFilters = rlsFilterForTableMaybe.get();
+          Map<String, List<String>> rowFilters = rlsFilterForTableMaybe.get();
           StringBuilder sb = new StringBuilder();
-          for (int i = 0; i < rowFilters.size(); i++) {
-            sb.append(rowFilters.get(i));
-            if (i < rowFilters.size() - 1) {
-              sb.append(" AND ");
+
+          for (String policyId : rowFilters.keySet()) {
+            List<String> filters = rowFilters.get(policyId);
+            for (int i = 0; i < filters.size(); i++) {
+              sb.append(filters.get(i));
+              if (i < filters.size() - 1) {
+                sb.append(" AND ");
+              }
             }
           }
           String key = String.format("%s-%s",CommonConstants.RLS_FILTERS,tableName);

@@ -137,9 +137,11 @@ public interface AccessControl extends FineGrainedAccessControl {
    */
   default TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
     if (table.equals("upsertMeetupRsvp")) {
-      return new TableRowColAuthResultImpl(List.of("event_id > 60", "event_id < 70"), List.of(), List.of());
+      return new TableRowColAuthResultImpl(Map.of("policyID1", List.of("event_id > 60", "event_id < 70")), Map.of(),
+          Map.of());
     } else if (table.equals("upsertPartialMeetupRsvp")) {
-      return new TableRowColAuthResultImpl(List.of("event_id > 60", "event_id < 70"), List.of(), List.of());
+      return new TableRowColAuthResultImpl(Map.of("policyID1", List.of("event_id > 60", "event_id < 70")), Map.of(),
+          Map.of());
     }
     return TableRowColAuthResultImpl.unrestricted();
   }
@@ -153,9 +155,9 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @return {@link MultiTableRowColAuthResult} with the result of the access control check.
    */
   default MultiTableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, Set<String> tables) {
-    Map<String, List<String>> rlsFilters = new HashMap<>();
+    Map<String, Map<String, List<String>>> rlsFilters = new HashMap<>();
     for (String table : tables) {
-      Optional<List<String>> rlsFiltersMaybe = getRowColFilters(requesterIdentity, table).getRLSFilters();
+      Optional<Map<String, List<String>>> rlsFiltersMaybe = getRowColFilters(requesterIdentity, table).getRLSFilters();
       rlsFiltersMaybe.ifPresent(rlsFilterList -> rlsFilters.put(table, rlsFilterList));
     }
     return new MultiTableRowColAuthResultImpl(rlsFilters);

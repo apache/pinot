@@ -916,14 +916,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Map<String, String> queryOptions =
         pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
 
-    Optional<List<String>> rlsFiltersMaybe = rlsFilters.getRLSFilters();
+    Optional<Map<String, List<String>>> rlsFiltersMaybe = rlsFilters.getRLSFilters();
     if (rlsFiltersMaybe.isPresent()) {
-      List<String> rowFilters = rlsFiltersMaybe.get();
+      Map<String, List<String>> rowFilters = rlsFiltersMaybe.get();
       StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < rowFilters.size(); i++) {
-        sb.append(rowFilters.get(i));
-        if (i < rowFilters.size() - 1) {
-          sb.append(" AND ");
+      for (String policyId : rowFilters.keySet()) {
+        List<String> filters = rowFilters.get(policyId);
+        for (int i = 0; i < filters.size(); i++) {
+          sb.append(filters.get(i));
+          if (i < filters.size() - 1) {
+            sb.append(" AND ");
+          }
         }
       }
       queryOptions.put(tableName, sb.toString());

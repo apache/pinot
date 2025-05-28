@@ -76,7 +76,7 @@ public final class BasicAuthUtils {
       Set<String> permissions = extractSet(configuration, prefix + "." + name + "." + PERMISSIONS);
 
       // Extract RLS filters
-      Map<String, List<String>> tableRlsFilters = new HashMap<>(); // Changed to Map<String, List<String>>
+      Map<String, Map<String, List<String>>> tableRlsFilters = new HashMap<>(); // Changed to Map<String, List<String>>
       if (!tables.isEmpty()) {
         for (String tableName : tables) {
           String rlsFilterKey = prefix + "." + name + "." + tableName + "." + RLS_FILTER;
@@ -87,7 +87,7 @@ public final class BasicAuthUtils {
                 .filter(StringUtils::isNotBlank) // Ensure individual filters are not blank
                 .collect(Collectors.toList());
             if (!rlsFilterList.isEmpty()) {
-              tableRlsFilters.put(tableName, rlsFilterList);
+              tableRlsFilters.put(tableName, Map.of(rlsFilterKey, rlsFilterList));
             }
           }
         }

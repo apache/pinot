@@ -35,13 +35,13 @@ public class BasicAuthPrincipal {
   private final Set<String> _excludeTables;
   private final Set<String> _permissions;
   //key: table name, val: list of RLS filters applicable for that table.
-  private final Map<String, List<String>> _rlsFilters;
-  private final Map<String, List<String>> _visibleCols;
-  private final Map<String, List<String>> _maskedCols;
+  private final Map<String, Map<String, List<String>>> _rlsFilters;
+  private final Map<String, Map<String, List<String>>> _visibleCols;
+  private final Map<String, Map<String, List<String>>> _maskedCols;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
-      Set<String> permissions, Map<String, List<String>> rlsFilters, Map<String, List<String>> visibleCols,
-      Map<String, List<String>> maskedCols) {
+      Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters,
+      Map<String, Map<String, List<String>>> visibleCols, Map<String, Map<String, List<String>>> maskedCols) {
     _name = name;
     _token = token;
     _tables = tables;
@@ -85,15 +85,15 @@ public class BasicAuthPrincipal {
    * @return An {@link java.util.Optional} containing the RLS filter string if configured for this principal and table,
    * otherwise {@link java.util.Optional#empty()}.
    */
-  public Optional<List<String>> getRLSFilters(String tableName) {
+  public Optional<Map<String, List<String>>> getRLSFilters(String tableName) {
     return Optional.ofNullable(_rlsFilters.get(tableName));
   }
 
-  public Optional<List<String>> getVisibleCols(String tableName) {
+  public Optional<Map<String, List<String>>> getVisibleCols(String tableName) {
     return Optional.ofNullable(_visibleCols.get(tableName));
   }
 
-  public Optional<List<String>> getMaskedCols(String tableName) {
+  public Optional<Map<String, List<String>>> getMaskedCols(String tableName) {
     return Optional.ofNullable(_maskedCols.get(tableName));
   }
 

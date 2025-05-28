@@ -1,40 +1,58 @@
 package org.apache.pinot.spi.auth;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import lombok.Builder;
 
 
 public class TableRowColAuthResultImpl implements TableRowColAuthResult {
 
   private static final TableRowColAuthResult UNRESTRICTED = new TableRowColAuthResultImpl();
 
-  private List<String> _rlsFilters;
-  private List<String> _visibleCols;
-  private List<String> _maskedCols;
+  private Map<String, List<String>> _rlsFilters;
+  private Map<String, List<String>> _visibleCols;
+  private Map<String, List<String>> _maskedCols;
 
   public TableRowColAuthResultImpl() {
 
   }
 
-  public TableRowColAuthResultImpl(List<String> rlsFilters, List<String> visibleCols, List<String> maskedCols) {
+  public TableRowColAuthResultImpl(Map<String, List<String>> maskedCols, Map<String, List<String>> visibleCols,
+      Map<String, List<String>> rlsFilters) {
     _rlsFilters = rlsFilters;
-    _visibleCols = visibleCols;
     _maskedCols = maskedCols;
+    _visibleCols = visibleCols;
+  }
+
+  public TableRowColAuthResult setVisibleCols(Map<String, List<String>> visibleCols) {
+    _visibleCols = visibleCols;
+    return this;
   }
 
   @Override
-  public Optional<List<String>> getRLSFilters() {
+  public TableRowColAuthResult setMaskedCols(Map<String, List<String>> maskedCols) {
+    _maskedCols = maskedCols;
+    return this;
+  }
+
+  @Override
+  public TableRowColAuthResult setRLSFilters(Map<String, List<String>> rlsFilters) {
+    _rlsFilters = rlsFilters;
+    return this;
+  }
+
+  @Override
+  public Optional<Map<String, List<String>>> getRLSFilters() {
     return Optional.ofNullable(_rlsFilters);
   }
 
   @Override
-  public Optional<List<String>> visibleColumns() {
+  public Optional<Map<String, List<String>>> visibleColumns() {
     return Optional.ofNullable(_visibleCols);
   }
 
   @Override
-  public Optional<List<String>> maskedColumns() {
+  public Optional<Map<String, List<String>>> maskedColumns() {
     return Optional.ofNullable(_maskedCols);
   }
 

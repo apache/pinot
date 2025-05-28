@@ -7,14 +7,14 @@ import java.util.Optional;
 
 public class MultiTableRowColAuthResultImpl implements MultiTableRowColAuthResult {
 
-  private Map<String, List<String>> _rlsFilters;
+  private Map<String, Map<String, List<String>>> _rlsFilters;
 
-  public MultiTableRowColAuthResultImpl(Map<String, List<String>> rlsFilters) {
+  public MultiTableRowColAuthResultImpl(Map<String, Map<String, List<String>>> rlsFilters) {
     _rlsFilters = rlsFilters;
   }
 
   @Override
-  public Optional<List<String>> getRLSFilterForTable(String tableName) {
+  public Optional<Map<String, List<String>>> getRLSFilterForTable(String tableName) {
     return Optional.ofNullable(_rlsFilters.get(tableName));
   }
 }

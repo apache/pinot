@@ -20,7 +20,6 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -105,14 +104,10 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       Set<String> failedTables = new HashSet<>();
-      Map<String, List<String>> tableRLSFilters = new HashMap<>();
 
       if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
         failedTables.add(brokerRequest.getQuerySource().getTableName());
       }
-
-      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(brokerRequest.getQuerySource().getTableName());
-      rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(brokerRequest.getQuerySource().getTableName(), strings));
 
       return new TableAuthorizationResult(failedTables);
     }
@@ -130,14 +125,10 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
       BasicAuthPrincipal principal = principalOpt.get();
       Set<String> failedTables = new HashSet<>();
-      Map<String, List<String>> tableRLSFilters = new HashMap<>();
       for (String table : tables) {
         if (!principal.hasTable(table)) {
           failedTables.add(table);
         }
-        //check if RLS filters have been defined for this table
-        Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
-        rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(table, strings));
       }
       return new TableAuthorizationResult(failedTables);
     }
@@ -154,7 +145,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return TableRowColAuthResultImpl.unrestricted();
       }
 
-//      TableRowColAuthResultImpl.TableRowColAuthResultImplBuilder builder = TableRowColAuthResultImpl.builder();
+      TableRowColAuthResult tableRowColAuthResult = new TableRowColAuthResultImpl();
 
       BasicAuthPrincipal principal = principalOpt.get();
 
@@ -162,15 +153,15 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Preconditions.checkArgument(principal.hasTable(table),
           "Principal: " + principal.getName() + " does not have access to table: " + table);
 
-      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
-      Optional<List<String>> visibleColsMaybe = principal.getVisibleCols(table);
-      Optional<List<String>> maskedColsMaybe = principal.getMaskedCols(table);
+      Optional<Map<String, List<String>>> rlsFiltersMaybe = principal.getRLSFilters(table);
+      Optional<Map<String, List<String>>> visibleColsMaybe = principal.getVisibleCols(table);
+      Optional<Map<String, List<String>>> maskedColsMaybe = principal.getMaskedCols(table);
 
-//      rlsFiltersMaybe.ifPresent(builder::_rlsFilters);
-//      visibleColsMaybe.ifPresent(builder::_visibleCols);
-//      maskedColsMaybe.ifPresent(builder::_maskedCols);
+      rlsFiltersMaybe.ifPresent(tableRowColAuthResult::setRLSFilters);
+      visibleColsMaybe.ifPresent(tableRowColAuthResult::setVisibleCols);
+      maskedColsMaybe.ifPresent(tableRowColAuthResult::setMaskedCols);
 
-      return null;
+      return tableRowColAuthResult;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
