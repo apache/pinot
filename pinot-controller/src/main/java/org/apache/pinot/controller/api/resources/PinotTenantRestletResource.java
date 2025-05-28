@@ -686,7 +686,8 @@ public class PinotTenantRestletResource {
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true, example = "1")
+      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true, example =
+          "1")
       @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
       @ApiParam(value =
           "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are allowed in this tenant rebalance"
