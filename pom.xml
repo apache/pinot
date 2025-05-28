@@ -866,6 +866,7 @@
         <type>test-jar</type>
       </dependency>
 
+      <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
       <!-- arrow bom -->
       <dependency>
         <groupId>org.apache.arrow</groupId>
@@ -1039,6 +1040,7 @@
         <version>${log4j.version}</version>
       </dependency>
 
+      <!-- We don't use slf4j but slf4j2. Including it here to support old libraries such as Spark 2.4 -->
       <!-- slf4j bom -->
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -1840,10 +1842,19 @@
         <version>${woodstox.version}</version>
       </dependency>
       <!-- Used by Hadoop and Spark -->
-      <!-- set of libraries -->
       <dependency>
         <groupId>org.apache.curator</groupId>
-        <artifactId>apache-curator</artifactId>
+        <artifactId>curator-client</artifactId>
+        <version>${curator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.curator</groupId>
+        <artifactId>curator-framework</artifactId>
+        <version>${curator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.curator</groupId>
+        <artifactId>curator-recipes</artifactId>
         <version>${curator.version}</version>
       </dependency>
 
