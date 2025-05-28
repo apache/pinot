@@ -162,8 +162,14 @@ public class QueryThreadContext {
 
   public static CloseableContext open(String serviceId) {
     CloseableContext open = open((Memento) null);
-    setServiceId(serviceId);
+    get()._serviceId = serviceId;
     return open;
+  }
+
+  /// Just kept for backward compatibility.
+  @Deprecated
+  public static CloseableContext openFromRequestMetadata(Map<String, String> requestMetadata) {
+    return openFromRequestMetadata("unknown", requestMetadata);
   }
 
   public static CloseableContext openFromRequestMetadata(String instanceId, Map<String, String> requestMetadata) {
@@ -433,17 +439,6 @@ public class QueryThreadContext {
    */
   public static String getServiceId() {
     return get().getServiceId();
-  }
-
-  /**
-   * Sets the serviceId of the query.
-   *
-   * The serviceId can only be set once.
-   * @throws IllegalStateException if seviceId is already set or if the {@link QueryThreadContext} is not
-   * initialized
-   */
-  public static void setServiceId(String serviceId) {
-    get().setServiceId(serviceId);
   }
 
   /**
