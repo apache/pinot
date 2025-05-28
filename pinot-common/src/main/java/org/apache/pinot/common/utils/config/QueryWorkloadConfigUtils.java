@@ -21,9 +21,9 @@ package org.apache.pinot.common.utils.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -99,7 +99,7 @@ public class QueryWorkloadConfigUtils {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
     Preconditions.checkNotNull(instanceCost, "InstanceCost cannot be null");
     try {
-      znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadName);
+      znRecord.setSimpleField(QueryWorkloadRefreshMessage.QUERY_WORKLOAD_NAME, queryWorkloadName);
       znRecord.setSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST, JsonUtils.objectToString(instanceCost));
     } catch (Exception e) {
       String errorMessage = String.format("Failed to convert InstanceCost : %s to ZNRecord",

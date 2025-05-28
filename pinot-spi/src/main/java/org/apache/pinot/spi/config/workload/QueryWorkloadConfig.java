@@ -25,9 +25,45 @@ import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
- * Class to represent the query workload configuration.
- * A QueryWorkload is applied to a collection of queries at the Helix Cluster Level, queries specify the workload they
- * belong to by specifying the query workload name in the query options
+ * Represents the configuration for a named query workload in a Pinot Helix cluster.
+ * <p>
+ * A QueryWorkload groups a set of nodes and associated configuration parameters under a single workload name.
+ * Workloads are applied at the cluster level: individual queries specify the workload they belong to by
+ * providing the workload name in their query options. This allows us to manage and enforce isolation by limiting
+ * the resources available to queries based on their workload classification.
+ * </p>
+ * <p><strong>Example:</strong></p>
+ * <pre>{@code
+ * {
+ *   "queryWorkloadName": "analytics",
+ *   "nodeConfigs": [
+ *     {
+ *       "nodeType": "leafNode",
+ *       "enforcementProfile": {
+ *        "cpuCostNs": 1000000,
+ *        "memoryCostBytes": 10000000
+ *       },
+ *       "propagationScheme": {
+ *         "propagationType": "TABLE",
+ *         "values": ["airlineStats"]
+ *       }
+ *      },
+ *     {
+ *       "nodeType": "nonLeafNode",
+ *       "enforcementProfile": {
+ *        "cpuCostNs": 2000000,
+ *        "memoryCostBytes": 20000000
+ *       },
+ *       "propagationScheme": {
+ *        "propagationType": "TENANT",
+ *        "values": ["tenantA", "tenantB"]
+ *       }
+ *     }
+ *   ]
+ * }
+ * }</pre>
+ *
+ * @see NodeConfig
  */
 public class QueryWorkloadConfig extends BaseJsonConfig {
 
@@ -41,16 +77,32 @@ public class QueryWorkloadConfig extends BaseJsonConfig {
   private List<NodeConfig> _nodeConfigs;
 
   @JsonCreator
+  /**
+   * Constructs a new QueryWorkloadConfig instance.
+   *
+   * @param queryWorkloadName unique name identifying this workload across the cluster
+   * @param nodeConfigs list of per-node configurations for this workload
+   */
   public QueryWorkloadConfig(@JsonProperty(QUERY_WORKLOAD_NAME) String queryWorkloadName,
       @JsonProperty(NODE_CONFIGS) List<NodeConfig> nodeConfigs) {
     _queryWorkloadName = queryWorkloadName;
     _nodeConfigs = nodeConfigs;
   }
 
+  /**
+   * Returns the unique name of this query workload.
+   *
+   * @return the workload name used by queries to specify this workload
+   */
   public String getQueryWorkloadName() {
     return _queryWorkloadName;
   }
 
+  /**
+   * Returns the list of node-specific configurations for this workload.
+   *
+   * @return list of NodeConfig objects for this workload
+   */
   public List<NodeConfig> getNodeConfigs() {
     return _nodeConfigs;
   }

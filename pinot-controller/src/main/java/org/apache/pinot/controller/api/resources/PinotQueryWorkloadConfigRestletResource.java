@@ -38,7 +38,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -85,7 +84,7 @@ public class PinotQueryWorkloadConfigRestletResource {
       LOGGER.info("Received request to get all queryWorkloadConfigs");
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
       if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, "No workload configs found", Response.Status.NOT_FOUND, null);
+        return JsonUtils.objectToString(Map.of());
       }
       String response = JsonUtils.objectToString(queryWorkloadConfigs);
       LOGGER.info("Successfully fetched all queryWorkloadConfigs");

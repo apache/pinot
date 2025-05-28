@@ -4792,7 +4792,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
           + queryWorkloadConfig.getQueryWorkloadName());
     }
-    _queryWorkloadManager.propagateWorkload(queryWorkloadConfig);
+    _queryWorkloadManager.propagateWorkloadUpdateMessage(queryWorkloadConfig);
   }
 
   public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
@@ -4812,6 +4812,12 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteQueryWorkloadConfig(String workload) {
+    QueryWorkloadConfig queryWorkloadConfig = getQueryWorkloadConfig(workload);
+    if (queryWorkloadConfig == null) {
+      LOGGER.warn("Query workload config for {} does not exist, skipping deletion", workload);
+      return;
+    }
+    _queryWorkloadManager.propagateDeleteWorkloadMessage(queryWorkloadConfig);
     ZKMetadataProvider.deleteQueryWorkloadConfig(_propertyStore, workload);
   }
 

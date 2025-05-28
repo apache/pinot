@@ -19,6 +19,7 @@
 package org.apache.pinot.common.messages;
 
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.spi.config.workload.InstanceCost;
@@ -31,14 +32,17 @@ import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
  */
 public class QueryWorkloadRefreshMessage extends Message {
   public static final String REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE = "REFRESH_QUERY_WORKLOAD";
+  public static final String DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE = "DELETE_QUERY_WORKLOAD";
+  public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
   public static final String INSTANCE_COST = "instanceCost";
 
   /**
    * Constructor for the sender.
    */
-  public QueryWorkloadRefreshMessage(String queryWorkloadName, InstanceCost instanceCost) {
+  public QueryWorkloadRefreshMessage(String queryWorkloadName, String messageSubType,
+                                     @Nullable InstanceCost instanceCost) {
     super(Message.MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
-    setMsgSubType(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE);
+    setMsgSubType(messageSubType);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
     QueryWorkloadConfigUtils.updateZNRecordWithInstanceCost(getRecord(), queryWorkloadName, instanceCost);
@@ -49,8 +53,9 @@ public class QueryWorkloadRefreshMessage extends Message {
    */
   public QueryWorkloadRefreshMessage(Message message) {
     super(message.getRecord());
-    if (!message.getMsgSubType().equals(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-      throw new IllegalArgumentException("Invalid message subtype:" + message.getMsgSubType());
+    if (!message.getMsgSubType().equals(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)
+        || !message.getMsgSubType().equals(DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+      throw new IllegalArgumentException("Unknown message subtype:" + message.getMsgSubType());
     }
   }
 

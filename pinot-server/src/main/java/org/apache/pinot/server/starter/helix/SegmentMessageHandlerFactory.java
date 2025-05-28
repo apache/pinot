@@ -31,7 +31,6 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
@@ -43,7 +42,6 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +74,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
-      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
-        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -271,32 +267,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
       _logger.error("onError: {}, {}", errorType, errorCode, e);
-    }
-  }
-
-  private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
-    final String _queryWorkloadName;
-    final InstanceCost _instanceCost;
-
-    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
-        NotificationContext context) {
-      super(queryWorkloadRefreshMessage, context);
-      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
-      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
-    }
-
-    @Override
-    public HelixTaskResult handleMessage() {
-      // TODO: Add logic to invoke the query workload manager to refresh the query workload config
-      HelixTaskResult result = new HelixTaskResult();
-      result.setSuccess(true);
-      return result;
-    }
-
-    @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
-          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 }

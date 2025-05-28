@@ -851,7 +851,7 @@ public class ZKMetadataProvider {
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
             CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
     if (znRecords == null) {
-      return null;
+      return Collections.emptyList();
     }
     int numZNRecords = znRecords.size();
     List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);

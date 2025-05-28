@@ -71,6 +71,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
         return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
       case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
+      case QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE:
         return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
@@ -249,7 +250,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
     @Override
     public HelixTaskResult handleMessage() {
-      // TODO: Add logic to invoke the query workload manager to refresh the query workload config
+      // TODO: Add logic to invoke the query workload manager to refresh/delete the query workload config
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
       return result;

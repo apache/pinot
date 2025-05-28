@@ -87,7 +87,16 @@ public class PropagationUtils {
     if (tableType == TableType.OFFLINE) {
       tags.add(TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer()));
     } else {
-      tags.add(TagNameUtils.getRealtimeTagForTenant(tenantConfig.getServer()));
+      // Returns the realtime tag if completed server tag is not set
+      String completedServerTag = TagNameUtils.extractCompletedServerTag(tenantConfig);
+      // Returns the realtime tag if consuming server tag is not set
+      String consumingServerTag = TagNameUtils.extractConsumingServerTag(tenantConfig);
+      if (completedServerTag.equals(consumingServerTag)) {
+        tags.add(completedServerTag);
+      } else {
+        tags.add(consumingServerTag);
+        tags.add(completedServerTag);
+      }
     }
   }
 

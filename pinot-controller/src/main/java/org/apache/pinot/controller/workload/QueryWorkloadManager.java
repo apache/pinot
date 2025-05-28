@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -64,7 +63,7 @@ public class QueryWorkloadManager {
    * 2. Calculate the instance cost for each instance
    * 3. Send the {@link QueryWorkloadRefreshMessage} to the instances
    */
-  public void propagateWorkload(QueryWorkloadConfig queryWorkloadConfig) {
+  public void propagateWorkloadUpdateMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
       // Resolve the instances based on the node type and propagation scheme
@@ -79,9 +78,31 @@ public class QueryWorkloadManager {
       // Calculate the instance cost for each instance
       Map<String, InstanceCost> instanceCostMap = _costSplitter.computeInstanceCostMap(nodeConfig, instances);
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
-              .collect(Collectors.toMap(Map.Entry::getKey,
-                      entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
+          .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRefreshMessage(queryWorkloadName,
+              QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE, entry.getValue())));
       // Send the QueryWorkloadRefreshMessage to the instances
+      _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+    }
+  }
+
+  /**
+   * Propagate delete workload refresh message for the given queryWorkloadConfig
+   * @param queryWorkloadConfig The query workload configuration to delete
+   * 1. Resolve the instances based on the node type and propagation scheme
+   * 2. Send the {@link QueryWorkloadRefreshMessage} with DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE to the instances
+   */
+  public void propagateDeleteWorkloadMessage(QueryWorkloadConfig queryWorkloadConfig) {
+    String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
+    for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
+      Set<String> instances = resolveInstances(nodeConfig);
+      if (instances.isEmpty()) {
+        String errorMsg = String.format("No instances found for Workload: %s", queryWorkloadName);
+        LOGGER.warn(errorMsg);
+        continue;
+      }
+      Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instances.stream()
+          .collect(Collectors.toMap(instance -> instance, instance -> new QueryWorkloadRefreshMessage(queryWorkloadName,
+              QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE, null)));
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
     }
   }
@@ -109,7 +130,7 @@ public class QueryWorkloadManager {
           PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags, queryWorkloadConfigs);
       // Propagate the workload for each QueryWorkloadConfig
       for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
-        propagateWorkload(queryWorkloadConfig);
+        propagateWorkloadUpdateMessage(queryWorkloadConfig);
       }
     } catch (Exception e) {
       String errorMsg = String.format("Failed to propagate workload for table: %s", tableName);
