@@ -262,8 +262,7 @@ public class DataTableSerDeTest {
   }
 
   @Test(dataProvider = "versionProvider")
-  public void testExecutionThreadCpuTimeNs(int dataTableVersion)
-      throws IOException {
+  public void testThreadCPUMemMeasurement(int dataTableVersion) throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
@@ -276,25 +275,32 @@ public class DataTableSerDeTest {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
 
+    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     DataTable dataTable = dataTableBuilder.build();
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
+    Assert.assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    Assert.assertTrue(
+        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName())) > 0);
 
     // Disable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
-    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    dataTable = dataTableBuilder.build();
+    newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     // When ThreadCpuTimeMeasurement is disabled, no value for
     // threadCpuTimeNs/systemActivitiesCpuTimeNs/responseSerializationCpuTimeNs.
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
     Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName()));
-
-    // Enable ThreadCpuTimeMeasurement, serialize/de-serialize data table.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
-    newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
-    // When ThreadCpuTimeMeasurement is enabled, value of responseSerializationCpuTimeNs is not 0.
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_CPU_TIME_NS.getName()));
-    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName()));
-    Assert.assertTrue(
-        Integer.parseInt(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName())) > 0);
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName()));
+    Assert.assertNull(newDataTable.getMetadata().get(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName()));
   }
 
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
