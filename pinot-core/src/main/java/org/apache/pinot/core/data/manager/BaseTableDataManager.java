@@ -52,7 +52,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -147,7 +146,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
-  protected TableConfigAndSchemaCache _tableConfigAndSchemaCache;
+  // Caches the latest TableConfig and Schema pair. The cache should not be modified.
+  protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
 
   protected volatile boolean _shutDown;
 
@@ -190,9 +190,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    _tableConfigAndSchemaCache = TableConfigAndSchemaCache.getInstance();
-    _tableConfigAndSchemaCache.setTableConfig(tableConfig);
-    _tableConfigAndSchemaCache.setSchema(_tableNameWithType, schema);
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -385,18 +383,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public IndexLoadingConfig fetchIndexLoadingConfig() {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig,
-            _tableConfigAndSchemaCache.getLatestTableConfig(_tableNameWithType),
-            _tableConfigAndSchemaCache.getLatestSchema(_tableNameWithType));
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
     return indexLoadingConfig;
+  }
+
+  public void refreshCachedTableSchema() {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    // Update the cached table config and schema with the latest schema
+    TableConfig tableConfig = _cachedTableConfigAndSchema.getLeft();
+    if (tableConfig == null) {
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    }
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
-    return Pair.of(
-        _tableConfigAndSchemaCache.getTableConfig(_tableNameWithType),
-        _tableConfigAndSchemaCache.getSchema(_tableNameWithType));
+    return _cachedTableConfigAndSchema;
   }
 
   @Override
@@ -1374,7 +1385,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     for (String columnName : segmentPhysicalColumns) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
       FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
-      DataSource source = segment.getDataSource(columnName);
+      DataSource source = segment.getDataSource(columnName, _cachedTableConfigAndSchema.getRight());
       Preconditions.checkNotNull(columnMetadata);
       Preconditions.checkNotNull(source);
 

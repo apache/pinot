@@ -85,23 +85,24 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext queryContext) {
     if (segments.isEmpty()) {
       return segments;
     }
-    if (!query.isEnablePrefetch()) {
-      return super.prune(segments, query);
+    if (!queryContext.isEnablePrefetch()) {
+      return super.prune(segments, queryContext);
     }
-    return prefetch(segments, query, fetchContexts -> {
+    return prefetch(segments, queryContext, fetchContexts -> {
       int numSegments = segments.size();
-      FilterContext filter = Objects.requireNonNull(query.getFilter());
+      FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
       ValueCache cachedValues = new ValueCache();
       Map<String, DataSource> dataSourceCache = new HashMap<>();
       List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
       for (int i = 0; i < numSegments; i++) {
         dataSourceCache.clear();
         IndexSegment segment = segments.get(i);
-        if (!pruneSegmentWithFetchContext(segment, fetchContexts[i], filter, dataSourceCache, cachedValues)) {
+        if (!pruneSegmentWithFetchContext(segment, fetchContexts[i], filter, dataSourceCache, cachedValues,
+            queryContext)) {
           selectedSegments.add(segment);
         }
       }
@@ -144,7 +145,7 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
         dataSourceCache.clear();
         IndexSegment segment = segments.get(i);
         FetchContext fetchContext = fetchContexts == null ? null : fetchContexts[i];
-        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues)) {
+        if (!pruneSegmentWithFetchContext(segment, fetchContext, filter, dataSourceCache, cachedValues, queryContext)) {
           selectedSegments.add(segment);
         }
       }
@@ -189,13 +190,13 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   }
 
   private boolean pruneSegmentWithFetchContext(IndexSegment segment, FetchContext fetchContext, FilterContext filter,
-      Map<String, DataSource> dataSourceCache, ValueCache cachedValues) {
+      Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext queryContext) {
     if (fetchContext == null) {
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues);
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, queryContext);
     }
     try {
       segment.acquire(fetchContext);
-      return pruneSegment(segment, filter, dataSourceCache, cachedValues);
+      return pruneSegment(segment, filter, dataSourceCache, cachedValues, queryContext);
     } finally {
       segment.release(fetchContext);
     }
@@ -203,12 +204,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
 
   @Override
   boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
-      ValueCache cachedValues) {
+      ValueCache cachedValues, QueryContext queryContext) {
     Predicate.Type predicateType = predicate.getType();
     if (predicateType == Predicate.Type.EQ) {
-      return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues, queryContext);
     } else if (predicateType == Predicate.Type.IN) {
-      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, queryContext);
     } else {
       return false;
     }
@@ -218,10 +219,10 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
    * For EQ predicate, prune the segments based on column bloom filter.
    */
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext queryContext) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
-        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
+    dataSourceCache.putIfAbsent(column, dataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -236,15 +237,16 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
    * NOTE: segments will not be pruned if the number of values is greater than the threshold.
    */
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext queryContext) {
     List<String> values = inPredicate.getValues();
     // Skip pruning when there are too many values in the IN predicate
     if (values.size() > _inPredicateThreshold) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
-        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column, queryContext.getSchema())
+        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, queryContext.getSchema()));
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();

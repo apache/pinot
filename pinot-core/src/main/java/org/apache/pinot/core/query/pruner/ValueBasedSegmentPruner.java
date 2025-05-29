@@ -98,17 +98,17 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   abstract boolean isApplicableToPredicate(Predicate predicate);
 
   @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext queryContext) {
     if (segments.isEmpty()) {
       return segments;
     }
-    FilterContext filter = Objects.requireNonNull(query.getFilter());
+    FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
     ValueCache cachedValues = new ValueCache();
     Map<String, DataSource> dataSourceCache = new HashMap<>();
     List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
     for (IndexSegment segment : segments) {
       dataSourceCache.clear();
-      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues)) {
+      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, queryContext)) {
         selectedSegments.add(segment);
       }
     }
@@ -116,18 +116,18 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   }
 
   protected boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
-      ValueCache cachedValues) {
+      ValueCache cachedValues, QueryContext queryContext) {
     switch (filter.getType()) {
       case AND:
         for (FilterContext child : filter.getChildren()) {
-          if (pruneSegment(segment, child, dataSourceCache, cachedValues)) {
+          if (pruneSegment(segment, child, dataSourceCache, cachedValues, queryContext)) {
             return true;
           }
         }
         return false;
       case OR:
         for (FilterContext child : filter.getChildren()) {
-          if (!pruneSegment(segment, child, dataSourceCache, cachedValues)) {
+          if (!pruneSegment(segment, child, dataSourceCache, cachedValues, queryContext)) {
             return false;
           }
         }
@@ -141,14 +141,14 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
           return false;
         }
-        return pruneSegmentWithPredicate(segment, predicate, dataSourceCache, cachedValues);
+        return pruneSegmentWithPredicate(segment, predicate, dataSourceCache, cachedValues, queryContext);
       default:
         throw new IllegalStateException();
     }
   }
 
   abstract boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate,
-      Map<String, DataSource> dataSourceCache, ValueCache cachedValues);
+      Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext queryContext);
 
   protected static Comparable convertValue(String stringValue, DataType dataType) {
     try {

@@ -59,7 +59,6 @@ import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -703,9 +702,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
-    // init after connecting to Helix
-    TableConfigAndSchemaCache.init(_helixManager.getHelixPropertyStore());
-
 
     // Start a background task to monitor Helix message count
     int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
@@ -875,7 +871,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
     _adminApiApplication.stop();
-    TableConfigAndSchemaCache.shutdown();
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 

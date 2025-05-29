@@ -137,6 +137,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
 
+  SCHEMA_REFRESH_FAILURES("tables", false, "Number of schema refresh failures"),
+
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.

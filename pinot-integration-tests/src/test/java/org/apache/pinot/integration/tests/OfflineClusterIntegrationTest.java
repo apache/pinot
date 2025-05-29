@@ -4066,24 +4066,50 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testSegmentReload() {
+    try {
+      // Reload a single segment in the offline table
+      String segmentName = listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0);
+      String response = reloadOfflineSegment(DEFAULT_TABLE_NAME + "_OFFLINE", segmentName, true);
+      JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      String jobId = statusString.substring(startIdx, endIdx).trim();
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return isReloadJobCompleted(jobId);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 600_000L, "Reload job did not complete in 10 minutes");
+    } catch (Exception e) {
+      fail("Segment reload failed with exception: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void testVirtualColumnWithPartialReload() throws Exception {
     Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
     // Pick any existing INT column name for the “valid” cases
     String validColumnName = oldSchema.getAllFieldSpecs().stream()
-            .filter(fs -> fs.getDataType() == DataType.INT)
-            .findFirst()
-            .get()
-            .getName();
+        .filter(fs -> fs.getDataType() == DataType.INT)
+        .findFirst()
+        .get()
+        .getName();
     //  New column name that is not in the schema
     String newColumn = "newColumn";
     DataType newdataType = DataType.INT;
     // Test queries
     List<String> queries = List.of(
-            SELECT_STAR_QUERY,
-            SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
-            SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
-            SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
-            "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
+        SELECT_STAR_QUERY,
+        SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
+        SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
+        SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
+        "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
     );
     for (String query: queries) {
       try {
@@ -4099,10 +4125,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
         // Partially reload one segment
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
-                listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
-        // Column should show up
+            listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+        // Column should show since it would be added as a virtual column
         runQueryAndAssert(query, newColumn, newFieldSpec);
-        // Now do a full reload and the column shows up
+        // Now do a full reload and the column should still be there, indicating there is no regression
         reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
         runQueryAndAssert(query, newColumn, newFieldSpec);
       } finally {
@@ -4123,8 +4149,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Keep insertion order – helps when debugging.
       Map<String, FieldSpec> newCols = new LinkedHashMap<>();
       List<DataType> newDataTypes = List.of(
-              DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE,
-              DataType.STRING, DataType.BOOLEAN, DataType.BYTES);
+          DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE,
+          DataType.STRING, DataType.BOOLEAN, DataType.BYTES);
       for (DataType dt : newDataTypes) {
         String col = "col_" + dt.name().toLowerCase();
         FieldSpec fs = new DimensionFieldSpec(col, dt, true);
@@ -4135,14 +4161,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       updateSchema(newSchema);
 
       // Reload segment.
-      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
 
-      // Grab a handful of rows with all columns.
-      JsonNode res = postQuery("SELECT * FROM " + DEFAULT_TABLE_NAME + " LIMIT 10");
+      JsonNode res = postQuery("SELECT * FROM " + DEFAULT_TABLE_NAME + " LIMIT 5000");
       assertNoError(res);
       JsonNode rows = res.get("resultTable").get("rows");
       DataSchema resultSchema =
-              JsonUtils.jsonNodeToObject(res.get("resultTable").get("dataSchema"), DataSchema.class);
+          JsonUtils.jsonNodeToObject(res.get("resultTable").get("dataSchema"), DataSchema.class);
 
       // Verify each new column.
       for (Map.Entry<String, FieldSpec> e : newCols.entrySet()) {
@@ -4150,12 +4175,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         FieldSpec fs = e.getValue();
 
         int idx = IntStream.range(0, resultSchema.size())
-                .filter(i -> resultSchema.getColumnName(i).equals(col))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Column " + col + " missing"));
+            .filter(i -> resultSchema.getColumnName(i).equals(col))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Column " + col + " missing"));
 
-        assertEquals(resultSchema.getColumnDataType(idx).name(), fs.getDataType().name(),
-                "Mismatch in reported type for " + col);
+        Assert.assertEquals(resultSchema.getColumnDataType(idx).name(), fs.getDataType().name(),
+            "Mismatch in reported type for " + col);
 
         for (JsonNode row : rows) {
           String expectedDefault;
@@ -4165,7 +4190,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           } else {
             expectedDefault = fs.getDefaultNullValueString();
           }
-          assertEquals(row.get(idx).asText(), expectedDefault, "Unexpected default value for " + col);
+          Assert.assertEquals(row.get(idx).asText(), expectedDefault, "Unexpected default value for " + col);
         }
       }
     } finally {
@@ -4191,8 +4216,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } else {
       // Full table reload response: structured JSON
       JsonNode tableLevelDetails
-              = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
-      assertEquals(tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText(), "SUCCESS");
+          = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
+      Assert.assertEquals(tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText(), "SUCCESS");
       jobId = tableLevelDetails.get("reloadJobId").asText();
     }
     String finalJobId = jobId;
@@ -4219,39 +4244,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       if (columnNames[columnIndex].equals(newAddedColumn)) {
         columnPresent = true;
         // Check the data type of the new column
-        assertEquals(resultSchema.getColumnDataType(columnIndex).name(), fieldSpec.getDataType().name());
+        Assert.assertEquals(resultSchema.getColumnDataType(columnIndex).name(), fieldSpec.getDataType().name());
         // Check the value of the new column
         for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
-          assertEquals(rows.get(rowIndex).get(columnIndex).asText(), String.valueOf(fieldSpec.getDefaultNullValue()));
+          Assert.assertEquals(rows.get(rowIndex).get(columnIndex).asText(),
+              String.valueOf(fieldSpec.getDefaultNullValue()));
         }
       }
     }
-    assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
-  }
-
-  @Test
-  public void testSegmentReload() {
-    try {
-      // Reload a single segment in the offline table
-      String segmentName = listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0);
-      String response = reloadOfflineSegment(DEFAULT_TABLE_NAME + "_OFFLINE", segmentName, true);
-      JsonNode responseJson = JsonUtils.stringToJsonNode(response);
-
-      // Single segment reload response: status is a string, parse manually
-      String statusString = responseJson.get("status").asText();
-      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
-      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
-      int endIdx = statusString.indexOf(',', startIdx);
-      String jobId = statusString.substring(startIdx, endIdx).trim();
-      TestUtils.waitForCondition(aVoid -> {
-        try {
-          return isReloadJobCompleted(jobId);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, 600_000L, "Reload job did not complete in 10 minutes");
-    } catch (Exception e) {
-      fail("Segment reload failed with exception: " + e.getMessage());
-    }
+    Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
 }

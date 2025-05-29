@@ -32,7 +32,6 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.SchemaUtils;
@@ -172,7 +171,6 @@ public class DimensionTableDataManagerTest {
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableConfigAndSchemaCache.init(propertyStoreMock);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
@@ -289,7 +287,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm the new column does not exist
     FieldSpec teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
-    assertNotNull(teamCitySpec, "Should return spec for existing column");
+    assertNull(teamCitySpec, "Should not return spec for non-existing column");
 
     // Reload the segment with a new column
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();

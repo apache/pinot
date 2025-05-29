@@ -32,7 +32,6 @@ import java.util.function.BiPredicate;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.config.provider.TableConfigAndSchemaCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
@@ -57,8 +56,6 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentPreloadUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreloadUtils.class);
-  private static final TableConfigAndSchemaCache TABLE_CONFIG_AND_SCHEMA_CACHE
-          = TableConfigAndSchemaCache.getInstance();
 
   private SegmentPreloadUtils() {
   }
@@ -206,45 +203,43 @@ public class SegmentPreloadUtils {
     /**
      * Get a virtual data source for the given column in the table.
      *
-     * @param segmentSchema Segment schema for the table has virtual columns like docId, segmentName, hostname
-     * @param tableName Table name could be with or without type suffix
+     *
      * @param column Column name for which the data source is needed
      * @param totalDocCount Total document count for the column
      * @return DataSource for the column
      */
-  public static DataSource getVirtualDataSource(Schema segmentSchema, String tableName, String column,
-                                                int totalDocCount) {
-    assert segmentSchema != null : "Segment Schema should not be null";
-    FieldSpec fieldSpec;
-    Schema tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getSchema(tableName);
-    // First check if the column is present in the segment schema
-    // If not, check if the column is present in the table schema
-    if (segmentSchema.hasColumn(column)) {
-      fieldSpec = segmentSchema.getFieldSpecFor(column);
-    } else {
-      if (!tableSchema.hasColumn(column)) {
-        // Fetch the latest schema from ZK if the column is not present in the table schema
-        tableSchema = TABLE_CONFIG_AND_SCHEMA_CACHE.getLatestSchema(tableName);
+  public static DataSource getVirtualDataSource(Schema tableSchema, String column, int totalDocCount) {
+    FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
+    if (originalFieldSpec == null) {
+      // If the column is not present in the table schema. There could be two possibilities:
+      // 1. Table Schema provided does not have the latest column. We rely on helix-refresh to update the table schema.
+      //     so there could be a delay in the refresh message reaching the server causing this issue.
+      // 2. The column could be an invalid, this is highly unlikely as invalid columns are pruned at broker,
+      LOGGER.warn("Column: {} is not present in the table schema: {}", column, tableSchema.getSchemaName());
+      return null;
+    }
+    // Make a copy of the field spec from the table schema to avoid modifying the original field spec
+    // This is important because the field spec in the table schema is used in different places to infer physical
+    // column and also during segment creation/updates
+    FieldSpec virtualFieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
+        originalFieldSpec.isSingleValueField(), originalFieldSpec.getMaxLength(),
+        originalFieldSpec.getDefaultNullValue(), originalFieldSpec.getMaxLengthExceedStrategy()) {
+      @Override
+      public FieldType getFieldType() {
+        return originalFieldSpec.getFieldType();
       }
-      // Make a copy of the field spec from the table schema to avoid modifying the original field spec
-      // This is important because the field spec in the table schema is used in different places to infer physical
-      // column and also during segment creation/updates
-      FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
-      fieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
-              originalFieldSpec.isSingleValueField()) {
-        @Override
-        public FieldType getFieldType() {
-          return originalFieldSpec.getFieldType();
-        }
-      };
-    }
-    if (!fieldSpec.isVirtualColumn()) {
+      @Override
+      public String getVirtualColumnProvider() {
+        return originalFieldSpec.getVirtualColumnProvider();
+      }
+    };
+    if (!virtualFieldSpec.isVirtualColumn()) {
       // Set the default virtual column provider if it is not set
-      fieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
+      virtualFieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
     }
-    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, totalDocCount);
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(virtualFieldSpec, totalDocCount);
     VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
     return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
-            virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
+        virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
   }
 }

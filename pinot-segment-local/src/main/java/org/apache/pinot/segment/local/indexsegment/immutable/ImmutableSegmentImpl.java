@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -236,15 +237,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public DataSource getDataSource(String column) {
-    DataSource dataSource = _dataSources.get(column);
+  public DataSource getDataSource(String column, Schema schema) {
+    DataSource dataSource = getDataSourceNullable(column);
     if (dataSource == null) {
-      // Populate a virtual data source
-      dataSource = SegmentPreloadUtils.getVirtualDataSource(_segmentMetadata.getSchema(),
-              _segmentMetadata.getTableName(), column, _segmentMetadata.getTotalDocs());
+      dataSource = SegmentPreloadUtils.getVirtualDataSource(schema, column, _segmentMetadata.getTotalDocs());
       _dataSources.put(column, dataSource);
     }
-      return dataSource;
+    return dataSource;
   }
 
   @Override

@@ -62,7 +62,7 @@ public interface IndexSegment {
   Set<String> getPhysicalColumnNames();
 
   /// Returns the [DataSource] for the given column.
-  /// TODO: Revisit all usage of this method to support virtual [DataSource].
+  /// Keeping this around for testing and usage during non query execution code paths.
   default DataSource getDataSource(String column) {
     DataSource dataSource = getDataSourceNullable(column);
     Preconditions.checkState(dataSource != null, "Failed to find data source for column: ", column);
@@ -76,10 +76,9 @@ public interface IndexSegment {
   /// Returns the [DataSource] for the given column, or creates a virtual one if it doesn't exist. The passed in
   /// [Schema] should be the latest schema of the table, not the one from [SegmentMetadata], and should contain the
   /// asked column.
-  /// TODO: Add support for virtual [DataSource].
-  default DataSource getDataSource(String column, Schema schema) {
-    return getDataSource(column);
-  }
+ default DataSource getDataSource(String column, Schema schema) {
+   return getDataSource(column);
+ }
 
   /**
    * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.

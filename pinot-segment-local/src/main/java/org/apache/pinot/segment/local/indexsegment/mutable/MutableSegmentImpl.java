@@ -1048,17 +1048,18 @@ public class MutableSegmentImpl implements MutableSegment {
   @Nullable
   @Override
   public DataSource getDataSourceNullable(String column) {
+    return getDataSource(column, _schema);
+  }
+
+  @Override
+  public DataSource getDataSource(String column, Schema schema) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
     if (indexContainer != null) {
       // Physical column
       return indexContainer.toDataSource();
+    } else {
+      return SegmentPreloadUtils.getVirtualDataSource(schema, column, _segmentMetadata.getTotalDocs());
     }
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    if (fieldSpec != null && fieldSpec.isVirtualColumn()) {
-      // Virtual column
-      return SegmentPreloadUtils.getVirtualDataSource(_schema, _realtimeTableName, column, _numDocsIndexed);
-    }
-    return null;
   }
 
   @Nullable
