@@ -423,6 +423,7 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+      tableName = tableType != null ? TableNameBuilder.forType(tableType).tableNameWithType(tableName) : tableName;
       // Validate the table is not referenced in any logical table config.
       List<LogicalTableConfig> allLogicalTableConfigs =
           ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());

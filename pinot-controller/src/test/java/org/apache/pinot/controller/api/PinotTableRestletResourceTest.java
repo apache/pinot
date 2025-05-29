@@ -671,6 +671,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             "Cannot delete table '" + tableNameWithType + "' because it is referenced in logical table: logicalTable"),
         msg);
 
+    // table delete with name and type should also fail
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(tableDeleteUrl + "?type=" + tableType)).getMessage();
+    assertTrue(msg.contains(
+            "Cannot delete table '" + tableNameWithType + "' because it is referenced in logical table: logicalTable"),
+        msg);
+
     // Delete logical table
     String logicalTableDeleteUrl = urlBuilder.forLogicalTableDelete(logicalTable);
     response = ControllerTest.sendDeleteRequest(logicalTableDeleteUrl);
