@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
@@ -41,7 +40,6 @@ import static org.testng.Assert.*;
 public class LeafStageWorkerAssignmentRuleTest {
   private static final String TABLE_NAME = "testTable";
   private static final String INVALID_SEGMENT_PARTITION = "testTable__1__35__20250509T1444Z";
-  private static final String EXCLUDED_NEW_SEGMENT = "testTable__1__104__20250509T1444Z";
   private static final List<String> FIELDS_IN_SCAN = List.of("userId", "orderId", "orderAmount", "cityId", "cityName");
   private static final String PARTITION_COLUMN = "userId";
   private static final String PARTITION_FUNCTION = "murmur";
@@ -51,7 +49,6 @@ public class LeafStageWorkerAssignmentRuleTest {
   private static final InstanceIdToSegments OFFLINE_INSTANCE_ID_TO_SEGMENTS;
   private static final InstanceIdToSegments REALTIME_INSTANCE_ID_TO_SEGMENTS;
   private static final InstanceIdToSegments REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS;
-  private static final InstanceIdToSegments REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_EXCLUDED_NEW_SEGMENTS;
   private static final InstanceIdToSegments HYBRID_INSTANCE_ID_TO_SEGMENTS;
 
   static {
@@ -64,9 +61,6 @@ public class LeafStageWorkerAssignmentRuleTest {
     REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS = new InstanceIdToSegments();
     REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS._realtimeTableSegmentsMap
         = createRealtimeSegmentsMapWithInvalidPartitionSegments();
-    REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_EXCLUDED_NEW_SEGMENTS = new InstanceIdToSegments();
-    REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_EXCLUDED_NEW_SEGMENTS._realtimeTableSegmentsMap
-        = createRealtimeSegmentsMapWithExcludedNewSegment();
     HYBRID_INSTANCE_ID_TO_SEGMENTS = new InstanceIdToSegments();
     HYBRID_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap = offlineSegmentsMap;
     HYBRID_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap = realtimeSegmentsMap;
@@ -147,7 +141,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       // Case-1: When inferInvalidPartitionSegment is set to true.
       TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS, Map.of("REALTIME",
-              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION), Map.of())), true);
+              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), true);
       // Basic checks.
       assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
       assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -164,7 +158,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       // Case-2: When inferInvalidPartitionSegment is set to false.
       TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS, Map.of("REALTIME",
-              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION), Map.of())), false);
+              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), false);
       // Basic checks.
       assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
       assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -172,47 +166,6 @@ public class LeafStageWorkerAssignmentRuleTest {
       assertEquals(result._pinotDataDistribution.getHashDistributionDesc().size(), 0);
       validateTableScanAssignment(result,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS._realtimeTableSegmentsMap, "REALTIME");
-    }
-  }
-
-  @Test
-  public void testAssignTableScanPartitionedRealtimeTableWithExcludedNewSegments() {
-    final Map<Integer, List<String>> excludedNewSegmentsMap = Map.of(1, List.of(EXCLUDED_NEW_SEGMENT));
-    {
-      // Case-1: When the routing manager has NOT selected the new segment that the SegmentPartitionManager
-      // has excluded. In that case, the segment will be excluded in the Table Scan assignment too.
-      TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-          REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of("REALTIME", createRealtimeTablePartitionInfo(
-              List.of(), excludedNewSegmentsMap)), false);
-      // Basic checks.
-      assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
-      assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
-      assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
-      assertEquals(result._pinotDataDistribution.getHashDistributionDesc().size(), 1);
-      HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
-      assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
-      assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-      assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
-      validateTableScanAssignment(result,
-          REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
-    }
-    {
-      // Case-2: When the routing manager has selected the new segment that the SegmentPartitionManager has excluded.
-      // In that case, the segment will be included in the Table Scan assignment.
-      TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-          REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_EXCLUDED_NEW_SEGMENTS, Map.of("REALTIME",
-              createRealtimeTablePartitionInfo(List.of(), excludedNewSegmentsMap)), false);
-      // Basic checks.
-      assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
-      assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
-      assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
-      assertEquals(result._pinotDataDistribution.getHashDistributionDesc().size(), 1);
-      HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
-      assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
-      assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-      assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
-      validateTableScanAssignment(result,
-          REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_EXCLUDED_NEW_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
     }
   }
 
@@ -329,48 +282,35 @@ public class LeafStageWorkerAssignmentRuleTest {
     return result;
   }
 
-  private static Map<String, List<String>> createRealtimeSegmentsMapWithExcludedNewSegment() {
-    Map<String, List<String>> result = createRealtimeSegmentsMap();
-    List<String> segments = new ArrayList<>(result.get("instance-1"));
-    segments.add(EXCLUDED_NEW_SEGMENT);
-    result.put("instance-1", segments);
-    return result;
-  }
-
   private static TablePartitionInfo createOfflineTablePartitionInfo() {
-    TablePartitionInfo.PartitionInfo[] infos = new TablePartitionInfo.PartitionInfo[OFFLINE_NUM_PARTITIONS];
+    List<List<String>> segmentsByPartition = new ArrayList<>();
     for (int partitionNum = 0; partitionNum < OFFLINE_NUM_PARTITIONS; partitionNum++) {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
-      String additionalInstance = String.format("instance-%s", NUM_SERVERS + partitionNum);
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap)
           .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
-      infos[partitionNum] = new TablePartitionInfo.PartitionInfo(Set.of(selectedInstance, additionalInstance),
-         segments);
+      segmentsByPartition.add(segments);
     }
     return new TablePartitionInfo(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(TABLE_NAME),
-        PARTITION_COLUMN, PARTITION_FUNCTION, OFFLINE_NUM_PARTITIONS, infos, List.of(), Map.of());
+        PARTITION_COLUMN, PARTITION_FUNCTION, OFFLINE_NUM_PARTITIONS, segmentsByPartition, List.of());
   }
 
   private static TablePartitionInfo createRealtimeTablePartitionInfo() {
-    return createRealtimeTablePartitionInfo(List.of(), Map.of());
+    return createRealtimeTablePartitionInfo(List.of());
   }
 
-  private static TablePartitionInfo createRealtimeTablePartitionInfo(List<String> invalidSegments,
-      Map<Integer, List<String>> excludedNewSegments) {
-    TablePartitionInfo.PartitionInfo[] infos = new TablePartitionInfo.PartitionInfo[REALTIME_NUM_PARTITIONS];
+  private static TablePartitionInfo createRealtimeTablePartitionInfo(List<String> invalidSegments) {
+    List<List<String>> segmentsByPartition = new ArrayList<>();
     for (int partitionNum = 0; partitionNum < REALTIME_NUM_PARTITIONS; partitionNum++) {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
-      String additionalInstance = String.format("instance-%s", NUM_SERVERS + (partitionNum % NUM_SERVERS));
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap)
           .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
-      infos[partitionNum] = new TablePartitionInfo.PartitionInfo(Set.of(selectedInstance, additionalInstance),
-          segments);
+      segmentsByPartition.add(segments);
     }
     return new TablePartitionInfo(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(TABLE_NAME),
-        PARTITION_COLUMN, PARTITION_FUNCTION, REALTIME_NUM_PARTITIONS, infos, invalidSegments, excludedNewSegments);
+        PARTITION_COLUMN, PARTITION_FUNCTION, REALTIME_NUM_PARTITIONS, segmentsByPartition, invalidSegments);
   }
 }
