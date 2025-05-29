@@ -304,7 +304,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       if (!excludedNewSegments.isEmpty()) {
         int numSegments = excludedNewSegments.size();
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
-            numSegments <= 10 ? excludedNewSegments: excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
+            numSegments <= 10 ? excludedNewSegments : excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
       }
     }
     _tablePartitionReplicatedServersInfo =
@@ -324,9 +324,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       int partitionId = segmentInfo._partitionId;
       if (partitionId == INVALID_PARTITION_ID) {
         segmentsWithInvalidPartition.add(segment);
-        continue;
-      }
-      if (partitionId < segmentsByPartition.size()) {
+      } else if (partitionId < segmentsByPartition.size()) {
         segmentsByPartition.get(partitionId).add(segment);
       } else {
         LOGGER.warn("Found segment: {} with partitionId: {} larger than numPartitions: {} in table: {}",

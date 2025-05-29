@@ -262,8 +262,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     String function = tablePartitionInfo.getPartitionFunctionName();
     int numSelectedServers = instanceIdToSegmentsMap.size();
     if (keyIndex == -1) {
-      LOGGER.warn("Unable to find partition column {} in table scan fields {}",
-          tablePartitionInfo.getPartitionColumn(), fieldNames);
+      LOGGER.warn("Unable to find partition column {} in table scan fields {}", tablePartitionInfo.getPartitionColumn(),
+          fieldNames);
       return null;
     } else if (numPartitions < numSelectedServers) {
       return null;
@@ -274,8 +274,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Map<Integer, List<String>> invalidSegmentsByInferredPartition;
     try {
       invalidSegmentsByInferredPartition = getInvalidSegmentsByInferredPartition(
-          tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition,
-          tableNameWithType, numPartitions);
+          tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition, tableNameWithType,
+          numPartitions);
     } catch (Throwable t) {
       return null;
     }
@@ -289,14 +289,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     // For each partition, we expect at most 1 server which will be stored in this array.
     String[] partitionToServerMap = new String[tablePartitionInfo.getNumPartitions()];
-    List<List<String>> partitionInfos = tablePartitionInfo.getSegmentsByPartition();
     Map<Integer, List<String>> segmentsByPartition = new HashMap<>();
     // Ensure each partition is assigned to exactly 1 server.
     for (int partitionNum = 0; partitionNum < numPartitions; partitionNum++) {
-      List<String> info = partitionInfos.get(partitionNum);
       List<String> selectedSegments = new ArrayList<>();
-      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsByPartition()
-          .get(partitionNum);
+      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsByPartition().get(partitionNum);
       if (!segmentsForPartition.isEmpty()) {
         String chosenServer;
         for (String segment : segmentsForPartition) {
