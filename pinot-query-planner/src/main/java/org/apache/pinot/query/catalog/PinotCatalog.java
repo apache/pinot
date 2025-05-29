@@ -90,20 +90,10 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    Set<String> result = new HashSet<>();
-    for (String tableName: _tableCache.getTableNameMap().keySet()) {
-      if (DatabaseUtils.isPartOfDatabase(tableName, _databaseName)) {
-        result.add(tableName);
-      }
-    }
-
-    for (String logicalTableName: _tableCache.getLogicalTableNameMap().keySet()) {
-      if (DatabaseUtils.isPartOfDatabase(logicalTableName, _databaseName)) {
-        result.add(logicalTableName);
-      }
-    }
-
-    return result;
+    return Stream.concat(_tableCache.getTableNameMap().keySet().stream(),
+            _tableCache.getLogicalTableNameMap().keySet().stream())
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+        .collect(Collectors.toSet());
   }
 
   @Override
