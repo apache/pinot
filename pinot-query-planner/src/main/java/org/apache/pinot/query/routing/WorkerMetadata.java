@@ -76,13 +76,17 @@ public class WorkerMetadata {
 
   @Nullable
   public Map<String, List<String>> getTableSegmentsMap() {
-    String tableSegmentsMapStr = _customProperties.get(TABLE_SEGMENTS_MAP_KEY);
+    return deserializeStringSegmentListMap(TABLE_SEGMENTS_MAP_KEY);
+  }
+
+  private Map<String, List<String>> deserializeStringSegmentListMap(String propertyKey) {
+    String tableSegmentsMapStr = _customProperties.get(propertyKey);
     if (tableSegmentsMapStr != null) {
       try {
         return JsonUtils.stringToObject(tableSegmentsMapStr, new TypeReference<Map<String, List<String>>>() {
         });
       } catch (IOException e) {
-        throw new RuntimeException("Unable to deserialize table segments map: " + tableSegmentsMapStr, e);
+        throw new RuntimeException("Unable to deserialize " + propertyKey + " : " + tableSegmentsMapStr, e);
       }
     } else {
       return null;
@@ -106,18 +110,7 @@ public class WorkerMetadata {
 
   @Nullable
   public Map<String, List<String>> getLogicalTableSegmentsMap() {
-    String logicalTableSegmentsMapStr = _customProperties.get(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
-    if (logicalTableSegmentsMapStr != null) {
-      try {
-        return JsonUtils.stringToObject(logicalTableSegmentsMapStr,
-            new TypeReference<Map<String, List<String>>>() {
-            });
-      } catch (IOException e) {
-        throw new RuntimeException("Unable to deserialize table segments map: " + logicalTableSegmentsMapStr, e);
-      }
-    } else {
-      return null;
-    }
+    return deserializeStringSegmentListMap(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
   }
 
   public void setLogicalTableSegmentsMap(Map<String, List<String>> logicalTableSegmentsMap) {

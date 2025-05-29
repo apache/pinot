@@ -141,20 +141,18 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
 
-    LogicalTableRouteInfo logicalTableRouteInfo = null;
-
     String tableNameInNode = node.getTableName();
     String tableName = _tableCache.getActualTableName(tableNameInNode);
     if (tableName == null) {
       tableName = _tableCache.getActualLogicalTableName(tableNameInNode);
       Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableNameInNode);
       LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
-      logicalTableRouteInfo = new LogicalTableRouteInfo();
+      LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
       tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, tableName, _tableCache);
+      dispatchablePlanMetadata.setLogicalTableRouteInfo(logicalTableRouteInfo);
     }
 
     dispatchablePlanMetadata.addScannedTable(tableName);
-    dispatchablePlanMetadata.setLogicalTableRouteInfo(logicalTableRouteInfo);
     dispatchablePlanMetadata.setTableOptions(
         node.getNodeHint().getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
     return null;

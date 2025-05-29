@@ -42,7 +42,6 @@ public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
 
   @Override
   public void init(LogicalTableConfig logicalTableConfig, TableCache tableCache) {
-    Map<String, Object> parameters = logicalTableConfig.getTimeBoundaryConfig().getParameters();
     List<String> includedTables = getTimeBoundaryTableNames(logicalTableConfig);
     _dateTimeFormatSpecMap = new HashMap<>(includedTables.size());
     for (String physicalTableName : includedTables) {

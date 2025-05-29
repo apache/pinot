@@ -252,6 +252,12 @@ public class ServerPlanRequestUtils {
     instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
+    /*
+      * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
+      * If segmentList is null, it means that the query is for a logical table and we need to set TableSegmentInfoList
+      *
+      * Either one of segmentList or tableRouteInfoList has to be set, but not both.
+     */
     if (segmentList != null) {
       instanceRequest.setSearchSegments(segmentList);
     } else {

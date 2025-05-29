@@ -56,7 +56,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -69,6 +68,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   private static final String DEFAULT_TENANT = "DefaultTenant";
   private static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable";
   protected static final String DEFAULT_TABLE_NAME = "physicalTable";
+  protected static final String EMPTY_OFFLINE_TABLE_NAME = "empty_o";
   protected static BaseLogicalTableIntegrationTest _sharedClusterTestSuite = null;
   protected List<File> _avroFiles;
 
@@ -113,6 +113,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
       _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
+      _controllerBaseApiUrl = _sharedClusterTestSuite._controllerBaseApiUrl;
     }
 
     _avroFiles = getAllAvroFiles();
@@ -166,6 +167,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    createLogicalTableWithEmptyOfflineTable();
   }
 
   @AfterClass
@@ -333,12 +335,34 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return LogicalTableConfig.fromString(resp);
   }
 
-  protected void deleteLogicalTable()
+  private void createLogicalTableWithEmptyOfflineTable()
       throws IOException {
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(getLogicalTableName());
-    // delete logical table
-    String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-    assertEquals(deleteResponse, "{\"status\":\"" + getLogicalTableName() + " logical table successfully deleted.\"}");
+    Schema schema = createSchema(getSchemaFileName());
+    schema.setSchemaName(TableNameBuilder.extractRawTableName(EMPTY_OFFLINE_TABLE_NAME));
+    addSchema(schema);
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    TableConfig offlineTableConfig = createOfflineTableConfig(EMPTY_OFFLINE_TABLE_NAME);
+    addTableConfig(offlineTableConfig);
+    physicalTableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME), new PhysicalTableConfig());
+    String  refOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME);
+
+    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
+
+    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(logicalTableName);
+    addSchema(logicalTableSchema);
+    LogicalTableConfigBuilder builder =
+        new LogicalTableConfigBuilder().setTableName(logicalTableName)
+            .setBrokerTenant(DEFAULT_TENANT)
+            .setRefOfflineTableName(refOfflineTableName)
+            .setPhysicalTableConfigMap(physicalTableConfigMap);
+
+    String resp =
+        ControllerTest.sendPostRequest(addLogicalTableUrl, builder.build().toSingleLineJsonString(), getHeaders());
+    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
+        + " logical table successfully added.\"}");
   }
 
   @Override
@@ -570,57 +594,17 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
   }
 
-  @DataProvider(name = "tableNameTypeProvider")
-  public Object[][] tableNameTypeProvider() {
-    return new Object[][]{
-        {"empty_o", TableType.OFFLINE},
-        {"empty_r", TableType.REALTIME}
-    };
-  }
-
-  @Test(dataProvider = "tableNameTypeProvider")
-  public void testEmptyPhysicalTable(String rawTableName, TableType tableType)
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLogicalTableWithEmptyOfflineTable(boolean useMultiStageQueryEngine)
       throws Exception {
-    Schema schema = createSchema(getSchemaFileName());
-    schema.setSchemaName(TableNameBuilder.extractRawTableName(rawTableName));
-    addSchema(schema);
 
-    List<String> physicalTableNames;
-    if (tableType == TableType.OFFLINE) {
-      TableConfig offlineTableConfig = createOfflineTableConfig(rawTableName);
-      addTableConfig(offlineTableConfig);
-      physicalTableNames = List.of(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-    } else {
-      TableConfig realtimeTableConfig = createRealtimeTableConfig(_avroFiles.get(0));
-      realtimeTableConfig.setTableName(rawTableName);
-      addTableConfig(realtimeTableConfig);
-      physicalTableNames = List.of(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String logicalTableName = rawTableName + "_logical";
-
-    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-    Schema logicalTableSchema = createSchema(getSchemaFileName());
-    logicalTableSchema.setSchemaName(logicalTableName);
-    addSchema(logicalTableSchema);
-    LogicalTableConfig logicalTable =
-        getLogicalTableConfig(logicalTableName, physicalTableNames, getBrokerTenant());
-    String resp =
-        ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
-    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
-        + " logical table successfully added.\"}");
-
+    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
     // Query should return empty result
-    setUseMultiStageQueryEngine(false);
     JsonNode queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
     assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
-    assertEquals(queryResponse.get("numServersQueried").asInt(), 0);
-    assertTrue(queryResponse.get("exceptions").isEmpty());
-
-    setUseMultiStageQueryEngine(true);
-    queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
-    assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
-    assertEquals(queryResponse.get("numServersQueried").asInt(), 1);
+    assertEquals(queryResponse.get("numServersQueried").asInt(), useMultiStageQueryEngine ? 1 : 0);
     assertTrue(queryResponse.get("exceptions").isEmpty());
   }
 
