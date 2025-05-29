@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
@@ -284,19 +283,17 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   private static TablePartitionInfo createOfflineTablePartitionInfo() {
-    TablePartitionInfo.PartitionInfo[] infos = new TablePartitionInfo.PartitionInfo[OFFLINE_NUM_PARTITIONS];
+    List<List<String>> segmentsByPartition = new ArrayList<>();
     for (int partitionNum = 0; partitionNum < OFFLINE_NUM_PARTITIONS; partitionNum++) {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
-      String additionalInstance = String.format("instance-%s", NUM_SERVERS + partitionNum);
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap)
           .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
-      infos[partitionNum] = new TablePartitionInfo.PartitionInfo(Set.of(selectedInstance, additionalInstance),
-         segments);
+      segmentsByPartition.add(segments);
     }
     return new TablePartitionInfo(TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(TABLE_NAME),
-        PARTITION_COLUMN, PARTITION_FUNCTION, OFFLINE_NUM_PARTITIONS, infos, List.of());
+        PARTITION_COLUMN, PARTITION_FUNCTION, OFFLINE_NUM_PARTITIONS, segmentsByPartition, List.of());
   }
 
   private static TablePartitionInfo createRealtimeTablePartitionInfo() {
@@ -304,18 +301,16 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   private static TablePartitionInfo createRealtimeTablePartitionInfo(List<String> invalidSegments) {
-    TablePartitionInfo.PartitionInfo[] infos = new TablePartitionInfo.PartitionInfo[REALTIME_NUM_PARTITIONS];
+    List<List<String>> segmentsByPartition = new ArrayList<>();
     for (int partitionNum = 0; partitionNum < REALTIME_NUM_PARTITIONS; partitionNum++) {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
-      String additionalInstance = String.format("instance-%s", NUM_SERVERS + (partitionNum % NUM_SERVERS));
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap)
           .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
-      infos[partitionNum] = new TablePartitionInfo.PartitionInfo(Set.of(selectedInstance, additionalInstance),
-          segments);
+      segmentsByPartition.add(segments);
     }
     return new TablePartitionInfo(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(TABLE_NAME),
-        PARTITION_COLUMN, PARTITION_FUNCTION, REALTIME_NUM_PARTITIONS, infos, invalidSegments);
+        PARTITION_COLUMN, PARTITION_FUNCTION, REALTIME_NUM_PARTITIONS, segmentsByPartition, invalidSegments);
   }
 }
