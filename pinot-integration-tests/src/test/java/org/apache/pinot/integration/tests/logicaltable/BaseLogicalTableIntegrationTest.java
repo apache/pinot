@@ -344,8 +344,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     TableConfig offlineTableConfig = createOfflineTableConfig(EMPTY_OFFLINE_TABLE_NAME);
     addTableConfig(offlineTableConfig);
-    physicalTableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME), new PhysicalTableConfig());
-    String  refOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME);
+    physicalTableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME),
+        new PhysicalTableConfig());
+    String refOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME);
 
     String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
 
