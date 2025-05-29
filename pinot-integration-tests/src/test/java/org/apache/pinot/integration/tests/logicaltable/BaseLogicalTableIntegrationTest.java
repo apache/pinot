@@ -48,6 +48,7 @@ import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -621,5 +622,15 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
     assertEquals(queryResponse.get("numServersQueried").asInt(), 1);
     assertTrue(queryResponse.get("exceptions").isEmpty());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  void testControllerQuerySubmit(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getLogicalTableName();
+    JsonNode response = postQueryToController(query);
+    assertTrue(response.get("exceptions").isEmpty());
   }
 }
