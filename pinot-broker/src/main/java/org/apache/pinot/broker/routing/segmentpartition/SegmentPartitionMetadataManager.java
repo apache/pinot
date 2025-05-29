@@ -268,8 +268,8 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
               : segmentsReducingFullyReplicatedServers.subList(0, 10) + "...", _tableNameWithType);
     }
     // Process new segments
-    Map<Integer, List<String>> excludedNewSegments = new HashMap<>();
     if (!newSegmentInfoEntries.isEmpty()) {
+      List<String> excludedNewSegments = new ArrayList<>();
       for (Map.Entry<String, SegmentInfo> entry : newSegmentInfoEntries) {
         String segment = entry.getKey();
         SegmentInfo segmentInfo = entry.getValue();
@@ -286,7 +286,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
             partitionInfo = new PartitionInfo(fullyReplicatedServers, segments);
             partitionInfoMap[partitionId] = partitionInfo;
           } else {
-            excludedNewSegments.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(segment);
+            excludedNewSegments.add(segment);
           }
         } else {
           // If the new segment is not the first segment of a partition, add it only if it won't reduce the fully
@@ -297,16 +297,14 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
           if (onlineServers.containsAll(partitionInfo._fullyReplicatedServers)) {
             partitionInfo._segments.add(segment);
           } else {
-            excludedNewSegments.computeIfAbsent(partitionId, (x) -> new ArrayList<>()).add(segment);
+            excludedNewSegments.add(segment);
           }
         }
       }
       if (!excludedNewSegments.isEmpty()) {
-        List<String> excludedSegmentsList = excludedNewSegments.values().stream().flatMap(Collection::stream)
-            .collect(Collectors.toList());
-        int numSegments = excludedSegmentsList.size();
+        int numSegments = excludedNewSegments.size();
         LOGGER.info("Excluded {} new segments: {}... without all replicas available in table: {}", numSegments,
-            numSegments <= 10 ? excludedSegmentsList : excludedSegmentsList.subList(0, 10) + "...", _tableNameWithType);
+            numSegments <= 10 ? excludedNewSegments: excludedNewSegments.subList(0, 10) + "...", _tableNameWithType);
       }
     }
     _tablePartitionReplicatedServersInfo =
@@ -315,9 +313,9 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   }
 
   private void computeTablePartitionInfo() {
-    List<List<String>> partitionInfoMap = new ArrayList<>();
+    List<List<String>> segmentsByPartition = new ArrayList<>();
     for (int i = 0; i < _numPartitions; i++) {
-      partitionInfoMap.add(new ArrayList<>());
+      segmentsByPartition.add(new ArrayList<>());
     }
     List<String> segmentsWithInvalidPartition = new ArrayList<>();
     for (Map.Entry<String, SegmentInfo> entry : _segmentInfoMap.entrySet()) {
@@ -328,8 +326,8 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         segmentsWithInvalidPartition.add(segment);
         continue;
       }
-      if (partitionId < partitionInfoMap.size()) {
-        partitionInfoMap.get(partitionId).add(segment);
+      if (partitionId < segmentsByPartition.size()) {
+        segmentsByPartition.get(partitionId).add(segment);
       } else {
         LOGGER.warn("Found segment: {} with partitionId: {} larger than numPartitions: {} in table: {}",
             segment, partitionId, _numPartitions, _tableNameWithType);
@@ -344,7 +342,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     }
     _tablePartitionInfo =
         new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
-            partitionInfoMap, segmentsWithInvalidPartition);
+            segmentsByPartition, segmentsWithInvalidPartition);
   }
 
   private static class SegmentInfo {

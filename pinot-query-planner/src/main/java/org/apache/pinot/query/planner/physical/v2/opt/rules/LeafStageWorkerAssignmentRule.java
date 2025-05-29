@@ -250,20 +250,20 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
       List<String> fieldNames, Map<String, List<String>> instanceIdToSegmentsMap,
-      @Nullable TablePartitionInfo tablePartitionReplicatedServersInfo, boolean inferInvalidSegmentPartition) {
-    if (tablePartitionReplicatedServersInfo == null) {
+      @Nullable TablePartitionInfo tablePartitionInfo, boolean inferInvalidSegmentPartition) {
+    if (tablePartitionInfo == null) {
       return null;
     }
     String tableType =
         Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType),
             "Illegal state: expected table name with type").toString();
-    int numPartitions = tablePartitionReplicatedServersInfo.getNumPartitions();
-    int keyIndex = fieldNames.indexOf(tablePartitionReplicatedServersInfo.getPartitionColumn());
-    String function = tablePartitionReplicatedServersInfo.getPartitionFunctionName();
+    int numPartitions = tablePartitionInfo.getNumPartitions();
+    int keyIndex = fieldNames.indexOf(tablePartitionInfo.getPartitionColumn());
+    String function = tablePartitionInfo.getPartitionFunctionName();
     int numSelectedServers = instanceIdToSegmentsMap.size();
     if (keyIndex == -1) {
       LOGGER.warn("Unable to find partition column {} in table scan fields {}",
-          tablePartitionReplicatedServersInfo.getPartitionColumn(), fieldNames);
+          tablePartitionInfo.getPartitionColumn(), fieldNames);
       return null;
     } else if (numPartitions < numSelectedServers) {
       return null;
@@ -274,7 +274,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Map<Integer, List<String>> invalidSegmentsByInferredPartition;
     try {
       invalidSegmentsByInferredPartition = getInvalidSegmentsByInferredPartition(
-          tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition,
+          tablePartitionInfo.getSegmentsWithInvalidPartition(), inferInvalidSegmentPartition,
           tableNameWithType, numPartitions);
     } catch (Throwable t) {
       return null;
@@ -288,14 +288,14 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       }
     }
     // For each partition, we expect at most 1 server which will be stored in this array.
-    String[] partitionToServerMap = new String[tablePartitionReplicatedServersInfo.getNumPartitions()];
-    List<List<String>> partitionInfos = tablePartitionReplicatedServersInfo.getSegmentsByPartition();
+    String[] partitionToServerMap = new String[tablePartitionInfo.getNumPartitions()];
+    List<List<String>> partitionInfos = tablePartitionInfo.getSegmentsByPartition();
     Map<Integer, List<String>> segmentsByPartition = new HashMap<>();
     // Ensure each partition is assigned to exactly 1 server.
     for (int partitionNum = 0; partitionNum < numPartitions; partitionNum++) {
       List<String> info = partitionInfos.get(partitionNum);
       List<String> selectedSegments = new ArrayList<>();
-      List<String> segmentsForPartition = tablePartitionReplicatedServersInfo.getSegmentsByPartition()
+      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsByPartition()
           .get(partitionNum);
       if (!segmentsForPartition.isEmpty()) {
         String chosenServer;
