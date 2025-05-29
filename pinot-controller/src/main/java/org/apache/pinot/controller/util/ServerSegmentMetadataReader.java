@@ -20,7 +20,6 @@ package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Lists;
@@ -397,34 +396,6 @@ public class ServerSegmentMetadataReader {
         ClientBuilder.newClient(clientConfig).target(url).request(MediaType.APPLICATION_JSON)
             .get(ValidDocIdsBitmapResponse.class);
     Preconditions.checkNotNull(response, "Unable to retrieve validDocIdsBitmap from %s", url);
-    return response;
-  }
-
-  /**
-   * Retrieves the creation time metadata for each segment of a given table from the each servers the segment is hosted.
-   *
-   * @param tableNameWithType The name of the table with type (e.g., myTable_OFFLINE)
-   * @param serverToSegmentsMap A map from server instance to the list of segments it hosts
-   * @param serverToEndpoints A BiMap from server instance to its admin endpoint
-   * @param timeoutMs Timeout in milliseconds for server requests
-   * @return A map from segment name to a list of creation times (in millis) reported by each server
-   * @throws IOException If there is an error parsing the server response
-   */
-  public Map<String, List<Long>> getSegmentCreationMetadataFromServers(String tableNameWithType,
-      Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints, int timeoutMs)
-      throws IOException {
-
-    List<String> segmentsMetadata =
-        getSegmentMetadataFromServer(tableNameWithType, serverToSegmentsMap, serverToEndpoints, new ArrayList<>(),
-            timeoutMs);
-    Map<String, List<Long>> response = new HashMap<>();
-    for (String segmentMetadata : segmentsMetadata) {
-      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
-      String segmentName = responseJson.get("segmentName").asText();
-      long creationTimeMillis = responseJson.get("creationTimeMillis").asLong();
-      response.computeIfAbsent(segmentName, k -> new ArrayList<>());
-      response.get(segmentName).add(creationTimeMillis);
-    }
     return response;
   }
 

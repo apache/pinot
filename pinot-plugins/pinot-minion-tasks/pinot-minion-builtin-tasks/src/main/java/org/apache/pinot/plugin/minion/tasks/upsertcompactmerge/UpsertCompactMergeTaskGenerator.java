@@ -21,14 +21,13 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -69,13 +68,15 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     private final long _validDocIds;
     private final long _invalidDocIds;
     private final double _segmentSizeInBytes;
+    private final long _segmentCreationTimeMillis;
 
     SegmentMergerMetadata(SegmentZKMetadata segmentZKMetadata, long validDocIds, long invalidDocIds,
-        double segmentSizeInBytes) {
+        double segmentSizeInBytes, long segmentCreationTimeMillis) {
       _segmentZKMetadata = segmentZKMetadata;
       _validDocIds = validDocIds;
       _invalidDocIds = invalidDocIds;
       _segmentSizeInBytes = segmentSizeInBytes;
+      _segmentCreationTimeMillis = segmentCreationTimeMillis;
     }
 
     public SegmentZKMetadata getSegmentZKMetadata() {
@@ -92,6 +93,10 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
     public double getSegmentSizeInBytes() {
       return _segmentSizeInBytes;
+    }
+
+    public long getSegmentCreationTimeMillis() {
+      return _segmentCreationTimeMillis;
     }
   }
 
@@ -217,14 +222,12 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         }
         // TODO see if multiple groups of same partition can be added
 
-        List<String> segmentNames =
-            groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList());
         //get max creation time for the segments across all servers. This will be used as the creation time of the
         // merge segment
-        Long maxCreationTimeMillis =
-            getMaxCreationTimeMillis(tableNameWithType, segmentNames, serverToSegments, serverToEndpoints,
-                serverSegmentMetadataReader);
-        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, segmentNames));
+        Optional<Long> maxCreationTimeMillis =
+            groups.get(0).stream().map(SegmentMergerMetadata::getSegmentCreationTimeMillis).max(Long::compare);
+        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
+            groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
@@ -233,7 +236,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
                 taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
                     String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT)))));
         configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY,
-            String.valueOf(maxCreationTimeMillis));
+            String.valueOf(maxCreationTimeMillis.get()));
         pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -313,8 +316,16 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
             continue;
           }
           double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
+          //We use the max creation time of the segment replica across servers. Refer to #15846 for more info.
+          Optional<Long> segmentCreationTimeMillis = validDocIdsMetadataInfoMap.get(segmentName).stream()
+              .map(ValidDocIdsMetadataInfo::getSegmentCreationTimeMillis).max(Long::compareTo);
+          if (segmentCreationTimeMillis.isEmpty()) {
+            LOGGER.info("No creation time found for segment: {}, skipping this segment", segmentName);
+            break;
+          }
           segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>()).add(
-              new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs, expectedSegmentSizeAfterCompaction));
+              new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs, expectedSegmentSizeAfterCompaction,
+                  segmentCreationTimeMillis.get()));
         }
         break;
       }
@@ -471,55 +482,5 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return StringUtils.join(
         segmentMergerMetadataList.stream().map(x -> String.valueOf(x.getSegmentZKMetadata().getCrc()))
             .collect(Collectors.toList()), ",");
-  }
-
-  /**
-   * Retrieves the maximum creation time (in milliseconds) among the specified segments across all servers.
-   *
-   * <p>This method filters the provided server-to-segments map to only include the segments specified in
-   * {@code segmentNames}, then queries the servers for the creation time metadata of those segments using
-   * {@link ServerSegmentMetadataReader#getSegmentCreationMetadataFromServers}. It returns the maximum creation
-   * time found. If no creation time is found for the given segments, a {@link RuntimeException} is thrown.
-   *
-   * @param tableNameWithType The name of the table with type (e.g., myTable_OFFLINE)
-   * @param segmentNames The list of segment names to query
-   * @param serverToSegments A map from server instance to the list of segments it hosts
-   * @param serverToEndpoints A BiMap from server instance to its admin endpoint
-   * @param serverSegmentMetadataReader The reader to fetch segment metadata from servers
-   * @return The maximum creation time in milliseconds among the specified segments
-   * @throws RuntimeException If no creation time is found for the given segments or if an I/O error occurs
-   */
-  @VisibleForTesting
-  protected Long getMaxCreationTimeMillis(String tableNameWithType, List<String> segmentNames,
-      Map<String, List<String>> serverToSegments, BiMap<String, String> serverToEndpoints,
-      ServerSegmentMetadataReader serverSegmentMetadataReader) {
-
-    // Filter serverToSegments to only include segments present in segmentNames
-    Set<String> segmentNameSet = new HashSet<>(segmentNames);
-    Map<String, List<String>> filteredServerToSegments = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
-      List<String> filteredSegments =
-          entry.getValue().stream().filter(segmentNameSet::contains).collect(Collectors.toList());
-      if (!filteredSegments.isEmpty()) {
-        filteredServerToSegments.put(entry.getKey(), filteredSegments);
-      }
-    }
-    Map<String, List<Long>> creationTimeMap;
-    try {
-      creationTimeMap =
-          serverSegmentMetadataReader.getSegmentCreationMetadataFromServers(tableNameWithType, filteredServerToSegments,
-              serverToEndpoints, 60_000);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
-    OptionalLong maxCreationTime =
-        creationTimeMap.values().stream().flatMapToLong(list -> list.stream().mapToLong(Long::longValue)).max();
-    if (maxCreationTime.isPresent()) {
-      return maxCreationTime.getAsLong();
-    } else {
-      String errorMessage = "No creation time found for segments: " + segmentNames;
-      throw new RuntimeException(errorMessage);
-    }
   }
 }
