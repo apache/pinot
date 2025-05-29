@@ -33,7 +33,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.query.routing.WorkerManager;
