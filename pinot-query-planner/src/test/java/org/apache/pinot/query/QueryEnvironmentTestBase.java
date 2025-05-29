@@ -308,7 +308,6 @@ public class QueryEnvironmentTestBase {
       }
     }
     Map<String, TablePartitionReplicatedServersInfo> partitionInfoMap = null;
-    Map<String, TablePartitionInfo> tablePartitionInfoMap = null;
     if (MapUtils.isNotEmpty(partitionedSegmentsMap)) {
       partitionInfoMap = new HashMap<>();
       for (Map.Entry<String, Pair<String, List<List<String>>>> entry : partitionedSegmentsMap.entrySet()) {
@@ -328,7 +327,6 @@ public class QueryEnvironmentTestBase {
                 partitionIdToInfoMap, Collections.emptyList());
         partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
-      // derive TablePartitionInfo map from partitionInfoMap
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();

@@ -200,22 +200,22 @@ public class MockRoutingManagerFactory {
     private final Set<String> _hybridTables;
     private final Set<String> _disabledTables;
     @Nullable
-    private final Map<String, TablePartitionReplicatedServersInfo> _partitionInfoMap;
+    private final Map<String, TablePartitionReplicatedServersInfo> _partitionReplicatedServersInfoMap;
     @Nullable
-    private final Map<String, TablePartitionInfo> _tablePartitionInfoMap;
+    private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
 
     public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
         Set<String> hybridTables, Set<String> disabledTables,
-        @Nullable Map<String, TablePartitionReplicatedServersInfo> partitionInfoMap,
-        Map<String, ServerInstance> serverInstances, @Nullable Map<String, TablePartitionInfo> tablePartitionInfoMap) {
+        @Nullable Map<String, TablePartitionReplicatedServersInfo> partitionReplicatedServersInfoMap,
+        Map<String, ServerInstance> serverInstances, @Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
       _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
-      _partitionInfoMap = partitionInfoMap;
+      _partitionReplicatedServersInfoMap = partitionReplicatedServersInfoMap;
       _serverInstances = serverInstances;
       _disabledTables = disabledTables;
-      _tablePartitionInfoMap = tablePartitionInfoMap;
+      _partitionInfoMap = partitionInfoMap;
     }
 
     @Override
@@ -259,13 +259,14 @@ public class MockRoutingManagerFactory {
     @Nullable
     @Override
     public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
-      return null;
+      return _partitionInfoMap != null ? _partitionInfoMap.get(tableNameWithType) : null;
     }
 
     @Nullable
     @Override
     public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
-      return _partitionInfoMap != null ? _partitionInfoMap.get(tableNameWithType) : null;
+      return _partitionReplicatedServersInfoMap != null ? _partitionReplicatedServersInfoMap.get(tableNameWithType)
+          : null;
     }
 
     @Override
