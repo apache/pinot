@@ -586,17 +586,21 @@ public class WorkerManager {
 
     if (logicalTableRouteInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
-        Preconditions.checkNotNull(physicalTableRoute.getOfflineRoutingTable());
-        transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
-            physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        // Routing table maybe null if no routing table is found OR there are no segments.
+        if (physicalTableRoute.getOfflineRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
+              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
       }
     }
 
     if (logicalTableRouteInfo.getRealtimeTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
-        Preconditions.checkNotNull(physicalTableRoute.getRealtimeRoutingTable());
-        transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
-            physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        // Routing table maybe null if no routing table is found OR there are no segments.
+        if (physicalTableRoute.getRealtimeRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
+              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
       }
     }
 

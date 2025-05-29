@@ -55,6 +55,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -566,5 +567,59 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+  }
+
+  @DataProvider(name = "tableNameTypeProvider")
+  public Object[][] tableNameTypeProvider() {
+    return new Object[][]{
+        {"empty_o", TableType.OFFLINE},
+        {"empty_r", TableType.REALTIME}
+    };
+  }
+
+  @Test(dataProvider = "tableNameTypeProvider")
+  public void testEmptyPhysicalTable(String rawTableName, TableType tableType)
+      throws Exception {
+    Schema schema = createSchema(getSchemaFileName());
+    schema.setSchemaName(TableNameBuilder.extractRawTableName(rawTableName));
+    addSchema(schema);
+
+    List<String> physicalTableNames;
+    if (tableType == TableType.OFFLINE) {
+      TableConfig offlineTableConfig = createOfflineTableConfig(rawTableName);
+      addTableConfig(offlineTableConfig);
+      physicalTableNames = List.of(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    } else {
+      TableConfig realtimeTableConfig = createRealtimeTableConfig(_avroFiles.get(0));
+      realtimeTableConfig.setTableName(rawTableName);
+      addTableConfig(realtimeTableConfig);
+      physicalTableNames = List.of(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+    }
+
+    String logicalTableName = rawTableName + "_logical";
+
+    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(logicalTableName);
+    addSchema(logicalTableSchema);
+    LogicalTableConfig logicalTable =
+        getLogicalTableConfig(logicalTableName, physicalTableNames, getBrokerTenant());
+    String resp =
+        ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
+    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
+        + " logical table successfully added.\"}");
+
+    // Query should return empty result
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
+    assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
+    assertEquals(queryResponse.get("numServersQueried").asInt(), 0);
+    assertTrue(queryResponse.get("exceptions").isEmpty());
+
+    setUseMultiStageQueryEngine(true);
+    queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
+    assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
+    assertEquals(queryResponse.get("numServersQueried").asInt(), 1);
+    assertTrue(queryResponse.get("exceptions").isEmpty());
   }
 }
