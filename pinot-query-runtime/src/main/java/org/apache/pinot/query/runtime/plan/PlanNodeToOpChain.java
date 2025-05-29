@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
+import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
@@ -180,16 +181,20 @@ public class PlanNodeToOpChain {
       PlanNode right = inputs.get(1);
       MultiStageOperator rightOperator = visit(right, context);
       JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-      if (joinStrategy == JoinNode.JoinStrategy.HASH) {
-        if (node.getLeftKeys().isEmpty()) {
-          // TODO: Consider adding non-equi as a separate join strategy.
-          return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-        } else {
-          return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-        }
-      } else {
-        assert joinStrategy == JoinNode.JoinStrategy.LOOKUP;
-        return new LookupJoinOperator(context, leftOperator, rightOperator, node);
+      switch (joinStrategy) {
+        case HASH:
+          if (node.getLeftKeys().isEmpty()) {
+            // TODO: Consider adding non-equi as a separate join strategy.
+            return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+          } else {
+            return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+          }
+        case LOOKUP:
+          return new LookupJoinOperator(context, leftOperator, rightOperator, node);
+        case ASOF:
+          return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+        default:
+          throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }
     }
 

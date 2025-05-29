@@ -32,10 +32,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -48,6 +50,9 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -141,28 +146,44 @@ public class TableViews {
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
+      @ApiParam(value = "Include segments being replaced", required = false)
+      @QueryParam("includeReplacedSegments") @DefaultValue("true") boolean includeReplacedSegments,
       @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
     TableViews.TableView externalView = getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
     TableViews.TableView idealStateView = getTableState(tableName, TableViews.IDEALSTATE, tableType);
-    List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
-    segmentStatusInfoListMap = getSegmentStatuses(externalView, idealStateView);
+
+    Map<String, Map<String, String>> externalViewStateMap = getStateMap(externalView);
+    Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
+    Set<String> segments = idealStateMap.keySet();
+
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage = SegmentLineageAccessHelper
+          .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableName);
+      SegmentLineageUtils
+          .filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
+    List<SegmentStatusInfo> segmentStatusInfoListMap = getSegmentStatuses(externalViewStateMap, idealStateMap);
+
     return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
   }
 
-  public List<SegmentStatusInfo> getSegmentStatuses(TableViews.TableView externalView,
-      TableViews.TableView idealStateView) {
-    Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
-    Map<String, Map<String, String>> externalViewMap = getStateMap(externalView);
+  public List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
+      Map<String, Map<String, String>> idealStateMap) {
     List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
 
-    for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segment = entry.getKey();
-      Map<String, String> externalViewEntryValue = entry.getValue();
-      Map<String, String> idealViewEntryValue = idealStateMap.get(segment);
-      if (isErrorSegment(externalViewEntryValue)) {
+      Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
+      Map<String, String> idealViewEntryValue = entry.getValue();
+
+      if (externalViewEntryValue == null) {
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+      } else if (isErrorSegment(externalViewEntryValue)) {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
       } else {
@@ -210,7 +231,7 @@ public class TableViews {
     return tableTypeViewResult;
   }
 
-  private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
+  public Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
     if (view != null && view._offline != null && !view._offline.isEmpty()) {
       return view._offline;
     } else if (view != null && view._realtime != null && !view._realtime.isEmpty()) {

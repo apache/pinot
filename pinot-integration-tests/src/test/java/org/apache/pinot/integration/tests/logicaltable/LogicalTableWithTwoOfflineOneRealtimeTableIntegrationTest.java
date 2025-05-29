@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategyService;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
@@ -62,8 +64,9 @@ public class LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest extends B
 
   private void updateTimeBoundaryTableInLogicalTable(LogicalTableConfig logicalTableConfig)
       throws IOException {
-    List<String> includedTables =
-        (List<String>) logicalTableConfig.getTimeBoundaryConfig().getParameters().get("includedTables");
+    TimeBoundaryStrategy timeBoundaryStrategy = TimeBoundaryStrategyService.getInstance()
+        .getTimeBoundaryStrategy(logicalTableConfig.getTimeBoundaryConfig().getBoundaryStrategy());
+    List<String> includedTables = timeBoundaryStrategy.getTimeBoundaryTableNames(logicalTableConfig);
 
     String timeBoundaryTableName = TableNameBuilder.extractRawTableName(includedTables.get(0));
     String newTimeBoundaryTableName = timeBoundaryTableName.equals("o_1") ? "o_2" : "o_1";
@@ -71,7 +74,8 @@ public class LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest extends B
 
     Map<String, Object> parameters = Map.of("includedTables", List.of(newTimeBoundaryTableName));
     logicalTableConfig.getTimeBoundaryConfig().setParameters(parameters);
+    logicalTableConfig.setQueryConfig(null);
 
-    updateLogicalTableConfig(logicalTableConfig.getTableName(), logicalTableConfig);
+    updateLogicalTableConfig(logicalTableConfig);
   }
 }

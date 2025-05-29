@@ -180,7 +180,6 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -2152,13 +2151,7 @@ public class PinotHelixResourceManager {
       updateBrokerResourceForLogicalTable(logicalTableConfig, tableName);
     }
 
-    TimeBoundaryConfig oldTimeBoundaryConfig = oldLogicalTableConfig.getTimeBoundaryConfig();
-    TimeBoundaryConfig newTimeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
-    // compare the old and new time boundary config and send message if they are different
-    if ((oldTimeBoundaryConfig != null && !oldTimeBoundaryConfig.equals(newTimeBoundaryConfig))
-    || (oldTimeBoundaryConfig == null && newTimeBoundaryConfig != null)) {
-      sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
-    }
+    sendLogicalTableConfigRefreshMessage(logicalTableConfig.getTableName());
 
     LOGGER.info("Updated logical table {}: Successfully updated table", tableName);
   }
@@ -3281,16 +3274,27 @@ public class PinotHelixResourceManager {
    * the ideal state because they are not supposed to be served.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
-    return getServerToSegmentsMap(tableNameWithType, null);
+    return getServerToSegmentsMap(tableNameWithType, null, true);
   }
 
-  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer) {
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer,
+      boolean includeReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+
+    Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+    Set<String> segments = idealStateMap.keySet();
+
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage = SegmentLineageAccessHelper
+          .getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segmentName = entry.getKey();
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         String server = instanceStateEntry.getKey();
