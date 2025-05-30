@@ -2367,11 +2367,26 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
   }
 
+  /**
+   * Returns all logical table names in the cluster regardless of their database name.
+   * @return List of logical table names
+   */
   public List<String> getAllLogicalTableNames() {
     List<String> logicalTableNames = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
         AccessOption.PERSISTENT);
     return logicalTableNames != null ? logicalTableNames : Collections.emptyList();
+  }
+
+  /**
+   * Returns all logical table names in the cluster that belong to the given database.
+   * @param databaseName The name of the database
+   * @return List of logical table names that belong to the given database
+   */
+  public List<String> getAllLogicalTableNames(String databaseName) {
+    return getAllLogicalTableNames().stream()
+        .filter(tableName -> DatabaseUtils.isPartOfDatabase(tableName, databaseName))
+        .collect(Collectors.toList());
   }
 
   /**
