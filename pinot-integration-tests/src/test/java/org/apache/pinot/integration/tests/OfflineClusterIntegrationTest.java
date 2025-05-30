@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -41,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
@@ -56,6 +58,7 @@ import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -76,6 +79,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -4085,5 +4089,169 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } catch (Exception e) {
       fail("Segment reload failed with exception: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void testVirtualColumnWithPartialReload() throws Exception {
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    // Pick any existing INT column name for the “valid” cases
+    String validColumnName = oldSchema.getAllFieldSpecs().stream()
+        .filter(fs -> fs.getDataType() == DataType.INT)
+        .findFirst()
+        .get()
+        .getName();
+    //  New column name that is not in the schema
+    String newColumn = "newColumn";
+    DataType newdataType = DataType.INT;
+    // Test queries
+    List<String> queries = List.of(
+        SELECT_STAR_QUERY,
+        SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
+        SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
+        SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
+        "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
+    );
+    for (String query: queries) {
+      try {
+        // Build new schema with the extra column
+        Schema newSchema = new Schema();
+        newSchema.setSchemaName(oldSchema.getSchemaName());
+        for (FieldSpec fs : oldSchema.getAllFieldSpecs()) {
+          newSchema.addField(fs);
+        }
+        FieldSpec newFieldSpec = new DimensionFieldSpec(newColumn, newdataType, true);
+        newSchema.addField(newFieldSpec);
+        updateSchema(newSchema);
+
+        // Partially reload one segment
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
+            listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+        // Column should show since it would be added as a virtual column
+        runQueryAndAssert(query, newColumn, newFieldSpec);
+        // Now do a full reload and the column should still be there, indicating there is no regression
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+        runQueryAndAssert(query, newColumn, newFieldSpec);
+      } finally {
+        // Reset back to the original schema for the next iteration
+        forceUpdateSchema(oldSchema);
+        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+      }
+    }
+  }
+
+  @Test
+  public void testVirtualColumnAfterReloadForDifferentDataTypes() throws Exception {
+    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    try {
+      // Build a new schema: copy everything, then add one virtual column per DataType.
+      Schema newSchema = new Schema();
+      oldSchema.getAllFieldSpecs().forEach(newSchema::addField);
+      // Keep insertion order – helps when debugging.
+      Map<String, FieldSpec> newCols = new LinkedHashMap<>();
+      List<DataType> newDataTypes = List.of(
+          DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE,
+          DataType.STRING, DataType.BOOLEAN, DataType.BYTES);
+      for (DataType dt : newDataTypes) {
+        String col = "col_" + dt.name().toLowerCase();
+        FieldSpec fs = new DimensionFieldSpec(col, dt, true);
+        newCols.put(col, fs);
+        newSchema.addField(fs);
+      }
+      newSchema.setSchemaName(oldSchema.getSchemaName());
+      updateSchema(newSchema);
+
+      // Reload segment.
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+
+      JsonNode res = postQuery("SELECT * FROM " + DEFAULT_TABLE_NAME + " LIMIT 5000");
+      assertNoError(res);
+      JsonNode rows = res.get("resultTable").get("rows");
+      DataSchema resultSchema =
+          JsonUtils.jsonNodeToObject(res.get("resultTable").get("dataSchema"), DataSchema.class);
+
+      // Verify each new column.
+      for (Map.Entry<String, FieldSpec> e : newCols.entrySet()) {
+        String col = e.getKey();
+        FieldSpec fs = e.getValue();
+
+        int idx = IntStream.range(0, resultSchema.size())
+            .filter(i -> resultSchema.getColumnName(i).equals(col))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Column " + col + " missing"));
+
+        Assert.assertEquals(resultSchema.getColumnDataType(idx).name(), fs.getDataType().name(),
+            "Mismatch in reported type for " + col);
+
+        for (JsonNode row : rows) {
+          String expectedDefault;
+          if (fs.getDataType() == DataType.BOOLEAN) {
+            // Pinot surfaces boolean default nulls as literal "false"
+            expectedDefault = "false";
+          } else {
+            expectedDefault = fs.getDefaultNullValueString();
+          }
+          Assert.assertEquals(row.get(idx).asText(), expectedDefault, "Unexpected default value for " + col);
+        }
+      }
+    } finally {
+      // Clean up the schema to the original state
+      forceUpdateSchema(oldSchema);
+      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+    }
+  }
+
+  private void reloadAndWait(String tableNameWithType, @Nullable String segmentName) throws Exception {
+    String response = (segmentName != null)
+        ? reloadOfflineSegment(tableNameWithType, segmentName, true)
+        : reloadOfflineTable(tableNameWithType, true);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    String jobId;
+    if (segmentName != null) {
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      jobId = statusString.substring(startIdx, endIdx).trim();
+    } else {
+      // Full table reload response: structured JSON
+      JsonNode tableLevelDetails
+          = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
+      Assert.assertEquals(tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText(), "SUCCESS");
+      jobId = tableLevelDetails.get("reloadJobId").asText();
+    }
+    String finalJobId = jobId;
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return isReloadJobCompleted(finalJobId);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Reload job did not complete in 10 minutes");
+  }
+
+  private void runQueryAndAssert(String query, String newAddedColumn, FieldSpec fieldSpec) throws Exception {
+    JsonNode response = postQuery(query);
+    assertNoError(response);
+    JsonNode rows = response.get("resultTable").get("rows");
+    JsonNode jsonSchema = response.get("resultTable").get("dataSchema");
+    DataSchema resultSchema = JsonUtils.jsonNodeToObject(jsonSchema, DataSchema.class);
+
+    assert !rows.isEmpty();
+    boolean columnPresent = false;
+    String[] columnNames = resultSchema.getColumnNames();
+    for (int columnIndex = 0; columnIndex < columnNames.length; columnIndex++) {
+      if (columnNames[columnIndex].equals(newAddedColumn)) {
+        columnPresent = true;
+        // Check the data type of the new column
+        Assert.assertEquals(resultSchema.getColumnDataType(columnIndex).name(), fieldSpec.getDataType().name());
+        // Check the value of the new column
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+          Assert.assertEquals(rows.get(rowIndex).get(columnIndex).asText(),
+              String.valueOf(fieldSpec.getDefaultNullValue()));
+        }
+      }
+    }
+    Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
 }

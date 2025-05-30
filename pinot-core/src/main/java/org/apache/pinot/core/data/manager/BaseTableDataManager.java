@@ -393,6 +393,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return indexLoadingConfig;
   }
 
+  public void refreshCachedTableSchema() {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    // Update the cached table config and schema with the latest schema
+    TableConfig tableConfig = _cachedTableConfigAndSchema.getLeft();
+    if (tableConfig == null) {
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    }
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+  }
+
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
@@ -1373,7 +1385,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     for (String columnName : segmentPhysicalColumns) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
       FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
-      DataSource source = segment.getDataSource(columnName);
+      DataSource source = segment.getDataSource(columnName, _cachedTableConfigAndSchema.getRight());
       Preconditions.checkNotNull(columnMetadata);
       Preconditions.checkNotNull(source);
 

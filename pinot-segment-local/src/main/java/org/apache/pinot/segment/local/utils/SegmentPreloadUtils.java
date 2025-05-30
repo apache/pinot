@@ -37,10 +37,18 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,5 +198,48 @@ public class SegmentPreloadUtils {
     ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType)
         .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
     return segmentMetadataMap;
+  }
+
+    /**
+     * Get a virtual data source for the given column in the table.
+     *
+     *
+     * @param column Column name for which the data source is needed
+     * @param totalDocCount Total document count for the column
+     * @return DataSource for the column
+     */
+  public static DataSource getVirtualDataSource(Schema tableSchema, String column, int totalDocCount) {
+    FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
+    if (originalFieldSpec == null) {
+      // If the column is not present in the table schema. There could be two possibilities:
+      // 1. Table Schema provided does not have the latest column. We rely on helix-refresh to update the table schema.
+      //     so there could be a delay in the refresh message reaching the server causing this issue.
+      // 2. The column could be an invalid, this is highly unlikely as invalid columns are pruned at broker,
+      LOGGER.warn("Column: {} is not present in the table schema: {}", column, tableSchema.getSchemaName());
+      return null;
+    }
+    // Make a copy of the field spec from the table schema to avoid modifying the original field spec
+    // This is important because the field spec in the table schema is used in different places to infer physical
+    // column and also during segment creation/updates
+    FieldSpec virtualFieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
+        originalFieldSpec.isSingleValueField(), originalFieldSpec.getMaxLength(),
+        originalFieldSpec.getDefaultNullValue(), originalFieldSpec.getMaxLengthExceedStrategy()) {
+      @Override
+      public FieldType getFieldType() {
+        return originalFieldSpec.getFieldType();
+      }
+      @Override
+      public String getVirtualColumnProvider() {
+        return originalFieldSpec.getVirtualColumnProvider();
+      }
+    };
+    if (!virtualFieldSpec.isVirtualColumn()) {
+      // Set the default virtual column provider if it is not set
+      virtualFieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
+    }
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(virtualFieldSpec, totalDocCount);
+    VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+    return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
+        virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
   }
 }

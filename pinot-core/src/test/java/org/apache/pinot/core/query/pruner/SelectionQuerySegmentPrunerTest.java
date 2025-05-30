@@ -210,7 +210,7 @@ public class SelectionQuerySegmentPrunerTest {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("foo", "testColumn"));
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource(ORDER_BY_COLUMN)).thenReturn(dataSource);
+    when(indexSegment.getDataSource(ORDER_BY_COLUMN, null)).thenReturn(dataSource);
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSourceMetadata.getMinValue()).thenReturn(minValue);

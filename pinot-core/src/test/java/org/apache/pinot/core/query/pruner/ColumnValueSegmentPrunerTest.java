@@ -58,7 +58,7 @@ public class ColumnValueSegmentPrunerTest {
     IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    when(indexSegment.getDataSource("column", null)).thenReturn(dataSource);
 
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);

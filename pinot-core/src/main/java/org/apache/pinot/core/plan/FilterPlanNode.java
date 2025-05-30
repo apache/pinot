@@ -151,7 +151,7 @@ public class FilterPlanNode implements PlanNode {
     if (columnName == null || !findLiteral) {
       return false;
     }
-    DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+    DataSource dataSource = _indexSegment.getDataSource(columnName, _queryContext.getSchema());
     return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
         FieldConfig.IndexType.H3);
   }
@@ -183,7 +183,7 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        DataSource dataSource = _indexSegment.getDataSource(columnName, _queryContext.getSchema());
         return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
             FieldConfig.IndexType.H3);
       }
@@ -192,7 +192,7 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        DataSource dataSource = _indexSegment.getDataSourceNullable(columnName);
+        DataSource dataSource = _indexSegment.getDataSource(columnName, _queryContext.getSchema());
         return dataSource != null && dataSource.getH3Index() != null && _queryContext.isIndexUseAllowed(columnName,
             FieldConfig.IndexType.H3);
       }

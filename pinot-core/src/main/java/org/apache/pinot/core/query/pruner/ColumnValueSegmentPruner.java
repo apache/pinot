@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -78,14 +79,14 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
 
   @Override
   boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate, Map<String, DataSource> dataSourceCache,
-      ValueCache cachedValues) {
+                                    ValueCache cachedValues, QueryContext queryContext) {
     Predicate.Type predicateType = predicate.getType();
     if (predicateType == Predicate.Type.EQ) {
-      return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues, queryContext);
     } else if (predicateType == Predicate.Type.IN) {
-      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
+      return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues, queryContext);
     } else if (predicateType == Predicate.Type.RANGE) {
-      return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
+      return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache, queryContext);
     } else {
       return false;
     }
@@ -99,10 +100,11 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    * </ul>
    */
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext queryContext) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
-        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column, queryContext.getSchema())
+        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, queryContext.getSchema()));
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -131,15 +133,16 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    * <p>NOTE: segments will not be pruned if the number of values is greater than the threshold.
    */
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, ValueCache valueCache) {
+      Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext queryContext) {
     List<String> values = inPredicate.getValues();
     // Skip pruning when there are too many values in the IN predicate
     if (values.size() > _inPredicateThreshold) {
       return false;
     }
     String column = inPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
-        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column, queryContext.getSchema())
+        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, queryContext.getSchema()));
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -160,10 +163,11 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
    * </ul>
    */
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
-      Map<String, DataSource> dataSourceCache) {
+      Map<String, DataSource> dataSourceCache, QueryContext queryContext) {
     String column = rangePredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment instanceof ImmutableSegment ? segment.getDataSource(column)
-        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column, queryContext.getSchema())
+        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, queryContext.getSchema()));
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();

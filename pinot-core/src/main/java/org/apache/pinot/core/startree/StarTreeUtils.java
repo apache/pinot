@@ -93,7 +93,8 @@ public class StarTreeUtils {
    */
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
-      @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
+      @Nullable FilterContext filter, List<Pair<Predicate,
+      PredicateEvaluator>> predicateEvaluatorMapping, QueryContext queryContext) {
     if (filter == null) {
       return Collections.emptyMap();
     }
@@ -109,7 +110,7 @@ public class StarTreeUtils {
           break;
         case OR:
           Pair<String, CompositePredicateEvaluator> pair =
-              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping);
+              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping, queryContext);
           if (pair == null) {
             return null;
           }
@@ -126,7 +127,7 @@ public class StarTreeUtils {
             if (type == FilterContext.Type.PREDICATE) {
               Predicate predicate = negatedChild.getPredicate();
               PredicateEvaluator predicateEvaluator =
-                  getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
+                  getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping, queryContext);
               // Do not use star-tree when the predicate cannot be solved with star-tree
               if (predicateEvaluator == null) {
                 return null;
@@ -155,7 +156,7 @@ public class StarTreeUtils {
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
           PredicateEvaluator predicateEvaluator =
-              getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
+              getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping, queryContext);
           // Do not use star-tree when the predicate cannot be solved with star-tree or is always false
           if (predicateEvaluator == null || predicateEvaluator.isAlwaysFalse()) {
             return null;
@@ -222,7 +223,8 @@ public class StarTreeUtils {
    */
   @Nullable
   private static Pair<String, CompositePredicateEvaluator> isOrClauseValidForStarTree(IndexSegment indexSegment,
-      FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
+      FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping,
+      QueryContext queryContext) {
     assert filter.getType() == FilterContext.Type.OR;
 
     List<ObjectBooleanPair<Predicate>> predicates = new ArrayList<>();
@@ -234,7 +236,7 @@ public class StarTreeUtils {
     List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators = new ArrayList<>();
     for (ObjectBooleanPair<Predicate> predicate : predicates) {
       PredicateEvaluator predicateEvaluator =
-          getPredicateEvaluator(indexSegment, predicate.left(), predicateEvaluatorMapping);
+          getPredicateEvaluator(indexSegment, predicate.left(), predicateEvaluatorMapping, queryContext);
       if (predicateEvaluator == null) {
         // The predicate cannot be solved with star-tree
         return null;
@@ -317,14 +319,14 @@ public class StarTreeUtils {
    */
   @Nullable
   private static PredicateEvaluator getPredicateEvaluator(IndexSegment indexSegment, Predicate predicate,
-      List<Pair<Predicate, PredicateEvaluator>> predicatesEvaluatorMapping) {
+      List<Pair<Predicate, PredicateEvaluator>> predicatesEvaluatorMapping, QueryContext queryContext) {
     ExpressionContext lhs = predicate.getLhs();
     if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
       // Star-tree does not support non-identifier expression
       return null;
     }
     String column = lhs.getIdentifier();
-    DataSource dataSource = indexSegment.getDataSource(column);
+    DataSource dataSource = indexSegment.getDataSource(column, queryContext.getSchema());
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary == null) {
       // Star-tree does not support non-dictionary encoded dimension
@@ -369,7 +371,7 @@ public class StarTreeUtils {
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-        extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators);
+        extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators, queryContext);
     if (predicateEvaluatorsMap == null) {
       return null;
     }
@@ -388,7 +390,7 @@ public class StarTreeUtils {
         }
 
         String column = aggregationFunctionColumnPair.getColumn();
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSource(column, queryContext.getSchema());
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
           return null;
@@ -396,7 +398,7 @@ public class StarTreeUtils {
       }
 
       for (String column : predicateEvaluatorsMap.keySet()) {
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSource(column, queryContext.getSchema());
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because filter column: '{}' has null values", column);
           return null;
@@ -410,7 +412,7 @@ public class StarTreeUtils {
         }
       }
       for (String column : groupByColumns) {
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSource(column, queryContext.getSchema());
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because group-by column: '{}' has null values", column);
           return null;
