@@ -1160,11 +1160,11 @@ public class InstanceSelectorTest {
     for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
       String segment = segments.get(segmentNum);
       if (segmentNum % 2 == 0) {
-        idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap0);
-        externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap0);
+        idealStateSegmentAssignment.put(segment, new HashMap<>(idealStateInstanceStateMap0));
+        externalViewSegmentAssignment.put(segment, new HashMap<>(externalViewInstanceStateMap0));
       } else {
-        idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap1);
-        externalViewSegmentAssignment.put(segment, externalViewInstanceStateMap1);
+        idealStateSegmentAssignment.put(segment, new HashMap<>(idealStateInstanceStateMap1));
+        externalViewSegmentAssignment.put(segment, new HashMap<>(externalViewInstanceStateMap1));
       }
       onlineSegments.add(segment);
     }

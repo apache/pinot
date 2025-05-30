@@ -101,7 +101,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
     }
 
-    return tryAssigning(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected);
+    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected);
   }
 
   /**
@@ -122,7 +122,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    *   }
    * }
    */
-  private Pair<Map<String, String>, Map<String, String>> tryAssigning(Set<String> segments,
+  private Pair<Map<String, String>, Map<String, String>> assign(Set<String> segments,
     SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
@@ -156,8 +156,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     for (int partition = 0; partition < numPartitions; partition++) {
       Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
       if (requiredSegments != null) {
-        getSelectedInstancesForPartition(segmentToSelectedInstanceMap, instanceToSegmentsMap, requiredSegments,
-          partition, preferredReplicaId);
+        getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId,
+          segmentToSelectedInstanceMap);
       }
     }
 
@@ -170,13 +170,13 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * the segments are available in the selected instances.
    * If no replica group is found, it throws an exception.
    */
-  private void getSelectedInstancesForPartition(Map<String, String> segmentToSelectedInstanceMap,
-    Map<String, Set<String>> instanceToSegmentsMap, Set<String> requiredSegments, int partitionId,
-    int preferredReplicaId) {
+  private void getSelectedInstancesForPartition(Map<String, Set<String>> instanceToSegmentsMap,
+    Set<String> requiredSegments, int partitionId, int preferredReplicaId,
+    Map<String, String> segmentToSelectedInstanceMapSink) {
     int numReplicaGroups = _instancePartitions.getNumReplicaGroups();
 
-    for (int i = 0; i < numReplicaGroups; i += 1) {
-      int selectedReplicaGroup = (i + preferredReplicaId) % numReplicaGroups;
+    for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
+      int selectedReplicaGroup = (replicaGroupOffset + preferredReplicaId) % numReplicaGroups;
       List<String> selectedInstances = _instancePartitions.getInstances(partitionId, selectedReplicaGroup);
 
       Set<String> segmentsFromSelectedInstances = new HashSet<>();
@@ -195,7 +195,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
           }
           for (String segment : servedSegments) {
             if (requiredSegments.contains(segment)) {
-              segmentToSelectedInstanceMap.put(segment, instance);
+              segmentToSelectedInstanceMapSink.put(segment, instance);
             }
           }
         }
@@ -204,7 +204,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     }
 
     throw new RuntimeException(
-      String.format("Unable to find any replica-group to serve table: %s", _tableNameWithType));
+      String.format("Unable to find any replica-group to serve segments in the instance-partition %s for table: %s",
+        partitionId, _tableNameWithType));
   }
 
   /**
@@ -212,8 +213,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * this method computes the segments that are optional and the segments that are not.
    */
   private Pair<Map<String, String>, Map<String, String>> computeOptionalSegments(
-    Map<String, String> segmentToSelectedInstanceMap,
-    SegmentStates segmentStates) {
+    Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
 
     Map<String, String> segmentsToInstanceMap = new HashMap<>();
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -229,6 +229,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
       for (SegmentInstanceCandidate candidate : candidates) {
         if (selectedInstance.equals(candidate.getInstance())) {
+          // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+          // broker or server can skip it upon any issue to process it.
           if (candidate.isOnline()) {
             segmentsToInstanceMap.put(segment, selectedInstance);
           } else {
