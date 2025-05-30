@@ -34,6 +34,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -540,7 +541,7 @@ public class SegmentAssignmentUtilsTest {
           SegmentAssignmentUtils.getRealtimeSegmentPartitionId(SEGMENT, REALTIME_TABLE_NAME_WITH_TYPE, helixManager,
               null);
 
-      assertEquals(partitionId, SegmentAssignmentUtils.getDefaultPartitionId(SEGMENT));
+      assertEquals(partitionId, SegmentUtils.getDefaultPartitionId(SEGMENT));
     }
   }
 
@@ -631,7 +632,7 @@ public class SegmentAssignmentUtilsTest {
           SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(SEGMENT, REALTIME_TABLE_NAME_WITH_TYPE,
               TableType.REALTIME, helixManager, 2, null);
 
-      assertEquals(partitionId, SegmentAssignmentUtils.getDefaultPartitionId(SEGMENT));
+      assertEquals(partitionId, SegmentUtils.getDefaultPartitionId(SEGMENT));
     }
   }
 
@@ -709,7 +710,7 @@ public class SegmentAssignmentUtilsTest {
           SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(SEGMENT, OFFLINE_TABLE_NAME_WITH_TYPE,
               TableType.OFFLINE, helixManager, 2, null);
 
-      assertEquals(partitionId, SegmentAssignmentUtils.getDefaultPartitionId(SEGMENT));
+      assertEquals(partitionId, SegmentUtils.getDefaultPartitionId(SEGMENT));
     }
 
     // Set partitionColumn to null and the columnPartitionMetadataMap to return empty map, now the partitionId should
@@ -725,7 +726,7 @@ public class SegmentAssignmentUtilsTest {
           SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(SEGMENT, OFFLINE_TABLE_NAME_WITH_TYPE,
               TableType.OFFLINE, helixManager, 2, null);
 
-      assertEquals(partitionId, SegmentAssignmentUtils.getDefaultPartitionId(SEGMENT));
+      assertEquals(partitionId, SegmentUtils.getDefaultPartitionId(SEGMENT));
     }
   }
 }

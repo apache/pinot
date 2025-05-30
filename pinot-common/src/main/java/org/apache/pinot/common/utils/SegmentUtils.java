@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -96,6 +97,41 @@ public class SegmentUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Return the OFFLINE table partitionId based on the segment metadata if available. If partitionColumn is null, return
+   * a default partitionId calculated based on the segment name
+   */
+  public static int getOfflinePartitionId(SegmentZKMetadata segmentZKMetadata, String offlineTableName,
+      @Nullable String partitionColumn) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    if (partitionColumn == null) {
+      // Use the same logic to calculate the partitionId if partitionColumn or calculated partitionId is null for both
+      // OFFLINE and REALTIME tables
+      return getDefaultPartitionId(segmentName);
+    }
+    ColumnPartitionMetadata partitionMetadata =
+        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(partitionColumn);
+    Preconditions.checkState(partitionMetadata != null,
+        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s",
+        segmentName, offlineTableName, partitionColumn);
+    Set<Integer> partitions = partitionMetadata.getPartitions();
+    Preconditions.checkState(partitions.size() == 1,
+        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
+        offlineTableName, partitionColumn);
+    return partitions.iterator().next();
+  }
+
+  /**
+   * Return a default partitionId based on the hashCode of the segment name. This can be used for both REALTIME and
+   * OFFLINE tables if a partitionId is not available to more evenly spread out these segments
+   */
+  public static int getDefaultPartitionId(String segmentName) {
+    // A random, but consistent, partition id is calculated based on the hash code of the segment name.
+    // Note that '% 10K' is used to prevent having partition ids with large value which will be problematic later in
+    // instance assignment formula.
+    return Math.abs(segmentName.hashCode() % 10_000);
   }
 
   /**
