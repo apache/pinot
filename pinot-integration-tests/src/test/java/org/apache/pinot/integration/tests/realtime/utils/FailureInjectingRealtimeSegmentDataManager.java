@@ -24,6 +24,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildFailureException;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -56,7 +57,8 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
     _failCommit = failCommit;
   }
 
-  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
+      throws SegmentBuildFailureException {
      if (_failCommit) {
        throw new RuntimeException("Forced failure in buildSegmentInternal");
      }
