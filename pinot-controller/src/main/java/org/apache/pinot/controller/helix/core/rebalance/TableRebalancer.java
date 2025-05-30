@@ -605,9 +605,9 @@ public class TableRebalancer {
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
       boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
-      PartitionIdFetcher partitionIdFetcher = new PartitionIdFetcherImpl(tableNameWithType,
-          TableConfigUtils.getPartitionColumn(tableConfig), _helixManager, isStrictRealtimeSegmentAssignment,
-          instancePartitionsMap);
+      PartitionIdFetcher partitionIdFetcher =
+          new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
+              isStrictRealtimeSegmentAssignment);
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
               lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
@@ -1014,7 +1014,7 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("Start offset is null for segment: {}", segmentName);
           return null;
         }
-        Integer partitionId = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+        Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
         // for simplicity here we disable consuming segment info if they do not have partitionId in segmentName
         if (partitionId == null) {
           tableRebalanceLogger.warn("Cannot determine partition id for realtime segment: {}", segmentName);
@@ -1767,62 +1767,27 @@ public class TableRebalancer {
     private final String _partitionColumn;
     private final HelixManager _helixManager;
     private final boolean _isStrictRealtimeSegmentAssignment;
-    private final Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
 
     private PartitionIdFetcherImpl(String tableNameWithType, @Nullable String partitionColumn,
-        HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment,
-        Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+        HelixManager helixManager, boolean isStrictRealtimeSegmentAssignment) {
       _tableNameWithType = tableNameWithType;
       _partitionColumn = partitionColumn;
       _helixManager = helixManager;
       _isStrictRealtimeSegmentAssignment = isStrictRealtimeSegmentAssignment;
-      _instancePartitionsMap = instancePartitionsMap;
     }
 
     @Override
     public int fetch(String segmentName, boolean isConsuming) {
-      Integer partitionId;
-      if (_isStrictRealtimeSegmentAssignment) {
-        // This is how partitionId is calculated for StrictRealtimeSegmentAssignment. Here partitionId is mandatory
-        partitionId =
-            SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
-                _partitionColumn);
-        Preconditions.checkState(partitionId != null, "Failed to find partition id for segment: %s of table: %s",
-            segmentName, _tableNameWithType);
-      } else {
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
-        if (tableType == TableType.REALTIME
-            && (isConsuming || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED))) {
-          // This is how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
-          // instance partitions in RealtimeSegmentAssignment
-          partitionId = SegmentUtils.getRealtimeSegmentPartitionIdOrDefault(segmentName, _tableNameWithType,
-              _helixManager, _partitionColumn);
-        } else {
-          // This is how partitionId is calculated for OFFLINE and REALTIME tables with COMPLETED instance partitions
-          int numPartitions = getNumPartitionsFromInstancePartitions(tableType, isConsuming, _instancePartitionsMap);
-          partitionId = SegmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableNameWithType, tableType,
-              _helixManager, numPartitions, _partitionColumn);
-        }
+      Integer partitionId =
+          SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
+      if (partitionId != null) {
+        return partitionId;
       }
-      return partitionId;
+      // Partition id is mandatory for StrictRealtimeSegmentAssignment
+      Preconditions.checkState(!_isStrictRealtimeSegmentAssignment,
+          "Failed to find partition id for segment: %s of table: %s", segmentName, _tableNameWithType);
+      return SegmentUtils.getDefaultPartitionId(segmentName);
     }
-  }
-
-  private static int getNumPartitionsFromInstancePartitions(TableType tableType, boolean isConsuming,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    int numPartitions;
-    if (tableType == TableType.OFFLINE) {
-      InstancePartitions instancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
-      assert instancePartitions != null;
-      numPartitions = instancePartitions.getNumPartitions();
-    } else {
-      InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
-      assert consumingInstancePartitions != null;
-      InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
-      numPartitions = isConsuming || completedInstancePartitions == null
-          ? consumingInstancePartitions.getNumPartitions() : completedInstancePartitions.getNumPartitions();
-    }
-    return numPartitions;
   }
 
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(

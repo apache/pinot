@@ -107,8 +107,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int segmentPartitionId =
-        SegmentUtils.getRealtimeSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager,
-            _partitionColumn);
+        SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     return assignConsumingSegment(segmentPartitionId, instancePartitions);
   }
 
