@@ -67,7 +67,8 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
         return currentNode;
       }
       return new PhysicalExchange(nodeId(), currentNode, pdd, Collections.emptyList(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.SINGLETON_EXCHANGE, currentNode.unwrap().getTraitSet().getCollation(),
+          PinotExecStrategyTrait.getDefaultExecStrategy());
     }
     List<PRelNode> newInputs = new ArrayList<>();
     for (PRelNode input : currentNode.getPRelInputs()) {

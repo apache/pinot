@@ -101,12 +101,15 @@ public class PlanFragmentAndMailboxAssignment {
       MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, new ArrayList<>(),
           currentFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), false, physicalExchange.getRelCollation().getFieldCollations(),
-          false /* todo: set sortOnSender */);
+          false /* sort on sender */);
       MailboxReceiveNode receiveNode = new MailboxReceiveNode(currentFragmentId, inputFragmentSchema,
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
-          false /* TODO: set sort on receiver */, false /* TODO: set sort on sender */, sendNode);
+          !physicalExchange.getRelCollation().getFieldCollations().isEmpty(), false, sendNode);
       if (receiverFragment == null) {
+        /*
+         * If the root node is an exchange, then the root fragment will not exist yet. We create it here.
+         */
         receiverFragment = createFragment(currentFragmentId, receiveNode, new ArrayList<>(), context,
             pRelNode.getPinotDataDistributionOrThrow().getWorkers());
       }
@@ -127,6 +130,14 @@ public class PlanFragmentAndMailboxAssignment {
     }
     // Convert PRelNode to PlanNode, and create parent/input PlanNode tree.
     PlanNode planNode = PRelToPlanNodeConverter.toPlanNode(pRelNode, currentFragmentId);
+    if (context._planFragmentMap.isEmpty()) {
+      /*
+       * If the root-node is NOT an exchange, then we create the root fragment here. If it's an exchange, it will be
+       * created in the process of handling the exchange.
+       */
+      createFragment(ROOT_FRAGMENT_ID, planNode, new ArrayList<>(), context,
+          pRelNode.getPinotDataDistributionOrThrow().getWorkers());
+    }
     for (PRelNode input : pRelNode.getPRelInputs()) {
       process(input, planNode, currentFragmentId, context);
     }
