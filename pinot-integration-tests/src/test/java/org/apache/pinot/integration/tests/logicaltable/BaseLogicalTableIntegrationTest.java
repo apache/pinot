@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -616,6 +617,38 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     @Language("sql")
     String query = "SELECT count(*) FROM " + getLogicalTableName();
     JsonNode response = postQueryToController(query);
-    assertNoError(response)
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM " + getOfflineTableNames().get(0);
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+  }
+
+  @Test
+  void testControllerJoinQuerySubmit()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getLogicalTableName() + " JOIN " + getPhysicalTableNames().get(0)
+        + " ON " + getLogicalTableName() + ".FlightNum = " + getPhysicalTableNames().get(0) + ".FlightNum";
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown JOIN " + getPhysicalTableNames().get(0)
+        + " ON unknown.FlightNum = " + getPhysicalTableNames().get(0) + ".FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    query = "SELECT count(*) FROM " + getLogicalTableName() + " JOIN known  ON "
+        + getLogicalTableName() + ".FlightNum = unknown.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
   }
 }
