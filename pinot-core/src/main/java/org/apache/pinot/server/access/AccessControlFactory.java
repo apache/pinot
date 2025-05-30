@@ -21,6 +21,7 @@ package org.apache.pinot.server.access;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

@@ -20,7 +20,7 @@ package org.apache.pinot.broker.routing.segmentpruner;
 
 import java.util.Set;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
-import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.spi.auth.request.BrokerRequest;
 
 
 /**

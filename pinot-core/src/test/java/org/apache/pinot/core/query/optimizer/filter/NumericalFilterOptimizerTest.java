@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
+import org.apache.pinot.spi.auth.request.PinotQuery;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;

@@ -21,11 +21,11 @@ package org.apache.pinot.sql.parsers.rewriter;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.auth.request.Expression;
+import org.apache.pinot.spi.auth.request.ExpressionType;
+import org.apache.pinot.spi.auth.request.Function;
+import org.apache.pinot.spi.auth.request.PinotQuery;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 

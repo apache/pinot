@@ -21,9 +21,9 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.auth.request.Literal;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

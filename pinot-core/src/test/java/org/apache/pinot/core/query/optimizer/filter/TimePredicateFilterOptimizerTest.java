@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.List;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
+import org.apache.pinot.spi.auth.request.Expression;
+import org.apache.pinot.spi.auth.request.Function;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;

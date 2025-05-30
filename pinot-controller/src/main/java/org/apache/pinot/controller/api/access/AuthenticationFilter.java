@@ -41,6 +41,8 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.spi.auth.controller.AccessControl;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.glassfish.grizzly.http.server.Request;
 
 

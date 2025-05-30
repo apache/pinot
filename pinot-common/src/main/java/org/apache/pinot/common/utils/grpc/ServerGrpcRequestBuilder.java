@@ -26,7 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.spi.auth.request.BrokerRequest;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;

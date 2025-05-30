@@ -19,9 +19,9 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.List;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.auth.request.Expression;
+import org.apache.pinot.spi.auth.request.Function;
+import org.apache.pinot.spi.auth.request.PinotQuery;
 
 
 public class SelectionsRewriter implements QueryRewriter {

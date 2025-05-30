@@ -19,7 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import java.util.List;
-import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.spi.auth.request.Expression;
 
 
 public class ParserUtils {

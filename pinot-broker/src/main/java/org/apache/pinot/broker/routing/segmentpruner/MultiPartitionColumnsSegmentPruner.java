@@ -30,11 +30,11 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionInfo;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionUtils;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.auth.request.BrokerRequest;
+import org.apache.pinot.spi.auth.request.Expression;
+import org.apache.pinot.spi.auth.request.Function;
+import org.apache.pinot.spi.auth.request.Identifier;
 import org.apache.pinot.sql.FilterKind;
 
 
