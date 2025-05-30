@@ -39,7 +39,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -56,6 +55,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -285,7 +285,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @return true if the query was successfully cancelled, false otherwise.
    */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
-      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
@@ -321,6 +322,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setReduceTimeMillis(response.getBrokerReduceTimeMs());
     statistics.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     statistics.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    statistics.setOfflineThreadMemAllocatedBytes(response.getOfflineThreadMemAllocatedBytes());
+    statistics.setRealtimeThreadMemAllocatedBytes(response.getRealtimeThreadMemAllocatedBytes());
+    statistics.setOfflineResponseSerMemAllocatedBytes(response.getOfflineResponseSerMemAllocatedBytes());
+    statistics.setRealtimeResponseSerMemAllocatedBytes(response.getRealtimeResponseSerMemAllocatedBytes());
+    statistics.setOfflineTotalMemAllocatedBytes(response.getOfflineTotalMemAllocatedBytes());
+    statistics.setRealtimeTotalMemAllocatedBytes(response.getRealtimeTotalMemAllocatedBytes());
     statistics.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
     statistics.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
     statistics.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());

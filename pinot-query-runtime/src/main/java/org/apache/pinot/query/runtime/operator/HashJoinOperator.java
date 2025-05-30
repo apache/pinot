@@ -36,7 +36,6 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -93,44 +92,15 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable() {
-    LOGGER.trace("Building hash table for join operator");
-    long startTime = System.currentTimeMillis();
-    int numRows = 0;
-    MseBlock rightBlock = _rightInput.nextBlock();
-    while (rightBlock.isData()) {
-      MseBlock.Data dataBlock = (MseBlock.Data) rightBlock;
-      List<Object[]> rows = dataBlock.asRowHeap().getRows();
-      // Row based overflow check.
-      if (rows.size() + numRows > _maxRowsInJoin) {
-        if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwForJoinRowLimitExceeded(
-              "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
-        } else {
-          // Just fill up the buffer.
-          int remainingRows = _maxRowsInJoin - numRows;
-          rows = rows.subList(0, remainingRows);
-          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
-          _rightInput.earlyTerminate();
-        }
-      }
-      for (Object[] row : rows) {
-        _rightTable.addRow(_rightKeySelector.getKey(row), row);
-      }
-      numRows += rows.size();
-      sampleAndCheckInterruption();
-      rightBlock = _rightInput.nextBlock();
+  protected void addRowsToRightTable(List<Object[]> rows) {
+    for (Object[] row : rows) {
+      _rightTable.addRow(_rightKeySelector.getKey(row), row);
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
-    } else {
-      _rightTable.finish();
-      _isRightTableBuilt = true;
-    }
-    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
-    LOGGER.trace("Finished building hash table for join operator");
+  }
+
+  @Override
+  protected void finishBuildingRightTable() {
+    _rightTable.finish();
   }
 
   @Override
@@ -260,15 +230,15 @@ public class HashJoinOperator extends BaseJoinOperator {
   protected List<Object[]> buildNonMatchRightRows() {
     List<Object[]> rows = new ArrayList<>();
     if (_rightTable.isKeysUnique()) {
-      for (Map.Entry<Object, Object[]> entry : _rightTable.entrySet()) {
-        Object[] rightRow = entry.getValue();
+      for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
+        Object[] rightRow = (Object[]) entry.getValue();
         if (!_matchedRightRows.containsKey(entry.getKey())) {
           rows.add(joinRow(null, rightRow));
         }
       }
     } else {
-      for (Map.Entry<Object, ArrayList<Object[]>> entry : _rightTable.entrySet()) {
-        List<Object[]> rightRows = entry.getValue();
+      for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
+        List<Object[]> rightRows = ((List<Object[]>) entry.getValue());
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {

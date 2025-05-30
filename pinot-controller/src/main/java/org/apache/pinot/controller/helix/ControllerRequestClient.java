@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
@@ -137,12 +138,34 @@ public class ControllerRequestClient {
     }
   }
 
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forLogicalTableCreate()),
+              logicalTableConfig.toJsonString(), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
           new URI(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())),
           tableConfig.toJsonString(), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
+          new URI(_controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableConfig.getTableName())),
+          logicalTableConfig.toJsonString(), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -241,11 +264,12 @@ public class ControllerRequestClient {
     }
   }
 
-  public void reloadSegment(String tableName, String segmentName, boolean forceReload)
+  public String reloadSegment(String tableName, String segmentName, boolean forceReload)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
-          new URI(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)), null, _headers));
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+        new URI(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)), null, _headers));
+      return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

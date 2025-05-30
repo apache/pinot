@@ -82,6 +82,15 @@ public class AggregationSpec {
     return _functionParameters;
   }
 
+  /// Returns `true` if the given [AggregationSpec] does not match the current one, in which case the star-tree index
+  /// needs to be updated, {@code false} otherwise.
+  /// - Update star-tree if the function parameters or compression codec changes.
+  /// - Do not update star-tree when index version or config changes to avoid rebuilding all the star-trees when the
+  /// default index setting changes. This is consistent with the behavior of forward indexes.
+  public boolean shouldModifyStarTree(AggregationSpec that) {
+    return _compressionCodec != that._compressionCodec || !_functionParameters.equals(that._functionParameters);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

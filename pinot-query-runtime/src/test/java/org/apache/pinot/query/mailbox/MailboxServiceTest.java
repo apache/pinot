@@ -27,6 +27,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -473,6 +475,50 @@ public class MailboxServiceTest {
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), 1);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+  }
+
+  @Test
+  public void testRemoteCancelledBecauseResourceExhausted()
+    throws Exception {
+    PinotConfiguration config = new PinotConfiguration(
+      Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+        1));
+    var mailboxService3 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    mailboxService3.start();
+    var mailboxService4 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
+    mailboxService4.start();
+
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    SendingMailbox sendingMailbox =
+      mailboxService4.getSendingMailbox("localhost", mailboxService3.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+    ReceivingMailbox receivingMailbox = mailboxService3.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(1);
+    receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
+    });
+
+    // Send some large data
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"longer-amount-of-data-than-server-expects"}));
+
+    // Wait until cancellation is delivered
+    receiveMailLatch.await();
+    assertEquals(numCallbacks.get(), 1);
+
+    // Assert that error block is returned from server.
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+    MseBlock block = readBlock(receivingMailbox);
+    assertNotNull(block);
+    assertTrue(block.isError());
+
+    assertTrue(block instanceof ErrorMseBlock);
+    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
+    assertEquals(errorMseBlock.getErrorMessages().get(QueryErrorCode.QUERY_CANCELLATION),
+      "Cancelled by sender with exception: CANCELLED: client cancelled");
+
+    mailboxService3.shutdown();
+    mailboxService4.shutdown();
   }
 
   @Test

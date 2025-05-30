@@ -22,44 +22,39 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 
 
 /**
  * The {@code IntLookupTable} is a lookup table for int keys.
  */
 @SuppressWarnings("unchecked")
-public class IntLookupTable extends LookupTable {
+public class IntLookupTable extends PrimitiveLookupTable {
   private final Int2ObjectOpenHashMap<Object> _lookupTable = new Int2ObjectOpenHashMap<>(INITIAL_CAPACITY);
 
   @Override
-  public void addRow(Object key, Object[] row) {
+  protected void addRowNotNullKey(Object key, Object[] row) {
     _lookupTable.compute((int) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
-  public void finish() {
-    if (!_keysUnique) {
-      for (Int2ObjectMap.Entry<Object> entry : _lookupTable.int2ObjectEntrySet()) {
-        convertValueToList(entry);
-      }
+  protected void finishNotNullKey() {
+    for (Int2ObjectMap.Entry<Object> entry : _lookupTable.int2ObjectEntrySet()) {
+      convertValueToList(entry);
     }
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  protected boolean containsNotNullKey(Object key) {
     return _lookupTable.containsKey((int) key);
   }
 
-  @Nullable
   @Override
-  public Object lookup(Object key) {
+  protected Object lookupNotNullKey(Object key) {
     return _lookupTable.get((int) key);
   }
 
-  @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
+  protected Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.int2ObjectEntrySet();
   }
 }

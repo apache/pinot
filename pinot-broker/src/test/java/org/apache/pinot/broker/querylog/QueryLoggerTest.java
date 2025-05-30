@@ -25,10 +25,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -113,6 +113,8 @@ public class QueryLoggerTest {
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
         + "queryEngine=singleStage,"
+        + "offlineMemAllocatedBytes(total/thread/resSer):0/0/0,"
+        + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
         + "replicaGroups=[],"
         + "query=SELECT * FROM foo");
     //@formatter:on

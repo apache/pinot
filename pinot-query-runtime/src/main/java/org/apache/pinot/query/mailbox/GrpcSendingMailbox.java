@@ -21,6 +21,8 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -171,7 +174,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
+    Metadata metadata = new Metadata();
+    metadata.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _id);
+
     return PinotMailboxGrpc.newStub(_channelManager.getChannel(_hostname, _port))
+        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata))
         .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
         .open(_statusObserver);
   }

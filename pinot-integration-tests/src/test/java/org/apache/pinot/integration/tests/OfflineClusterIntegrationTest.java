@@ -2026,9 +2026,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16343";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
-        + (useMultiStageQueryEngine() ? "CAST(NewAddedDerivedTimestamp AS BIGINT)" : "NewAddedDerivedTimestamp")
-        + " = 1411862400000";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedTimestamp = 1411862400000";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pinotQuery, h2Query);
 
@@ -2221,6 +2219,55 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to remove expression override");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testInvisibleColumns(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long numTotalDocs = getCountStarResult();
+    TableConfig tableConfig = createOfflineTableConfig();
+    Schema schema = createSchema();
+
+    schema.addField(new MetricFieldSpec("$IntMetric", DataType.INT, 1));
+    schema.addField(new DateTimeFieldSpec("$DerivedTimestamp", DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
+    updateSchema(schema);
+
+    List<TransformConfig> transformConfigs =
+        List.of(new TransformConfig("$DerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    tableConfig.setIngestionConfig(ingestionConfig);
+    updateTableConfig(tableConfig);
+
+    // Trigger reload and verify column count doesn't change in query but changes in segment metadata
+    reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
+    assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
+    JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    assertEquals(segmentsMetadata.size(), 12);
+    for (JsonNode segmentMetadata : segmentsMetadata) {
+      assertEquals(segmentMetadata.get("columns").size(), 81);
+    }
+
+    String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE $IntMetric = 1 AND $DerivedTimestamp = 1411862400000";
+    String h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
+    testQuery(pinotQuery, h2Query);
+
+    // Reset the table config first to pass the validation
+    updateTableConfig(_tableConfig);
+
+    // Need to force update the schema because removing columns is backward-incompatible change
+    forceUpdateSchema(_schema);
+
+    reloadAllSegments(TEST_REGULAR_COLUMNS_QUERY, false, numTotalDocs);
+    assertEquals(postQuery(SELECT_STAR_QUERY).get("resultTable").get("dataSchema").get("columnNames").size(), 79);
+    segmentsMetadata = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
+    assertEquals(segmentsMetadata.size(), 12);
+    for (JsonNode segmentMetadata : segmentsMetadata) {
+      assertEquals(segmentMetadata.get("columns").size(), 79);
+    }
   }
 
   @Test
@@ -4012,5 +4059,31 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNoError(result);
 
     assertEquals(result.get("clientRequestId").asText(), clientRequestId);
+  }
+
+  @Test
+  public void testSegmentReload() {
+    try {
+      // Reload a single segment in the offline table
+      String segmentName = listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0);
+      String response = reloadOfflineSegment(DEFAULT_TABLE_NAME + "_OFFLINE", segmentName, true);
+      JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+
+      // Single segment reload response: status is a string, parse manually
+      String statusString = responseJson.get("status").asText();
+      assertTrue(statusString.contains("SUCCESS"), "Segment reload failed: " + statusString);
+      int startIdx = statusString.indexOf("reload job id:") + "reload job id:".length();
+      int endIdx = statusString.indexOf(',', startIdx);
+      String jobId = statusString.substring(startIdx, endIdx).trim();
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return isReloadJobCompleted(jobId);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 600_000L, "Reload job did not complete in 10 minutes");
+    } catch (Exception e) {
+      fail("Segment reload failed with exception: " + e.getMessage());
+    }
   }
 }

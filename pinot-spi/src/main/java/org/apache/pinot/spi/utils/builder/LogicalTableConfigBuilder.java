@@ -23,6 +23,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 
 
 public class LogicalTableConfigBuilder {
@@ -33,6 +34,7 @@ public class LogicalTableConfigBuilder {
   private QuotaConfig _quotaConfig;
   private String _refOfflineTableName;
   private String _refRealtimeTableName;
+  private TimeBoundaryConfig _timeBoundaryConfig;
 
 
   public LogicalTableConfigBuilder setTableName(String tableName) {
@@ -70,6 +72,11 @@ public class LogicalTableConfigBuilder {
     return this;
   }
 
+  public LogicalTableConfigBuilder setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
+    _timeBoundaryConfig = timeBoundaryConfig;
+    return this;
+  }
+
   public LogicalTableConfig build() {
     LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
     logicalTableConfig.setTableName(_tableName);
@@ -79,6 +86,7 @@ public class LogicalTableConfigBuilder {
     logicalTableConfig.setQuotaConfig(_quotaConfig);
     logicalTableConfig.setRefOfflineTableName(_refOfflineTableName);
     logicalTableConfig.setRefRealtimeTableName(_refRealtimeTableName);
+    logicalTableConfig.setTimeBoundaryConfig(_timeBoundaryConfig);
     return logicalTableConfig;
   }
 }

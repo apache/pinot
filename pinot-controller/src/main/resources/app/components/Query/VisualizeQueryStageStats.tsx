@@ -16,8 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from "react";
-import ReactFlow, { Background, Controls, MiniMap, Handle, Node, Edge } from "react-flow-renderer";
+import React, {useMemo, useState} from "react";
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  Handle,
+  Node,
+  Edge,
+  ControlButton
+} from "react-flow-renderer";
 import dagre from "dagre";
 import { Typography, useTheme } from "@material-ui/core";
 import "react-flow-renderer/dist/style.css";
@@ -27,7 +35,8 @@ import isEmpty from "lodash/isEmpty";
  * Main component to visualize query stage stats as a flowchart.
  */
 export const VisualizeQueryStageStats = ({ stageStats }) => {
-  const { nodes, edges } = generateFlowElements(stageStats); // Generate nodes and edges from input data
+  const [simpleMode, setSimpleMode] = useState(true);
+  const { nodes, edges } = useMemo(() => generateFlowElements(stageStats, simpleMode), [stageStats, simpleMode]); // Generate nodes and edges from input data
   
   if(isEmpty(stageStats)) {
     return (
@@ -38,17 +47,22 @@ export const VisualizeQueryStageStats = ({ stageStats }) => {
   }
 
   return (
-    <div style={{ height: 500 }}>
+    <div style={{ height: 1000 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         fitView
         nodeTypes={nodeTypes} // Use custom node types
-        zoomOnScroll={false}
+        zoomOnScroll={true}
       >
         <Background />
-        <Controls showInteractive={false} />
-        <MiniMap />
+        <Controls showInteractive={false}>
+          <ControlButton onClick={() => setSimpleMode(!simpleMode)}>
+            {/* TODO: Look for an icon for this */}
+            {simpleMode ? "Show Details" : "Hide Details"}
+          </ControlButton>
+        </Controls>
+        <MiniMap/>
       </ReactFlow>
     </div>
   );
@@ -125,23 +139,53 @@ const layoutNodesAndEdges = (nodes, edges, direction = "TB") => {
 };
 
 /**
+ * Simplifies the data structure for a node to display only the most useful information.
+ * @param data
+ */
+const calculateSimpleData = (data) => {
+  const simpleData = {
+    type: data.type,
+    clockTimeMs: data.clockTimeMs,
+    emittedRows: data.emittedRows,
+  }
+  if (data.stage) {
+    simpleData["stage"] = data.stage;
+  }
+  if (data.parallelism) {
+    simpleData["parallelism"] = data.parallelism;
+  }
+  if (data.table) {
+    simpleData["table"] = data.table;
+  }
+  if (data.numEntriesScannedPostFilter) {
+    simpleData["numEntriesScannedPostFilter"] = data.numEntriesScannedPostFilter;
+  }
+  if (data.numEntriesScannedInFilter) {
+    simpleData["numEntriesScannedInFilter"] = data.numEntriesScannedInFilter;
+  }
+  return simpleData;
+}
+
+/**
  * Recursively generates nodes and edges for the flowchart from a hierarchical data structure.
  */
-const generateFlowElements = (stats) => {
+const generateFlowElements = (stats, simpleMode) => {
   const stageRoots: Map<Number, Node> = new Map();
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  const createFlowNode = (data, id, parentId) => {
-    const { width, height } = calculateNodeDimensions(data);
+  const createFlowNode = (data, id, parentId, clockTime, strokeWidth) => {
+    const actualNodeData = simpleMode ? calculateSimpleData(data) : data;
+
+    const { width, height } = calculateNodeDimensions(actualNodeData);
 
     // Add the node
-    const flowNode: Node = { id, type: "customNode", data, position: { x: 0, y: 0 }, width, height };
+    const flowNode: Node = { id, type: "customNode", data: actualNodeData, position: { x: 0, y: 0 }, width, height };
     nodes.push(flowNode);
 
     // Add an edge if this node has a parent
     if (parentId) {
-      edges.push({ id: `edge-${id}`, source: parentId, target: id });
+      edges.push({ id: `edge-${id}`, source: parentId, target: id, style: { strokeWidth }});
     }
 
     return flowNode;
@@ -152,8 +196,11 @@ const generateFlowElements = (stats) => {
    *
    * Nodes that have been already added to the graph are not added again.
    */
-  const traverseTree = (node, id, parentId) => {
+  const traverseTree = (node, id, parentId, totalTime) => {
     const { children, ...data } = node;
+
+    const clockTime = data["clockTimeMs"] || 0;
+    const strokeWidth: number = Math.max(1, Math.min(50, clockTime / totalTime * 50));
 
     const stageId = data["stage"];
     if (stageId) {
@@ -162,21 +209,21 @@ const generateFlowElements = (stats) => {
         // Add an edge if this node has a parent
         if (parentId) {
           const id = oldFlowNode.id;
-          edges.push({ id: `edge-${parentId}-${id}`, source: parentId, target: id });
+          edges.push({ id: `edge-${parentId}-${id}`, source: parentId, target: id, style: { strokeWidth }, label: clockTime + "ms" });
           return;
         }
       }
     }
 
-    const newFlowNode = createFlowNode(data, id, parentId);
+    const newFlowNode = createFlowNode(data, id, parentId, clockTime, strokeWidth);
     if (stageId) {
       stageRoots.set(stageId, newFlowNode);
     }
     // Recursively process children
-    children?.forEach((child, idx) => traverseTree(child, `${id}.${idx+1}`, newFlowNode.id));
+    children?.forEach((child, idx) => traverseTree(child, `${id}.${idx+1}`, newFlowNode.id, totalTime));
   };
 
-  traverseTree(stats, "0", null); // Start traversal from the root node
+  traverseTree(stats, "0", null, stats["executionTimeMs"]); // Start traversal from the root node
 
   return layoutNodesAndEdges(nodes, edges);
 };

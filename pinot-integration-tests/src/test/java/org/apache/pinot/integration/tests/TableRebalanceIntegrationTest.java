@@ -64,7 +64,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest {
+public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
   private static String getQueryString(RebalanceConfig rebalanceConfig) {
     return "dryRun=" + rebalanceConfig.isDryRun() + "&preChecks=" + rebalanceConfig.isPreChecks()
         + "&reassignInstances=" + rebalanceConfig.isReassignInstances()
@@ -73,6 +73,7 @@ public class TableRebalanceIntegrationTest extends HybridClusterIntegrationTest 
         + "&bootstrap=" + rebalanceConfig.isBootstrap() + "&downtime=" + rebalanceConfig.isDowntime()
         + "&minAvailableReplicas=" + rebalanceConfig.getMinAvailableReplicas()
         + "&bestEfforts=" + rebalanceConfig.isBestEfforts()
+        + "&batchSizePerServer=" + rebalanceConfig.getBatchSizePerServer()
         + "&externalViewCheckIntervalInMs=" + rebalanceConfig.getExternalViewCheckIntervalInMs()
         + "&externalViewStabilizationTimeoutInMs=" + rebalanceConfig.getExternalViewStabilizationTimeoutInMs()
         + "&updateTargetTier=" + rebalanceConfig.isUpdateTargetTier()

@@ -56,6 +56,12 @@ enum ResultViewType {
   VISUAL = 'visual',
 }
 
+enum ErrorViewType {
+  EXCEPTION = 'exception',
+  JSON = 'json',
+  VISUAL = 'visual',
+}
+
 const useStyles = makeStyles((theme) => ({
   title: {
     flexGrow: 1,
@@ -182,7 +188,7 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
-  const [showException, setShowException] = useState<boolean>(false);
+  const [showErrorType, setShowErrorType] = useState<ErrorViewType>(ErrorViewType.EXCEPTION);
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -608,9 +614,22 @@ const QueryPage = () => {
                         className={classes.sqlError} 
                         severity="error" 
                         action={
+
                           <FormControlLabel
-                            control={<Switch color="primary" checked={showException} onChange={(e) => setShowException(e.target.checked)} name="checkedA" />}
-                            label={<Typography variant='body2'>Show Exceptions</Typography>}
+                              labelPlacement='start'
+                              control={
+                                <ButtonGroup color='primary' size='small'>
+                                  <Button onClick={() => setShowErrorType(ErrorViewType.EXCEPTION)} variant={showErrorType === ErrorViewType.EXCEPTION ? "contained" : "outlined"}>Exception</Button>
+                                  <Button onClick={() => setShowErrorType(ErrorViewType.JSON)} variant={showErrorType === ErrorViewType.JSON ? "contained" : "outlined"}>Json</Button>
+                                  {
+                                    stageStats && Object.keys(stageStats).length > 0 &&
+                                    <Button onClick={() => setShowErrorType(ErrorViewType.VISUAL)} variant={showErrorType === ErrorViewType.VISUAL ? "contained" : "outlined"}>Visual</Button>
+                                  }
+                                </ButtonGroup>
+                              }
+                              label={<Typography style={{marginRight: "8px"}}>View</Typography>}
+                              style={{marginRight: 0}}
+                              className={classes.runNowBtn}
                           />
                         }
                       >
@@ -624,16 +643,37 @@ const QueryPage = () => {
                       </Alert>
                       <Box m={"16px"}></Box>
 
-                      {
-                        showException && resultError.map((error) => (
-                          <Box style={{paddingBottom: "10px"}}>
-                            <Alert className={classes.sqlError} severity="error">
-                              {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
-                              {error.message}
-                            </Alert>
-                          </Box>
-                        ))
-                      }
+                      {showErrorType === ErrorViewType.EXCEPTION && (
+                          resultError.map((error, index) => (
+                              <Box key={error.errorCode ? error.errorCode : `error-${index}`} style={{paddingBottom: "10px"}}>
+                                <Alert className={classes.sqlError} severity="error">
+                                  {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
+                                  {error.message}
+                                </Alert>
+                              </Box>
+                          ))
+                      )}
+                      {showErrorType === ErrorViewType.JSON && (
+                          <SimpleAccordion
+                              headerTitle="Query Result (JSON Format)"
+                              showSearchBox={false}
+                          >
+                            <CodeMirror
+                                options={jsonoptions}
+                                value={outputResult}
+                                className={classes.queryOutput}
+                                autoCursor={false}
+                            />
+                          </SimpleAccordion>
+                      )}
+                      {showErrorType === ErrorViewType.VISUAL && (
+                          <SimpleAccordion
+                              headerTitle="Query Stats Visualized"
+                              showSearchBox={false}
+                          >
+                            <VisualizeQueryStageStats stageStats={stageStats} />
+                          </SimpleAccordion>
+                      )}
                     </>
                   )
                 }

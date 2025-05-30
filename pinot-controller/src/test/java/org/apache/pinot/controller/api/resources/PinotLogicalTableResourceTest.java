@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +32,8 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -334,6 +337,61 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testLogicalTableTimeBoundaryConfigValidation()
+      throws IOException {
+    // Test logical table time boundary strategy validation
+    addDummySchema(LOGICAL_TABLE_NAME);
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_8"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+
+    // Test logical table with no time boundary config
+    logicalTableConfig.setTimeBoundaryConfig(null);
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig' should not be null for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig(null, null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of()));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty"),
+        throwable.getMessage());
+  }
+
+  @Test
   public void testLogicalTableWithSameNameNotAllowed()
       throws IOException {
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(LOGICAL_TABLE_NAME);
@@ -393,7 +451,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     assertEquals(response, objectMapper.writeValueAsString(List.of()));
 
     // setup physical tables and logical tables
-    List<String> logicalTableNames = List.of("db.test_logical_table_1", "test_logical_table_2", "test_logical_table_3");
+    List<String> logicalTableNames =
+        List.of("db.test_logical_table_1", "default.test_logical_table_2", "test_logical_table_3");
     List<String> physicalTableNames = List.of("test_table_1", "test_table_2", "db.test_table_3");
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
 
@@ -405,9 +464,56 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     }
 
-    // verify logical table names
+    // verify logical table names without headers, should return tables without database prefix (or default database)
     String getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
-    assertEquals(getLogicalTableNamesResponse, objectMapper.writeValueAsString(logicalTableNames));
+    assertEquals(getLogicalTableNamesResponse,
+        objectMapper.writeValueAsString(List.of("test_logical_table_2", "test_logical_table_3")));
+
+    // verify logical table names with headers, should return tables with database prefix
+    Map<String, String> headers = new HashMap<>(getHeaders());
+    headers.put(CommonConstants.DATABASE, "db");
+    getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, headers);
+    assertEquals(getLogicalTableNamesResponse,
+        objectMapper.writeValueAsString(List.of("db.test_logical_table_1")));
+  }
+
+  @Test
+  public void testLogicalTableDatabaseHeaderMismatchValidation()
+      throws IOException {
+    Map<String, String> headers = new HashMap<>(getHeaders());
+    headers.put(CommonConstants.DATABASE, "db1");
+    String logicalTableName = "db2.test_logical_table";
+    LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableName,
+        List.of("test_table_1_OFFLINE", "test_table_2_REALTIME"), BROKER_TENANT);
+
+    // Test add logical table with database header mismatch
+    String msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+            headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test get logical table with database header mismatch
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendGetRequest(getLogicalTableUrl, headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test update logical table with database header mismatch
+    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+            headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test delete logical table with database header mismatch
+    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
   }
 
   @Test

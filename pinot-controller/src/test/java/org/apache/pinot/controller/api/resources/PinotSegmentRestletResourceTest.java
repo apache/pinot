@@ -60,8 +60,8 @@ public class PinotSegmentRestletResourceTest {
     fullServerToSegmentsMap.put("svr01", new ArrayList<>(List.of("seg01", "seg02")));
     fullServerToSegmentsMap.put("svr02", new ArrayList<>(List.of("seg02", "seg03")));
     fullServerToSegmentsMap.put("svr03", new ArrayList<>(List.of("seg03", "seg01")));
-    when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName, null)).thenReturn(fullServerToSegmentsMap);
-    when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName, "svr02")).thenReturn(
+    when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName, null, true)).thenReturn(fullServerToSegmentsMap);
+    when(_pinotHelixResourceManager.getServerToSegmentsMap(tableName, "svr02", true)).thenReturn(
         Map.of("svr02", new ArrayList<>(List.of("seg02", "seg03"))));
     when(_pinotHelixResourceManager.getServers(tableName, "seg01")).thenReturn(Set.of("svr01", "svr03"));
 

@@ -24,9 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -309,11 +309,27 @@ public class QueryLogger {
         builder.append(params._queryEngine.getName());
       }
     },
+    OFFLINE_MEM_ALLOCATED_BYTES("offlineMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getOfflineTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineResponseSerMemAllocatedBytes());
+      }
+    },
+    REALTIME_MEM_ALLOCATED_BYTES("realtimeMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRealtimeTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
+      }
+    },
     REPLICA_GROUPS("replicaGroups") {
-        @Override
-        void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-            builder.append(params._response.getReplicaGroups());
-        }
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+          builder.append(params._response.getReplicaGroups());
+      }
     };
 
     public final String _entryName;

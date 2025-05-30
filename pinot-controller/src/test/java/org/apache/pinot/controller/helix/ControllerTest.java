@@ -81,6 +81,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -406,8 +407,9 @@ public class ControllerTest {
         .setBrokerTenant(brokerTenant)
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
-        .setQuotaConfig(new QuotaConfig(null, "999"))
+        .setQuotaConfig(new QuotaConfig(null, "99999"))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
+        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }
@@ -750,9 +752,19 @@ public class ControllerTest {
     getControllerRequestClient().addTableConfig(tableConfig);
   }
 
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().addLogicalTableConfig(logicalTableConfig);
+  }
+
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().updateTableConfig(tableConfig);
+  }
+
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().updateLogicalTableConfig(logicalTableConfig);
   }
 
   public void toggleTableState(String tableName, TableType type, boolean enable)
@@ -842,9 +854,9 @@ public class ControllerTest {
     return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
   }
 
-  public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
+  public String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
   public String reloadRealtimeTable(String tableName)
