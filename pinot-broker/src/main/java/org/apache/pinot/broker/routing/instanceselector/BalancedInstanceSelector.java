@@ -65,7 +65,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions);
     // TODO: refactor to dedup the code and use a single for loop
     Map<Integer, Integer> replicaGroupToSegmentCount = new HashMap<>();
-    if (_adaptiveServerSelector != null) {
+    if (_priorityGroupInstanceSelector != null) {
       for (String segment : segments) {
         List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
         // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
