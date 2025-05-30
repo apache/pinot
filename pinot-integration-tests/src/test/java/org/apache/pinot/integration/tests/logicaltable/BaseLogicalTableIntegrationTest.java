@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.integration.tests.QueryAssert;
 import org.apache.pinot.integration.tests.QueryGenerator;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -67,6 +69,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   private static final String DEFAULT_TENANT = "DefaultTenant";
   private static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable";
   protected static final String DEFAULT_TABLE_NAME = "physicalTable";
+  protected static final String EMPTY_OFFLINE_TABLE_NAME = "empty_o";
   protected static BaseLogicalTableIntegrationTest _sharedClusterTestSuite = null;
   protected List<File> _avroFiles;
 
@@ -111,6 +114,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
       _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
+      _controllerBaseApiUrl = _sharedClusterTestSuite._controllerBaseApiUrl;
     }
 
     _avroFiles = getAllAvroFiles();
@@ -164,6 +168,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    createLogicalTableWithEmptyOfflineTable();
   }
 
   @AfterClass
@@ -250,6 +255,13 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return DEFAULT_TENANT;
   }
 
+  // Setup H2 table with the same name as the logical table.
+  protected void setUpH2Connection(List<File> avroFiles)
+      throws Exception {
+    setUpH2Connection();
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getLogicalTableName(), _h2Connection);
+  }
+
   /**
    * Creates a new OFFLINE table config.
    */
@@ -324,12 +336,35 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     return LogicalTableConfig.fromString(resp);
   }
 
-  protected void deleteLogicalTable()
+  private void createLogicalTableWithEmptyOfflineTable()
       throws IOException {
-    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(getLogicalTableName());
-    // delete logical table
-    String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
-    assertEquals(deleteResponse, "{\"status\":\"" + getLogicalTableName() + " logical table successfully deleted.\"}");
+    Schema schema = createSchema(getSchemaFileName());
+    schema.setSchemaName(TableNameBuilder.extractRawTableName(EMPTY_OFFLINE_TABLE_NAME));
+    addSchema(schema);
+
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    TableConfig offlineTableConfig = createOfflineTableConfig(EMPTY_OFFLINE_TABLE_NAME);
+    addTableConfig(offlineTableConfig);
+    physicalTableConfigMap.put(TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME),
+        new PhysicalTableConfig());
+    String refOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME);
+
+    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
+
+    String addLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
+    Schema logicalTableSchema = createSchema(getSchemaFileName());
+    logicalTableSchema.setSchemaName(logicalTableName);
+    addSchema(logicalTableSchema);
+    LogicalTableConfigBuilder builder =
+        new LogicalTableConfigBuilder().setTableName(logicalTableName)
+            .setBrokerTenant(DEFAULT_TENANT)
+            .setRefOfflineTableName(refOfflineTableName)
+            .setPhysicalTableConfigMap(physicalTableConfigMap);
+
+    String resp =
+        ControllerTest.sendPostRequest(addLogicalTableUrl, builder.build().toSingleLineJsonString(), getHeaders());
+    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
+        + " logical table successfully added.\"}");
   }
 
   @Override
@@ -414,22 +449,24 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertEquals(new HashSet<>(getPhysicalTableNames()), logicalTableConfig.getPhysicalTableConfigMap().keySet());
   }
 
-  @Test
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
   public void testQueriesFromQueryFile()
       throws Exception {
+    setUseMultiStageQueryEngine(false);
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries(true, false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test
@@ -557,5 +594,61 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     response = postQuery(starQuery);
     exceptions = response.get("exceptions");
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLogicalTableWithEmptyOfflineTable(boolean useMultiStageQueryEngine)
+      throws Exception {
+
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
+    // Query should return empty result
+    JsonNode queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
+    assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
+    assertEquals(queryResponse.get("numServersQueried").asInt(), useMultiStageQueryEngine ? 1 : 0);
+    assertTrue(queryResponse.get("exceptions").isEmpty());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  void testControllerQuerySubmit(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getLogicalTableName();
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM " + getOfflineTableNames().get(0);
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+  }
+
+  @Test
+  void testControllerJoinQuerySubmit()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getLogicalTableName() + " JOIN " + getPhysicalTableNames().get(0)
+        + " ON " + getLogicalTableName() + ".FlightNum = " + getPhysicalTableNames().get(0) + ".FlightNum";
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown JOIN " + getPhysicalTableNames().get(0)
+        + " ON unknown.FlightNum = " + getPhysicalTableNames().get(0) + ".FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    query = "SELECT count(*) FROM " + getLogicalTableName() + " JOIN known  ON "
+        + getLogicalTableName() + ".FlightNum = unknown.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
   }
 }

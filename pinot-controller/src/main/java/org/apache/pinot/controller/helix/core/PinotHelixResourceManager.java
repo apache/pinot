@@ -907,6 +907,17 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Given a logical table name in any case, returns the logical table name as defined in Helix/Segment/Schema
+   * @param logicalTableName logical tableName in any case.
+   * @return logicalTableName actually defined in Pinot (matches case) and exists ,else, return the input value
+   */
+  public String getActualLogicalTableName(String logicalTableName, @Nullable String databaseName) {
+    logicalTableName = DatabaseUtils.translateTableName(logicalTableName, databaseName, _tableCache.isIgnoreCase());
+    String actualTableName = _tableCache.getActualLogicalTableName(logicalTableName);
+    return actualTableName != null ? actualTableName : logicalTableName;
+  }
+
+  /**
    * Table related APIs
    */
   // TODO: move table related APIs here
