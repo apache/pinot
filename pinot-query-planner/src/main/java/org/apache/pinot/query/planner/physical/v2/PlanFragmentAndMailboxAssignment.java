@@ -79,7 +79,9 @@ public class PlanFragmentAndMailboxAssignment {
     }
     if (pRelNode.unwrap() instanceof PhysicalExchange) {
       PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
-      int senderFragmentId = context._planFragmentMap.size() + 1;
+      // receiverFragment may be null if this is the root fragment has not been found yet.
+      PlanFragment receiverFragment = context._planFragmentMap.get(currentFragmentId);
+      int senderFragmentId = context._planFragmentMap.size() + (receiverFragment == null ? 1 : 0);
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
       RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
@@ -92,9 +94,8 @@ public class PlanFragmentAndMailboxAssignment {
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
           false /* TODO: set sort on receiver */, false /* TODO: set sort on sender */, sendNode);
-      PlanFragment receiveFragment = context._planFragmentMap.get(currentFragmentId);
-      if (receiveFragment == null) {
-        receiveFragment = createFragment(currentFragmentId, receiveNode, new ArrayList<>(), context,
+      if (receiverFragment == null) {
+        receiverFragment = createFragment(currentFragmentId, receiveNode, new ArrayList<>(), context,
             pRelNode.getPinotDataDistributionOrThrow().getWorkers());
       }
       PlanFragment newPlanFragment = createFragment(senderFragmentId, sendNode, new ArrayList<>(), context,
