@@ -18,53 +18,29 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.base.Preconditions;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.BcryptUtils;
-import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
-import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * Zookeeper Basic Authentication based on Pinot Controller UI.
- * The user role has been distinguished by user and admin. Only admin can have access to the
- * user console page in Pinot controller UI. And admin can change user info (table permission/
- * number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
- * and these changes happen immediately.
- * Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
- *
+ * Zookeeper Basic Authentication for brokers. The user role has been distinguished by user and admin.
+ * Users Configurations are stored in Helix Zookeeper and user password are encrypted via Bcrypt Encryption Algorithm.
  */
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
-  private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
 
-  public ZkBasicAuthAccessControlFactory() {
-    // left blank
-  }
-
   @Override
   public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    // Build an AccessControlUserCache for user info from ZK, then create AccessControl.
     _accessControl = new BasicAuthAccessControl(new AccessControlUserCache(propertyStore));
   }
 
@@ -76,72 +52,16 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
   /**
    * Access Control using header-based basic http authentication
    */
-  private static class BasicAuthAccessControl implements AccessControl {
-    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+  private static class BasicAuthAccessControl extends AbstractBasicAuthAccessControl {
     private final AccessControlUserCache _userCache;
 
-    public BasicAuthAccessControl(AccessControlUserCache userCache) {
+    BasicAuthAccessControl(AccessControlUserCache userCache) {
       _userCache = userCache;
     }
 
     @Override
-    public AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
-      return authorize(requesterIdentity, (BrokerRequest) null);
-    }
-
-    @Override
-    public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-          .isSetTableName()) {
-        // no table restrictions? accept
-        return TableAuthorizationResult.success();
-      }
-
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
-    }
-
-    @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
-      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
-      if (!principalOpt.isPresent()) {
-        throw new NotAuthorizedException("Basic");
-      }
-      if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-
-      ZkBasicAuthPrincipal principal = principalOpt.get();
-      Set<String> failedTables = new HashSet<>();
-      for (String table : tables) {
-        if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
-          failedTables.add(table);
-        }
-      }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables);
-    }
-
-    private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
-      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-
-      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
-          .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
-
-      Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal =
-          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
-
-      Optional<ZkBasicAuthPrincipal> principalOpt = password2principal.entrySet().stream().filter(
-          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
-              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
-      return principalOpt;
+    protected Optional<ZkBasicAuthPrincipal> getPrincipal(RequesterIdentity requesterIdentity) {
+      return BasicAuthUtils.getPrincipal(getTokens(requesterIdentity), _userCache, ComponentType.BROKER);
     }
   }
 }
