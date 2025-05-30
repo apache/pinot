@@ -616,6 +616,6 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     @Language("sql")
     String query = "SELECT count(*) FROM " + getLogicalTableName();
     JsonNode response = postQueryToController(query);
-    assertTrue(response.get("exceptions").isEmpty());
+    assertNoError(response)
   }
 }
