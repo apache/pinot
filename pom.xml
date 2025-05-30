@@ -147,7 +147,7 @@
     <jackson.version>2.19.0</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
-    <jersey.version>3.1.10</jersey.version>
+    <jersey.version>2.46</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
     <swagger-ui.version>5.22.0</swagger-ui.version>
