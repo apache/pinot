@@ -27,6 +27,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -72,7 +73,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
       InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
     int numPartitions = instancePartitions.getNumPartitions();
     checkReplication(instancePartitions, _replication, _tableName);
-    int partitionId = SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableName,
+    int partitionId = SegmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableName,
         _tableConfig.getTableType(), _helixManager, numPartitions, _partitionColumn) % numPartitions;
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
@@ -99,11 +100,11 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     } else {
       Map<Integer, List<String>> instancePartitionIdToSegmentsMap;
       if (_tableConfig.getTableType() == TableType.OFFLINE) {
-        instancePartitionIdToSegmentsMap = SegmentAssignmentUtils
+        instancePartitionIdToSegmentsMap = SegmentUtils
             .getOfflineInstancePartitionIdToSegmentsMap(currentAssignment.keySet(),
                 instancePartitions.getNumPartitions(), _tableName, _helixManager, _partitionColumn);
       } else {
-        instancePartitionIdToSegmentsMap = SegmentAssignmentUtils
+        instancePartitionIdToSegmentsMap = SegmentUtils
             .getRealtimeInstancePartitionIdToSegmentsMap(currentAssignment.keySet(),
                 instancePartitions.getNumPartitions(), _tableName, _helixManager, _partitionColumn);
       }

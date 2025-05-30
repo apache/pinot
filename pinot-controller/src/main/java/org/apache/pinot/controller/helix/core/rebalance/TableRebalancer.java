@@ -1795,13 +1795,13 @@ public class TableRebalancer {
             && (isConsuming || !_instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED))) {
           // This is how partitionId is calculated for CONSUMING segments and ONLINE segments without COMPLETED
           // instance partitions in RealtimeSegmentAssignment
-          partitionId = SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType,
+          partitionId = SegmentUtils.getRealtimeSegmentPartitionIdOrDefault(segmentName, _tableNameWithType,
               _helixManager, _partitionColumn);
         } else {
           // This is how partitionId is calculated for OFFLINE and REALTIME tables with COMPLETED instance partitions
           int numPartitions = getNumPartitionsFromInstancePartitions(tableType, isConsuming, _instancePartitionsMap);
-          partitionId = SegmentAssignmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableNameWithType,
-              tableType, _helixManager, numPartitions, _partitionColumn);
+          partitionId = SegmentUtils.getOfflineOrCompletedPartitionId(segmentName, _tableNameWithType, tableType,
+              _helixManager, numPartitions, _partitionColumn);
         }
       }
       return partitionId;
