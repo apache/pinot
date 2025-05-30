@@ -191,10 +191,6 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     Queue<String> lastQueue = new LinkedList<>();
     Set<String> dimTables = getDimensionalTables(config.getTenantName());
     dryRunResults.forEach((table, dryRynResult) -> {
-      // only when a table is marked DONE in dry run, we schedule it to rebalance
-      if (dryRynResult.getStatus() != RebalanceResult.Status.DONE) {
-        return;
-      }
       if (dimTables.contains(table)) {
         // check if the dimension table is a pure scale out or scale in.
         // pure scale out means that only new servers are added and no servers are removed, vice versa
