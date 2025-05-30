@@ -19,9 +19,9 @@
 package org.apache.pinot.query.routing.table;
 
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.spi.auth.request.BrokerRequest;
 
 
 /**

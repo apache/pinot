@@ -20,7 +20,7 @@ package org.apache.pinot.common.request.context;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.spi.auth.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;

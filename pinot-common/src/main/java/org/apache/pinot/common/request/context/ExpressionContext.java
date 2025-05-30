@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.spi.auth.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 

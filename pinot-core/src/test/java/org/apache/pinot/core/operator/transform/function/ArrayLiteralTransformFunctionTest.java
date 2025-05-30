@@ -20,9 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.spi.auth.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;

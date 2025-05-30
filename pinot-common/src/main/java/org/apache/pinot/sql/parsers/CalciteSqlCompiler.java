@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.spi.auth.request.BrokerRequest;
+import org.apache.pinot.spi.auth.request.DataSource;
+import org.apache.pinot.spi.auth.request.PinotQuery;
+import org.apache.pinot.spi.auth.request.QuerySource;
 
 
 public class CalciteSqlCompiler {
