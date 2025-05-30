@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -50,52 +47,21 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 
 public class PlanFragmentAndMailboxAssignment {
   private static final int ROOT_FRAGMENT_ID = 0;
-  private static final int FIRST_NON_ROOT_FRAGMENT_ID = 1;
 
   public Result compute(PRelNode rootPRelNode, PhysicalPlannerContext physicalPlannerContext) {
-    Preconditions.checkState(!(rootPRelNode.unwrap() instanceof Exchange), "root node should never be exchange");
-    final DataSchema rootDataSchema = PRelToPlanNodeConverter.toDataSchema(rootPRelNode.unwrap().getRowType());
-    // Create input fragment's send node.
-    MailboxSendNode sendNode = new MailboxSendNode(FIRST_NON_ROOT_FRAGMENT_ID, rootDataSchema, new ArrayList<>(),
-        ROOT_FRAGMENT_ID, PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.SINGLETON,
-        null, false, null, false);
-    // Create root receive node.
-    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(ROOT_FRAGMENT_ID, rootDataSchema,
-        FIRST_NON_ROOT_FRAGMENT_ID, PinotRelExchangeType.getDefaultExchangeType(),
-        RelDistribution.Type.BROADCAST_DISTRIBUTED, null, null, false, false, sendNode);
     // Create the first two fragments.
     Context context = new Context(physicalPlannerContext);
-    PlanFragment rootFragment = createFragment(ROOT_FRAGMENT_ID, rootReceiveNode, new ArrayList<>(), context);
-    PlanFragment firstInputFragment = createFragment(FIRST_NON_ROOT_FRAGMENT_ID, sendNode, new ArrayList<>(), context);
-    rootFragment.getChildren().add(firstInputFragment);
-    QueryServerInstance brokerInstance = new QueryServerInstance(physicalPlannerContext.getInstanceId(),
-        physicalPlannerContext.getHostName(), physicalPlannerContext.getPort(), physicalPlannerContext.getPort());
-    computeMailboxInfos(FIRST_NON_ROOT_FRAGMENT_ID, ROOT_FRAGMENT_ID,
-        createWorkerMap(rootPRelNode.getPinotDataDistributionOrThrow().getWorkers(), context),
-        ImmutableMap.of(0, brokerInstance), ExchangeStrategy.SINGLETON_EXCHANGE, context);
     // Traverse entire tree.
-    context._fragmentMetadataMap.get(ROOT_FRAGMENT_ID).setWorkerIdToServerInstanceMap(ImmutableMap.of(
-        0, brokerInstance));
-    visit(rootPRelNode, sendNode, firstInputFragment, context);
+    visit(rootPRelNode, null, ROOT_FRAGMENT_ID, context);
     Result result = new Result();
     result._fragmentMetadataMap = context._fragmentMetadataMap;
     result._planFragmentMap = context._planFragmentMap;
     return result;
   }
 
-  /**
-   * Invariants: 1. Parent PlanNode does not have current node in input yet. 2. This node is NOT the fragment root. This
-   * is because each fragment root is a MailboxSendNode.
-   */
-  private void visit(PRelNode pRelNode, @Nullable PlanNode parent, PlanFragment currentFragment, Context context) {
-    int currentFragmentId = currentFragment.getFragmentId();
-    DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
-    if (MapUtils.isEmpty(fragmentMetadata.getWorkerIdToServerInstanceMap())) {
-      // TODO: This is quite a complex invariant.
-      fragmentMetadata.setWorkerIdToServerInstanceMap(createWorkerMap(
-          pRelNode.getPinotDataDistributionOrThrow().getWorkers(), context));
-    }
+  private void visit(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId, Context context) {
     if (pRelNode.unwrap() instanceof TableScan) {
+      DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
       TableScanMetadata tableScanMetadata = Objects.requireNonNull(pRelNode.getTableScanMetadata(),
           "No metadata in table scan PRelNode");
       String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
@@ -113,7 +79,7 @@ public class PlanFragmentAndMailboxAssignment {
     }
     if (pRelNode.unwrap() instanceof PhysicalExchange) {
       PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
-      int senderFragmentId = context._planFragmentMap.size();
+      int senderFragmentId = context._planFragmentMap.size() + 1;
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
       RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
@@ -126,15 +92,21 @@ public class PlanFragmentAndMailboxAssignment {
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
           false /* TODO: set sort on receiver */, false /* TODO: set sort on sender */, sendNode);
-      PlanFragment newPlanFragment = createFragment(senderFragmentId, sendNode, new ArrayList<>(), context);
+      PlanFragment receiveFragment = context._planFragmentMap.get(currentFragmentId);
+      if (receiveFragment == null) {
+        receiveFragment = createFragment(currentFragmentId, receiveNode, new ArrayList<>(), context,
+            pRelNode.getPinotDataDistributionOrThrow().getWorkers());
+      }
+      PlanFragment newPlanFragment = createFragment(senderFragmentId, sendNode, new ArrayList<>(), context,
+          physicalExchange.getPRelInputs().get(0).getPinotDataDistributionOrThrow().getWorkers());
       Map<Integer, QueryServerInstance> senderWorkers = createWorkerMap(pRelNode.getPRelInput(0)
           .getPinotDataDistributionOrThrow().getWorkers(), context);
       Map<Integer, QueryServerInstance> receiverWorkers = createWorkerMap(pRelNode.getPinotDataDistributionOrThrow()
           .getWorkers(), context);
       computeMailboxInfos(senderFragmentId, currentFragmentId, senderWorkers, receiverWorkers,
           physicalExchange.getExchangeStrategy(), context);
-      currentFragment.getChildren().add(newPlanFragment);
-      visit(pRelNode.getPRelInput(0), sendNode, newPlanFragment, context);
+      context._planFragmentMap.get(currentFragmentId).getChildren().add(newPlanFragment);
+      visit(pRelNode.getPRelInput(0), sendNode, newPlanFragment.getFragmentId(), context);
       if (parent != null) {
         parent.getInputs().add(receiveNode);
       }
@@ -142,7 +114,7 @@ public class PlanFragmentAndMailboxAssignment {
     }
     PlanNode planNode = PRelToPlanNodeConverter.toPlanNode(pRelNode, currentFragmentId);
     for (PRelNode input : pRelNode.getPRelInputs()) {
-      visit(input, planNode, currentFragment, context);
+      visit(input, planNode, currentFragmentId, context);
     }
     if (parent != null) {
       parent.getInputs().add(planNode);
@@ -150,10 +122,14 @@ public class PlanFragmentAndMailboxAssignment {
   }
 
   private PlanFragment createFragment(int fragmentId, PlanNode planNode, List<PlanFragment> inputFragments,
-      Context context) {
+      Context context, List<String> workers) {
+    // track new plan fragment
     PlanFragment fragment = new PlanFragment(fragmentId, planNode, inputFragments);
     context._planFragmentMap.put(fragmentId, fragment);
-    context._fragmentMetadataMap.put(fragmentId, new DispatchablePlanMetadata());
+    // add fragment metadata
+    DispatchablePlanMetadata fragmentMetadata = new DispatchablePlanMetadata();
+    fragmentMetadata.setWorkerIdToServerInstanceMap(createWorkerMap(workers, context));
+    context._fragmentMetadataMap.put(fragmentId, fragmentMetadata);
     return fragment;
   }
 

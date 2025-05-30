@@ -82,6 +82,7 @@ public class PhysicalPlannerContext {
     _instanceId = instanceId;
     _queryOptions = queryOptions == null ? Map.of() : queryOptions;
     _useLiteMode = PhysicalPlannerContext.useLiteMode(queryOptions);
+    _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -119,6 +120,10 @@ public class PhysicalPlannerContext {
 
   public boolean isUseLiteMode() {
     return _useLiteMode;
+  }
+
+  public QueryServerInstance getBrokerQueryServerInstance() {
+    return new QueryServerInstance(_instanceId, _hostName, _port, _port);
   }
 
   public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {
