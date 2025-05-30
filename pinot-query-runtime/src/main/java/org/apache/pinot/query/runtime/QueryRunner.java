@@ -275,12 +275,15 @@ public class QueryRunner {
             workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan,
-          _leafQueryExecutor, _executorService);
+      Map<String, String> rlsFilters =
+          requestMetadata.entrySet().stream().filter(e -> e.getKey().startsWith(CommonConstants.RLS_FILTERS))
+              .collect(Collectors.toMap(e -> e.getKey().split("-")[1], Map.Entry::getValue));
+      opChain =
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+              rlsFilters);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
-    try {
+    } try {
       // This can fail if the executor rejects the task.
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
@@ -376,8 +379,7 @@ public class QueryRunner {
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
-                .putAllMetadata(ImmutableMap.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId))
-                .build();
+                .putAllMetadata(ImmutableMap.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId)).build();
             responseObserver.onNext(response);
           }
           responseObserver.onCompleted();
@@ -500,7 +502,7 @@ public class QueryRunner {
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-            leafNodesConsumer, true);
+            leafNodesConsumer, true, Map.of());
     opChain.close(); // probably unnecessary, but formally needed
 
     PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
