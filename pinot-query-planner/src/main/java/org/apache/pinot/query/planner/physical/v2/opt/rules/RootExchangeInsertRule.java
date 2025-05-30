@@ -31,6 +31,10 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 
 
+/**
+ * Adds an exchange node at the root of the plan if the root node is not already located as a singleton on the broker.
+ * This is because the entire data needs to be returned by the broker to the client.
+ */
 public class RootExchangeInsertRule implements PRelNodeTransformer {
   private final PhysicalPlannerContext _context;
 

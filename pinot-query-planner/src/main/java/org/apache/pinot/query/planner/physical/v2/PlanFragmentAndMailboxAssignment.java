@@ -35,6 +35,7 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -45,6 +46,28 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
 
 
+/**
+ * <h1>Responsibilities</h1>
+ * This does the following:
+ * <ul>
+ *   <li>Splits plan around PhysicalExchange nodes to create plan fragments.</li>
+ *   <li>Converts PRelNodes to PlanNodes.</li>
+ *   <li>
+ *     Creates mailboxes for connecting plan fragments. This is done simply based on the workers in the send/receive
+ *     plan nodes, and the exchange strategy (identity, partitioning, etc.).
+ *   </li>
+ *   <li>
+ *     Creates metadata for each plan fragment, which includes the scanned tables, unavailable segments, etc.
+ *   </li>
+ * </ul>
+ * <h1>Design Note</h1>
+ * This class is completely un-opinionated. The old optimizer had a lot of custom logic added to mailbox assignment,
+ * but this class instead doesn't do any special handling, apart from assigning mailboxes based on the exchange
+ * strategy. This is an important and conscious design choice, because it ensures division of responsibilities and
+ * allows optimizer rules like worker assignment to completely own their responsibilities. This is also important for
+ * keeping the optimizer maximally pluggable. (e.g. you can swap out the default worker assignment rule with a
+ * custom rule like the LiteMode worker assignment rule).
+ */
 public class PlanFragmentAndMailboxAssignment {
   private static final int ROOT_FRAGMENT_ID = 0;
 
@@ -52,44 +75,33 @@ public class PlanFragmentAndMailboxAssignment {
     // Create the first two fragments.
     Context context = new Context(physicalPlannerContext);
     // Traverse entire tree.
-    visit(rootPRelNode, null, ROOT_FRAGMENT_ID, context);
+    process(rootPRelNode, null, ROOT_FRAGMENT_ID, context);
     Result result = new Result();
     result._fragmentMetadataMap = context._fragmentMetadataMap;
     result._planFragmentMap = context._planFragmentMap;
     return result;
   }
 
-  private void visit(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId, Context context) {
+  private void process(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId, Context context) {
     if (pRelNode.unwrap() instanceof TableScan) {
-      DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
-      TableScanMetadata tableScanMetadata = Objects.requireNonNull(pRelNode.getTableScanMetadata(),
-          "No metadata in table scan PRelNode");
-      String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
-      if (!tableScanMetadata.getUnavailableSegmentsMap().isEmpty()) {
-        fragmentMetadata.addUnavailableSegments(tableName,
-            tableScanMetadata.getUnavailableSegmentsMap().get(tableName));
-      }
-      fragmentMetadata.addScannedTable(tableName);
-      fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
-      NodeHint nodeHint = NodeHint.fromRelHints(((TableScan) pRelNode.unwrap()).getHints());
-      fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
-      if (tableScanMetadata.getTimeBoundaryInfo() != null) {
-        fragmentMetadata.setTimeBoundaryInfo(tableScanMetadata.getTimeBoundaryInfo());
-      }
+      processTableScan((PhysicalTableScan) pRelNode.unwrap(), currentFragmentId, context);
     }
     if (pRelNode.unwrap() instanceof PhysicalExchange) {
+      // Split an exchange into two fragments: one for the sender and one for the receiver.
+      // The sender fragment will have a MailboxSendNode and receiver a MailboxReceiveNode.
+      // It is possible that the receiver fragment doesn't exist yet (e.g. when PhysicalExchange is the root node).
+      // In that case, we also create it here. If it exists already, we simply re-use it.
       PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
-      // receiverFragment may be null if this is the root fragment has not been found yet.
       PlanFragment receiverFragment = context._planFragmentMap.get(currentFragmentId);
       int senderFragmentId = context._planFragmentMap.size() + (receiverFragment == null ? 1 : 0);
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
       RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
           physicalExchange.getExchangeStrategy(), physicalExchange.getDistributionKeys()).getType();
-      List<PlanNode> inputs = new ArrayList<>();
-      MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, inputs, currentFragmentId,
-          PinotRelExchangeType.getDefaultExchangeType(), distributionType, physicalExchange.getDistributionKeys(),
-          false, physicalExchange.getRelCollation().getFieldCollations(), false /* todo: set sortOnSender */);
+      MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, new ArrayList<>(),
+          currentFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
+          physicalExchange.getDistributionKeys(), false, physicalExchange.getRelCollation().getFieldCollations(),
+          false /* todo: set sortOnSender */);
       MailboxReceiveNode receiveNode = new MailboxReceiveNode(currentFragmentId, inputFragmentSchema,
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
@@ -107,18 +119,37 @@ public class PlanFragmentAndMailboxAssignment {
       computeMailboxInfos(senderFragmentId, currentFragmentId, senderWorkers, receiverWorkers,
           physicalExchange.getExchangeStrategy(), context);
       context._planFragmentMap.get(currentFragmentId).getChildren().add(newPlanFragment);
-      visit(pRelNode.getPRelInput(0), sendNode, newPlanFragment.getFragmentId(), context);
+      process(pRelNode.getPRelInput(0), sendNode, newPlanFragment.getFragmentId(), context);
       if (parent != null) {
         parent.getInputs().add(receiveNode);
       }
       return;
     }
+    // Convert PRelNode to PlanNode, and create parent/input PlanNode tree.
     PlanNode planNode = PRelToPlanNodeConverter.toPlanNode(pRelNode, currentFragmentId);
     for (PRelNode input : pRelNode.getPRelInputs()) {
-      visit(input, planNode, currentFragmentId, context);
+      process(input, planNode, currentFragmentId, context);
     }
     if (parent != null) {
       parent.getInputs().add(planNode);
+    }
+  }
+
+  private void processTableScan(PhysicalTableScan tableScan, int currentFragmentId, Context context) {
+    DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
+    TableScanMetadata tableScanMetadata = Objects.requireNonNull(tableScan.getTableScanMetadata(),
+        "No metadata in table scan PRelNode");
+    String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
+    if (!tableScanMetadata.getUnavailableSegmentsMap().isEmpty()) {
+      fragmentMetadata.addUnavailableSegments(tableName,
+          tableScanMetadata.getUnavailableSegmentsMap().get(tableName));
+    }
+    fragmentMetadata.addScannedTable(tableName);
+    fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
+    NodeHint nodeHint = NodeHint.fromRelHints(tableScan.getHints());
+    fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
+    if (tableScanMetadata.getTimeBoundaryInfo() != null) {
+      fragmentMetadata.setTimeBoundaryInfo(tableScanMetadata.getTimeBoundaryInfo());
     }
   }
 
