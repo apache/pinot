@@ -345,7 +345,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
     int numReplicas = Integer.MAX_VALUE;
-    if (rebalanceConfig.isDowntime() || PauselessConsumptionUtils.isPauselessEnabled(tableConfig)){
+    if (rebalanceConfig.isDowntime() || PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       for (String segment : segmentsToMove) {
         numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
       }
@@ -365,7 +365,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
       if (numReplicas == 1) {
         pass = false;
-        warnings.add("Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss during rebalance");
+        warnings.add(
+            "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
+                + "during rebalance");
       } else if (rebalanceConfig.isDowntime() || minAvailableReplica <= 0) {
         pass = false;
         warnings.add("Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
