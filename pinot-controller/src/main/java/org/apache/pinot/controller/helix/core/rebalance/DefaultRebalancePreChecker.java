@@ -358,6 +358,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
     }
 
+    // It was revealed a risk of data loss for pauseless tables during rebalance, when downtime=true or
+    // minAvailableReplicas=0 -- If a segment is being moved and has not yet uploaded to deep store, premature
+    // deletion could cause irrecoverable data loss. This pre-check added as a workaround to warn the potential risk.
+    // TODO: Get to the root cause of the issue and revisit this pre-check.
     if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       int minAvailableReplica = rebalanceConfig.getMinAvailableReplicas();
       if (minAvailableReplica < 0) {
