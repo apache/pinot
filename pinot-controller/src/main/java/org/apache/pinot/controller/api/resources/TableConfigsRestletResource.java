@@ -49,6 +49,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -73,6 +74,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -283,6 +285,17 @@ public class TableConfigsRestletResource {
       String tableName, @Context HttpHeaders headers) {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+
+      // Validate the table is not referenced in any logical table config.
+      List<LogicalTableConfig> allLogicalTableConfigs =
+          ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+      for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+        validateRefTableName(tableName, logicalTableConfig.getRefOfflineTableName(),
+            logicalTableConfig.getTableName());
+        validateRefTableName(tableName, logicalTableConfig.getRefRealtimeTableName(),
+            logicalTableConfig.getTableName());
+      }
+
       boolean tableExists =
           _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
               tableName);
@@ -301,6 +314,15 @@ public class TableConfigsRestletResource {
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  private void validateRefTableName(String tableName,
+      String refTableName, String logicalTableName) {
+    if (refTableName != null && tableName.equals(TableNameBuilder.extractRawTableName(refTableName))) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+              tableName, logicalTableName), Response.Status.CONFLICT);
     }
   }
 
