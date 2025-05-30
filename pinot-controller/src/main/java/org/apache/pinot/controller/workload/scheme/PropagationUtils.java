@@ -48,11 +48,11 @@ public class PropagationUtils {
   }
 
   /**
-   * Get the mapping tableNameWithType → {NON_LEAF_NODE→brokerTag, LEAF_NODE→(serverTag + overrides)}
+   * Get the mapping tableNameWithType → {BROKER_NODE→brokerTag, SERVER_NODE→(serverTag + overrides)}
    * 1. Get all table configs from the PinotHelixResourceManager
    * 2. For each table config, extract the tenant config
    * 3. For each tenant config, get the broker and server tags
-   * 4. Populate the helix tags for NON_LEAF_NODE and LEAF_NODE separately
+   * 4. Populate the helix tags for BROKER_NODE and SERVER_NODE separately
    */
   public static Map<String, Map<NodeConfig.Type, Set<String>>> getTableToHelixTags(
           PinotHelixResourceManager pinotResourceManager) {
@@ -65,17 +65,17 @@ public class PropagationUtils {
       List<String> tenantTags = new ArrayList<>();
       collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
 
-      // Populate the helix tags for NON_LEAF_NODE and LEAF_NODE separately to provide flexibility
+      // Populate the helix tags for BROKER_NODE and SERVER_NODE separately to provide flexibility
       // in workload propagation to direct the workload to only specific node types
       String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-      Set<String> nonLeafTags = Collections.singleton(brokerTag);
+      Set<String> brokerTags = Collections.singleton(brokerTag);
 
-      Set<String> leafTags = new HashSet<>(tenantTags);
-      leafTags.remove(brokerTag);
+      Set<String> serverTags = new HashSet<>(tenantTags);
+      serverTags.remove(brokerTag);
 
       Map<NodeConfig.Type, Set<String>> nodeTypeToTags = new EnumMap<>(NodeConfig.Type.class);
-      nodeTypeToTags.put(NodeConfig.Type.NON_LEAF_NODE, nonLeafTags);
-      nodeTypeToTags.put(NodeConfig.Type.LEAF_NODE, leafTags);
+      nodeTypeToTags.put(NodeConfig.Type.BROKER_NODE, brokerTags);
+      nodeTypeToTags.put(NodeConfig.Type.SERVER_NODE, serverTags);
 
       tableToTags.put(tableConfig.getTableName(), nodeTypeToTags);
     }
@@ -135,17 +135,27 @@ public class PropagationUtils {
   }
 
   /**
-   * Returns a set of QueryWorkloadConfigs that are associated with the specified helix tags.
-   * The method performs the following:
-   * 1. Fetches all QueryWorkloadConfigs from the PinotHelixResourceManager.
-   * 2. For each config, iterates through node types and their propagation schemes.
-   * 3. For TENANT propagation:
-   *    - Resolves tenant values to helix tags (direct tag or expanded list).
-   *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
-   * 4. For TABLE propagation:
-   *    - Resolves table names to tableWithType forms.
-   *    - Maps each tableWithType and node type to helix tags via getTableToHelixTags.
-   *    - Adds QueryWorkloadConfigs if any tag intersects with the filterTags.
+   * Returns the set of {@link QueryWorkloadConfig}s that match any of the given Helix tags.
+   *
+   * This method filters the provided list of QueryWorkloadConfigs based on whether their propagation
+   * targets intersect with the specified `filterTags`. The matching is performed based on the
+   * propagation type defined for each node in the config:
+   *
+   * - For {@code TENANT} propagation:
+   *   1. Each value in the propagation scheme is treated as a tenant name or direct Helix tag.
+   *   2. If the value is a recognized Helix tag (broker/server), it is used directly.
+   *   3. Otherwise, the value is resolved to possible broker and server tags for the tenant.
+   *   4. If any resolved tag matches one of the `filterTags`, the config is included.
+   *
+   * - For {@code TABLE} propagation:
+   *   1. Table names are expanded to include type-suffixed forms (OFFLINE and/or REALTIME).
+   *   2. These table names are mapped to corresponding Helix tags using node type.
+   *   3. If any of the mapped tags intersect with `filterTags`, the config is included.
+   *
+   * @param pinotHelixResourceManager The resource manager used to look up table and instance metadata.
+   * @param filterTags The set of Helix tags used for filtering configs.
+   * @param queryWorkloadConfigs The full list of workload configs to evaluate.
+   * @return A set of workload configs whose propagation targets intersect with the filterTags.
    */
   public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
       PinotHelixResourceManager pinotHelixResourceManager, List<String> filterTags,

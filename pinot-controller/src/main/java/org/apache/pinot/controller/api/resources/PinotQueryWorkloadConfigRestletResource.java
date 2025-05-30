@@ -105,7 +105,7 @@ public class PinotQueryWorkloadConfigRestletResource {
    *   "queryWorkloadName" : "workload-foo1",
    *   "nodeConfigs" : {
    *   {
-   *       "nodeType" : "LeafNode",
+   *       "nodeType" : "brokerNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 500,
    *         "memoryCostBytes": 1000
@@ -116,7 +116,7 @@ public class PinotQueryWorkloadConfigRestletResource {
    *       }
    *     },
    *     {
-   *       "nodeType" : "NonLeafNode",
+   *       "nodeType" : "serverNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 1500,
    *         "memoryCostBytes": 12000
@@ -165,7 +165,7 @@ public class PinotQueryWorkloadConfigRestletResource {
    * @param nodeTypeString  {@link NodeConfig.Type} string representation of the instance
    * @return Map of workload name to instance cost
    * Example request:
-   * /queryWorkloadConfigs/instance/Server_localhost_1234?nodeType=LEAF_NODE
+   * /queryWorkloadConfigs/instance/Server_localhost_1234?nodeType=serverNode
    * Example response:
    * {
    *  "workload1": {
@@ -214,7 +214,7 @@ public class PinotQueryWorkloadConfigRestletResource {
    *   "queryWorkloadName" : "workload-foo1",
    *   "nodeConfigs" : {
    *    {
-   *       "nodeType" : "LeafNode",
+   *       "nodeType" : "brokerNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 500,
    *         "memoryCostBytes": 1000
@@ -225,7 +225,7 @@ public class PinotQueryWorkloadConfigRestletResource {
    *       }
    *     },
    *     {
-   *       "nodeType" : "nonLeafNode",
+   *       "nodeType" : "serverNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 1500,
    *         "memoryCostBytes": 12000

@@ -30,7 +30,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * <p>
  * Each NodeConfig specifies:
  * <ul>
- *   <li><strong>Node Type:</strong> The role of the node (leaf or non-leaf) in processing queries.</li>
+ *   <li><strong>Node Type:</strong> The role of the node in processing queries.</li>
  *   <li><strong>Enforcement Profile:</strong> Resource limits (CPU and memory) applied to this node.</li>
  *   <li><strong>Propagation Scheme:</strong> Optional instructions for cascading configs to downstream nodes.</li>
  * </ul>
@@ -47,8 +47,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class NodeConfig extends BaseJsonConfig {
 
   public enum Type {
-    LEAF_NODE("leafNode"),
-    NON_LEAF_NODE("nonLeafNode");
+    BROKER_NODE("brokerNode"),
+    SERVER_NODE("serverNode");
 
     private final String _value;
 

@@ -56,19 +56,19 @@ public class QueryWorkloadConfigUtilsTest {
     // Shared, valid configuration
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
 
-    // Leaf node
-    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+    // Server node
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         List.of("value1", "value2"));
-    NodeConfig leafNodeConfig = new NodeConfig(NodeConfig.Type.LEAF_NODE, validEnforcementProfile,
-            leafPropagationScheme);
+    NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
+        serverPropagationScheme);
 
-    // Non-leaf node
-    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
+    // Broker node
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
         List.of("value3", "value4"));
-    NodeConfig nonLeafNodeConfig = new NodeConfig(NodeConfig.Type.NON_LEAF_NODE, validEnforcementProfile,
-            nonLeafPropagationScheme);
+    NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
+        brokerPropagationScheme);
 
-    List<NodeConfig> nodeConfigs = List.of(leafNodeConfig, nonLeafNodeConfig);
+    List<NodeConfig> nodeConfigs = List.of(serverNodeConfig, brokerNodeConfig);
     QueryWorkloadConfig validQueryWorkloadConfig = new QueryWorkloadConfig("workloadId", nodeConfigs);
 
     // Valid scenario: NODE_CONFIGS field is a JSON array string
@@ -78,7 +78,7 @@ public class QueryWorkloadConfigUtilsTest {
     data.add(new Object[] { validZnRecord, validQueryWorkloadConfig, false });
 
     // Null propagation scheme
-    NodeConfig nodeConfigWithoutPropagationScheme = new NodeConfig(NodeConfig.Type.LEAF_NODE, validEnforcementProfile,
+    NodeConfig nodeConfigWithoutPropagationScheme = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
             null);
     List<NodeConfig> nodeConfigsWithoutPropagation = List.of(nodeConfigWithoutPropagationScheme);
     ZNRecord znRecordNullPropagation = new ZNRecord("workloadId");
@@ -124,17 +124,17 @@ public class QueryWorkloadConfigUtilsTest {
     List<Object[]> data = new ArrayList<>();
 
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
-    // Leaf node
-    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+    // Server scheme
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         List.of("value1", "value2"));
-    NodeConfig leafNodeConfig = new NodeConfig(NodeConfig.Type.LEAF_NODE, validEnforcementProfile,
-            leafPropagationScheme);
-    // Non-leaf node
-    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
+    NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
+        serverPropagationScheme);
+    // Broker scheme
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
         List.of("value3", "value4"));
-    NodeConfig nonLeafNodeConfig = new NodeConfig(NodeConfig.Type.NON_LEAF_NODE, validEnforcementProfile,
-            nonLeafPropagationScheme);
-    List<NodeConfig> nodeConfigs = List.of(leafNodeConfig, nonLeafNodeConfig);
+    NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
+        brokerPropagationScheme);
+    List<NodeConfig> nodeConfigs = List.of(serverNodeConfig, brokerNodeConfig);
     QueryWorkloadConfig validQueryWorkloadConfig = new QueryWorkloadConfig("workloadId", nodeConfigs);
 
     // 1) Valid scenario
@@ -148,7 +148,8 @@ public class QueryWorkloadConfigUtilsTest {
     data.add(new Object[] { validQueryWorkloadConfig, validZnRecord, expectedValidZnRecord, false });
 
     // 2) Null propagation scheme in both nodes
-    NodeConfig nodeConfigWithoutPropagation = new NodeConfig(NodeConfig.Type.LEAF_NODE, validEnforcementProfile, null);
+    NodeConfig nodeConfigWithoutPropagation = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
+        null);
     List<NodeConfig> nodeConfigsWithoutPropagation = List.of(nodeConfigWithoutPropagation);
     QueryWorkloadConfig configWithoutPropagation = new QueryWorkloadConfig("noPropagation",
         nodeConfigsWithoutPropagation);
@@ -164,17 +165,17 @@ public class QueryWorkloadConfigUtilsTest {
     expectedZnRecordNoPropagation.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, nodeConfigsNoPropagationJson);
     data.add(new Object[] { configWithoutPropagation, znRecordNoPropagation, expectedZnRecordNoPropagation, false });
 
-    // 3) Null leaf node in QueryWorkloadConfig
-    List<NodeConfig> nodeConfigsWithNullLeaf = List.of(nonLeafNodeConfig);
-    QueryWorkloadConfig nullLeafNodeConfig = new QueryWorkloadConfig("nullLeaf", nodeConfigsWithNullLeaf);
-    ZNRecord znRecordNullLeaf = new ZNRecord("nullLeafId");
-    ZNRecord expectedZnRecordNullLeaf = new ZNRecord("nullLeafId");
-    znRecordNullLeaf.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, "nullLeaf");
-    expectedZnRecordNullLeaf.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, "nullLeaf");
-    String nodeConfigsWithNullLeafJson = JsonUtils.objectToString(nodeConfigsWithNullLeaf);
-    znRecordNullLeaf.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, nodeConfigsWithNullLeafJson);
-    expectedZnRecordNullLeaf.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, nodeConfigsWithNullLeafJson);
-    data.add(new Object[] { nullLeafNodeConfig, znRecordNullLeaf, expectedZnRecordNullLeaf, false });
+    // 3) Null server node in QueryWorkloadConfig
+    List<NodeConfig> nodeConfigsWithNullServerNode = List.of(brokerNodeConfig);
+    QueryWorkloadConfig nullServerNodeConfig = new QueryWorkloadConfig("nullServer", nodeConfigsWithNullServerNode);
+    ZNRecord znRecordNullServer = new ZNRecord("nullServerId");
+    ZNRecord expectedZnRecordNullServer = new ZNRecord("nullServerId");
+    znRecordNullServer.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, "nullServer");
+    expectedZnRecordNullServer.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, "nullServer");
+    String nodeConfigsWithNullServerJson = JsonUtils.objectToString(nodeConfigsWithNullServerNode);
+    znRecordNullServer.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, nodeConfigsWithNullServerJson);
+    expectedZnRecordNullServer.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, nodeConfigsWithNullServerJson);
+    data.add(new Object[] { nullServerNodeConfig, znRecordNullServer, expectedZnRecordNullServer, false });
 
     // 4) Null QueryWorkloadConfig -> should fail
     ZNRecord znRecordNullConfig = new ZNRecord("nullConfigId");

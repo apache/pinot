@@ -49,9 +49,9 @@ public class TenantPropagationScheme implements PropagationScheme {
     // Get the unique set of helix tags for the tenants
     Set<String> helixTags = new HashSet<>();
     for (String tenantName : tenantNames) {
-      if (nodeType == NodeConfig.Type.NON_LEAF_NODE) {
+      if (nodeType == NodeConfig.Type.BROKER_NODE) {
         helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
-      } else if (nodeType == NodeConfig.Type.LEAF_NODE) {
+      } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
         if (TagNameUtils.isOfflineServerTag(tenantName) || TagNameUtils.isRealtimeServerTag(tenantName)) {
           helixTags.add(tenantName);
         } else {

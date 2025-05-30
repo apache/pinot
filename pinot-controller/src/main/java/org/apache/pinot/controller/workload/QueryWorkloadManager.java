@@ -46,7 +46,7 @@ public class QueryWorkloadManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private PropagationSchemeProvider _propagationSchemeProvider;
+  private final PropagationSchemeProvider _propagationSchemeProvider;
   private final CostSplitter _costSplitter;
 
   public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager) {
@@ -73,9 +73,6 @@ public class QueryWorkloadManager {
         LOGGER.warn(errorMsg);
         continue;
       }
-      // TODO: Currently the assumption is that each instance for a workload can be tied to one node type or have
-      // one cost. To re-evaluate this, once we support this for MSE, where a instance can be both leaf and non-leaf
-      // Calculate the instance cost for each instance
       Map<String, InstanceCost> instanceCostMap = _costSplitter.computeInstanceCostMap(nodeConfig, instances);
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRefreshMessage(queryWorkloadName,

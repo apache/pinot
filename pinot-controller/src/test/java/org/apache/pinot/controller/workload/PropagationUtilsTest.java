@@ -62,12 +62,12 @@ public class PropagationUtilsTest {
         // Verify the results
         Map<String, Map<NodeConfig.Type, Set<String>>> expectedTags = new HashMap<>();
         expectedTags.put("table1_OFFLINE", new HashMap<>() {{
-            put(NodeConfig.Type.LEAF_NODE, Set.of("serverTag1_OFFLINE"));
-            put(NodeConfig.Type.NON_LEAF_NODE, Set.of("brokerTenant1_BROKER"));
+            put(NodeConfig.Type.SERVER_NODE, Set.of("serverTag1_OFFLINE"));
+            put(NodeConfig.Type.BROKER_NODE, Set.of("brokerTenant1_BROKER"));
         }});
         expectedTags.put("table2_REALTIME", new HashMap<>() {{
-            put(NodeConfig.Type.LEAF_NODE, Set.of("serverTag2_REALTIME"));
-            put(NodeConfig.Type.NON_LEAF_NODE, Set.of("brokerTenant2_BROKER"));
+            put(NodeConfig.Type.SERVER_NODE, Set.of("serverTag2_REALTIME"));
+            put(NodeConfig.Type.BROKER_NODE, Set.of("brokerTenant2_BROKER"));
         }});
 
         Assert.assertEquals(tableToHelixTags.size(), expectedTags.size(),
@@ -203,12 +203,12 @@ public class PropagationUtilsTest {
         return instanceConfig;
     }
 
-    private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme leafScheme,
-                                                          PropagationScheme nonLeafScheme) {
+    private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme serverScheme,
+                                                          PropagationScheme brokerScheme) {
         EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10);
         return new QueryWorkloadConfig(name, List.of(
-           new NodeConfig(NodeConfig.Type.LEAF_NODE, enforcementProfile, leafScheme),
-           new NodeConfig(NodeConfig.Type.NON_LEAF_NODE, enforcementProfile, nonLeafScheme)
+           new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, serverScheme),
+           new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, brokerScheme)
       ));
     }
 }

@@ -38,7 +38,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *   "queryWorkloadName": "analytics",
  *   "nodeConfigs": [
  *     {
- *       "nodeType": "leafNode",
+ *       "nodeType": "brokerNode",
  *       "enforcementProfile": {
  *        "cpuCostNs": 1000000,
  *        "memoryCostBytes": 10000000
@@ -49,7 +49,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *       }
  *      },
  *     {
- *       "nodeType": "nonLeafNode",
+ *       "nodeType": "serverNode",
  *       "enforcementProfile": {
  *        "cpuCostNs": 2000000,
  *        "memoryCostBytes": 20000000

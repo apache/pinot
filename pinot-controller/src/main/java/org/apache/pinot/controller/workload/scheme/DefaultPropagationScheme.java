@@ -37,10 +37,10 @@ public class DefaultPropagationScheme implements PropagationScheme {
     Set<String> instances;
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
     switch (nodeType) {
-      case NON_LEAF_NODE:
+      case BROKER_NODE:
         instances = new HashSet<>(_pinotHelixResourceManager.getAllBrokerInstances());
         break;
-      case LEAF_NODE:
+      case SERVER_NODE:
         instances = new HashSet<>(_pinotHelixResourceManager.getAllServerInstances());
         break;
       default:
