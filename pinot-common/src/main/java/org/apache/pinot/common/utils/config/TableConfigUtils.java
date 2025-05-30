@@ -26,9 +26,11 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +47,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;
@@ -468,5 +471,40 @@ public class TableConfigUtils {
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+  }
+
+  public static Set<String> getRelevantTags(TableConfig tableConfig) {
+    Set<String> relevantTags = new HashSet<>();
+    String serverTenantName = tableConfig.getTenantConfig().getServer();
+    if (serverTenantName != null) {
+      String serverTenantTag =
+          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      relevantTags.add(serverTenantTag);
+    }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig != null) {
+      String completedTag = tagOverrideConfig.getRealtimeCompleted();
+      String consumingTag = tagOverrideConfig.getRealtimeConsuming();
+      if (completedTag != null) {
+        relevantTags.add(completedTag);
+      }
+      if (consumingTag != null) {
+        relevantTags.add(consumingTag);
+      }
+    }
+    if (tableConfig.getInstanceAssignmentConfigMap() != null) {
+      // for simplicity, including all segment types present in instanceAssignmentConfigMap
+      tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
+        String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
+        relevantTags.add(tag);
+      });
+    }
+    if (tableConfig.getTierConfigsList() != null) {
+      tableConfig.getTierConfigsList().forEach(tierConfig -> {
+        String tierTag = tierConfig.getServerTag();
+        relevantTags.add(tierTag);
+      });
+    }
+    return relevantTags;
   }
 }

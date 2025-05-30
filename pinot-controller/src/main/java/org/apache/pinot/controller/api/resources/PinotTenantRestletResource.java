@@ -31,10 +31,12 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -57,6 +59,8 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -76,6 +80,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,15 +109,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TENANT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
@@ -304,8 +312,10 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.READ)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the instance partitions of a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
-      @ApiResponse(code = 404, message = "Instance partitions not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")
+  })
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -333,9 +343,11 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update an instance partition for a server type in a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
       @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
-      @ApiResponse(code = 500, message = "Error updating the tenant")})
+      @ApiResponse(code = 500, message = "Error updating the tenant")
+  })
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -384,31 +396,14 @@ public class PinotTenantRestletResource {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
-      if (tenantName.equals(tableConfigTenant)) {
+      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
+      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
         tables.add(table);
-      }
-      if (tableConfig.getTenantConfig().getTagOverrideConfig() != null) {
-        String completed = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted();
-        if (completed != null && getRawTenantName(completed).equals(tenantName)) {
-          tables.add(table);
-        }
-        String consuming = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming();
-        if (consuming != null && getRawTenantName(consuming).equals(tenantName)) {
-          tables.add(table);
-        }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
-  }
-
-  private String getRawTenantName(String tenantName) {
-    if (tenantName.lastIndexOf("_") > 0) {
-      return tenantName.substring(0, tenantName.lastIndexOf("_"));
-    }
-    return tenantName;
   }
 
   private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
@@ -690,9 +685,39 @@ public class PinotTenantRestletResource {
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig config) {
+      @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true, example =
+          "1")
+      @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
+      @ApiParam(value =
+          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are allowed in this tenant rebalance"
+              + " job. Leave blank to allow all tables from the tenant", example = "")
+      @QueryParam("allowTables") String allowTables,
+      @ApiParam(value =
+          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are blocked in this tenant rebalance"
+              + " job. These table will be removed from allowTables", example = "")
+      @QueryParam("blockTables") String blockTables,
+      @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
+      @QueryParam("verboseResult") Boolean verboseResult,
+      @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
+      TenantRebalanceConfig config) {
     // TODO decide on if the tenant rebalance should be database aware or not
     config.setTenantName(tenantName);
+    // Query params should override the config provided in the body, if present
+    if (degreeOfParallelism != null) {
+      config.setDegreeOfParallelism(degreeOfParallelism);
+    }
+    if (verboseResult != null) {
+      config.setVerboseResult(verboseResult);
+    }
+    if (allowTables != null) {
+      config.setAllowTables(Arrays.stream(StringUtil.split(allowTables, ',', 0)).map(String::strip).collect(
+          Collectors.toSet()));
+    }
+    if (blockTables != null) {
+      config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0)).map(String::strip).collect(
+          Collectors.toSet()));
+    }
     return _tenantRebalancer.rebalance(config);
   }
 
