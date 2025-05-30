@@ -76,7 +76,10 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -2568,6 +2571,49 @@ public class TableConfigUtilsTest {
           + "and replicaGroupPartitionConfig are set");
     } catch (IllegalStateException ignored) {
     }
+  }
+
+  @Test
+  public void testValidateImplicitRealtimeTablePartitionSelectorConfigs() {
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    when(instanceAssignmentConfig.getPartitionSelector()).thenReturn(
+        InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig));
+    assertTrue(
+        e.getMessage().contains("IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for REALTIME tables"));
+
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        Mockito.mock(InstanceReplicaGroupPartitionConfig.class);
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(false);
+    when(instanceAssignmentConfig.getReplicaGroupPartitionConfig()).thenReturn(instanceReplicaGroupPartitionConfig);
+    TableConfig tableConfig2 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig2));
+    assertTrue(e.getMessage()
+        .contains("IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based partitioning"));
+
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(true);
+    when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(1);
+    TableConfig tableConfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig3));
+    assertTrue(e.getMessage()
+        .contains("numPartitions should not be explicitly set when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR"));
+
+    when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(0);
+    TableConfig tableConfig4 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig4);
   }
 
   private Map<String, String> getStreamConfigs() {

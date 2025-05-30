@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.instance;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 
@@ -30,7 +31,8 @@ public class InstancePartitionSelectorFactory {
   private InstancePartitionSelectorFactory() {
   }
 
-  public static InstancePartitionSelector getInstance(InstanceAssignmentConfig.PartitionSelector partitionSelector,
+  public static InstancePartitionSelector getInstance(TableConfig tableConfig,
+      InstanceAssignmentConfig.PartitionSelector partitionSelector,
       InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig, String tableNameWithType,
       InstancePartitions existingInstancePartitions, @Nullable InstancePartitions preConfiguredInstancePartitions,
       boolean minimizeDataMovement) {
@@ -44,6 +46,9 @@ public class InstancePartitionSelectorFactory {
       case MIRROR_SERVER_SET_PARTITION_SELECTOR:
         return new MirrorServerSetInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
             existingInstancePartitions, preConfiguredInstancePartitions, minimizeDataMovement);
+      case IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR:
+        return new ImplicitRealtimeTablePartitionSelector(tableConfig, instanceReplicaGroupPartitionConfig,
+            tableNameWithType, existingInstancePartitions, minimizeDataMovement);
       default:
         throw new IllegalStateException("Unexpected PartitionSelector: " + partitionSelector + ", should be from"
             + Arrays.toString(InstanceAssignmentConfig.PartitionSelector.values()));
