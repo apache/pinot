@@ -177,7 +177,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     List<String> segmentNames =
         segmentMetadataList.stream().map(SegmentMetadataImpl::getName).collect(Collectors.toList());
     Set<Integer> partitionIDSet = segmentNames.stream().map(x -> {
-      Integer segmentPartitionId = SegmentUtils.getPartitionIdFromRealtimeSegmentName(x);
+      Integer segmentPartitionId = SegmentUtils.getPartitionIdFromSegmentName(x);
       if (segmentPartitionId == null) {
         throw new IllegalStateException(String.format("Partition id not found for %s", x));
       }

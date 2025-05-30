@@ -295,7 +295,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
           break;
         } else {
-          Integer partitionID = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+          Integer partitionID = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
           if (partitionID == null) {
             LOGGER.warn("Partition ID not found for segment: {}, skipping it for {}", segmentName,
                 MinionConstants.UpsertCompactMergeTask.TASK_TYPE);

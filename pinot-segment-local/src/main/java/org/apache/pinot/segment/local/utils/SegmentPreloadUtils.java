@@ -162,7 +162,7 @@ public class SegmentPreloadUtils {
       int requestedPartitionId, SegmentZKMetadata segmentZKMetadata) {
     Preconditions.checkState(segmentZKMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s",
         segmentName, tableNameWithType);
-    Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
+    Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentZKMetadata, null);
     Preconditions.checkNotNull(partitionId,
         String.format("Failed to get partition id for segment: %s from table: %s", segmentName, tableNameWithType));
     if (partitionId == requestedPartitionId) {
