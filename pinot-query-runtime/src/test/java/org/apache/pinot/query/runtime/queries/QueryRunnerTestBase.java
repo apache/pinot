@@ -209,16 +209,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows) {
-    compareRowEquals(resultTable, expectedRows, false);
+    compareRowEquals(resultTable, expectedRows, false, "", "");
   }
 
-  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
+  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder,
+      String testCaseName, String sql) {
     List<Object[]> resultRows = resultTable.getRows();
     int numRows = resultRows.size();
     assertEquals(numRows, expectedRows.size(),
-        String.format("Mismatched number of results.\nExpected Rows:\n%s\nActual Rows:\n%s",
+        String.format("Mismatched number of results.\nExpected Rows:\n%s\nActual Rows:\n%s. query:\n%s",
             expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
-            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
+            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")), sql));
 
     DataSchema dataSchema = resultTable.getDataSchema();
     resultRows.forEach(row -> canonicalizeRow(dataSchema, row));
@@ -235,8 +236,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
               Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         assertTrue(typeCompatibleFuzzyEquals(dataSchema.getColumnDataType(j), resultRow[j], expectedRow[j]),
-            String.format("Mismatched value at row id: %d, column id: %d. Expected Row: %s, Actual Row: %s", i, j,
-                Arrays.toString(expectedRow), Arrays.toString(resultRow)));
+            String.format("Mismatched value in case: %s. row: %d, column id: %d. Expected Row: %s, Actual Row: %s. query: %s",
+                testCaseName, i, j, Arrays.toString(expectedRow), Arrays.toString(resultRow), sql));
       }
     }
   }
