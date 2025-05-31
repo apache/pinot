@@ -57,14 +57,14 @@ public class DocIdSetPlanNode implements PlanNode {
     if (queryCache != null && _queryContext.getFilter() != null
         && !(_segmentContext.getIndexSegment() instanceof MutableSegment)) {
       if (QueryCacheUtils.isExpensiveFilter(_queryContext.getFilter())) {
-        String cacheKey = QueryCache.getCacheKey(_segmentContext.getIndexSegment().getSegmentName(),
-            _queryContext.getFilter());
-        Object cachedValue = queryCache.get(cacheKey);
+        QueryCache.SegmentKey segmentKey =
+            new QueryCache.SegmentKey(_segmentContext.getIndexSegment().getSegmentName(), _queryContext.getFilter());
+        Object cachedValue = queryCache.get(segmentKey);
         if (cachedValue != null) {
           return new CachedBitmapDocIdSetOperator((ImmutableRoaringBitmap) cachedValue, _maxDocPerCall);
         }
         bitmap = new MutableRoaringBitmap();
-        queryCacheUpdater = new QueryCache.QueryCacheUpdater(queryCache, cacheKey);
+        queryCacheUpdater = new QueryCache.QueryCacheUpdater(queryCache, segmentKey);
       }
     }
     return new DocIdSetOperator(
