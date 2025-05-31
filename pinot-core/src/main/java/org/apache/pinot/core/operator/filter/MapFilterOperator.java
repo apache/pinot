@@ -66,7 +66,7 @@ public class MapFilterOperator extends BaseFilterOperator {
     _keyName = arguments.get(1).getLiteral().getStringValue();
 
     // Get JSON index and create operator
-    DataSource dataSource = indexSegment.getDataSource(_columnName, queryContext.getSchema());
+    DataSource dataSource = indexSegment.getDataSource(_columnName);
     JsonIndexReader jsonIndex = dataSource.getJsonIndex();
     if (jsonIndex != null && useJsonIndex(_predicate.getType())) {
       FilterContext filterContext = createFilterContext();

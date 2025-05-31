@@ -325,15 +325,6 @@ public interface TableDataManager {
   Pair<TableConfig, Schema> getCachedTableConfigAndSchema();
 
   /**
-   * Refresh the cached table schema on the server.
-   * This is invoked when the TableConfigRefreshMessage is received on the server from controller on any schema change.
-   * This helps us ensure that server has access to the latest schema for query execution.
-   * For example, if a new column is added to the schema, it helps us create the virtual column until the segments are
-   * reloaded with the new schema.
-   */
-  void refreshCachedTableSchema();
-
-  /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
    *
    * @param segmentNameStr name of segment for which the state change is being handled

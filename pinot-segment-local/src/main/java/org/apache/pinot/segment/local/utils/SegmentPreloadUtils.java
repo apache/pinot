@@ -209,8 +209,8 @@ public class SegmentPreloadUtils {
      * @return DataSource for the column
      */
   public static DataSource getVirtualDataSource(Schema tableSchema, String column, int totalDocCount) {
-    FieldSpec originalFieldSpec = tableSchema.getFieldSpecFor(column);
-    if (originalFieldSpec == null) {
+    FieldSpec fieldSpec = tableSchema.getFieldSpecFor(column);
+    if (fieldSpec == null) {
       // If the column is not present in the table schema. There could be two possibilities:
       // 1. Table Schema provided does not have the latest column. We rely on helix-refresh to update the table schema.
       //     so there could be a delay in the refresh message reaching the server causing this issue.
@@ -218,27 +218,13 @@ public class SegmentPreloadUtils {
       LOGGER.warn("Column: {} is not present in the table schema: {}", column, tableSchema.getSchemaName());
       return null;
     }
-    // Make a copy of the field spec from the table schema to avoid modifying the original field spec
-    // This is important because the field spec in the table schema is used in different places to infer physical
-    // column and also during segment creation/updates
-    FieldSpec virtualFieldSpec = new FieldSpec(originalFieldSpec.getName(), originalFieldSpec.getDataType(),
-        originalFieldSpec.isSingleValueField(), originalFieldSpec.getMaxLength(),
-        originalFieldSpec.getDefaultNullValue(), originalFieldSpec.getMaxLengthExceedStrategy()) {
-      @Override
-      public FieldType getFieldType() {
-        return originalFieldSpec.getFieldType();
-      }
-      @Override
-      public String getVirtualColumnProvider() {
-        return originalFieldSpec.getVirtualColumnProvider();
-      }
-    };
-    if (!virtualFieldSpec.isVirtualColumn()) {
+    String virtualColumnProviderName = fieldSpec.getVirtualColumnProvider();
+    if (virtualColumnProviderName == null) {
       // Set the default virtual column provider if it is not set
-      virtualFieldSpec.setVirtualColumnProvider(DefaultNullValueVirtualColumnProvider.class.getName());
+      virtualColumnProviderName = DefaultNullValueVirtualColumnProvider.class.getName();
     }
-    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(virtualFieldSpec, totalDocCount);
-    VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, totalDocCount);
+    VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnProviderName);
     return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
         virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
   }
