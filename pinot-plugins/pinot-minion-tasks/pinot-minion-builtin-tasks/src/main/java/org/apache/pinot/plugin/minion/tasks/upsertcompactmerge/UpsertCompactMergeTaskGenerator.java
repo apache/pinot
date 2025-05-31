@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -67,13 +68,15 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     private final long _validDocIds;
     private final long _invalidDocIds;
     private final double _segmentSizeInBytes;
+    private final long _segmentCreationTimeMillis;
 
     SegmentMergerMetadata(SegmentZKMetadata segmentZKMetadata, long validDocIds, long invalidDocIds,
-        double segmentSizeInBytes) {
+        double segmentSizeInBytes, long segmentCreationTimeMillis) {
       _segmentZKMetadata = segmentZKMetadata;
       _validDocIds = validDocIds;
       _invalidDocIds = invalidDocIds;
       _segmentSizeInBytes = segmentSizeInBytes;
+      _segmentCreationTimeMillis = segmentCreationTimeMillis;
     }
 
     public SegmentZKMetadata getSegmentZKMetadata() {
@@ -90,6 +93,10 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
     public double getSegmentSizeInBytes() {
       return _segmentSizeInBytes;
+    }
+
+    public long getSegmentCreationTimeMillis() {
+      return _segmentCreationTimeMillis;
     }
   }
 
@@ -214,6 +221,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
         // TODO see if multiple groups of same partition can be added
+
+        //get max creation time for the segments across all servers. This will be used as the creation time of the
+        // merge segment
+        Optional<Long> maxCreationTimeMillis =
+            groups.get(0).stream().map(SegmentMergerMetadata::getSegmentCreationTimeMillis).max(Long::compare);
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
             groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
@@ -223,6 +235,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
             Long.parseLong(
                 taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
                     String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT)))));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY,
+            String.valueOf(maxCreationTimeMillis.get()));
         pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -302,9 +316,16 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
             continue;
           }
           double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
-          segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>())
-              .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs,
-                  expectedSegmentSizeAfterCompaction));
+          //We use the max creation time of the segment replica across servers. Refer to #15846 for more info.
+          Optional<Long> segmentCreationTimeMillis = validDocIdsMetadataInfoMap.get(segmentName).stream()
+              .map(ValidDocIdsMetadataInfo::getSegmentCreationTimeMillis).max(Long::compareTo);
+          if (segmentCreationTimeMillis.isEmpty()) {
+            LOGGER.info("No creation time found for segment: {}, skipping this segment", segmentName);
+            break;
+          }
+          segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>()).add(
+              new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs, expectedSegmentSizeAfterCompaction,
+                  segmentCreationTimeMillis.get()));
         }
         break;
       }
@@ -429,11 +450,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   @Override
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME, "%s only supports realtime tables!",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check upsert enabled
-    Preconditions.checkState(tableConfig.isUpsertEnabled(),
-        "Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for %s",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check snapshot enabled
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
