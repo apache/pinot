@@ -59,11 +59,11 @@ public class ZeroCopyDataBlockSerdeTest {
     r.nextBytes(bytes2);
 
     return new Object[][] {
-        {"empty error", MetadataBlock.newError(Collections.emptyMap())},
-        {"error with single message", MetadataBlock.newError(ImmutableMap.<Integer, String>builder()
+        {"empty error", MetadataBlock.newError(-1, -1, null, Collections.emptyMap())},
+        {"error with single message", MetadataBlock.newError(3, 1, "test2", ImmutableMap.<Integer, String>builder()
             .put(123, "error")
             .build())},
-        {"error with two messages", MetadataBlock.newError(ImmutableMap.<Integer, String>builder()
+        {"error with two messages", MetadataBlock.newError(3, 1, "multiple", ImmutableMap.<Integer, String>builder()
             .put(123, "error")
             .put(1234, "another error")
             .build())},

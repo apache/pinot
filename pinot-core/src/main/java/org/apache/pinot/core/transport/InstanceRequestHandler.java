@@ -126,7 +126,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
     String tableNameWithType = null;
 
-    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(_instanceName)) {
       // Put all code inside try block to catch all exceptions.
       int requestSize = msg.readableBytes();
       QueryThreadContext.setQueryEngine("sse");

@@ -24,43 +24,75 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
-import javax.validation.constraints.NotNull;
-import org.apache.pinot.common.datablock.DataBlockUtils;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.ExceptionUtils;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// A block that represents a failed execution.
 ///
 public class ErrorMseBlock implements MseBlock.Eos {
+  private final int _stage;
+  private final int _worker;
+  private final String _serverId;
   private final EnumMap<QueryErrorCode, String> _errorMessages;
 
+  /// Kept for backward compatibility.
+  ///
+  /// @deprecated Use [#fromMap(Map)] instead
+  @Deprecated
   public ErrorMseBlock(Map<QueryErrorCode, String> errorMessages) {
+    this(-1, -1, null, errorMessages);
+  }
+
+  public ErrorMseBlock(int stage, int worker, String serverId, Map<QueryErrorCode, String> errorMessages) {
+    _stage = stage;
+    _worker = worker;
+    _serverId = serverId;
     Preconditions.checkArgument(!errorMessages.isEmpty(), "Error messages cannot be empty");
     _errorMessages = new EnumMap<>(errorMessages);
   }
 
+  public static ErrorMseBlock fromMap(Map<QueryErrorCode, String> errorMessages) {
+    int stage;
+    int worker;
+    String server;
+    if (MseWorkerThreadContext.isInitialized()) {
+      stage = MseWorkerThreadContext.getStageId();
+      worker = MseWorkerThreadContext.getWorkerId();
+      server = QueryThreadContext.getServiceId();
+    } else {
+      stage = -1; // Default value when not initialized
+      worker = -1; // Default value when not initialized
+      server = null; // Default value when not initialized
+    }
+    return new ErrorMseBlock(stage, worker, server, errorMessages);
+  }
+
   public static ErrorMseBlock fromException(Exception e) {
     QueryErrorCode errorCode;
+    boolean extractTrace;
     if (e instanceof QueryException) {
       errorCode = ((QueryException) e).getErrorCode();
+      extractTrace = false;
     } else if (e instanceof ProcessingException) {
       errorCode = QueryErrorCode.fromErrorCode(((ProcessingException) e).getErrorCode());
+      extractTrace = true;
     } else {
       errorCode = QueryErrorCode.UNKNOWN;
+      extractTrace = true;
     }
-    String errorMessage = shouldIncludeStackTrace(errorCode) ? DataBlockUtils.extractErrorMsg(e) : e.getMessage();
-    return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
+    String errorMessage = extractTrace ? ExceptionUtils.consolidateExceptionMessages(e) : e.getMessage();
+    return fromMap(Collections.singletonMap(errorCode, errorMessage));
   }
 
   public static ErrorMseBlock fromError(QueryErrorCode errorCode, String errorMessage) {
-    return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
-  }
-
-  private static boolean shouldIncludeStackTrace(@NotNull QueryErrorCode errorCode) {
-    return QueryErrorCode.UNKNOWN.equals(errorCode);
+    return fromMap(Collections.singletonMap(errorCode, errorMessage));
   }
 
   @Override
@@ -73,6 +105,22 @@ public class ErrorMseBlock implements MseBlock.Eos {
   /// It is guaranteed that the map is not empty.
   public Map<QueryErrorCode, String> getErrorMessages() {
     return _errorMessages;
+  }
+
+  /// Returns the stage where the error occurred, or -1 if the server wasn't able to calculate that.
+  public int getStage() {
+    return _stage;
+  }
+
+  /// Returns the worker where the error occurred, or -1 if the server wasn't able to calculate that.
+  public int getWorker() {
+    return _worker;
+  }
+
+  /// Returns the server ID where the error occurred, or null if the server wasn't able to calculate that.
+  @Nullable
+  public String getServerId() {
+    return _serverId;
   }
 
   @Override

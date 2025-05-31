@@ -85,7 +85,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressWarnings("DuplicatedCode")
 public abstract class BaseDataBlock implements DataBlock {
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
-  // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// Only values from QueryErrorCode are allowed as keys, but readers should not assume that given newer components
+  /// may have more error codes.
   protected Map<Integer, String> _errCodeToExceptionMap;
 
   protected final int _numRows;
