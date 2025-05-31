@@ -20,6 +20,7 @@ package org.apache.pinot.core.accounting;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,13 +174,12 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
      */
     @Override
     public Map<String, ? extends QueryResourceTracker> getQueryResources() {
-      if (!_resourceAggregators.containsKey(TrackingScope.QUERY)) {
-        return new HashMap<>();
+      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      if (queryAggregator == null) {
+        return Collections.emptyMap();
       }
 
-      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
-      Map<String, ? extends QueryResourceTracker> queryResources = queryAggregator.getQueryResources(_threadEntriesMap);
-      return queryResources;
+      return queryAggregator.getQueryResources(_threadEntriesMap);
     }
 
     @Override
@@ -254,10 +254,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     @Override
     public ThreadExecutionContext getThreadExecutionContext() {
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
-    }
-
-    public CPUMemThreadLevelAccountingObjects.ThreadEntry getThreadEntry() {
-      return _threadLocalEntry.get();
     }
 
     /**

@@ -160,7 +160,7 @@ public class CPUMemThreadLevelAccountingObjects {
 
 
     public String getWorkloadName() {
-      return _workloadName == null ? CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME : _workloadName;
+      return _workloadName;
     }
 
     @Override
