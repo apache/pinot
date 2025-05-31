@@ -112,6 +112,7 @@ import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
+import org.apache.pinot.common.messages.TableSchemaRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -1585,13 +1586,17 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
-
+    List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
-      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
         reloadAllSegments(tableNameWithType, false, null);
       }
+    }
+    // Send updated schema message to the table names with type
+    for (String tableNameWithType : tableNamesWithType) {
+      LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
+      sendTableSchemaRefreshMessage(tableNameWithType);
     }
   }
 
@@ -3283,6 +3288,26 @@ public class PinotHelixResourceManager {
           tableNameWithType);
     } else {
       LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
+  private void sendTableSchemaRefreshMessage(String tableNameWithType) {
+    TableSchemaRefreshMessage refreshMessage = new TableSchemaRefreshMessage(tableNameWithType);
+    // Send segment refresh message to servers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    // Send segment refresh message to servers
+    recipientCriteria.setResource(tableNameWithType);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} schema refresh messages to servers for table: {}", numMessagesSent,
+          tableNameWithType);
+    } else {
+      LOGGER.warn("No schema refresh message sent to servers for table: {}", tableNameWithType);
     }
   }
 
