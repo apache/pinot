@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -119,13 +120,20 @@ public class QueryWorkloadConfigUtils {
       throw new RuntimeException(errorMessage, e);
     }
   }
-
-  public static List<QueryWorkloadConfig> getQueryWorkloadConfigsFromController(String controllerUrl, String instanceId,
+  /**
+   * Fetches query workload configs for a specific instance from the controller.
+   *
+   * @param controllerUrl The URL of the controller.
+   * @param instanceId The ID of the instance to fetch configs for.
+   * @param nodeType The type of node (e.g., BROKER, SERVER).
+   * @return A map of workload names to their corresponding InstanceCost objects.
+   */
+  public static Map<String, InstanceCost> getQueryWorkloadConfigsFromController(String controllerUrl, String instanceId,
                                                                                 NodeConfig.Type nodeType) {
     try {
       if (controllerUrl == null || controllerUrl.isEmpty()) {
         LOGGER.warn("Controller URL is empty, cannot fetch query workload configs for instance: {}", instanceId);
-        return Collections.emptyList();
+        return Collections.emptyMap();
       }
       URI queryWorkloadURI = new URI(controllerUrl + "/queryWorkloadConfigs/instance/" + instanceId + "?nodeType="
               + nodeType);
@@ -133,7 +141,7 @@ public class QueryWorkloadConfigUtils {
               .setVersion(HttpVersion.HTTP_1_1)
               .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
               .build();
-      AtomicReference<List<QueryWorkloadConfig>> workloadConfigs = new AtomicReference<>(null);
+      AtomicReference<Map<String, InstanceCost>> workloadToInstanceCost = new AtomicReference<>(null);
       RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 1.2f);
       retryPolicy.attempt(() -> {
         try {
@@ -141,13 +149,13 @@ public class QueryWorkloadConfigUtils {
                   HTTP_CLIENT.sendRequest(request, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS)
           );
           if (response.getStatusCode() == HttpStatus.SC_OK) {
-            workloadConfigs.set(QueryWorkloadConfigUtils.getQueryWorkloadConfigs(response.getResponse()));
+            workloadToInstanceCost.set(JsonUtils.stringToObject(response.getResponse(), new TypeReference<>() { }));
             LOGGER.info("Successfully fetched query workload configs from controller: {}, Instance: {}",
                     controllerUrl, instanceId);
             return true;
           } else if (response.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
             LOGGER.info("No query workload configs found for controller: {}, Instance: {}", controllerUrl, instanceId);
-            workloadConfigs.set(Collections.emptyList());
+            workloadToInstanceCost.set(Collections.emptyMap());
             return true;
           } else {
             LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}, Status: {}",
@@ -160,22 +168,11 @@ public class QueryWorkloadConfigUtils {
           return false;
         }
       });
-      return workloadConfigs.get();
+      return workloadToInstanceCost.get();
     } catch (Exception e) {
       LOGGER.warn("Failed to fetch query workload configs from controller: {}, Instance: {}",
               controllerUrl, instanceId, e);
-      return Collections.emptyList();
-    }
-  }
-
-  public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(String queryWorkloadConfigsJson) {
-    Preconditions.checkNotNull(queryWorkloadConfigsJson, "Query workload configs JSON cannot be null");
-    try {
-      return JsonUtils.stringToObject(queryWorkloadConfigsJson, new TypeReference<>() { });
-    } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert query workload configs: %s to list of QueryWorkloadConfig",
-          queryWorkloadConfigsJson);
-      throw new RuntimeException(errorMessage, e);
+      return Collections.emptyMap();
     }
   }
 

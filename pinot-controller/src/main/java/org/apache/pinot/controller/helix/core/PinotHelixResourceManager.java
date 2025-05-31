@@ -4822,7 +4822,6 @@ public class PinotHelixResourceManager {
     return tagMinInstanceMap;
   }
 
-  @Nullable
   public List<QueryWorkloadConfig> getAllQueryWorkloadConfigs() {
     return ZKMetadataProvider.getAllQueryWorkloadConfigs(_propertyStore);
   }

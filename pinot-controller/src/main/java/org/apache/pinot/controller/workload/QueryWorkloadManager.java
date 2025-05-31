@@ -34,6 +34,7 @@ import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +118,7 @@ public class QueryWorkloadManager {
   public void propagateWorkloadFor(String tableName) {
     try {
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
+      if (queryWorkloadConfigs.isEmpty()) {
           return;
       }
       // Get the helixTags associated with the table
@@ -143,14 +144,13 @@ public class QueryWorkloadManager {
    * 3. Find the instance associated with the {@link QueryWorkloadConfig} and node type
    *
    * @param instanceName The instance name to get the workload costs for
-   * @param nodeType {@link NodeConfig.Type} The node type to get the workload costs for
    * @return A map of workload name to {@link InstanceCost} for the given instance and node type
    */
-  public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName, NodeConfig.Type nodeType) {
+  public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
     try {
       Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
+      if (queryWorkloadConfigs.isEmpty()) {
         LOGGER.warn("No query workload configs found in zookeeper");
         return workloadToInstanceCostMap;
       }
@@ -160,6 +160,16 @@ public class QueryWorkloadManager {
         LOGGER.warn("Instance config not found for instance: {}", instanceName);
         return workloadToInstanceCostMap;
       }
+      NodeConfig.Type nodeType;
+      if (InstanceTypeUtils.isServer(instanceName)) {
+        nodeType = NodeConfig.Type.SERVER_NODE;
+      } else if (InstanceTypeUtils.isBroker(instanceName)) {
+        nodeType = NodeConfig.Type.BROKER_NODE;
+      } else {
+        LOGGER.warn("Unsupported instance type: {}, cannot compute workload costs", instanceName);
+        return workloadToInstanceCostMap;
+      }
+
       // Find all workloads associated with the helix tags
       Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
           PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, instanceConfig.getTags(),
@@ -179,8 +189,7 @@ public class QueryWorkloadManager {
       }
       return workloadToInstanceCostMap;
     } catch (Exception e) {
-      String errorMsg = String.format("Failed to get workload to instance cost map for instance: %s, nodeType: %s",
-          instanceName, nodeType.getJsonValue());
+      String errorMsg = String.format("Failed to get workload to instance cost map for instance: %s", instanceName);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }

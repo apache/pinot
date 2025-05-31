@@ -848,7 +848,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  @Nullable
   public static List<QueryWorkloadConfig> getAllQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,

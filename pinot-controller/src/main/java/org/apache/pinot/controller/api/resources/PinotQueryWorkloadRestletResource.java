@@ -33,7 +33,6 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -47,7 +46,6 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.workload.InstanceCost;
-import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -67,8 +65,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
         + "context will be considered.")
 }))
 @Path("/")
-public class PinotQueryWorkloadConfigRestletResource {
-  public static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryWorkloadConfigRestletResource.class);
+public class PinotQueryWorkloadRestletResource {
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryWorkloadRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -83,7 +81,7 @@ public class PinotQueryWorkloadConfigRestletResource {
     try {
       LOGGER.info("Received request to get all queryWorkloadConfigs");
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs == null || queryWorkloadConfigs.isEmpty()) {
+      if (queryWorkloadConfigs.isEmpty()) {
         return JsonUtils.objectToString(Map.of());
       }
       String response = JsonUtils.objectToString(queryWorkloadConfigs);
@@ -96,7 +94,7 @@ public class PinotQueryWorkloadConfigRestletResource {
   }
 
   /**
-   * API to specific query workload config
+   * API to fetch query workload config
    * @param queryWorkloadName Name of the query workload
    * Example request:
    * /queryWorkloadConfigs/workload-foo1
@@ -162,10 +160,9 @@ public class PinotQueryWorkloadConfigRestletResource {
   /**
    * API to get all workload configs associated with the instance
    * @param instanceName Helix instance name
-   * @param nodeTypeString  {@link NodeConfig.Type} string representation of the instance
    * @return Map of workload name to instance cost
    * Example request:
-   * /queryWorkloadConfigs/instance/Server_localhost_1234?nodeType=serverNode
+   * /queryWorkloadConfigs/instance/Server_localhost_1234
    * Example response:
    * {
    *  "workload1": {
@@ -185,11 +182,10 @@ public class PinotQueryWorkloadConfigRestletResource {
   @ApiOperation(value = "Get all workload configs associated with the instance",
       notes = "Get all workload configs associated with the instance")
   public String getQueryWorkloadConfigForInstance(@PathParam("instanceName") String instanceName,
-      @QueryParam("nodeType") String nodeTypeString, @Context HttpHeaders httpHeaders) {
+                                                  @Context HttpHeaders httpHeaders) {
     try {
-      NodeConfig.Type nodeType = NodeConfig.Type.forValue(nodeTypeString);
       Map<String, InstanceCost> workloadToInstanceCostMap = _pinotHelixResourceManager.getQueryWorkloadManager()
-          .getWorkloadToInstanceCostFor(instanceName, nodeType);
+          .getWorkloadToInstanceCostFor(instanceName);
       if (workloadToInstanceCostMap == null || workloadToInstanceCostMap.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "No workload configs found for instance: " + instanceName,
             Response.Status.NOT_FOUND, null);
@@ -290,6 +286,47 @@ public class PinotQueryWorkloadConfigRestletResource {
       String errorMessage = String.format("Error when deleting query workload for workload: %s, error: %s",
           queryWorkloadName, e);
       throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * API to refresh propagation for a single query workload config
+   * This API doesn't update the config, it only triggers the propagation of an existing workload config
+   *
+   * @param queryWorkloadName Name of the query workload to refresh
+   * Example request:
+   * POST /queryWorkloadConfigs/{queryWorkloadName}/refresh
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/queryWorkloadConfigs/{queryWorkloadName}/refresh")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_QUERY_WORKLOAD_CONFIG)
+  @Authenticate(AccessType.UPDATE)
+  @ApiOperation(value = "Refresh query workload config propagation", notes = "Force propagation of an existing config")
+  public Response refreshQueryWorkloadConfig(@PathParam("queryWorkloadName") String queryWorkloadName,
+                                             @Context HttpHeaders httpHeaders) {
+    try {
+      LOGGER.info("Received request to refresh workload config propagation for workload: {}", queryWorkloadName);
+      // Fetch existing config
+      QueryWorkloadConfig existingConfig = _pinotHelixResourceManager.getQueryWorkloadConfig(queryWorkloadName);
+      if (existingConfig == null) {
+        throw new ControllerApplicationException(LOGGER, "Workload config not found for workload: " + queryWorkloadName,
+            Response.Status.NOT_FOUND, null);
+      }
+      _pinotHelixResourceManager.getQueryWorkloadManager().propagateWorkloadUpdateMessage(existingConfig);
+      String successMessage = String.format("Query workload config propagation triggered for workload: %s",
+          queryWorkloadName);
+      LOGGER.info(successMessage);
+      return Response.ok().entity(successMessage).build();
+    } catch (Exception e) {
+      if (e instanceof ControllerApplicationException) {
+        throw (ControllerApplicationException) e;
+      } else {
+        String errorMessage = String.format("Error when refreshing query workload config for workload: %s, error: %s",
+            queryWorkloadName, e);
+        throw new ControllerApplicationException(LOGGER, errorMessage,
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
     }
   }
 }
