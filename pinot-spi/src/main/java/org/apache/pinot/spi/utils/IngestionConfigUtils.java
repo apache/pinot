@@ -128,19 +128,18 @@ public final class IngestionConfigUtils {
    * Fetches the streamConfig from the list of streamConfigs according to the partition id.
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig, int partitionId) {
-    if (partitionId < PARTITION_PADDING_OFFSET) {
-      return getFirstStreamConfigMap(tableConfig);
+    List<Map<String, String>> streamConfigMaps = getStreamConfigMaps(tableConfig);
+    int numStreams = streamConfigMaps.size();
+    if (numStreams == 1) {
+      // Single stream
+      return streamConfigMaps.get(0);
+    } else {
+      // Multiple streams
+      int index = getStreamConfigIndexFromPinotPartitionId(partitionId);
+      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
+          tableConfig.getTableName());
+      return streamConfigMaps.get(index);
     }
-
-    String tableNameWithType = tableConfig.getTableName();
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
-    int index = getStreamConfigIndexFromPinotPartitionId(partitionId);
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    Preconditions.checkState(ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null
-            && ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size() > index,
-        "Cannot find stream config of index: %s for table: %s", index, tableNameWithType);
-    return ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().get(index);
   }
 
   public static List<AggregationConfig> getAggregationConfigs(TableConfig tableConfig) {
