@@ -221,7 +221,7 @@ public class FilterPlanNode implements PlanNode {
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter, int numDocs) {
     if (_queryCache != null) {
       // Check if the filter is cacheable
-      Object bitmap = _queryCache.get(QueryCache.getCacheKey(_indexSegment.getSegmentName(), filter));
+      Object bitmap = _queryCache.get(new QueryCache.SegmentKey(_indexSegment.getSegmentName(), filter));
       if (bitmap instanceof ImmutableRoaringBitmap) {
         // Check if the filter is already cached
         return new CachedBitmapFilterOperator((ImmutableRoaringBitmap) bitmap, false, numDocs,
