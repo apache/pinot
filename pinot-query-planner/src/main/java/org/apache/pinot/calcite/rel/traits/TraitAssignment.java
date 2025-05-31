@@ -121,8 +121,8 @@ public class TraitAssignment {
         "Always expect left and right keys to be same size. Found: %s and %s",
         joinInfo.leftKeys, joinInfo.rightKeys);
     // Case-3: Default case.
-    RelDistribution rightDistribution = joinInfo.isEqui() && !joinInfo.rightKeys.isEmpty()
-        ? RelDistributions.hash(joinInfo.rightKeys) : RelDistributions.BROADCAST_DISTRIBUTED;
+    RelDistribution rightDistribution = !joinInfo.rightKeys.isEmpty() ? RelDistributions.hash(joinInfo.rightKeys)
+        : RelDistributions.BROADCAST_DISTRIBUTED;
     RelDistribution leftDistribution;
     if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
       leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;

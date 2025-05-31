@@ -282,7 +282,7 @@ public class AggregatePushdownRule extends PRelOptRule {
     relNode = PinotRuleUtils.unboxRel(relNode);
     if (relNode instanceof Project) {
       return ((Project) relNode).getProjects();
-    } else if (relNode instanceof Union) {
+    } else if (relNode instanceof Union || relNode instanceof Exchange) {
       return findImmediateProjects(relNode.getInput(0));
     }
     return null;
