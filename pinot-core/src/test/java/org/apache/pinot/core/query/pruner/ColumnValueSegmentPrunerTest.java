@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -115,7 +116,7 @@ public class ColumnValueSegmentPrunerTest {
     IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    when(indexSegment.getDataSource("column", null)).thenReturn(dataSource);
 
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);

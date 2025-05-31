@@ -21,6 +21,7 @@ package org.apache.pinot.query.catalog;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -68,10 +69,14 @@ public class PinotCatalog implements Schema {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
+
+    if (tableName == null) {
+      tableName = _tableCache.getActualLogicalTableName(physicalTableName);
+    }
+
     if (tableName == null) {
       return null;
     }
-
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     if (schema == null) {
       return null;
@@ -86,7 +91,9 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+    return Stream.concat(_tableCache.getTableNameMap().keySet().stream(),
+            _tableCache.getLogicalTableNameMap().keySet().stream())
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
         .collect(Collectors.toSet());
   }
 

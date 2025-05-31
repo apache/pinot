@@ -19,26 +19,29 @@
 package org.apache.pinot.core.routing;
 
 import java.util.List;
+import java.util.Set;
 
 
 /**
- * Tracks segments by partition for a table. Also tracks the invalid partition segments.
+ * An advanced version of {@link TablePartitionInfo} that also contains information about the fully replicated servers
+ * for each partition.
  */
-public class TablePartitionInfo {
+public class TablePartitionReplicatedServersInfo {
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final String _partitionFunctionName;
   private final int _numPartitions;
-  private final List<List<String>> _segmentsByPartition;
+  private final PartitionInfo[] _partitionInfoMap;
   private final List<String> _segmentsWithInvalidPartition;
 
-  public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions, List<List<String>> segmentsByPartition, List<String> segmentsWithInvalidPartition) {
+  public TablePartitionReplicatedServersInfo(String tableNameWithType, String partitionColumn,
+      String partitionFunctionName, int numPartitions, PartitionInfo[] partitionInfoMap,
+      List<String> segmentsWithInvalidPartition) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
-    _segmentsByPartition = segmentsByPartition;
+    _partitionInfoMap = partitionInfoMap;
     _segmentsWithInvalidPartition = segmentsWithInvalidPartition;
   }
 
@@ -58,11 +61,21 @@ public class TablePartitionInfo {
     return _numPartitions;
   }
 
-  public List<List<String>> getSegmentsByPartition() {
-    return _segmentsByPartition;
+  public PartitionInfo[] getPartitionInfoMap() {
+    return _partitionInfoMap;
   }
 
   public List<String> getSegmentsWithInvalidPartition() {
     return _segmentsWithInvalidPartition;
+  }
+
+  public static class PartitionInfo {
+    public final Set<String> _fullyReplicatedServers;
+    public final List<String> _segments;
+
+    public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments) {
+      _fullyReplicatedServers = fullyReplicatedServers;
+      _segments = segments;
+    }
   }
 }
