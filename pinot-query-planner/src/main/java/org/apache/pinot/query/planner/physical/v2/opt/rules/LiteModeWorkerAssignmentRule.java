@@ -28,6 +28,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -35,6 +37,7 @@ import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 
 
@@ -46,16 +49,23 @@ import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   private static final Random RANDOM = new Random();
   private final PhysicalPlannerContext _context;
+  private final boolean _runInBroker;
 
   public LiteModeWorkerAssignmentRule(PhysicalPlannerContext context) {
     _context = context;
+    _runInBroker = Boolean.parseBoolean(context.getQueryOptions().getOrDefault("runInBroker", "false"));
   }
 
   @Override
   public PRelNode execute(PRelNode currentNode) {
     Set<String> workerSet = new HashSet<>();
-    accumulateWorkers(currentNode, workerSet);
-    List<String> workers = List.of(sampleWorker(new ArrayList<>(workerSet)));
+    List<String> workers;
+    if (_runInBroker) {
+      workers = List.of(String.format("0@%s", _context.getInstanceId()));
+    } else {
+      accumulateWorkers(currentNode, workerSet);
+      workers = List.of(sampleWorker(new ArrayList<>(workerSet)));
+    }
     PinotDataDistribution pdd = new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(),
         null, null);
     return addExchangeAndWorkers(currentNode, null, pdd);
@@ -67,13 +77,24 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
         return currentNode;
       }
       return new PhysicalExchange(nodeId(), currentNode, pdd, Collections.emptyList(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.SINGLETON_EXCHANGE, currentNode.unwrap().getTraitSet().getCollation(),
+          PinotExecStrategyTrait.getDefaultExecStrategy());
     }
     List<PRelNode> newInputs = new ArrayList<>();
     for (PRelNode input : currentNode.getPRelInputs()) {
       newInputs.add(addExchangeAndWorkers(input, currentNode, pdd));
     }
-    return currentNode.with(newInputs, pdd);
+    currentNode = currentNode.with(newInputs, pdd);
+    if (!currentNode.areTraitsSatisfied()) {
+      RelCollation collation = currentNode.unwrap().getTraitSet().getCollation();
+      Preconditions.checkState(collation != null && !collation.getFieldCollations().isEmpty(),
+          "Expected non-null collation since traits are not satisfied");
+      PinotDataDistribution sortedPDD = new PinotDataDistribution(
+          RelDistribution.Type.SINGLETON, pdd.getWorkers(), pdd.getWorkerHash(), null, collation);
+      return new PhysicalSort(currentNode.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(), collation,
+          null, null, currentNode, nodeId(), sortedPDD, false);
+    }
+    return currentNode;
   }
 
   /**
