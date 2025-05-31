@@ -39,26 +39,26 @@ public class InMemoryQueryCacheTest {
     InMemoryQueryCache cache = new InMemoryQueryCache();
 
     // Test put and get
-    cache.put("key1", "value1");
-    Assert.assertEquals(cache.get("key1"), "value1");
+    cache.put(new QueryCache.SegmentKey("seg1", "key1"), "value1");
+    Assert.assertEquals(cache.get(new QueryCache.SegmentKey("seg1", "key1")), "value1");
 
     // Test overwrite
-    cache.put("key1", "value2");
-    Assert.assertEquals(cache.get("key1"), "value2");
+    cache.put(new QueryCache.SegmentKey("seg1", "key1"), "value2");
+    Assert.assertEquals(cache.get(new QueryCache.SegmentKey("seg1", "key1")), "value2");
 
     // Test null value, expecting a NPE
     try {
-      cache.put("key2", null);
+      cache.put(new QueryCache.SegmentKey("seg1", "key2"), null);
       Assert.fail("Expected NullPointerException");
     } catch (NullPointerException e) {
       // Expected
     }
 
     // Test get non-existent key
-    Assert.assertNull(cache.get("non-existent-key"));
+    Assert.assertNull(cache.get(new QueryCache.SegmentKey("seg1", "non-existent-key")));
 
     // Test remove
-    cache.remove("key1");
+    cache.invalidateCacheForKey("key1");
     Assert.assertNull(cache.get("key1"));
   }
 
@@ -139,7 +139,7 @@ public class InMemoryQueryCacheTest {
                 }
                 break;
               case 2: // remove
-                cache.remove(key);
+                cache.invalidateCacheForKey(key);
                 // Verify it was removed
                 Assert.assertNull(cache.get(key));
                 break;
@@ -168,24 +168,25 @@ public class InMemoryQueryCacheTest {
   @Test
   public void testQueryCacheUpdater() {
     InMemoryQueryCache cache = new InMemoryQueryCache();
-    String cacheKey = "test-key";
+    String segmentName = "testSegment";
+    QueryCache.SegmentKey segmentKey = new QueryCache.SegmentKey(segmentName, "key");
 
     // Create cache updater
-    QueryCache.QueryCacheUpdater updater = new QueryCache.QueryCacheUpdater(cache, cacheKey);
+    QueryCache.QueryCacheUpdater updater = new QueryCache.QueryCacheUpdater(cache, segmentKey);
 
     // Update cache via updater
     String value = "test-value";
     updater.update(value);
 
     // Verify cache was updated
-    Assert.assertEquals(cache.get(cacheKey), value);
+    Assert.assertEquals(cache.get(segmentKey), value);
 
     // Update again
     String newValue = "new-test-value";
     updater.update(newValue);
 
     // Verify cache was updated with new value
-    Assert.assertEquals(cache.get(cacheKey), newValue);
+    Assert.assertEquals(cache.get(segmentKey), newValue);
   }
 
   @Test
@@ -197,6 +198,6 @@ public class InMemoryQueryCacheTest {
     String cacheKey = QueryCache.getCacheKey(segmentName, filterContext);
 
     // Verify cache key format
-    Assert.assertEquals(cacheKey, "testSegment_-1103212440");
+    Assert.assertEquals(cacheKey, "testSegment" + QueryCache.SegmentKey.DELIMITER + "-1103212440");
   }
 }
