@@ -434,7 +434,7 @@ public class ServerSegmentMetadataReader {
     return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
-  private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
+  public String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
@@ -443,10 +443,9 @@ public class ServerSegmentMetadataReader {
   }
 
   public String generateTableMetadataServerURL(String tableNameWithType, List<String> columns,
-                                               Set<String> segmentsToInclude, String endpoint) {
+      Set<String> segmentsToInclude, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
-    String paramsStr = generateColumnsParam(columns)
-            + generateSegmentsParam(segmentsToInclude);
+    String paramsStr = generateColumnsParam(columns) + generateSegmentsParam(segmentsToInclude);
     return String.format("%s/tables/%s/segments/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
