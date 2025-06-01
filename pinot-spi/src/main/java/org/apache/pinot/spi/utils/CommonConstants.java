@@ -634,6 +634,8 @@ public class CommonConstants {
         // name, when that segment has multiple partitions in its columnPartitionMap.
         public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
+
+        public static final String USE_BROKER_PRUNING = "useBrokerPruning";
       }
 
       public static class QueryOptionValue {
