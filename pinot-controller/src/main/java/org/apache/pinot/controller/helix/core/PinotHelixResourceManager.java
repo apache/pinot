@@ -1586,17 +1586,26 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
-    List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-    if (reload) {
-      LOGGER.info("Reloading tables with name: {}", schemaName);
-      for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType, false, null);
+    List<String> tableNamesWithType;
+    try {
+      tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
+      if (reload) {
+        LOGGER.info("Reloading tables with name: {}", schemaName);
+        for (String tableNameWithType : tableNamesWithType) {
+          reloadAllSegments(tableNameWithType, false, null);
+        }
       }
-    }
-    // Send updated schema message to the table names with type
-    for (String tableNameWithType : tableNamesWithType) {
-      LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
-      sendTableSchemaRefreshMessage(tableNameWithType);
+      // Send schema refresh message to all tables that use this schema
+      for (String tableNameWithType : tableNamesWithType) {
+        LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
+        sendTableSchemaRefreshMessage(tableNameWithType);
+      }
+    } catch (TableNotFoundException e) {
+      if (reload) {
+        throw e;
+      }
+      // We don't throw exception if no tables found for schema when reload is false. Since this could be valid case
+      LOGGER.warn("No tables found for schema (refresh only): {}", schemaName, e);
     }
   }
 
@@ -3293,13 +3302,13 @@ public class PinotHelixResourceManager {
 
   private void sendTableSchemaRefreshMessage(String tableNameWithType) {
     TableSchemaRefreshMessage refreshMessage = new TableSchemaRefreshMessage(tableNameWithType);
-    // Send segment refresh message to servers
+    // Send refresh message to servers
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setSessionSpecific(true);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    // Send segment refresh message to servers
+    // Send refresh message to servers
     recipientCriteria.setResource(tableNameWithType);
     // Send message with no callback and infinite timeout on the recipient
     int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
