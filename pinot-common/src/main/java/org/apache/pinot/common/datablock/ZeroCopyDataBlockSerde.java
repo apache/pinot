@@ -46,9 +46,12 @@ import org.apache.pinot.segment.spi.memory.PinotOutputStream;
  */
 public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
-  private static final int STAGE_ID_FAKE_ERROR_CODE = -1;
-  private static final int WORKER_ID_FAKE_ERROR_CODE = -2;
-  private static final int SERVER_ID_FAKE_ERROR_CODE = -3;
+  /// The error metadata version is used to identify the format of the error metadata.
+  /// The single version so far is 1, which includes stageId and workerId as ints and serverId as a string after the
+  /// exceptions.
+  /// Although this is not strictly necessary, it is useful to have a version to allow for future
+  /// changes in the error metadata format (adding new metadata fields, changing the format to key-value pairs, etc.).
+  private static final int ERROR_METADATA_VERSION = 1;
 
   private final PagedPinotOutputStream.PageAllocator _allocator;
 
@@ -118,36 +121,19 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       return;
     }
 
-    // We add 3 fake error codes to the map to store stage, worker and server ID.
-    // These fake error codes are only used in the serialized format.
-    // When deserialized, the returned datablock will not contain these fake error codes.
-    into.writeInt(errCodeToExceptionMap.size() + 3);
+    into.writeInt(errCodeToExceptionMap.size());
     for (Map.Entry<Integer, String> entry : errCodeToExceptionMap.entrySet()) {
       into.writeInt(entry.getKey());
       into.writeInt4String(entry.getValue());
     }
-    int stage;
-    int worker;
-    String serverId;
+    // this should always be the case, but we apply defensive programming here to avoid issues in the future
     if (dataBlock instanceof MetadataBlock) {
       MetadataBlock metablock = (MetadataBlock) dataBlock;
-      stage = metablock.getStageId();
-      worker = metablock.getWorkerId();
-      serverId = metablock.getServerId() != null ? metablock.getServerId() : "";
-    } else {
-      stage = -1; // Default value when not initialized
-      worker = -1; // Default value when not initialized
-      serverId = ""; // Default value when not initialized
+      into.writeInt(ERROR_METADATA_VERSION);
+      into.writeInt(metablock.getStageId());
+      into.writeInt(metablock.getWorkerId());
+      into.writeInt4String(metablock.getServerId() != null ? metablock.getServerId() : "");
     }
-    // Add fake error codes for stage, worker and server ID
-    into.writeInt(STAGE_ID_FAKE_ERROR_CODE);
-    into.writeInt4String(String.valueOf(stage));
-
-    into.writeInt(WORKER_ID_FAKE_ERROR_CODE);
-    into.writeInt4String(String.valueOf(worker));
-
-    into.writeInt(SERVER_ID_FAKE_ERROR_CODE);
-    into.writeInt4String(serverId);
   }
 
   private static void serializeDictionary(DataBlock dataBlock, PinotOutputStream into)
@@ -229,20 +215,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
               bufferView(buffer, header._fixedSizeDataStart + offset, header._fixedSizeDataLength),
               bufferView(buffer, header._variableSizeDataStart + offset, header._variableSizeDataLength));
         case METADATA: {
-          Map<Integer, String> exceptions = deserializeExceptions(stream, header);
-          if (!exceptions.isEmpty()) {
-            // Remove the fake error codes that we added during serialization
-            // and transform them into stageId, workerId and serverId
-            String stageIdStr = exceptions.remove(STAGE_ID_FAKE_ERROR_CODE);
-            int stageId = stageIdStr != null ? Integer.parseInt(stageIdStr) : -1;
-            String workerIdStr = exceptions.remove(WORKER_ID_FAKE_ERROR_CODE);
-            int workerId = workerIdStr != null ? Integer.parseInt(workerIdStr) : -1;
-            String serverId = exceptions.remove(SERVER_ID_FAKE_ERROR_CODE);
-            return MetadataBlock.newError(stageId, workerId, serverId, exceptions);
-          } else {
-            List<DataBuffer> metadata = deserializeMetadata(buffer, header);
-            return new MetadataBlock(metadata);
-          }
+          ErrorsAndMetadata exceptions = deserializeExceptions(stream, header);
+          List<DataBuffer> metadata = deserializeMetadata(buffer, header);
+          return exceptions.asBlock(metadata);
         }
         default:
           throw new UnsupportedOperationException("Unsupported data table version: " + getVersion() + " with type: "
@@ -290,21 +265,37 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return currentOffset;
   }
 
+  /// Deserializes the exceptions and metadata from the stream.
   @VisibleForTesting
-  static Map<Integer, String> deserializeExceptions(PinotInputStream stream, Header header)
+  static ErrorsAndMetadata deserializeExceptions(PinotInputStream stream, Header header)
       throws IOException {
     if (header._exceptionsLength == 0) {
-      return new HashMap<>();
+      return ErrorsAndMetadata.EMPTY;
     }
+    long currentOffset = header.getExceptionsStart();
+
     stream.seek(header.getExceptionsStart());
     int numExceptions = stream.readInt();
-    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
+    // We reserve extra space for the fake error codes storing stageId, workerId and serverId
+    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions + 3));
     for (int i = 0; i < numExceptions; i++) {
       int errCode = stream.readInt();
       String errMessage = stream.readInt4UTF();
       exceptions.put(errCode, errMessage);
     }
-    return exceptions;
+
+    long readOffset = stream.getCurrentOffset() - currentOffset;
+    if (readOffset >= header._exceptionsLength) {
+      return new ErrorsAndMetadata(exceptions, -1, -1, "");
+    }
+    int errorMetadataVersion = stream.readInt();
+    if (errorMetadataVersion != ERROR_METADATA_VERSION) {
+      return new ErrorsAndMetadata(exceptions, -1, -1, "");
+    }
+    int stageId = stream.readInt();
+    int workerId = stream.readInt();
+    String serverId = stream.readInt4UTF();
+    return new ErrorsAndMetadata(exceptions, stageId, workerId, serverId);
   }
 
   private DataBuffer bufferView(DataBuffer buffer, long offset, int length) {
@@ -499,6 +490,31 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
     public int getMetadataStart() {
       return _metadataStart;
+    }
+  }
+
+  private static class ErrorsAndMetadata {
+    public static final ErrorsAndMetadata EMPTY =
+        new ErrorsAndMetadata(new HashMap<>(), -1, -1, "");
+
+    private final Map<Integer, String> _exceptions;
+    private final int _stageId;
+    private final int _workerId;
+    private final String _serverId;
+
+    public ErrorsAndMetadata(Map<Integer, String> exceptions, int stageId, int workerId, String serverId) {
+      _exceptions = exceptions;
+      _stageId = stageId;
+      _workerId = workerId;
+      _serverId = serverId;
+    }
+
+    public MetadataBlock asBlock(List<DataBuffer> statsByStage) {
+      if (_exceptions.isEmpty()) {
+        return new MetadataBlock(statsByStage);
+      } else {
+        return MetadataBlock.newErrorWithStats(_stageId, _workerId, _serverId, _exceptions, statsByStage);
+      }
     }
   }
 }

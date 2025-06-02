@@ -73,7 +73,12 @@ public class ZeroCopyDataBlockSerdeTest {
             new MetadataBlock(Lists.newArrayList(PinotDataBuffer.empty(), PinotDataBuffer.empty()))},
         {"eos with one not empty stat", new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))},
         {"eos with two not empty stat",
-            new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1), PinotByteBuffer.wrap(bytes2)))}
+            new MetadataBlock(Lists.newArrayList(PinotByteBuffer.wrap(bytes1), PinotByteBuffer.wrap(bytes2)))},
+        {"error with stats", MetadataBlock.newErrorWithStats(12, 21, "fakeId",
+            ImmutableMap.<Integer, String>builder()
+                .put(123, "error")
+                .build(),
+            Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))}
     };
   }
 
