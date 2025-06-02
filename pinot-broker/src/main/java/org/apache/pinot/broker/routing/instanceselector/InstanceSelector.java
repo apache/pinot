@@ -27,6 +27,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
@@ -48,7 +49,8 @@ public interface InstanceSelector {
    * (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * Should be called only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
+  void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
+      IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
   /**
    * Processes the instances change. Changed instances are pre-computed based on the current and previous enabled
