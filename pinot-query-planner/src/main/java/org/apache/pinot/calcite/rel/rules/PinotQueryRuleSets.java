@@ -92,8 +92,8 @@ public class PinotQueryRuleSets {
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
 
-      // reduce SUM and AVG
-      // TODO: Consider not reduce at all.
+      // reduce only SUM and AVG only when the resulting SUM0
+      // matches the pattern of AggregateCaseToFilter optimizations
       PinotAggregateReduceFunctionsRule.INSTANCE,
 
       // convert CASE-style filtered aggregates into true filtered aggregates
