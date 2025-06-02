@@ -40,8 +40,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -60,6 +60,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -126,12 +127,9 @@ public class PinotClientRequest {
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
 
+  @Inject
+  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
-
-  @PostConstruct
-  public void init() {
-    _instanceId = _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, "unknownBroker");
-  }
 
   @GET
   @ManagedAsync
