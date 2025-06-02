@@ -423,19 +423,8 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
-      tableName = tableType != null ? TableNameBuilder.forType(tableType).tableNameWithType(tableName) : tableName;
-      // Validate the table is not referenced in any logical table config.
-      List<LogicalTableConfig> allLogicalTableConfigs =
-          ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
-      for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
-        // tableName should neither be the ref offline nor ref realtime table name in the logical table config.
-        if (tableName.equals(logicalTableConfig.getRefOfflineTableName())
-            || tableName.equals(logicalTableConfig.getRefRealtimeTableName())) {
-          throw new ControllerApplicationException(LOGGER,
-              "Cannot delete table '" + tableName + "' because it is referenced in logical table: "
-                  + logicalTableConfig.getTableName(), Response.Status.CONFLICT);
-        }
-      }
+
+      validateLogicalTableReference(tableName);
 
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
@@ -479,6 +468,23 @@ public class PinotTableRestletResource {
     }
     TableType typeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     return typeFromTableName == null || typeFromTableName == expectedType;
+  }
+
+  private void validateLogicalTableReference(String tableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    List<LogicalTableConfig> allLogicalTableConfigs =
+        ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+    for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+      String refOfflineTableName = logicalTableConfig.getRefOfflineTableName();
+      String refRealtimeTableName = logicalTableConfig.getRefRealtimeTableName();
+      if (tableName.equals(refOfflineTableName) || tableName.equals(refRealtimeTableName)
+          || rawTableName.equals(TableNameBuilder.extractRawTableName(refOfflineTableName))
+          || rawTableName.equals(TableNameBuilder.extractRawTableName(refRealtimeTableName))) {
+        throw new ControllerApplicationException(LOGGER,
+            "Cannot delete table '" + tableName + "' because it is referenced in logical table: "
+                + logicalTableConfig.getTableName(), Response.Status.CONFLICT);
+      }
+    }
   }
 
   @PUT

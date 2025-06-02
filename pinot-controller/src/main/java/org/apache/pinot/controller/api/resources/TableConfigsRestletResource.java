@@ -284,6 +284,11 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers) {
     try {
+      if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
+        throw new ControllerApplicationException(LOGGER, "Invalid table name: " + tableName + ". Use raw table name.",
+            Response.Status.BAD_REQUEST);
+      }
+
       tableName = DatabaseUtils.translateTableName(tableName, headers);
 
       // Validate the table is not referenced in any logical table config.
@@ -319,7 +324,7 @@ public class TableConfigsRestletResource {
 
   private void validateRefTableName(String tableName,
       String refTableName, String logicalTableName) {
-    if (refTableName != null && tableName.equals(TableNameBuilder.extractRawTableName(refTableName))) {
+    if (tableName.equals(TableNameBuilder.extractRawTableName(refTableName))) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
               tableName, logicalTableName), Response.Status.CONFLICT);

@@ -651,6 +651,28 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   @Test
+  public void testDeleteTableConfigWithTableTypeValidation()
+      throws IOException {
+    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    String tableName = "testDeleteWithTypeValidation";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.addTableConfig(offlineTableConfig);
+
+    // Delete table should fail because it is not a raw table name
+    String msg = Assert.expectThrows(
+            IOException.class,
+            () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(offlineTableConfig.getTableName())))
+        .getMessage();
+    Assert.assertTrue(msg.contains("Invalid table name: testDeleteWithTypeValidation_OFFLINE. Use raw table name."),
+        msg);
+
+    // Delete table with raw table name
+    String response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    Assert.assertTrue(response.contains("Deleted TableConfigs: testDeleteWithTypeValidation"), response);
+  }
+
+  @Test
   public void testUnrecognizedProperties()
       throws IOException {
     String tableName = "testUnrecognized1";
