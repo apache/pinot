@@ -542,19 +542,9 @@ public class TableRebalancer {
         if (segmentsToMoveChanged) {
           try {
             // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-            Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
+            instancePartitionsMap =
                 getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
-                    tableRebalanceLogger);
-            instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
-            instancePartitionsUnchanged = instancePartitionsMapAndUnchanged.getRight();
-            // If the instance partitions have changed, clear the segmentPartitionIdMap as the number of partitions
-            // may have changed, resulting in a different partitionId calculation. This change will only make a
-            // difference for the scenario when it was changed from or to 1 partition. The numPartitions is not used
-            // otherwise.
-            if (!instancePartitionsUnchanged) {
-              LOGGER.info("Clear the cached segmentPartitionIdMap as the instance partitions has changed");
-              segmentPartitionIdMap.clear();
-            }
+                    tableRebalanceLogger).getLeft();
             tierToInstancePartitionsMap =
                 getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
                     minimizeDataMovement, tableRebalanceLogger).getLeft();
