@@ -42,6 +42,7 @@ on:
       - "licenses/**"
       - "licenses-binary/**"
       - "**.md"
+  workflow_dispatch: {}
 
 jobs:
   linter-test:
