@@ -111,8 +111,8 @@ import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
-import org.apache.pinot.common.messages.TableSchemaRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -1594,11 +1594,13 @@ public class PinotHelixResourceManager {
         for (String tableNameWithType : tableNamesWithType) {
           reloadAllSegments(tableNameWithType, false, null);
         }
-      }
-      // Send schema refresh message to all tables that use this schema
-      for (String tableNameWithType : tableNamesWithType) {
-        LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
-        sendTableSchemaRefreshMessage(tableNameWithType);
+      } else {
+        // Send schema refresh message to all tables that use this schema
+        for (String tableNameWithType : tableNamesWithType) {
+          LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
+          sendTableConfigSchemaRefreshMessage(tableNameWithType, getServerInstancesForTable(tableNameWithType,
+              TableNameBuilder.getTableTypeFromTableName(tableNameWithType)));
+        }
       }
     } catch (TableNotFoundException e) {
       if (reload) {
@@ -3300,23 +3302,24 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendTableSchemaRefreshMessage(String tableNameWithType) {
-    TableSchemaRefreshMessage refreshMessage = new TableSchemaRefreshMessage(tableNameWithType);
-    // Send refresh message to servers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    // Send refresh message to servers
-    recipientCriteria.setResource(tableNameWithType);
-    // Send message with no callback and infinite timeout on the recipient
-    int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
-    if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} schema refresh messages to servers for table: {}", numMessagesSent,
-          tableNameWithType);
-    } else {
-      LOGGER.warn("No schema refresh message sent to servers for table: {}", tableNameWithType);
+  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType, List<String> instances) {
+    TableConfigSchemaRefreshMessage refreshMessage = new TableConfigSchemaRefreshMessage(tableNameWithType);
+    for (String instance : instances) {
+      // Send refresh message to servers
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setInstanceName(instance);
+      recipientCriteria.setSessionSpecific(true);
+      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+      // Send message with no callback and infinite timeout on the recipient
+      int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} schema refresh messages to servers for table: {} for instance: {}", numMessagesSent,
+            tableNameWithType, instance);
+      } else {
+        LOGGER.warn("No schema refresh message sent to servers for table: {} for instance: {}", tableNameWithType,
+            instance);
+      }
     }
   }
 

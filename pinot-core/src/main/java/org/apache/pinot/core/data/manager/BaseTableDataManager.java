@@ -383,26 +383,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public IndexLoadingConfig fetchIndexLoadingConfig() {
-    refreshCachedTableConfigAndSchema();
-    Pair<TableConfig, Schema> tableConfigAndSchema = getCachedTableConfigAndSchema();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig,
-        tableConfigAndSchema.getLeft(), tableConfigAndSchema.getRight());
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
     return indexLoadingConfig;
   }
 
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
-  }
-
-  @Override
-  public void refreshCachedTableConfigAndSchema() {
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
   @Override

@@ -22,16 +22,16 @@ import java.util.UUID;
 import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
-public class TableSchemaRefreshMessage extends Message {
-  public static final String REFRESH_TABLE_SCHEMA = "REFRESH_TABLE_SCHEMA";
+public class TableConfigSchemaRefreshMessage extends Message {
+  public static final String REFRESH_TABLE_CONFIG_AND_SCHEMA = "REFRESH_TABLE_CONFIG_AND_SCHEMA";
   private static final String TABLE_NAME_KEY = "tableName";
 
   /**
    * Constructor for the sender.
    */
-  public TableSchemaRefreshMessage(String tableNameWithType) {
+  public TableConfigSchemaRefreshMessage(String tableNameWithType) {
     super(Message.MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
-    setMsgSubType(REFRESH_TABLE_SCHEMA);
+    setMsgSubType(REFRESH_TABLE_CONFIG_AND_SCHEMA);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
     ZNRecord znRecord = getRecord();
@@ -41,9 +41,9 @@ public class TableSchemaRefreshMessage extends Message {
   /**
    * Constructor for the receiver.
    */
-  public TableSchemaRefreshMessage(Message message) {
+  public TableConfigSchemaRefreshMessage(Message message) {
     super(message.getRecord());
-    if (!message.getMsgSubType().equals(REFRESH_TABLE_SCHEMA)) {
+    if (!message.getMsgSubType().equals(REFRESH_TABLE_CONFIG_AND_SCHEMA)) {
       throw new IllegalArgumentException("Invalid message subtype:" + message.getMsgSubType());
     }
   }
