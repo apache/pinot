@@ -1731,11 +1731,8 @@ public class TableRebalancer {
       Map<String, String> currentInstanceStateMap = assignment.getValue();
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
 
-      Collection<String> segmentStates = currentInstanceStateMap.values();
-      boolean isConsuming = segmentStates.stream().noneMatch(state -> state.equals(SegmentStateModel.ONLINE))
-          && segmentStates.stream().anyMatch(state -> state.equals(SegmentStateModel.CONSUMING));
       int partitionId =
-          segmentPartitionIdMap.computeIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName, isConsuming));
+          segmentPartitionIdMap.computeIfAbsent(segmentName, v -> partitionIdFetcher.fetch(segmentName));
       Pair<Set<String>, Set<String>> currentAndTargetInstances =
           Pair.of(currentInstanceStateMap.keySet(), targetInstanceStateMap.keySet());
       currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap
@@ -1749,7 +1746,7 @@ public class TableRebalancer {
   @VisibleForTesting
   @FunctionalInterface
   interface PartitionIdFetcher {
-    int fetch(String segmentName, boolean isConsuming);
+    int fetch(String segmentName);
   }
 
   private static class PartitionIdFetcherImpl implements PartitionIdFetcher {
@@ -1767,7 +1764,7 @@ public class TableRebalancer {
     }
 
     @Override
-    public int fetch(String segmentName, boolean isConsuming) {
+    public int fetch(String segmentName) {
       Integer partitionId =
           SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
       if (partitionId != null) {
