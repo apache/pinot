@@ -1706,7 +1706,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-        .setConsumerDir(consumerDir);
+        .setConsumerDir(consumerDir)
+        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

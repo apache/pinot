@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -88,6 +89,8 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
@@ -193,6 +196,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
   private final Object2IntOpenHashMap _multiColumnPos;
   private final List<Object> _multiColumnValues;
+  private MultiColumnTextMetadata _multiColumnTextMetadata;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -204,6 +208,7 @@ public class MutableSegmentImpl implements MutableSegment {
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
         segmentZKMetadata.getSegmentName(), _schema, segmentZKMetadata.getCreationTime()) {
+
       @Override
       public int getTotalDocs() {
         return _numDocsIndexed;
@@ -222,6 +227,12 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public boolean isMutableSegment() {
         return true;
+      }
+
+      @Nullable
+      @Override
+      public MultiColumnTextMetadata getMultiColumnTextMetadata() {
+        return _multiColumnTextMetadata;
       }
     };
 
@@ -447,15 +458,21 @@ public class MutableSegmentImpl implements MutableSegment {
               "Multi-column text index is currently only supported on STRING type columns! Found column: " + column
                   + " of type: " + dataType);
         }
-
         columnsSV.add(schema.getFieldSpecFor(column).isSingleValueField());
       }
-
       _multiColumnTextIndex =
           new MultiColumnRealtimeLuceneTextIndex(textColumns, columnsSV, _consumerDir, config.getSegmentName(),
               textConfig);
       _multiColumnPos = _multiColumnTextIndex.getMapping();
       _multiColumnValues = new ArrayList<>(_multiColumnPos.size());
+      // Fill the list with nulls
+      for (int i = 0; i < _multiColumnPos.size(); i++) {
+        _multiColumnValues.add(null);
+      }
+      PropertiesConfiguration configProperties = new PropertiesConfiguration();
+      configProperties.setProperty("columns", textColumns);
+      configProperties.setProperty(MultiColumnTextIndexConstants.MetadataKey.INDEX_VERSION, 1);
+      _multiColumnTextMetadata = new MultiColumnTextMetadata(configProperties);
     } else {
       _multiColumnTextIndex = null;
       _multiColumnPos = null;

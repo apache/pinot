@@ -322,7 +322,7 @@ STRING;sv;raw;text_index;true;
 STRING;sv;raw;range_index;false;Unsupported data type: STRING
 STRING;sv;raw;startree_index;false;Dimension: col does not have dictionary
 STRING;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
-STRING;sv;raw;multi_col_text_index;false;expected [1] but found [null]
+STRING;sv;raw;multi_col_text_index;true;
 STRING;mv;raw;timestamp_index;false;Caught exception while reading data
 STRING;mv;raw;bloom_filter;true;
 STRING;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
@@ -334,7 +334,7 @@ STRING;mv;raw;text_index;true;
 STRING;mv;raw;range_index;false;Cannot get number of bytes for: STRING
 STRING;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
 STRING;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
-STRING;mv;raw;multi_col_text_index;false;expected [1] but found [null]
+STRING;mv;raw;multi_col_text_index;true;
 STRING;sv;dict;timestamp_index;false;Caught exception while reading data
 STRING;sv;dict;bloom_filter;true;
 STRING;sv;dict;fst_index;true;
@@ -346,7 +346,7 @@ STRING;sv;dict;text_index;true;
 STRING;sv;dict;range_index;true;
 STRING;sv;dict;startree_index;false;class java.lang.String cannot be cast to class java.lang.Number (java.lang.String and java.lang.Number are in module java.base of loader 'bootstrap')
 STRING;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
-STRING;sv;dict;multi_col_text_index;false;expected [1] but found [null]
+STRING;sv;dict;multi_col_text_index;true;
 STRING;mv;dict;timestamp_index;false;Caught exception while reading data
 STRING;mv;dict;bloom_filter;true;
 STRING;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
@@ -358,7 +358,7 @@ STRING;mv;dict;text_index;true;
 STRING;mv;dict;range_index;true;
 STRING;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
 STRING;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
-STRING;mv;dict;multi_col_text_index;false;expected [1] but found [null]
+STRING;mv;dict;multi_col_text_index;true;
 JSON;sv;raw;timestamp_index;false;Caught exception while reading data
 JSON;sv;raw;bloom_filter;true;
 JSON;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns

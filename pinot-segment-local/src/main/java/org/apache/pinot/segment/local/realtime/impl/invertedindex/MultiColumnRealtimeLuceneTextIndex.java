@@ -341,4 +341,9 @@ public class MultiColumnRealtimeLuceneTextIndex implements MutableTextIndex {
 
     return mapping;
   }
+
+  @Override
+  public boolean isMultiColumn() {
+    return true;
+  }
 }

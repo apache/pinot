@@ -386,7 +386,7 @@ public class TableIndexingTest {
           indexTypes.add(FieldConfig.IndexType.TEXT);
           break;
         case "multi_col_text_index":
-             /* star tree
+             /* multi col text index
               "tableIndexConfig": {
                 "multiColumnTextIndexConfig": {
                   "columns": ["text_col_1"]
@@ -723,8 +723,8 @@ public class TableIndexingTest {
     stats.put("startree_index", starTrees);
 
     int multiColCount = 0;
-    if (segment.getSegmentMetadata().getMultiColumnTextMetadata() != null &&
-        segment.getSegmentMetadata().getMultiColumnTextMetadata().getColumns().contains(columnName)) {
+    if (segment.getSegmentMetadata().getMultiColumnTextMetadata() != null && segment.getSegmentMetadata()
+        .getMultiColumnTextMetadata().getColumns().contains(columnName)) {
       multiColCount = 1;
     }
 

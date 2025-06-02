@@ -250,8 +250,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       MultiColumnTextIndexConfig mcTextConfig = _config.getMultiColumnTextIndexConfig();
       BooleanArrayList columnsSV = new BooleanArrayList();
       for (String col : mcTextConfig.getColumns()) {
+        FieldSpec columnFieldSpec = schema.getFieldSpecFor(col);
+        if (columnFieldSpec.getDataType() != DataType.STRING) {
+          throw new UnsupportedOperationException(
+              "Text index is currently only supported on STRING columns: " + col);
+        }
         columnsSV.add(schema.getFieldSpecFor(col).isSingleValueField());
       }
+
       _multiColTextIndexCreator =
           new MultiColumnLuceneTextIndexCreator(mcTextConfig.getColumns(),
               columnsSV, _indexDir, true, segmentCreationSpec.isRealtimeConversion(),
@@ -373,7 +379,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    if (_multiColTextIndexCreator != null) {
+    if ((_multiColTextIndexCreator != null) && (_config.getMultiColumnTextIndexConfig() != null)) {
       for (String col : _config.getMultiColumnTextIndexConfig().getColumns()) {
         Object value = row.getValue(col); //TODO: what about nulls ?
         _multiColumnValues.add(value);

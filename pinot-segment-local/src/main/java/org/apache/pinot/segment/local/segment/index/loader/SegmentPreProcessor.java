@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -172,8 +171,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     // that the other required indices (e.g. forward index) are up-to-date.
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       if (processStarTrees(indexDir, segmentOperationsThrottler)) {
-        // NOTE: When adding new steps after this, un-comment the next line.
-        // _segmentDirectory.reloadMetadata();
+        _segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
     }
@@ -230,7 +228,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
       // Check if there is need to create/modify/remove multi-col text index
       if (needProcessMultiColumnTextIndex()) {
-        LOGGER.info("Found multi-column text index needs updates in segment: {}", _segmentMetadata.getName());
+        LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
         return true;
       }
 
@@ -279,8 +277,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
   private boolean needProcessMultiColumnTextIndex() {
     MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
-    MultiColumnTextMetadata oldConfig = _segmentMetadata.getMultiColumnTextMetadata();
-
+    MultiColumnTextMetadata oldConfig = _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata();
     return shouldModifyMultiColTextIndex(newConfig, oldConfig);
   }
 
@@ -297,18 +294,30 @@ public class SegmentPreProcessor implements AutoCloseable {
         return true;
       }
 
-      if (!Objects.equals(oldConfig.getProperties(), newConfig.getProperties())) {
+      Map<String, String> newProperties = newConfig.getProperties();
+      if (newProperties == null) {
+        // If new properties are null, we assume it is empty
+        newProperties = Collections.emptyMap();
+      }
+      if (!Objects.equals(oldConfig.getProperties(), newProperties)) {
         return true;
       }
 
-      return !MultiColumnTextMetadata.equals(newConfig.getPerColumnProperties(), oldConfig.getPerColumnProperties());
+      Map<String, Map<String, String>> newPerColumnProperties = newConfig.getPerColumnProperties();
+      if (newPerColumnProperties == null) {
+        // If new per-column properties are null, we assume it is empty
+        newPerColumnProperties = Collections.emptyMap();
+      }
+      return !MultiColumnTextMetadata.equals(newPerColumnProperties, oldConfig.getPerColumnProperties());
     }
   }
 
   private void processMultiColTextIndex(File indexDir, Map<String, FieldIndexConfigs> configsByCol,
       TableConfig tableConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    MultiColumnTextMetadata oldConfig = _segmentMetadata.getMultiColumnTextMetadata();
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+    String segmentName = segmentMetadata.getName();
+    MultiColumnTextMetadata oldConfig = segmentMetadata.getMultiColumnTextMetadata();
     MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
     boolean remove = false;
     boolean create = newConfig != null;
@@ -318,7 +327,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         remove = true;
       } else {
         if (shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
-          LOGGER.info("Change detected in multi-column text index for segment: {}", _segmentMetadata.getName());
+          LOGGER.info("Change detected in multi-column text index for segment: {}", segmentName);
         } else {
           create = false;
         }
@@ -326,14 +335,17 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
 
     if (remove) {
-      LOGGER.info("Removing multi-column text index from segment: {}", _segmentMetadata.getName());
+      LOGGER.info("Removing multi-column text index from segment: {}", segmentName);
       removeMultiColumnTextIndex(indexDir);
     } else if (create) {
-      // TODO: if we create the index (from scratch), we might need to drop it first,
-      // TODO: if props are the same, we might only need to add and/or remove columns (compute diff!)
-      new MultiColumnTextIndexHandler(_segmentDirectory, configsByCol, newConfig, tableConfig)
-          .updateIndices(segmentWriter);
-      _segmentMetadata = new SegmentMetadataImpl(indexDir);
+      if (oldConfig != null) {
+        // Drop existing multi-column text index before creating a new one
+        // TODO: if props are the same, we might only need to add and/or remove columns (compute diff!)
+        removeMultiColumnTextIndex(indexDir);
+      }
+      MultiColumnTextIndexHandler multiColumnTextIndexHandler =
+          new MultiColumnTextIndexHandler(_segmentDirectory, configsByCol, newConfig, tableConfig);
+      multiColumnTextIndexHandler.updateIndices(segmentWriter);
     }
   }
 
@@ -346,17 +358,15 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // Remove the index file and index map file
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    File textIdxDir = new File(segmentDirectory, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
-    try {
-      FileUtils.forceDelete(indexDir);
-    } catch (FileNotFoundException e) {
-      LOGGER.warn("Multi-column text index directory not found at path: " + textIdxDir);
+    File textIdxDir =
+        SegmentDirectoryPaths.findTextIndexIndexFile(segmentDirectory, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+
+    if (textIdxDir != null && textIdxDir.exists()) {
+      FileUtils.forceDelete(textIdxDir);
     }
     File mappingFile = new File(segmentDirectory, MultiColumnTextIndexConstants.DOCID_MAPPING_FILE_NAME);
-    try {
+    if (mappingFile.exists()) {
       FileUtils.forceDelete(mappingFile);
-    } catch (FileNotFoundException e) {
-      LOGGER.warn("Multi-column text index mapping file not found at path: " + textIdxDir);
     }
   }
 

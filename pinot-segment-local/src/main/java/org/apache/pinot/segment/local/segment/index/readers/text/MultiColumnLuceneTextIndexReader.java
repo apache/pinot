@@ -453,7 +453,7 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
           }
         } else {
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.doc(i);
+            Document document = indexSearcher.storedFields().document(i);
             IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
             int pinotDocId = Integer.parseInt(field.stringValue());
             buffer.putInt(i * Integer.BYTES, pinotDocId);

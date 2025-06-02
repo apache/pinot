@@ -207,11 +207,6 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
     }
   }
 
-  /*public MultiColumnLuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
-    this(List.of(context.getFieldSpec().getName()), context.getIndexDir(), context.isTextCommitOnClose(),
-        context.isRealtimeConversion(), context.getConsumerDir(), context.getImmutableToMutableIdMap(), indexConfig);
-  }*/
-
   public IndexWriter getIndexWriter() {
     return _indexWriter;
   }
@@ -300,49 +295,6 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
     }
   }
 
-  // TODO: remove if not needed
-  //@Override
-  public void add(String column, String document) {
-    if (_reuseMutableIndex) {
-      return; // no-op
-    }
-
-    // text index on SV column
-    Document docToIndex = new Document();
-    docToIndex.add(new TextField(column, document, Field.Store.NO));
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-    try {
-      _indexWriter.addDocument(docToIndex);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to multi-column Lucene index for column: " + column, e);
-    }
-  }
-
-  // TODO: remove if not needed
-  public void add(String column, String[] documents, int length) {
-    if (_reuseMutableIndex) {
-      return; // no-op
-    }
-
-    Document docToIndex = new Document();
-
-    // Whenever multiple fields with the same name appear in one document, both the
-    // inverted index and term vectors will logically append the tokens of the
-    // field to one another, in the order the fields were added.
-    for (int i = 0; i < length; i++) {
-      docToIndex.add(new TextField(column, documents[i], Field.Store.NO));
-    }
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-
-    try {
-      _indexWriter.addDocument(docToIndex);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + column, e);
-    }
-  }
-
   // documents -> list of values for all text columns (either String or String[])
   public void add(List<Object> documents) {
     if (_reuseMutableIndex) {
@@ -352,13 +304,13 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
     // text index on SV column
     Document docToIndex = new Document();
     for (int i = 0, n = _textColumns.size(); i < n; i++) {
-      if (_textColumnsSV.get(i)) {
+      if (_textColumnsSV.getBoolean(i)) {
         docToIndex.add(new TextField(_textColumns.get(i), (String) documents.get(i), Field.Store.NO));
       } else {
         String column = _textColumns.get(i);
         String[] values = (String[]) documents.get(i);
-        for (int j = 0; j < values.length; j++) {
-          docToIndex.add(new TextField(column, values[j], Field.Store.NO));
+        for (String value : values) {
+          docToIndex.add(new TextField(column, value, Field.Store.NO));
         }
       }
     }
