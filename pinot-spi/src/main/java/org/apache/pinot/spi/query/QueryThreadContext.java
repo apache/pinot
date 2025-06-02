@@ -160,9 +160,9 @@ public class QueryThreadContext {
     return open("unknown");
   }
 
-  public static CloseableContext open(String serviceId) {
+  public static CloseableContext open(String instanceId) {
     CloseableContext open = open((Memento) null);
-    get()._serviceId = serviceId;
+    get()._instanceId = instanceId;
     return open;
   }
 
@@ -223,7 +223,7 @@ public class QueryThreadContext {
       context.setCid(memento._cid);
       context.setSql(memento._sql);
       context.setQueryEngine(memento._queryEngine);
-      context.setServiceId(memento._serviceId);
+      context.setInstanceId(memento._instanceId);
     }
 
     THREAD_LOCAL.set(context);
@@ -430,15 +430,15 @@ public class QueryThreadContext {
   }
 
   /**
-   * Returns the serviceId of the query.
+   * Returns the instanceid of the query.
    *
    * This is usually the id that identifies the server, broker, controller, etc.
    *
-   * The default value of {@code null} means the serviceId is not set.
+   * The default value of {@code null} means the instanceid is not set.
    * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
    */
-  public static String getServiceId() {
-    return get().getServiceId();
+  public static String getInstanceId() {
+    return get().getInstanceId();
   }
 
   /**
@@ -462,7 +462,7 @@ public class QueryThreadContext {
     private String _cid;
     private String _sql;
     private String _queryEngine;
-    private String _serviceId;
+    private String _instanceId;
 
     public long getStartTimeMs() {
       return _startTimeMs;
@@ -535,14 +535,14 @@ public class QueryThreadContext {
       _queryEngine = queryType;
     }
 
-    public void setServiceId(String serviceId) {
-      Preconditions.checkState(_serviceId == null, "Service id already set to %s, cannot set again",
-          getServiceId());
-      _serviceId = serviceId;
+    public void setInstanceId(String instanceId) {
+      Preconditions.checkState(_instanceId == null, "Service id already set to %s, cannot set again",
+          getInstanceId());
+      _instanceId = instanceId;
     }
 
-    public String getServiceId() {
-      return _serviceId;
+    public String getInstanceId() {
+      return _instanceId;
     }
 
     @Override
@@ -606,8 +606,8 @@ public class QueryThreadContext {
     }
 
     @Override
-    public void setServiceId(String serviceId) {
-      LOGGER.debug("Setting service id to {} in a fake context", serviceId);
+    public void setInstanceId(String instanceId) {
+      LOGGER.debug("Setting instance id to {} in a fake context", instanceId);
     }
 
     @Override
@@ -638,7 +638,7 @@ public class QueryThreadContext {
     private final String _cid;
     private final String _sql;
     private final String _queryEngine;
-    private final String _serviceId;
+    private final String _instanceId;
 
     private Memento(Instance instance) {
       _startTimeMs = instance.getStartTimeMs();
@@ -648,7 +648,7 @@ public class QueryThreadContext {
       _cid = instance.getCid();
       _sql = instance.getSql();
       _queryEngine = instance.getQueryEngine();
-      _serviceId = instance.getServiceId();
+      _instanceId = instance.getInstanceId();
     }
   }
 

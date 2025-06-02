@@ -65,7 +65,7 @@ public class ErrorMseBlock implements MseBlock.Eos {
     if (MseWorkerThreadContext.isInitialized()) {
       stage = MseWorkerThreadContext.getStageId();
       worker = MseWorkerThreadContext.getWorkerId();
-      server = QueryThreadContext.getServiceId();
+      server = QueryThreadContext.getInstanceId();
     } else {
       stage = -1; // Default value when not initialized
       worker = -1; // Default value when not initialized
