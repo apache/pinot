@@ -46,11 +46,9 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class, memorySegmentProxyClass);
         dbbCC.setAccessible(true);
-        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
-            .asType(MethodType.methodType(
-                ByteBuffer.class,
-                long.class, int.class, Object.class, Object.class
-            ));
+        MethodHandle dbbCCMh = MethodHandles.lookup()
+            .unreflectConstructor(dbbCC)
+            .asType(MethodType.methodType(ByteBuffer.class, long.class, int.class, Object.class, Object.class));
         return (addr, size, att) -> {
           try {
             return (ByteBuffer) dbbCCMh.invokeExact(addr, size, att, (Object) null);
@@ -65,7 +63,8 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE, Object.class);
         dbbCC.setAccessible(true);
-        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
+        MethodHandle dbbCCMh = MethodHandles.lookup()
+            .unreflectConstructor(dbbCC)
             .asType(MethodType.methodType(ByteBuffer.class, long.class, int.class, Object.class));
         return (addr, size, att) -> {
           try {
@@ -81,7 +80,8 @@ public class ByteBufferUtil {
             (Constructor<? extends ByteBuffer>) Class.forName("java.nio.DirectByteBuffer")
                 .getDeclaredConstructor(Long.TYPE, Integer.TYPE);
         dbbCC.setAccessible(true);
-        MethodHandle dbbCCMh = MethodHandles.lookup().unreflectConstructor(dbbCC)
+        MethodHandle dbbCCMh = MethodHandles.lookup()
+            .unreflectConstructor(dbbCC)
             .asType(MethodType.methodType(ByteBuffer.class, long.class, int.class));
         return (addr, size, att) -> {
           try {
@@ -120,7 +120,8 @@ public class ByteBufferUtil {
   }
 
   private interface CreatorSupplier {
-    ByteBufferCreator createCreator() throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException;
+    ByteBufferCreator createCreator()
+        throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException;
   }
 
   private interface ByteBufferCreator {
