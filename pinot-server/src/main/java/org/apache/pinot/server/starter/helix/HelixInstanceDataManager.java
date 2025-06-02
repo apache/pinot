@@ -76,7 +76,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -96,8 +96,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   // A cache for the logical table context
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
-  private static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
-  private static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
 
   private final Map<String, LogicalTableConfig> _logicalTableConfigMap = new ConcurrentHashMap<>();
   private final Map<String, Schema> _schemaMap = new ConcurrentHashMap<>();
@@ -245,7 +243,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
 
     // Add child listeners to the property store for logical table config changes
-    _propertyStore.subscribeChildChanges(LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
+    _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
 
     LOGGER.info("Helix instance data manager started");
   }
@@ -274,7 +272,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
-    _propertyStore.unsubscribeChildChanges(LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
+    _propertyStore.unsubscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
     LOGGER.info("Helix instance data manager shut down");
   }
 
@@ -642,7 +640,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       List<String> pathsToAdd = new ArrayList<>();
       for (String logicalTableName : logicalTableNames) {
         if (!_logicalTableConfigMap.containsKey(logicalTableName)) {
-          pathsToAdd.add(LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
+          pathsToAdd.add(ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
         }
       }
       if (!pathsToAdd.isEmpty()) {
@@ -681,7 +679,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
             }
 
             addSchema(logicalTableName);
-            String logicalTableConfigPath = LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
+            String logicalTableConfigPath = ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
             getPropertyStore().subscribeDataChanges(logicalTableConfigPath, _zkLogicalTableConfigChangeListener);
           } catch (Exception e) {
             LOGGER.error("Caught exception while refreshing logical table config for ZNRecord: {}", znRecord.getId(),
@@ -757,7 +755,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         // remove schema
         removeSchema(logicalTableConfig);
         // Unsubscribe from the logical table config path
-        String logicalTableConfigPath = LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
+        String logicalTableConfigPath = ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
         getPropertyStore().unsubscribeDataChanges(logicalTableConfigPath, _zkLogicalTableConfigChangeListener);
       }
     }

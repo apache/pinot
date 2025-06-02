@@ -1696,4 +1696,12 @@ public class CommonConstants {
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
   }
+
+  /**
+   * ZK paths used by Pinot.
+   */
+  public static class ZkPaths {
+    public static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
+    public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
+  }
 }
