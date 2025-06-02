@@ -127,8 +127,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _tableNameHashForFixedReplicaRouting =
         TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
 
-    _priorityGroupInstanceSelector = _adaptiveServerSelector == null ? null : new PriorityGroupInstanceSelector(
-        _adaptiveServerSelector);
+    _priorityGroupInstanceSelector =
+        _adaptiveServerSelector == null ? null : new PriorityGroupInstanceSelector(_adaptiveServerSelector);
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
@@ -136,9 +136,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
-                   IdealState idealState, ExternalView externalView,
-                   Set<String> onlineSegments) {
+  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
     _enabledServerStore = enabledServerMap;
     Map<String, Long> newSegmentCreationTimeMap =
@@ -288,8 +287,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance),
-                      getGroup(instance)));
+              candidates.add(
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getGroup(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -478,7 +477,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     ServerInstance server = _enabledServerStore.get(instanceID);
     if (server == null) {
       LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
-              instanceID, _tableNameWithType);
+          instanceID, _tableNameWithType);
     } else {
       group = server.getPool();
     }
