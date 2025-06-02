@@ -123,7 +123,7 @@ public class ReceivingMailbox {
       } else {
         MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
         Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStage(), metadataBlock.getWorker(),
+        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(),
             metadataBlock.getServerId(), exceptionsByQueryError);
         setErrorBlock(errorBlock, dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;

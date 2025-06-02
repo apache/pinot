@@ -37,8 +37,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /// A block that represents a failed execution.
 ///
 public class ErrorMseBlock implements MseBlock.Eos {
-  private final int _stage;
-  private final int _worker;
+  private final int _stageId;
+  private final int _workerId;
   private final String _serverId;
   private final EnumMap<QueryErrorCode, String> _errorMessages;
 
@@ -50,9 +50,9 @@ public class ErrorMseBlock implements MseBlock.Eos {
     this(-1, -1, null, errorMessages);
   }
 
-  public ErrorMseBlock(int stage, int worker, String serverId, Map<QueryErrorCode, String> errorMessages) {
-    _stage = stage;
-    _worker = worker;
+  public ErrorMseBlock(int stageId, int workerId, String serverId, Map<QueryErrorCode, String> errorMessages) {
+    _stageId = stageId;
+    _workerId = workerId;
     _serverId = serverId;
     Preconditions.checkArgument(!errorMessages.isEmpty(), "Error messages cannot be empty");
     _errorMessages = new EnumMap<>(errorMessages);
@@ -108,13 +108,13 @@ public class ErrorMseBlock implements MseBlock.Eos {
   }
 
   /// Returns the stage where the error occurred, or -1 if the server wasn't able to calculate that.
-  public int getStage() {
-    return _stage;
+  public int getStageId() {
+    return _stageId;
   }
 
   /// Returns the worker where the error occurred, or -1 if the server wasn't able to calculate that.
-  public int getWorker() {
-    return _worker;
+  public int getWorkerId() {
+    return _workerId;
   }
 
   /// Returns the server ID where the error occurred, or null if the server wasn't able to calculate that.

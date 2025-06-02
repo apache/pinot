@@ -649,8 +649,8 @@ public class QueryDispatcher {
       String errorMessage;
       Map.Entry<QueryErrorCode, String> error;
       String from;
-      if (errorBlock.getStage() >= 0) {
-        from = "from stage " + errorBlock.getStage();
+      if (errorBlock.getStageId() >= 0) {
+        from = "from stage " + errorBlock.getStageId();
         if (errorBlock.getServerId() != null) {
           from += " on server " + errorBlock.getServerId();
         }

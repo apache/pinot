@@ -36,8 +36,8 @@ public class MetadataBlock extends BaseDataBlock {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBlock.class);
   @Nullable
   private List<DataBuffer> _statsByStage;
-  private final int _stage;
-  private final int _worker;
+  private final int _stageId;
+  private final int _workerId;
   @Nullable
   private final String _serverId;
 
@@ -71,16 +71,16 @@ public class MetadataBlock extends BaseDataBlock {
   public MetadataBlock(List<DataBuffer> statsByStage) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
-    _stage = -1;
-    _worker = -1;
+    _stageId = -1;
+    _workerId = -1;
     _serverId = null;
   }
 
-  private MetadataBlock(int stage, int worker, @Nullable String serverId) {
+  private MetadataBlock(int stageId, int workerId, @Nullable String serverId) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = Collections.emptyList();
-    _stage = stage;
-    _worker = worker;
+    _stageId = stageId;
+    _workerId = workerId;
     _serverId = serverId;
   }
 
@@ -114,12 +114,12 @@ public class MetadataBlock extends BaseDataBlock {
     return 0;
   }
 
-  public int getStage() {
-    return _stage;
+  public int getStageId() {
+    return _stageId;
   }
 
-  public int getWorker() {
-    return _worker;
+  public int getWorkerId() {
+    return _workerId;
   }
 
   @Nullable

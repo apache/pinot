@@ -131,8 +131,8 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     String serverId;
     if (dataBlock instanceof MetadataBlock) {
       MetadataBlock metablock = (MetadataBlock) dataBlock;
-      stage = metablock.getStage();
-      worker = metablock.getWorker();
+      stage = metablock.getStageId();
+      worker = metablock.getWorkerId();
       serverId = metablock.getServerId() != null ? metablock.getServerId() : "";
     } else {
       stage = -1; // Default value when not initialized

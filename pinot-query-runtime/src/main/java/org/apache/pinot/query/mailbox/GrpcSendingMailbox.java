@@ -270,10 +270,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
       Map<Integer, String> errorMessagesByInt = Maps.newHashMapWithExpectedSize(errorMessagesByCode.size());
       errorMessagesByCode.forEach((code, message) -> errorMessagesByInt.put(code.getId(), message));
       if (serializedStats != null && !serializedStats.isEmpty()) {
-        return MetadataBlock.newErrorWithStats(block.getStage(), block.getWorker(), block.getServerId(),
+        return MetadataBlock.newErrorWithStats(block.getStageId(), block.getWorkerId(), block.getServerId(),
             errorMessagesByInt, serializedStats);
       } else {
-        return MetadataBlock.newError(block.getStage(), block.getWorker(), block.getServerId(), errorMessagesByInt);
+        return MetadataBlock.newError(block.getStageId(), block.getWorkerId(), block.getServerId(), errorMessagesByInt);
       }
     }
   }

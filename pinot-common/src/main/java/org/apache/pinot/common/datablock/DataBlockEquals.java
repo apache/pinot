@@ -174,17 +174,17 @@ public class DataBlockEquals {
         }
         MetadataBlock leftMeta = (MetadataBlock) left;
         MetadataBlock rightMeta = (MetadataBlock) right;
-        if (!Objects.equals(leftMeta.getStage(), rightMeta.getStage())) {
+        if (!Objects.equals(leftMeta.getStageId(), rightMeta.getStageId())) {
           if (_failOnFalse) {
-            throw new IllegalArgumentException("Different stages: " + leftMeta.getStage() + " and "
-                + rightMeta.getStage());
+            throw new IllegalArgumentException("Different stages: " + leftMeta.getStageId() + " and "
+                + rightMeta.getStageId());
           }
           return false;
         }
-        if (!Objects.equals(leftMeta.getWorker(), rightMeta.getWorker())) {
+        if (!Objects.equals(leftMeta.getWorkerId(), rightMeta.getWorkerId())) {
           if (_failOnFalse) {
-            throw new IllegalArgumentException("Different workers: " + leftMeta.getWorker() + " and "
-                + rightMeta.getWorker());
+            throw new IllegalArgumentException("Different workers: " + leftMeta.getWorkerId() + " and "
+                + rightMeta.getWorkerId());
           }
           return false;
         }
