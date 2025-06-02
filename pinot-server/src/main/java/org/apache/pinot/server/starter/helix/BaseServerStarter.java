@@ -88,6 +88,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.SegmentHandleUpsertOrDedupThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -673,9 +674,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Relax throttling until the server is ready to serve queries
     SegmentDownloadThrottler segmentDownloadThrottler =
         new SegmentDownloadThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, false);
+    int maxHandleUpsertOrDedupConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM));
+    int maxHandleUpsertOrDedupConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    SegmentHandleUpsertOrDedupThrottler segmentHandleUpsertOrDedupThrottler =
+        new SegmentHandleUpsertOrDedupThrottler(maxHandleUpsertOrDedupConcurrency,
+            maxHandleUpsertOrDedupConcurrencyBeforeServingQueries, false);
     _segmentOperationsThrottler =
         new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
-            segmentDownloadThrottler);
+            segmentDownloadThrottler, segmentHandleUpsertOrDedupThrottler);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);

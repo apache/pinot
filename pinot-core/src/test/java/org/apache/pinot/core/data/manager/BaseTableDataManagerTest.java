@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.SegmentHandleUpsertOrDedupThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
@@ -104,7 +105,7 @@ public class BaseTableDataManagerTest {
           .addMetric(LONG_COLUMN, DataType.LONG).build();
   static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
       new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2, 4, true),
-      new SegmentDownloadThrottler(2, 4, true));
+      new SegmentDownloadThrottler(2, 4, true), new SegmentHandleUpsertOrDedupThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()

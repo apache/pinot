@@ -55,7 +55,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
-    super(tableNameWithType, partitionId, context);
+    super(tableNameWithType, partitionId, context, null);
   }
 
   @Override

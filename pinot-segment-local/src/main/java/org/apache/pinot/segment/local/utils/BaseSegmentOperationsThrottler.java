@@ -222,6 +222,14 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   }
 
   /**
+   * Get the estimated number of threads waiting for the semaphore
+   * @return the estimated queue length
+   */
+  public int getQueueLength() {
+    return _semaphore.getQueueLength();
+  }
+
+  /**
    * Get the number of available permits
    * @return number of available permits
    */

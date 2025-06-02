@@ -437,7 +437,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId, _segmentOperationsThrottler)
+        .preloadSegments(indexLoadingConfig);
   }
 
   /**
@@ -451,7 +452,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in dedup-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId, _segmentOperationsThrottler)
+        .preloadSegments(indexLoadingConfig);
   }
 
   protected void doAddOnlineSegment(String segmentName)
@@ -552,10 +554,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableUpsertMetadataManager != null
+            ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId, _segmentOperationsThrottler)
             : null;
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableDedupMetadataManager != null
+            ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId, _segmentOperationsThrottler)
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
@@ -711,7 +715,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkNotNull(partitionId, "PartitionId is not available for segment: '" + segmentName
         + "' (dedup-enabled table: " + _tableNameWithType + ")");
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId);
+        _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId, _segmentOperationsThrottler);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
     if (partitionDedupMetadataManager.isPreloading()) {
@@ -738,7 +742,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkNotNull(partitionId, "Failed to get partition id for segment: " + segmentName
         + " (upsert-enabled table: " + _tableNameWithType + ")");
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId, _segmentOperationsThrottler);
 
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());

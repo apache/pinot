@@ -77,7 +77,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
+        (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0, null) : null;
     try {
       _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COLUMN, null,
           partitionDedupMetadataManager);

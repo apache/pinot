@@ -23,8 +23,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -110,14 +112,18 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   }
 
   @Override
-  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
+  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k ->
+      createPartitionDedupMetadataManager(partitionId, segmentOperationsThrottler)
+    );
   }
 
   /**
    * Create PartitionDedupMetadataManager for given partition id.
    */
-  protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+  protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   @Override
   public DedupContext getContext() {

@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+
+
 class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
-  protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
+  protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _context);
   }
 }

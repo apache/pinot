@@ -88,7 +88,7 @@ public class MutableSegmentImplUpsertComparisonColTest implements PinotBuffersAf
     File jsonFile = new File(dataResourceUrl.getFile());
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), _tableConfig, _schema, _tableDataManager);
-    _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);
+    _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0, null);
     _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, true, "secondsSinceEpoch",
         _partitionUpsertMetadataManager, null);
     GenericRow reuse = new GenericRow();

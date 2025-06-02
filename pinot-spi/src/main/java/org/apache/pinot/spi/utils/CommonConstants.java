@@ -268,6 +268,7 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
     // Preprocess throttle config specifically for StarTree index rebuild
     public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.startree.preprocess.parallelism";
@@ -278,6 +279,8 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // Download throttle config
     public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
         "pinot.server.max.segment.download.parallelism";
     // Setting to Integer.MAX_VALUE to effectively disable throttling by default
@@ -286,6 +289,20 @@ public class CommonConstants {
         "pinot.server.max.segment.download.parallelism.before.serving.queries";
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
+        String.valueOf(Integer.MAX_VALUE);
+
+    // Handle upsert / dedup throttle config
+    // Preprocess throttle configs
+    public static final String CONFIG_OF_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM =
+        "pinot.server.max.segment.handle.upsert.or.dedup.parallelism";
+    // Setting to Integer.MAX_VALUE to effectively disable throttling by default
+    public static final String DEFAULT_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM =
+        String.valueOf(Integer.MAX_VALUE);
+    // Before serving queries is enabled, we should use a higher preprocess parallelism to process segments faster
+    public static final String CONFIG_OF_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.handle.upsert.or.dedup.parallelism.before.serving.queries";
+    // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
+    public static final String DEFAULT_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
   }
 

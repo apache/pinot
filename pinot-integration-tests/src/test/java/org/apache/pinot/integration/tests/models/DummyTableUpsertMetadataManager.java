@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.upsert.BaseTableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -39,7 +40,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
 
   @Override
-  public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     return new DummyPartitionUpsertMetadataManager("dummy", partitionId, _context);
   }
 
@@ -59,7 +61,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   class DummyPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
     public DummyPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
-      super(tableNameWithType, partitionId, context);
+      super(tableNameWithType, partitionId, context, null);
     }
 
     @Override

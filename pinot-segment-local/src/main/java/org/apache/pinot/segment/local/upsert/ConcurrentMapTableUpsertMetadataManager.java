@@ -25,8 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -46,7 +48,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
       new ConcurrentHashMap<>();
 
   @Override
-  public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
         k -> _context.isEnableDeletedKeysCompactionConsistency()
             ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)

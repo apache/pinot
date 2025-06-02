@@ -713,7 +713,7 @@ public class BasePartitionUpsertMetadataManagerTest {
   private static class DummyPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
 
     protected DummyPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
-      super(tableNameWithType, partitionId, context);
+      super(tableNameWithType, partitionId, context, null);
     }
 
     public void trackSegment(IndexSegment seg) {

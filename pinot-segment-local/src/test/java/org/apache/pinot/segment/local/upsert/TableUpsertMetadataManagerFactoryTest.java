@@ -68,8 +68,8 @@ public class TableUpsertMetadataManagerFactoryTest {
             tableDataManager);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
-        0) instanceof ConcurrentMapPartitionUpsertMetadataManager);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0, null)
+        instanceof ConcurrentMapPartitionUpsertMetadataManager);
   }
 
   @Test
@@ -85,8 +85,8 @@ public class TableUpsertMetadataManagerFactoryTest {
             tableDataManager);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
-        0) instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0, null)
+        instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
   }
 
   @SuppressWarnings("deprecation")

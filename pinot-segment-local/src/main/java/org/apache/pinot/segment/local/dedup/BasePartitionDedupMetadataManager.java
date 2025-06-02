@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -64,6 +65,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final AtomicDouble _largestSeenTime;
   protected final File _tableIndexDir;
   protected final Logger _logger;
+  protected final SegmentOperationsThrottler _segmentOperationsThrottler;
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
@@ -73,7 +75,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   private final Lock _preloadLock = new ReentrantLock();
   private volatile boolean _isPreloading;
 
-  protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext) {
+  protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _context = dedupContext;
@@ -85,6 +88,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _tableIndexDir = dedupContext.getTableIndexDir();
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
+    _segmentOperationsThrottler = segmentOperationsThrottler;
     if (_metadataTTL > 0) {
       Preconditions.checkArgument(_dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",

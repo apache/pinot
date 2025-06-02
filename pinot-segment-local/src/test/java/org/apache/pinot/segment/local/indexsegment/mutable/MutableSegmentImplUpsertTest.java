@@ -83,7 +83,7 @@ public class MutableSegmentImplUpsertTest {
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema,
             mock(TableDataManager.class));
-    _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);
+    _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0, null);
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COLUMN, _partitionUpsertMetadataManager,
             null);
