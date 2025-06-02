@@ -119,7 +119,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       throws IOException, InterruptedException {
     validateParams();
 
-    _zkChanger = new PinotZKChanger(_zkHost, _zkPath);
+    _zkChanger = new PinotZKChanger("MoveReplicaGroup", _zkHost, _zkPath);
     _helix = _zkChanger.getHelixAdmin();
 
     if (!isExistingTable(_tableName)) {

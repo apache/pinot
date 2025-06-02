@@ -37,7 +37,7 @@ public class PinotTableRebalancer extends PinotZKChanger {
       boolean includeConsuming, Enablement minimizeDataMovement, boolean bootstrap, boolean downtime,
       int minReplicasToKeepUpForNoDowntime, int batchSizePerServer, boolean lowDiskMode, boolean bestEffort,
       long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs) {
-    super(zkAddress, clusterName);
+    super("PinotTableRebalancer", zkAddress, clusterName);
     _rebalanceConfig.setDryRun(dryRun);
     _rebalanceConfig.setReassignInstances(reassignInstances);
     _rebalanceConfig.setIncludeConsuming(includeConsuming);
