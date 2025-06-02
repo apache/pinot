@@ -322,6 +322,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setReduceTimeMillis(response.getBrokerReduceTimeMs());
     statistics.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     statistics.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    statistics.setOfflineThreadMemAllocatedBytes(response.getOfflineThreadMemAllocatedBytes());
+    statistics.setRealtimeThreadMemAllocatedBytes(response.getRealtimeThreadMemAllocatedBytes());
+    statistics.setOfflineResponseSerMemAllocatedBytes(response.getOfflineResponseSerMemAllocatedBytes());
+    statistics.setRealtimeResponseSerMemAllocatedBytes(response.getRealtimeResponseSerMemAllocatedBytes());
+    statistics.setOfflineTotalMemAllocatedBytes(response.getOfflineTotalMemAllocatedBytes());
+    statistics.setRealtimeTotalMemAllocatedBytes(response.getRealtimeTotalMemAllocatedBytes());
     statistics.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
     statistics.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
     statistics.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());

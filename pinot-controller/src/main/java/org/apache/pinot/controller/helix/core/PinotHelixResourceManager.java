@@ -907,6 +907,17 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Given a logical table name in any case, returns the logical table name as defined in Helix/Segment/Schema
+   * @param logicalTableName logical tableName in any case.
+   * @return logicalTableName actually defined in Pinot (matches case) and exists ,else, return the input value
+   */
+  public String getActualLogicalTableName(String logicalTableName, @Nullable String databaseName) {
+    logicalTableName = DatabaseUtils.translateTableName(logicalTableName, databaseName, _tableCache.isIgnoreCase());
+    String actualTableName = _tableCache.getActualLogicalTableName(logicalTableName);
+    return actualTableName != null ? actualTableName : logicalTableName;
+  }
+
+  /**
    * Table related APIs
    */
   // TODO: move table related APIs here
@@ -2367,11 +2378,26 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getLogicalTableConfig(_propertyStore, tableName);
   }
 
+  /**
+   * Returns all logical table names in the cluster regardless of their database name.
+   * @return List of logical table names
+   */
   public List<String> getAllLogicalTableNames() {
     List<String> logicalTableNames = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forLogicalTable(_propertyStore).getRelativePath(),
         AccessOption.PERSISTENT);
     return logicalTableNames != null ? logicalTableNames : Collections.emptyList();
+  }
+
+  /**
+   * Returns all logical table names in the cluster that belong to the given database.
+   * @param databaseName The name of the database
+   * @return List of logical table names that belong to the given database
+   */
+  public List<String> getAllLogicalTableNames(String databaseName) {
+    return getAllLogicalTableNames().stream()
+        .filter(tableName -> DatabaseUtils.isPartOfDatabase(tableName, databaseName))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -2550,56 +2576,52 @@ public class PinotHelixResourceManager {
 
   @VisibleForTesting
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl) {
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
+
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     SegmentZKMetadata segmentZKMetadata =
         SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, null, -1);
-    ZNRecord znRecord = segmentZKMetadata.toZNRecord();
+
+    // Update segment tier to support direct assignment for multiple data directories
+    if (needTieredSegmentAssignment(tableConfig)) {
+      updateSegmentTargetTier(tableNameWithType, segmentZKMetadata, getSortedTiers(tableConfig));
+    }
 
     String segmentName = segmentMetadata.getName();
-    String segmentZKMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, znRecord, AccessOption.PERSISTENT),
-        "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+    Preconditions.checkState(createSegmentZkMetadata(tableNameWithType, segmentZKMetadata),
+        "Failed to create ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
-    assignTableSegment(tableNameWithType, segmentName);
+    assignSegment(tableConfig, segmentZKMetadata);
   }
 
-  public void assignTableSegment(String tableNameWithType, String segmentName) {
-    String segmentZKMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+  public boolean needTieredSegmentAssignment(TableConfig tableConfig) {
+    return _enableTieredSegmentAssignment && CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList());
+  }
+
+  public List<Tier> getSortedTiers(TableConfig tableConfig) {
+    return TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
+        TierFactory.PINOT_SERVER_STORAGE_TYPE);
+  }
+
+  public void assignSegment(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata) {
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = segmentZKMetadata.getSegmentName();
 
     // Assign instances for the segment and add it into IdealState
     try {
-      TableConfig tableConfig = getTableConfig(tableNameWithType);
-      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
-
-      // Initialize tier information only in case direct tier assignment is configured
-      if (_enableTieredSegmentAssignment && CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
-        List<Tier> sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
-
-        // Update segment tier to support direct assignment for multiple data directories
-        updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
-
-        InstancePartitions tierInstancePartitions =
-            TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
-                _helixZkManager);
-        if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-          // Override instance partitions for offline table
-          LOGGER.info("Overriding with tiered instance partitions: {} for segment: {} of table: {}",
-              tierInstancePartitions, segmentName, tableNameWithType);
-          instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, tierInstancePartitions);
-        }
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+      // TODO: Support direct tier assignment for UPLOADED real-time segments
+      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        instancePartitionsMap = getInstacePartitionsMap(tableConfig, segmentZKMetadata.getTier());
+      } else {
+        instancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       }
 
       SegmentAssignment segmentAssignment =
           SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
-      Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
         Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
@@ -2608,7 +2630,7 @@ public class PinotHelixResourceManager {
               tableNameWithType);
         } else {
           List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
+              segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               tableNameWithType);
           currentAssignment.put(segmentName,
@@ -2621,7 +2643,7 @@ public class PinotHelixResourceManager {
       LOGGER.error(
           "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
           segmentName, tableNameWithType, e);
-      if (_propertyStore.remove(segmentZKMetadataPath, AccessOption.PERSISTENT)) {
+      if (removeSegmentZKMetadata(tableNameWithType, segmentName)) {
         LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
       } else {
         LOGGER.error("Failed to deleted segment ZK metadata for segment: {} of table: {}", segmentName,
@@ -2631,55 +2653,64 @@ public class PinotHelixResourceManager {
     }
   }
 
-  // Assign a list of segments in batch mode
-  public void assignTableSegments(String tableNameWithType, List<String> segmentNames) {
-    Map<String, String> segmentZKMetadataPathMap = new HashMap<>();
-    for (String segmentName : segmentNames) {
-      String segmentZKMetadataPath =
-          ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-      segmentZKMetadataPathMap.put(segmentName, segmentZKMetadataPath);
+  private Map<InstancePartitionsType, InstancePartitions> getInstacePartitionsMap(TableConfig tableConfig,
+      @Nullable String tierName) {
+    if (tierName != null) {
+      assert tableConfig.getTierConfigsList() != null;
+      Tier tier = TierConfigUtils.getTier(tableConfig.getTierConfigsList(), tierName);
+      InstancePartitions tieredInstancePartitions =
+          TierConfigUtils.getTieredInstancePartitions(tableConfig, tier, _helixZkManager);
+      return Map.of(InstancePartitionsType.OFFLINE, tieredInstancePartitions);
+    } else {
+      return fetchOrComputeInstancePartitions(tableConfig.getTableName(), tableConfig);
     }
-    // Assign instances for the segment and add it into IdealState
-    try {
-      TableConfig tableConfig = getTableConfig(tableNameWithType);
-      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
+  }
 
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
+  // Assign a list of segments in batch mode
+  public void assignSegments(TableConfig tableConfig, Map<String, SegmentZKMetadata> segmentZKMetadataMap) {
+    String tableNameWithType = tableConfig.getTableName();
+    Set<String> segments = segmentZKMetadataMap.keySet();
+
+    try {
+      Map<InstancePartitionsType, InstancePartitions> nonTierInstancePartitionsMap;
+      Map<String, Map<InstancePartitionsType, InstancePartitions>> tierToInstancePartitionsMap;
 
       // Initialize tier information only in case direct tier assignment is configured
-      if (_enableTieredSegmentAssignment && CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())) {
-        List<Tier> sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager);
-        for (String segmentName : segmentNames) {
-          // Update segment tier to support direct assignment for multiple data directories
-          updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
-          InstancePartitions tierInstancePartitions =
-              TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
-                  _helixZkManager);
-          if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-            // Override instance partitions for offline table
-            LOGGER.info("Overriding with tiered instance partitions: {} for segment: {} of table: {}",
-                tierInstancePartitions, segmentName, tableNameWithType);
-            instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, tierInstancePartitions);
-          }
+      // TODO: Support direct tier assignment for UPLOADED real-time segments
+      if (needTieredSegmentAssignment(tableConfig) && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        nonTierInstancePartitionsMap = null;
+        tierToInstancePartitionsMap = new HashMap<>();
+        for (Map.Entry<String, SegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
+          SegmentZKMetadata segmentZKMetadata = entry.getValue();
+          tierToInstancePartitionsMap.computeIfAbsent(segmentZKMetadata.getTier(),
+              k -> getInstacePartitionsMap(tableConfig, k));
         }
+      } else {
+        nonTierInstancePartitionsMap = fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
+        tierToInstancePartitionsMap = null;
       }
 
       SegmentAssignment segmentAssignment =
           SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
       long segmentAssignmentStartMs = System.currentTimeMillis();
-      Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
         assert idealState != null;
-        for (String segmentName : segmentNames) {
-          Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+        Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+        for (Map.Entry<String, SegmentZKMetadata> entry : segmentZKMetadataMap.entrySet()) {
+          String segmentName = entry.getKey();
+          SegmentZKMetadata segmentZKMetadata = entry.getValue();
           if (currentAssignment.containsKey(segmentName)) {
             LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
                 tableNameWithType);
           } else {
+            Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+            if (nonTierInstancePartitionsMap != null) {
+              instancePartitionsMap = nonTierInstancePartitionsMap;
+            } else {
+              instancePartitionsMap = tierToInstancePartitionsMap.get(segmentZKMetadata.getTier());
+            }
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -2688,16 +2719,14 @@ public class PinotHelixResourceManager {
         }
         return idealState;
       });
-      LOGGER.info("Added {} segments: {} to IdealState for table: {} in {} ms", segmentNames.size(), segmentNames,
+      LOGGER.info("Added {} segments: {} to IdealState for table: {} in {} ms", segmentZKMetadataMap.size(), segments,
           tableNameWithType, System.currentTimeMillis() - segmentAssignmentStartMs);
     } catch (Exception e) {
       LOGGER.error(
           "Caught exception while adding segments: {} to IdealState for table: {}, deleting segments ZK metadata",
-          segmentNames, tableNameWithType, e);
-      for (Map.Entry<String, String> segmentZKMetadataPathEntry : segmentZKMetadataPathMap.entrySet()) {
-        String segmentName = segmentZKMetadataPathEntry.getKey();
-        String segmentZKMetadataPath = segmentZKMetadataPathEntry.getValue();
-        if (_propertyStore.remove(segmentZKMetadataPath, AccessOption.PERSISTENT)) {
+          segments, tableNameWithType, e);
+      for (String segmentName : segments) {
+        if (removeSegmentZKMetadata(tableNameWithType, segmentName)) {
           LOGGER.info("Deleted segment ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
         } else {
           LOGGER.error("Failed to delete segment ZK metadata for segment: {} of table: {}", segmentName,
@@ -3840,21 +3869,32 @@ public class PinotHelixResourceManager {
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
-  /**
-   * Calculate the target tier the segment belongs to and set it in segment ZK metadata as goal state, which can be
-   * checked by servers when loading the segment to put it onto the target storage tier.
-   */
+  /// Calculates the target tier for the segments within a table, updates the segment ZK metadata and persists the
+  /// update to ZK.
   @VisibleForTesting
   Map<String, Set<String>> updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
-    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
     List<Tier> sortedTiers =
-        CollectionUtils.isNotEmpty(tierCfgs) ? TierConfigUtils.getSortedTiersForStorageType(tierCfgs,
-            TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager) : Collections.emptyList();
+        CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) ? getSortedTiers(tableConfig) : List.of();
     LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
         rebalanceJobId, tableNameWithType, sortedTiers);
     Map<String, Set<String>> tierToSegmentsMap = new HashMap<>();
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
-      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
+      if (segmentMetadataZNRecord == null) {
+        LOGGER.warn("Failed to find ZK metadata for segment: {} of table: {}, skipping updating target tier",
+            segmentName, tableNameWithType);
+        continue;
+      }
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+      String tier = segmentZKMetadata.getTier();
+      if (updateSegmentTargetTier(tableNameWithType, segmentZKMetadata, sortedTiers)) {
+        if (updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion())) {
+          tier = segmentZKMetadata.getTier();
+        } else {
+          LOGGER.warn("Failed to persist ZK metadata for segment: {} of table: {} because of version change, skipping "
+              + "updating target tier", segmentName, tableNameWithType);
+        }
+      }
       if (tier != null) {
         tierToSegmentsMap.computeIfAbsent(tier, t -> new HashSet<>()).add(segmentName);
       }
@@ -3862,41 +3902,38 @@ public class PinotHelixResourceManager {
     return tierToSegmentsMap;
   }
 
-  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
-    ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
-    if (segmentMetadataZNRecord == null) {
-      LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
-      return null;
-    }
+  /// Calculates the target tier for the segment and set it into the segment ZK metadata. Returns `true` if the segment
+  /// ZK metadata is updated, `false` otherwise. This method does NOT persist the segment ZK metadata update to ZK.
+  public boolean updateSegmentTargetTier(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
+      List<Tier> sortedTiers) {
+    String segmentName = segmentZKMetadata.getSegmentName();
     Tier targetTier = null;
     for (Tier tier : sortedTiers) {
       TierSegmentSelector tierSegmentSelector = tier.getSegmentSelector();
-      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentName)) {
+      if (tierSegmentSelector.selectSegment(tableNameWithType, segmentZKMetadata)) {
         targetTier = tier;
         break;
       }
     }
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
-    String targetTierName = null;
     if (targetTier == null) {
       if (segmentZKMetadata.getTier() == null) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
-        return null;
+        return false;
       }
       LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
+      segmentZKMetadata.setTier(null);
+      return true;
     } else {
-      targetTierName = targetTier.getName();
+      String targetTierName = targetTier.getName();
       if (targetTierName.equals(segmentZKMetadata.getTier())) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
             targetTierName);
-        return targetTierName;
+        return false;
       }
       LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
+      segmentZKMetadata.setTier(targetTierName);
+      return true;
     }
-    // Update the tier in segment ZK metadata and write it back to ZK.
-    segmentZKMetadata.setTier(targetTierName);
-    updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
-    return targetTierName;
   }
 
   /**

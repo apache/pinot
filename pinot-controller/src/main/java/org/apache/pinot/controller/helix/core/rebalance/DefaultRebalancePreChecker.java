@@ -33,6 +33,7 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableMetadataReader;
@@ -343,14 +344,37 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
     List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
-    if (rebalanceConfig.isDowntime()) {
-      int numReplicas = Integer.MAX_VALUE;
+    int numReplicas = Integer.MAX_VALUE;
+    if (rebalanceConfig.isDowntime() || PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       for (String segment : segmentsToMove) {
         numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
       }
+    }
+
+    if (rebalanceConfig.isDowntime()) {
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
         warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
+      }
+    }
+
+    // It was revealed a risk of data loss for pauseless tables during rebalance, when downtime=true or
+    // minAvailableReplicas=0 -- If a segment is being moved and has not yet uploaded to deep store, premature
+    // deletion could cause irrecoverable data loss. This pre-check added as a workaround to warn the potential risk.
+    // TODO: Get to the root cause of the issue and revisit this pre-check.
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      int minAvailableReplica = rebalanceConfig.getMinAvailableReplicas();
+      if (minAvailableReplica < 0) {
+        minAvailableReplica = numReplicas + minAvailableReplica;
+      }
+      if (numReplicas == 1) {
+        pass = false;
+        warnings.add(
+            "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
+                + "during rebalance");
+      } else if (rebalanceConfig.isDowntime() || minAvailableReplica <= 0) {
+        pass = false;
+        warnings.add("Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
       }
     }
 

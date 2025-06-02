@@ -26,7 +26,6 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
-import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
@@ -70,11 +69,9 @@ public class PinotDispatchPlanner {
     context.getWorkerManager().assignWorkers(rootFragment, context);
     // 4. compute the mailbox assignment for each stage.
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
-    // 5. Run physical optimizations
-    runPhysicalOptimizers(rootNode, context, _tableCache);
-    // 6. Run validations
+    // 5. Run validations
     runValidations(rootFragment, context);
-    // 7. convert it into query plan.
+    // 6. convert it into query plan.
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
@@ -117,16 +114,6 @@ public class PinotDispatchPlanner {
     rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
     for (PlanFragment child : planFragment.getChildren()) {
       runValidations(child, context);
-    }
-  }
-
-  // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.
-  private void runPhysicalOptimizers(PlanNode subPlanRoot, DispatchablePlanContext dispatchablePlanContext,
-      TableCache tableCache) {
-    if (dispatchablePlanContext.getPlannerContext().getOptions().getOrDefault("useColocatedJoin", "false")
-        .equals("true")) {
-      GreedyShuffleRewriteVisitor.optimizeShuffles(subPlanRoot,
-          dispatchablePlanContext.getDispatchablePlanMetadataMap(), tableCache);
     }
   }
 

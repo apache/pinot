@@ -106,6 +106,12 @@ public interface RoutingManager {
   TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
 
   /**
+   * Returns the {@link TablePartitionReplicatedServersInfo} for a given table.
+   */
+  @Nullable
+  TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType);
+
+  /**
    * Returns the enabled server instances currently serving the given table.
    */
   @Nullable

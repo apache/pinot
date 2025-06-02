@@ -150,6 +150,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
       Map<ServerInstance, ServerRouteInfo> tmp = routingTable.getServerInstanceToSegmentsMap();
       for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : tmp.entrySet()) {
+        // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,
             "Entry for server %s and table type: %s already exist!", serverEntry.getKey(), tableType);
@@ -288,18 +289,18 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     // For each partition, we expect at most 1 server which will be stored in this array.
     String[] partitionToServerMap = new String[tablePartitionInfo.getNumPartitions()];
-    TablePartitionInfo.PartitionInfo[] partitionInfos = tablePartitionInfo.getPartitionInfoMap();
     Map<Integer, List<String>> segmentsByPartition = new HashMap<>();
     // Ensure each partition is assigned to exactly 1 server.
     for (int partitionNum = 0; partitionNum < numPartitions; partitionNum++) {
-      TablePartitionInfo.PartitionInfo info = partitionInfos[partitionNum];
       List<String> selectedSegments = new ArrayList<>();
-      if (info != null) {
+      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsByPartition().get(partitionNum);
+      if (!segmentsForPartition.isEmpty()) {
         String chosenServer;
-        for (String segment : info._segments) {
+        for (String segment : segmentsForPartition) {
           chosenServer = segmentToServer.get(segment);
           // segmentToServer may return null if TPI has a segment not present in instanceIdToSegmentsMap.
-          // This can happen when the segment was not selected for the query (due to pruning for instance).
+          // This can happen when the segment was not selected for the query, which may be because of pruning,
+          // or because the segment is optional because it is new.
           if (chosenServer != null) {
             selectedSegments.add(segment);
             if (partitionToServerMap[partitionNum] == null) {

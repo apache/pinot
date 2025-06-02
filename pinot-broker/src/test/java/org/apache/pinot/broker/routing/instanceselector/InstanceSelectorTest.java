@@ -1094,6 +1094,112 @@ public class InstanceSelectorTest {
   }
 
   @Test
+  public void testMultiStageStrictReplicaGroupSelectorForSomeErrorSegments() {
+    String offlineTableName = "testTable_OFFLINE";
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+
+    // Create instance-partitions with two replica-groups and 2 partitions. Each replica-group has 2 instances.
+    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
+      "0_0", ImmutableList.of("instance-0"),
+      "0_1", ImmutableList.of("instance-2"),
+      "1_0", ImmutableList.of("instance-1"),
+      "1_1", ImmutableList.of("instance-3"));
+    InstancePartitions instancePartitions = new InstancePartitions(offlineTableName);
+    instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
+    instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));
+    instancePartitions.setInstances(1, 0, partitionToInstances.get("1_0"));
+    instancePartitions.setInstances(1, 1, partitionToInstances.get("1_1"));
+
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    Map<String, String> queryOptions = new HashMap<>();
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
+
+    MultiStageReplicaGroupSelector multiStageSelector =
+      new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        false, 300);
+    multiStageSelector = spy(multiStageSelector);
+    doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
+
+    List<String> enabledInstances = new ArrayList<>();
+    IdealState idealState = new IdealState(offlineTableName);
+    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
+    ExternalView externalView = new ExternalView(offlineTableName);
+    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+
+    // Mark all instances as enabled
+    for (int i = 0; i < 4; i++) {
+      enabledInstances.add(String.format("instance-%d", i));
+    }
+
+    List<String> segments = getSegments();
+
+    // Create two idealState and externalView maps. One is used for segments with replica-group=0 and the other for rg=1
+    Map<String, String> idealStateInstanceStateMap0 = new TreeMap<>();
+    Map<String, String> externalViewInstanceStateMap0 = new TreeMap<>();
+    Map<String, String> idealStateInstanceStateMap1 = new TreeMap<>();
+    Map<String, String> externalViewInstanceStateMap1 = new TreeMap<>();
+
+    // instance-0 and instance-2 mirror each other in the two replica-groups. Same for instance-1 and instance-3.
+    for (int i = 0; i < 4; i++) {
+      String instance = enabledInstances.get(i);
+      if (i % 2 == 0) {
+        idealStateInstanceStateMap0.put(instance, ONLINE);
+        externalViewInstanceStateMap0.put(instance, ONLINE);
+      } else {
+        idealStateInstanceStateMap1.put(instance, ONLINE);
+        externalViewInstanceStateMap1.put(instance, ONLINE);
+      }
+    }
+
+    // Even numbered segments get assigned to [instance-0, instance-2], and odd numbered segments get assigned to
+    // [instance-1,instance-3].
+    for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
+      String segment = segments.get(segmentNum);
+      if (segmentNum % 2 == 0) {
+        idealStateSegmentAssignment.put(segment, new HashMap<>(idealStateInstanceStateMap0));
+        externalViewSegmentAssignment.put(segment, new HashMap<>(externalViewInstanceStateMap0));
+      } else {
+        idealStateSegmentAssignment.put(segment, new HashMap<>(idealStateInstanceStateMap1));
+        externalViewSegmentAssignment.put(segment, new HashMap<>(externalViewInstanceStateMap1));
+      }
+      onlineSegments.add(segment);
+    }
+
+    // Set one segment in each replica group to ERROR state.
+    externalViewSegmentAssignment.get("segment1").put("instance-1", "ERROR");
+    externalViewSegmentAssignment.get("segment2").put("instance-2", "ERROR");
+
+    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
+
+    // Even though instance-0 and instance-3 belong to different replica groups, they handle exclusive sets of segments
+    // and hence they can together serve all segments.
+    Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
+    for (int segmentNum = 0; segmentNum < segments.size(); segmentNum++) {
+      if (segmentNum % 2 == 0) {
+        expectedReplicaGroupInstanceSelectorResult.put(segments.get(segmentNum), "instance-0");
+      } else {
+        expectedReplicaGroupInstanceSelectorResult.put(segments.get(segmentNum), "instance-3");
+      }
+    }
+    InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+
+    // If instance-3 has an error segment as well, there is no replica group available to serve complete set of
+    // segments.
+    externalViewSegmentAssignment.get("segment3").put("instance-3", "ERROR");
+    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
+    try {
+      multiStageSelector.select(brokerRequest, segments, 0);
+      fail("Method call above should have failed");
+    } catch (Exception ignored) {
+    }
+  }
+
+  @Test
   public void testUnavailableSegments() {
     String offlineTableName = "testTable_OFFLINE";
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
