@@ -80,6 +80,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
           _routingManager.buildRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.initOrUpdateLogicalTableQueryQuota(physicalOrLogicalTable);
         } else {
           _routingManager.buildRouting(physicalOrLogicalTable);
           TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalOrLogicalTable);

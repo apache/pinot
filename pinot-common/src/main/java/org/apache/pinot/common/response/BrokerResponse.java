@@ -334,6 +334,41 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns the thread memory bytes allocated for query execution against offline table.
+   */
+  long getOfflineThreadMemAllocatedBytes();
+
+  /**
+   * Returns the thread memory bytes allocated for query execution against realtime table.
+   */
+  long getRealtimeThreadMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against offline table.
+   */
+  long getOfflineResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against realtime table.
+   */
+  long getRealtimeResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getOfflineTotalMemAllocatedBytes() {
+    return getOfflineThreadMemAllocatedBytes() + getOfflineResponseSerMemAllocatedBytes();
+  }
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getRealtimeTotalMemAllocatedBytes() {
+    return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
+  }
+
+
+  /**
    * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
    */
   long getExplainPlanNumEmptyFilterSegments();

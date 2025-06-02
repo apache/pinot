@@ -116,14 +116,17 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitJoin(JoinNode node, Plan.PlanNode.Builder builder) {
-      Plan.JoinNode joinNode = Plan.JoinNode.newBuilder()
+      Plan.JoinNode.Builder joinNode = Plan.JoinNode.newBuilder()
           .setJoinType(convertJoinType(node.getJoinType()))
           .addAllLeftKeys(node.getLeftKeys())
           .addAllRightKeys(node.getRightKeys())
           .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
-          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
-          .build();
-      builder.setJoinNode(joinNode);
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()));
+
+      if (node.getMatchCondition() != null) {
+        joinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setJoinNode(joinNode.build());
       return null;
     }
 
@@ -289,6 +292,10 @@ public class PlanNodeSerializer {
           return Plan.JoinType.SEMI;
         case ANTI:
           return Plan.JoinType.ANTI;
+        case ASOF:
+          return Plan.JoinType.ASOF;
+        case LEFT_ASOF:
+          return Plan.JoinType.LEFT_ASOF;
         default:
           throw new IllegalStateException("Unsupported JoinRelType: " + joinType);
       }
@@ -300,6 +307,8 @@ public class PlanNodeSerializer {
           return Plan.JoinStrategy.HASH;
         case LOOKUP:
           return Plan.JoinStrategy.LOOKUP;
+        case ASOF:
+          return Plan.JoinStrategy.AS_OF;
         default:
           throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }

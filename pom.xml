@@ -147,7 +147,7 @@
     <jackson.version>2.19.0</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
-    <jersey.version>2.45</jersey.version>
+    <jersey.version>2.46</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
     <swagger-ui.version>5.22.0</swagger-ui.version>
@@ -155,7 +155,7 @@
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
     <quartz.version>2.5.0</quartz.version>
-    <calcite.version>1.39.0</calcite.version>
+    <calcite.version>1.40.0</calcite.version>
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
@@ -177,15 +177,15 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.50</aws.sdk.version>
-    <azure.sdk.version>1.2.34</azure.sdk.version>
+    <aws.sdk.version>2.31.54</aws.sdk.version>
+    <azure.sdk.version>1.2.35</azure.sdk.version>
     <azure.msal4j.version>1.20.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
-    <scala-xml.version>2.3.0</scala-xml.version>
+    <scala-xml.version>2.4.0</scala-xml.version>
     <fmpp.version>0.9.16</fmpp.version>
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
@@ -193,7 +193,7 @@
     <enforcer-api.version>3.5.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
-    <spark3.version>3.5.3</spark3.version>
+    <spark3.version>3.5.6</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.1</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
@@ -208,7 +208,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.14.0</commons-csv.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
-    <commons-beanutils.version>1.10.1</commons-beanutils.version>
+    <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-io.version>2.19.0</commons-io.version>
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
@@ -237,8 +237,8 @@
     <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>3.25.5</protobuf.version>
-    <grpc.version>1.72.0</grpc.version>
+    <protobuf.version>3.25.8</protobuf.version>
+    <grpc.version>1.73.0</grpc.version>
     <google.cloud.libraries.version>26.61.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
@@ -253,13 +253,13 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.30.3</jline.version>
+    <jline.version>3.30.4</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.3</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
-    <woodstox.version>7.1.0</woodstox.version>
+    <woodstox.version>7.1.1</woodstox.version>
     <curator.version>5.8.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
@@ -269,15 +269,15 @@
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.8</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.1.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
-    <okio.version>3.11.0</okio.version>
+    <okio.version>3.12.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.11.0-pre2</c3p0.version>
+    <c3p0.version>0.11.1</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
     <checker-qual.version>3.49.3</checker-qual.version>
     <groovy-all.version>2.4.21</groovy-all.version>
@@ -295,8 +295,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.posix.version>2.27ea1</openhft.posix.version>
-    <openhft.chronicle-core.version>2.27ea3</openhft.chronicle-core.version>
+    <openhft.chronicle-bom.version>2.27ea42</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.9</maven.version>
     <plexus-utils.version>4.0.2</plexus-utils.version>
@@ -305,7 +304,7 @@
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
-    <testcontainers.version>1.21.0</testcontainers.version>
+    <testcontainers.version>1.21.1</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
@@ -868,15 +867,13 @@
       </dependency>
 
       <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
+      <!-- arrow bom -->
       <dependency>
         <groupId>org.apache.arrow</groupId>
-        <artifactId>arrow-vector</artifactId>
+        <artifactId>arrow-bom</artifactId>
         <version>${arrow.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.arrow</groupId>
-        <artifactId>arrow-memory-netty</artifactId>
-        <version>${arrow.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1029,47 +1026,30 @@
       </dependency>
 
       <!-- log4j2 related dependencies -->
+      <!-- log4j bom -->
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-api</artifactId>
+        <artifactId>log4j-bom</artifactId>
         <version>${log4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-core</artifactId>
-        <version>${log4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-slf4j2-impl</artifactId>
-        <version>${log4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-1.2-api</artifactId>
         <version>${log4j.version}</version>
       </dependency>
+
       <!-- We don't use slf4j but slf4j2. Including it here to support old libraries such as Spark 2.4 -->
-      <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-slf4j-impl</artifactId>
-        <version>${log4j.version}</version>
-      </dependency>
+      <!-- slf4j bom -->
       <dependency>
         <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
+        <artifactId>slf4j-bom</artifactId>
         <version>${slf4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>jcl-over-slf4j</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>jul-to-slf4j</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
+
       <dependency>
         <groupId>com.lmax</groupId>
         <artifactId>disruptor</artifactId>
@@ -1475,30 +1455,14 @@
         <artifactId>metrics-core</artifactId>
         <version>${yammer-metrics.version}</version>
       </dependency>
+
+      <!-- dropwizard metrics bom -->
       <dependency>
         <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-core</artifactId>
+        <artifactId>metrics-bom</artifactId>
         <version>${dropwizard-metrics.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-jmx</artifactId>
-        <version>${dropwizard-metrics.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-jvm</artifactId>
-        <version>${dropwizard-metrics.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-json</artifactId>
-        <version>${dropwizard-metrics.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-graphite</artifactId>
-        <version>${dropwizard-metrics.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1560,6 +1524,7 @@
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
       </dependency>
+
       <!-- Required by Calcite -->
       <dependency>
         <groupId>org.immutables</groupId>
@@ -1578,47 +1543,15 @@
         <version>${janino.version}</version>
       </dependency>
 
-      <!-- Jersey Libraries -->
+      <!-- Jersey bom -->
       <dependency>
-        <groupId>org.glassfish.jersey.core</groupId>
-        <artifactId>jersey-server</artifactId>
+        <groupId>org.glassfish.jersey</groupId>
+        <artifactId>jersey-bom</artifactId>
         <version>${jersey.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.core</groupId>
-        <artifactId>jersey-client</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.core</groupId>
-        <artifactId>jersey-common</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.containers</groupId>
-        <artifactId>jersey-container-grizzly2-http</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.containers</groupId>
-        <artifactId>jersey-container-servlet-core</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.media</groupId>
-        <artifactId>jersey-media-multipart</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.media</groupId>
-        <artifactId>jersey-media-json-jackson</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.jersey.inject</groupId>
-        <artifactId>jersey-hk2</artifactId>
-        <version>${jersey.version}</version>
-      </dependency>
+
       <dependency>
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>hk2-locator</artifactId>
@@ -1629,6 +1562,7 @@
         <artifactId>hk2-metadata-generator</artifactId>
         <version>${hk2.version}</version>
       </dependency>
+
       <dependency>
         <groupId>io.swagger</groupId>
         <artifactId>swagger-jersey2-jaxrs</artifactId>
@@ -1683,15 +1617,13 @@
         <version>${ipaddress.version}</version>
       </dependency>
 
+      <!-- chronicle bom -->
       <dependency>
         <groupId>net.openhft</groupId>
-        <artifactId>posix</artifactId>
-        <version>${openhft.posix.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>net.openhft</groupId>
-        <artifactId>chronicle-core</artifactId>
-        <version>${openhft.chronicle-core.version}</version>
+        <artifactId>chronicle-bom</artifactId>
+        <version>${openhft.chronicle-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1704,11 +1636,16 @@
         <artifactId>stax2-api</artifactId>
         <version>${stax2-api.version}</version>
       </dependency>
+
+      <!-- sslcontext-kickstart bom -->
       <dependency>
         <groupId>io.github.hakky54</groupId>
-        <artifactId>sslcontext-kickstart-for-netty</artifactId>
+        <artifactId>sslcontext-kickstart-bom</artifactId>
         <version>${sslcontext.kickstart.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
+
       <dependency>
         <groupId>org.mindrot</groupId>
         <artifactId>jbcrypt</artifactId>
@@ -1791,15 +1728,13 @@
         <version>${confluent.version}</version>
       </dependency>
 
+      <!-- pulsar bom -->
       <dependency>
         <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client</artifactId>
+        <artifactId>pulsar-bom</artifactId>
         <version>${pulsar.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client-admin</artifactId>
-        <version>${pulsar.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <dependency>
@@ -1882,22 +1817,7 @@
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-server</artifactId>
-        <version>${eclipse.jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-servlet</artifactId>
-        <version>${eclipse.jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-util</artifactId>
-        <version>${eclipse.jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-util-ajax</artifactId>
         <version>${eclipse.jetty.version}</version>
       </dependency>
       <dependency>
@@ -1905,6 +1825,16 @@
         <artifactId>jetty-webapp</artifactId>
         <version>${eclipse.jetty.version}</version>
       </dependency>
+
+      <!-- jetty bom -->
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-bom</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <!-- Used by Hadoop and Jackson -->
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
@@ -1927,6 +1857,7 @@
         <artifactId>curator-recipes</artifactId>
         <version>${curator.version}</version>
       </dependency>
+
       <!-- Used by reflections and jersey-hk2 -->
       <dependency>
         <groupId>org.javassist</groupId>
@@ -1994,36 +1925,24 @@
         <version>${paranamer.version}</version>
       </dependency>
       <!-- Dependencies in Confluent Kafka libraries -->
+      <!-- kotlin bom -->
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib-jdk8</artifactId>
+        <artifactId>kotlin-bom</artifactId>
         <version>${kotlin.stdlib.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib</artifactId>
-        <version>${kotlin.stdlib.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib-common</artifactId>
-        <version>${kotlin.stdlib.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-reflect</artifactId>
-        <version>${kotlin.stdlib.version}</version>
-      </dependency>
+
+      <!-- okio bom -->
       <dependency>
         <groupId>com.squareup.okio</groupId>
-        <artifactId>okio</artifactId>
+        <artifactId>okio-bom</artifactId>
         <version>${okio.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>com.squareup.okio</groupId>
-        <artifactId>okio-jvm</artifactId>
-        <version>${okio.version}</version>
-      </dependency>
+
       <!-- Used in async-http-client and orc-core -->
       <dependency>
         <groupId>org.jetbrains</groupId>
@@ -2087,36 +2006,32 @@
         <version>${testng.version}</version>
         <scope>test</scope>
       </dependency>
+
+      <!-- mockito bom -->
       <dependency>
         <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
+        <artifactId>mockito-bom</artifactId>
         <version>${mockito-core.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
+
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
         <version>${equalsverifier.version}</version>
         <scope>test</scope>
       </dependency>
+
+      <!-- testcontainers bom -->
       <dependency>
         <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers</artifactId>
+        <artifactId>testcontainers-bom</artifactId>
         <version>${testcontainers.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>kafka</artifactId>
-        <version>${testcontainers.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>pulsar</artifactId>
-        <version>${testcontainers.version}</version>
-        <scope>test</scope>
-      </dependency>
+
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
@@ -2135,12 +2050,16 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
+
+      <!-- assertj bom -->
       <dependency>
         <groupId>org.assertj</groupId>
-        <artifactId>assertj-core</artifactId>
+        <artifactId>assertj-bom</artifactId>
         <version>${assertj.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
+
       <dependency>
         <groupId>org.apache.maven.enforcer</groupId>
         <artifactId>enforcer-api</artifactId>
@@ -2187,7 +2106,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.44.4</version>
+          <version>2.44.5</version>
           <executions>
             <execution>
               <goals>
@@ -2547,7 +2466,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
-          <version>3.5.0</version>
+          <version>3.5.1</version>
         </plugin>
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
@@ -2581,7 +2500,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.24.0</version>
+            <version>10.25.0</version>
           </dependency>
         </dependencies>
         <executions>

@@ -613,4 +613,23 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(brokerResponse.getOfflineThreadCpuTimeNs(), 0);
     assertEquals(brokerResponse.getRealtimeThreadCpuTimeNs(), 0);
   }
+
+  @Test
+  public void testThreadMemAllocatedBytes() {
+    String query = "SELECT * FROM testTable";
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    // NOTE: Need to check whether thread mem measurement is enabled because some environments might not support
+    //       ThreadMXBean.getThreadAllocatedBytes()
+    if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      assertTrue(brokerResponse.getOfflineThreadMemAllocatedBytes() > 0);
+      assertTrue(brokerResponse.getRealtimeThreadMemAllocatedBytes() > 0);
+    }
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertEquals(brokerResponse.getOfflineThreadMemAllocatedBytes(), 0);
+    assertEquals(brokerResponse.getRealtimeThreadMemAllocatedBytes(), 0);
+  }
 }

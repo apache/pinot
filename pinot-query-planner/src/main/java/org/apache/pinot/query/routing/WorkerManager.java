@@ -35,18 +35,22 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
+import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -373,7 +377,11 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
     Map<String, String> tableOptions = metadata.getTableOptions();
     if (tableOptions == null) {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      if (metadata.getLogicalTableRouteInfo() != null) {
+        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
+      } else {
+        assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      }
       return;
     }
 
@@ -392,7 +400,11 @@ public class WorkerManager {
     if (Boolean.parseBoolean(tableOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
       setSegmentsForReplicatedLeafFragment(metadata);
     } else {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      if (metadata.getLogicalTableRouteInfo() != null) {
+        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
+      } else {
+        assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      }
     }
   }
 
@@ -537,6 +549,86 @@ public class WorkerManager {
   private List<String> setSegmentsHelper(String tableNameWithType) {
     return _routingManager.getSegments(
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""));
+  }
+
+  private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    LogicalTableRouteInfo logicalTableRouteInfo = metadata.getLogicalTableRouteInfo();
+    Preconditions.checkNotNull(logicalTableRouteInfo);
+    LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+    tableRouteProvider.fillRouteMetadata(logicalTableRouteInfo, _routingManager);
+    if (logicalTableRouteInfo.getTimeBoundaryInfo() != null) {
+      metadata.setTimeBoundaryInfo(logicalTableRouteInfo.getTimeBoundaryInfo());
+    }
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+
+    if (logicalTableRouteInfo.hasOffline()) {
+      offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getOfflineTableName() + "\"");
+    }
+
+    if (logicalTableRouteInfo.hasRealtime()) {
+      realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + logicalTableRouteInfo.getRealtimeTableName() + "\"");
+    }
+
+    tableRouteProvider.calculateRoutes(logicalTableRouteInfo, _routingManager, offlineBrokerRequest,
+        realtimeBrokerRequest, context.getRequestId());
+
+    assignTableSegmentsToWorkers(logicalTableRouteInfo, metadata);
+  }
+
+  private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
+      DispatchablePlanMetadata metadata) {
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap =
+        new HashMap<>();
+
+    if (logicalTableRouteInfo.getOfflineTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
+        // Routing table maybe null if no routing table is found OR there are no segments.
+        if (physicalTableRoute.getOfflineRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
+              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
+      }
+    }
+
+    if (logicalTableRouteInfo.getRealtimeTables() != null) {
+      for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
+        // Routing table maybe null if no routing table is found OR there are no segments.
+        if (physicalTableRoute.getRealtimeRoutingTable() != null) {
+          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
+              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+        }
+      }
+    }
+
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry
+        : serverInstanceToLogicalSegmentsMap.entrySet()) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
+    }
+
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    metadata.setWorkerIdToTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
+  }
+
+  private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
+      Map<ServerInstance, ServerRouteInfo> segmentsMap,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
+    for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+      Map<String, List<String>> tableNameToSegmentsMap =
+          serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+      // TODO: support optional segments for multi-stage engine.
+      Preconditions.checkState(
+          tableNameToSegmentsMap.put(physicalTableName, serverEntry.getValue().getSegments()) == null,
+          "Entry for server {} and physical table: {} already exist!", serverEntry.getKey(), physicalTableName);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -691,10 +783,12 @@ public class WorkerManager {
           tableName);
 
       if (offlineRoutingExists && realtimeRoutingExists) {
-        TablePartitionInfo offlineTpi = _routingManager.getTablePartitionInfo(offlineTableName);
+        TablePartitionReplicatedServersInfo offlineTpi = _routingManager.getTablePartitionReplicatedServersInfo(
+            offlineTableName);
         Preconditions.checkState(offlineTpi != null, "Failed to find table partition info for table: %s",
             offlineTableName);
-        TablePartitionInfo realtimeTpi = _routingManager.getTablePartitionInfo(realtimeTableName);
+        TablePartitionReplicatedServersInfo realtimeTpi = _routingManager.getTablePartitionReplicatedServersInfo(
+            realtimeTableName);
         Preconditions.checkState(realtimeTpi != null, "Failed to find table partition info for table: %s",
             realtimeTableName);
         // For hybrid table, find the common servers for each partition
@@ -706,14 +800,15 @@ public class WorkerManager {
 
         verifyCompatibility(offlineTpi, realtimeTpi);
 
-        TablePartitionInfo.PartitionInfo[] offlinePartitionInfoMap = offlineTpi.getPartitionInfoMap();
-        TablePartitionInfo.PartitionInfo[] realtimePartitionInfoMap = realtimeTpi.getPartitionInfoMap();
+        TablePartitionReplicatedServersInfo.PartitionInfo[] offlinePartitionInfoMap = offlineTpi.getPartitionInfoMap();
+        TablePartitionReplicatedServersInfo.PartitionInfo[] realtimePartitionInfoMap
+            = realtimeTpi.getPartitionInfoMap();
 
         int numPartitions = offlineTpi.getNumPartitions();
         PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
         for (int i = 0; i < numPartitions; i++) {
-          TablePartitionInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
-          TablePartitionInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
+          TablePartitionReplicatedServersInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
+          TablePartitionReplicatedServersInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
           if (offlinePartitionInfo == null && realtimePartitionInfo == null) {
             continue;
           }
@@ -750,7 +845,8 @@ public class WorkerManager {
     }
   }
 
-  private static void verifyCompatibility(TablePartitionInfo offlineTpi, TablePartitionInfo realtimeTpi)
+  private static void verifyCompatibility(TablePartitionReplicatedServersInfo offlineTpi,
+      TablePartitionReplicatedServersInfo realtimeTpi)
       throws IllegalArgumentException {
     Preconditions.checkState(offlineTpi.getPartitionColumn().equals(realtimeTpi.getPartitionColumn()),
         "Partition column mismatch for hybrid table %s: %s offline vs %s online", offlineTpi.getTableNameWithType(),
@@ -782,13 +878,15 @@ public class WorkerManager {
   }
 
   private PartitionTableInfo getOfflinePartitionTableInfo(String offlineTableName) {
-    TablePartitionInfo offlineTpi = _routingManager.getTablePartitionInfo(offlineTableName);
+    TablePartitionReplicatedServersInfo offlineTpi = _routingManager.getTablePartitionReplicatedServersInfo(
+        offlineTableName);
     Preconditions.checkState(offlineTpi != null, "Failed to find table partition info for table: %s", offlineTableName);
     return PartitionTableInfo.fromTablePartitionInfo(offlineTpi, TableType.OFFLINE);
   }
 
   private PartitionTableInfo getRealtimePartitionTableInfo(String realtimeTableName) {
-    TablePartitionInfo realtimeTpi = _routingManager.getTablePartitionInfo(realtimeTableName);
+    TablePartitionReplicatedServersInfo realtimeTpi = _routingManager.getTablePartitionReplicatedServersInfo(
+        realtimeTableName);
     Preconditions.checkState(realtimeTpi != null, "Failed to find table partition info for table: %s",
         realtimeTableName);
     return PartitionTableInfo.fromTablePartitionInfo(realtimeTpi, TableType.REALTIME);
@@ -809,18 +907,21 @@ public class WorkerManager {
       _timeBoundaryInfo = timeBoundaryInfo;
     }
 
-    static PartitionTableInfo fromTablePartitionInfo(TablePartitionInfo tablePartitionInfo,
+    static PartitionTableInfo fromTablePartitionInfo(
+        TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo,
         TableType tableType) {
-      if (!tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty()) {
+      if (!tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty()) {
         throw new IllegalStateException(
-            "Find " + tablePartitionInfo.getSegmentsWithInvalidPartition().size() + " segments with invalid partition");
+            "Find " + tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().size()
+            + " segments with invalid partition");
       }
 
-      int numPartitions = tablePartitionInfo.getNumPartitions();
-      TablePartitionInfo.PartitionInfo[] tablePartitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+      int numPartitions = tablePartitionReplicatedServersInfo.getNumPartitions();
+      TablePartitionReplicatedServersInfo.PartitionInfo[] tablePartitionInfoMap = tablePartitionReplicatedServersInfo
+          .getPartitionInfoMap();
       PartitionInfo[] workerPartitionInfoMap = new PartitionInfo[numPartitions];
       for (int i = 0; i < numPartitions; i++) {
-        TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoMap[i];
+        TablePartitionReplicatedServersInfo.PartitionInfo partitionInfo = tablePartitionInfoMap[i];
         if (partitionInfo != null) {
           switch (tableType) {
             case OFFLINE:
@@ -836,8 +937,8 @@ public class WorkerManager {
           }
         }
       }
-      return new PartitionTableInfo(tablePartitionInfo.getPartitionColumn(),
-          tablePartitionInfo.getPartitionFunctionName(), workerPartitionInfoMap, null);
+      return new PartitionTableInfo(tablePartitionReplicatedServersInfo.getPartitionColumn(),
+          tablePartitionReplicatedServersInfo.getPartitionFunctionName(), workerPartitionInfoMap, null);
     }
   }
 
