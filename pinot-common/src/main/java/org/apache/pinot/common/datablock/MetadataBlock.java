@@ -49,7 +49,8 @@ public class MetadataBlock extends BaseDataBlock {
     return new MetadataBlock();
   }
 
-  public static MetadataBlock newError(int stage, int worker, String serverId, Map<Integer, String> exceptions) {
+  public static MetadataBlock newError(int stage, int worker, @Nullable String serverId,
+      Map<Integer, String> exceptions) {
     MetadataBlock errorBlock = new MetadataBlock(stage, worker, serverId);
     for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
       errorBlock.addException(exception.getKey(), exception.getValue());
