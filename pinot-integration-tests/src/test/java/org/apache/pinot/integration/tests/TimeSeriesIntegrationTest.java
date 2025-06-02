@@ -47,13 +47,14 @@ import static org.testng.Assert.assertEquals;
 public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   protected static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesIntegrationTest.class);
-  private static final String TS_COLUMN = "tsCol";
-  private static final String CITY_COLUMN = "cityCol";
-  private static final String PLATFORM_COLUMN = "platformCol";
+  private static final String TS_COLUMN = "ts";
+  private static final String DAYS_SINCE_FIRST_TRIP_COLUMN = "daysSinceFirstTrip";
+  private static final String DEVICE_OS_COLUMN = "deviceOs";
   private static final String REFERRAL_COLUMN = "referralCol";
-  private static final String VIEWS_COLUMN = "viewsCol";
+  private static final String TOTAL_TRIPS_COLUMN = "totalTrips";
 
-  private static final String[] PLATFORMS = new String[]{"windows", "android", "ios"};
+  private static final String[] DEVICES = new String[]{"windows", "android", "ios"};
+  private static final long NUMBER_OF_ROWS = 1000L;
   private static final long VIEWS_MIN_VALUE = 20L;
   private static final long VIEWS_MAX_VALUE = 30L;
   private static final long DATA_START_TIME_SEC = 1747008000L;
@@ -65,10 +66,10 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, PLATFORM_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
-        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
+      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
   }
 
@@ -77,10 +78,10 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | min{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, CITY_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 5, (ts, val, row) ->
-        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MIN_VALUE)
+      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MIN_VALUE)
     );
   }
 
@@ -89,7 +90,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | sum{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, REFERRAL_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 2, (ts, val, row) -> {
       String referral = row.get("metric").get(REFERRAL_COLUMN).asText();
@@ -105,7 +106,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s*10\"}"
         + " | max{%s,%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, PLATFORM_COLUMN, CITY_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 15, (ts, val, row) -> {
       long expected = ts <= DATA_START_TIME_SEC ? 0L : 10 * VIEWS_MAX_VALUE;
@@ -118,7 +119,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, PLATFORM_COLUMN, CITY_COLUMN, REFERRAL_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 30, (ts, val, row) -> {
       // Since there are 30 groups, each minute will have 2 rows.
@@ -132,10 +133,10 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"%s='windows'\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
-      PLATFORM_COLUMN, TS_COLUMN, VIEWS_COLUMN, PLATFORM_COLUMN, CITY_COLUMN, REFERRAL_COLUMN
+      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 10, (ts, val, row) ->
-        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : 2L)
+      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : 2L)
     );
   }
 
@@ -144,7 +145,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     String query = String.format(
       "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{42} | keepLastValue{}",
-      TS_COLUMN, VIEWS_COLUMN, PLATFORM_COLUMN
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 42L : VIEWS_MAX_VALUE)
@@ -168,11 +169,6 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  @FunctionalInterface
-  interface TimeSeriesValidator {
-    void validate(long timestamp, long value, JsonNode row);
-  }
-
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     addTimeSeriesConfigurations(brokerConf);
@@ -190,61 +186,24 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
   public long getCountStarResult() {
-    return 1000L;
+    return NUMBER_OF_ROWS;
   }
 
   @Override
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
       .addSingleValueDimension(TS_COLUMN, FieldSpec.DataType.LONG)
-      .addSingleValueDimension(CITY_COLUMN, FieldSpec.DataType.LONG)
-      .addSingleValueDimension(PLATFORM_COLUMN, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(DAYS_SINCE_FIRST_TRIP_COLUMN, FieldSpec.DataType.LONG)
+      .addSingleValueDimension(DEVICE_OS_COLUMN, FieldSpec.DataType.STRING)
       .addSingleValueDimension(REFERRAL_COLUMN, FieldSpec.DataType.BOOLEAN)
-      .addSingleValueDimension(VIEWS_COLUMN, FieldSpec.DataType.LONG)
+      .addSingleValueDimension(TOTAL_TRIPS_COLUMN, FieldSpec.DataType.LONG)
       .build();
-  }
-
-  private org.apache.avro.Schema.Field createAvroField(String name, org.apache.avro.Schema.Type type) {
-    return new org.apache.avro.Schema.Field(name, org.apache.avro.Schema.create(type), null, null);
-  }
-
-  public File createAvroFile()
-    throws Exception {
-    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
-      createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
-      createAvroField(CITY_COLUMN, org.apache.avro.Schema.Type.LONG),
-      createAvroField(PLATFORM_COLUMN, org.apache.avro.Schema.Type.STRING),
-      createAvroField(REFERRAL_COLUMN, org.apache.avro.Schema.Type.BOOLEAN),
-      createAvroField(VIEWS_COLUMN, org.apache.avro.Schema.Type.LONG)
-    ));
-
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      writer.create(avroSchema, avroFile);
-      for (int i = 0; i < getCountStarResult(); i++) {
-        writer.append(getRecord(avroSchema, i));
-      }
-    }
-    return avroFile;
-  }
-
-  private static GenericData.@NotNull Record getRecord(org.apache.avro.Schema avroSchema, int i) {
-    GenericData.Record record = new GenericData.Record(avroSchema);
-    // Do not set DATA_START_TIME_SEC for easier assertion of values.
-    record.put(TS_COLUMN, (DATA_START_TIME_SEC + 1 + i) * 1000L);
-    record.put(CITY_COLUMN, i % 5);
-    record.put(PLATFORM_COLUMN, PLATFORMS[i % PLATFORMS.length]);
-    record.put(REFERRAL_COLUMN, (i % 2) == 0);
-    // Alternate between VIEWS_MIN_VALUE and VIEWS_MAX_VALUE.
-    record.put(VIEWS_COLUMN, VIEWS_MIN_VALUE + (VIEWS_MAX_VALUE - VIEWS_MIN_VALUE) * (i % 2));
-    return record;
   }
 
   @BeforeClass
   public void setUp()
     throws Exception {
-    LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
+    LOGGER.info("Setting up integration test class: {}", getClass().getSimpleName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -254,8 +213,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder =
-        ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
+      _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
     }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // create & upload schema AND table config
@@ -272,13 +230,13 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     uploadSegments(getTableName(), _tarDir);
 
     waitForAllDocsLoaded(60_000);
-    LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
+    LOGGER.info("Finished setting up integration test class: {}", getClass().getSimpleName());
   }
 
   @AfterClass
   public void tearDown()
     throws Exception {
-    LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
+    LOGGER.info("Tearing down integration test class: {}", getClass().getSimpleName());
     dropOfflineTable(getTableName());
     FileUtils.deleteDirectory(_tempDir);
 
@@ -287,13 +245,49 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
-    LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
+    LOGGER.info("Finished tearing down integration test class: {}", getClass().getSimpleName());
   }
 
   @Override
   public TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).build();
+  }
+
+  public File createAvroFile()
+    throws Exception {
+    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
+    avroSchema.setFields(ImmutableList.of(
+      createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
+      createAvroField(DAYS_SINCE_FIRST_TRIP_COLUMN, org.apache.avro.Schema.Type.LONG),
+      createAvroField(DEVICE_OS_COLUMN, org.apache.avro.Schema.Type.STRING),
+      createAvroField(REFERRAL_COLUMN, org.apache.avro.Schema.Type.BOOLEAN),
+      createAvroField(TOTAL_TRIPS_COLUMN, org.apache.avro.Schema.Type.LONG)
+    ));
+
+    File avroFile = new File(_tempDir, "data.avro");
+    try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+      writer.create(avroSchema, avroFile);
+      for (int i = 0; i < getCountStarResult(); i++) {
+        writer.append(getRecord(avroSchema, i));
+      }
+    }
+    return avroFile;
+  }
+
+  private org.apache.avro.Schema.Field createAvroField(String name, org.apache.avro.Schema.Type type) {
+    return new org.apache.avro.Schema.Field(name, org.apache.avro.Schema.create(type), null, null);
+  }
+
+  private static GenericData.@NotNull Record getRecord(org.apache.avro.Schema avroSchema, int i) {
+    GenericData.Record record = new GenericData.Record(avroSchema);
+    // Do not set DATA_START_TIME_SEC for easier assertion of values.
+    record.put(TS_COLUMN, (DATA_START_TIME_SEC + 1 + i) * 1000L);
+    record.put(DAYS_SINCE_FIRST_TRIP_COLUMN, i % 5);
+    record.put(DEVICE_OS_COLUMN, DEVICES[i % DEVICES.length]);
+    record.put(REFERRAL_COLUMN, (i % 2) == 0);
+    // Alternate between VIEWS_MIN_VALUE and VIEWS_MAX_VALUE.
+    record.put(TOTAL_TRIPS_COLUMN, VIEWS_MIN_VALUE + (VIEWS_MAX_VALUE - VIEWS_MIN_VALUE) * (i % 2));
+    return record;
   }
 
   private void addTimeSeriesConfigurations(PinotConfiguration conf) {
@@ -302,5 +296,10 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
       "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
     conf.setProperty(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
       SimpleTimeSeriesBuilderFactory.class.getName());
+  }
+
+  @FunctionalInterface
+  interface TimeSeriesValidator {
+    void validate(long timestamp, long value, JsonNode row);
   }
 }

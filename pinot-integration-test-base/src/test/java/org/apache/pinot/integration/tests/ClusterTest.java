@@ -555,7 +555,7 @@ public abstract class ClusterTest extends ControllerTest {
    * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
    * This is used for testing timeseries queries.
    */
-  public JsonNode getTimeseriesQuery(@Language("sql") String query, long startTime, long endTime) {
+  public JsonNode getTimeseriesQuery(String query, long startTime, long endTime) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
         String.valueOf(startTime), "end", String.valueOf(endTime));
@@ -565,15 +565,6 @@ public abstract class ClusterTest extends ControllerTest {
     } catch (Exception e) {
       throw new RuntimeException("Failed to get timeseries query: " + query, e);
     }
-  }
-
-  private static String buildQueryUrl(String baseUrl, Map<String, String> params) throws Exception {
-    URIBuilder builder = new URIBuilder(baseUrl);
-    for (Map.Entry<String, String> entry : params.entrySet()) {
-      builder.addParameter(entry.getKey(), entry.getValue());
-    }
-    URI uri = builder.build();
-    return uri.toString();
   }
 
   /**
@@ -864,5 +855,14 @@ public abstract class ClusterTest extends ControllerTest {
     if (useMultiStageQueryEngine()) {
       throw new SkipException("Some queries fail when using multi-stage engine");
     }
+  }
+
+  private static String buildQueryUrl(String baseUrl, Map<String, String> params) throws Exception {
+    URIBuilder builder = new URIBuilder(baseUrl);
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      builder.addParameter(entry.getKey(), entry.getValue());
+    }
+    URI uri = builder.build();
+    return uri.toString();
   }
 }
