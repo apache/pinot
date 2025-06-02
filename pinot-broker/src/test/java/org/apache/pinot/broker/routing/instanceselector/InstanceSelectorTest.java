@@ -171,8 +171,7 @@ public class InstanceSelectorTest {
   @DataProvider(name = "selectorType")
   public Object[] getSelectorType() {
     return new Object[]{
-        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-        BALANCED_INSTANCE_SELECTOR
+        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, BALANCED_INSTANCE_SELECTOR
     };
   }
 
@@ -239,11 +238,11 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
         new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
             false, 300);
@@ -313,7 +312,7 @@ public class InstanceSelectorTest {
     balancedInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     replicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     strictReplicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
-            onlineSegments);
+        onlineSegments);
 
     int requestId = 0;
 
@@ -767,8 +766,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -850,8 +849,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -933,8 +932,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -1059,7 +1058,7 @@ public class InstanceSelectorTest {
     }
 
     multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
-            onlineSegments);
+        onlineSegments);
 
     // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
     // assigned to instance-1.
@@ -1085,14 +1084,14 @@ public class InstanceSelectorTest {
     // If instance-0 is down, replica-group 1 should be picked even with requestId=0
     enabledInstances.remove("instance-0");
     multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
-            onlineSegments);
+        onlineSegments);
     selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
 
     // If instance-2 also goes down, no replica-group is eligible
     enabledInstances.remove("instance-2");
     multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
-            onlineSegments);
+        onlineSegments);
     try {
       multiStageSelector.select(brokerRequest, segments, 0);
       fail("Method call above should have failed");
@@ -1125,8 +1124,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     MultiStageReplicaGroupSelector multiStageSelector =
-      new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-        false, 300);
+        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
 
@@ -1180,7 +1179,8 @@ public class InstanceSelectorTest {
     externalViewSegmentAssignment.get("segment1").put("instance-1", "ERROR");
     externalViewSegmentAssignment.get("segment2").put("instance-2", "ERROR");
 
-    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
 
     // Even though instance-0 and instance-3 belong to different replica groups, they handle exclusive sets of segments
     // and hence they can together serve all segments.
@@ -1198,7 +1198,8 @@ public class InstanceSelectorTest {
     // If instance-3 has an error segment as well, there is no replica group available to serve complete set of
     // segments.
     externalViewSegmentAssignment.get("segment3").put("instance-3", "ERROR");
-    multiStageSelector.init(new HashSet<>(enabledInstances), idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+        onlineSegments);
     try {
       multiStageSelector.select(brokerRequest, segments, 0);
       fail("Method call above should have failed");
@@ -1212,8 +1213,8 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
+            300);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
         new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
@@ -1260,7 +1261,7 @@ public class InstanceSelectorTest {
     // }
     balancedInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     strictReplicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
-            onlineSegments);
+        onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
@@ -2045,9 +2046,8 @@ public class InstanceSelectorTest {
     // Ideal states for two segments
     //   [segment0] -> [instance0:online, instance1:offline]
     Map<String, List<Pair<String, String>>> idealSateMap =
-        ImmutableMap.of(
-            newSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)),
-            oldSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
+        ImmutableMap.of(newSeg, ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)), oldSeg,
+            ImmutableList.of(Pair.of(instance0, OFFLINE), Pair.of(instance1, ONLINE)));
 
     IdealState idealState = createIdealState(idealSateMap);
 
@@ -2055,9 +2055,8 @@ public class InstanceSelectorTest {
     // External view for two segments
     //   [segment0] -> [instance0:offline, instance1:online]
     Map<String, List<Pair<String, String>>> externalViewMap =
-        ImmutableMap.of(
-            newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)),
-            oldSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
+        ImmutableMap.of(newSeg, ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)), oldSeg,
+            ImmutableList.of(Pair.of(instance0, ONLINE), Pair.of(instance1, ONLINE)));
 
     ExternalView externalView = createExternalView(externalViewMap);
 
@@ -2081,8 +2080,9 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     HybridSelector hybridSelector = mock(HybridSelector.class);
-    ReplicaGroupInstanceSelector instanceSelector = new ReplicaGroupInstanceSelector(
-        offlineTableName, propertyStore, brokerMetrics, hybridSelector, Clock.systemUTC(), false, 300);
+    ReplicaGroupInstanceSelector instanceSelector =
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, hybridSelector,
+            Clock.systemUTC(), false, 300);
 
     // Define instances and segments
     String instance0 = "instance0";
@@ -2098,14 +2098,14 @@ public class InstanceSelectorTest {
     // Define candidates for each segment
     Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap = new HashMap<>();
     // segment0 -> instance0, instance1
-    instanceCandidatesMap.put(segment0, Arrays.asList(new SegmentInstanceCandidate(instance0, true),
-        new SegmentInstanceCandidate(instance1, true)));
+    instanceCandidatesMap.put(segment0,
+        Arrays.asList(new SegmentInstanceCandidate(instance0, true), new SegmentInstanceCandidate(instance1, true)));
     // segment1 -> instance2, instance3
-    instanceCandidatesMap.put(segment1, Arrays.asList(new SegmentInstanceCandidate(instance2, true),
-        new SegmentInstanceCandidate(instance3, true)));
+    instanceCandidatesMap.put(segment1,
+        Arrays.asList(new SegmentInstanceCandidate(instance2, true), new SegmentInstanceCandidate(instance3, true)));
     // segment2 -> instance3, instance4 // instance4 is not in the hybrid selector's server ranking
-    instanceCandidatesMap.put(segment2, Arrays.asList(new SegmentInstanceCandidate(instance4, true),
-        new SegmentInstanceCandidate(instance3, true)));
+    instanceCandidatesMap.put(segment2,
+        Arrays.asList(new SegmentInstanceCandidate(instance4, true), new SegmentInstanceCandidate(instance3, true)));
 
     // Define the segment states
     SegmentStates segmentStates = new SegmentStates(instanceCandidatesMap, new HashSet<>(segments), null);
@@ -2120,8 +2120,8 @@ public class InstanceSelectorTest {
     when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(serverRanks);
 
     // Act
-    Pair<Map<String, String>, Map<String, String>> selectedResult = instanceSelector.select(segments, 0,
-        segmentStates, null);
+    Pair<Map<String, String>, Map<String, String>> selectedResult =
+        instanceSelector.select(segments, 0, segmentStates, null);
 
     // Assert
     Map<String, String> expectedSelection = new HashMap<>();
