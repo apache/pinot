@@ -98,8 +98,32 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - name: Verify with binary-compatibility-check profile
-        run: mvn verify -DskipTests -Pbinary-compat-check -T1C
+      - name: Build SPI on PR branch
+        run: mvn clean package -T1C -pl pinot-spi -am -DskipTests
+      - name: Checkout master into a subfolder
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: pinot-master
+      - name: Build SPI on master
+        working-directory: pinot-master
+        run: mvn clean package -T1C -pl pinot-spi -am -DskipTests
+      - name: Download japicmp CLI
+        run: |
+          JAPICMP_VER=0.23.1
+          curl -sLo japicmp.jar \
+            https://repo1.maven.org/maven2/org/japicmp/japicmp/$JAPICMP_VER/japicmp-$JAPICMP_VER-jar-with-dependencies.jar
+      - name: Prepare JARs for comparison
+        run: |
+          cp pinot-master/pinot-spi/target/pinot-spi-1.4.0-SNAPSHOT.jar old.jar
+          cp pinot-spi/target/pinot-spi-1.4.0-SNAPSHOT.jar new.jar
+      - name: Compare API compatibility
+        run: |
+          java -jar japicmp.jar \
+            --old old.jar \
+            --new new.jar \
+            --error-on-binary-incompatibility \
+            --only-incompatible
   unit-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
