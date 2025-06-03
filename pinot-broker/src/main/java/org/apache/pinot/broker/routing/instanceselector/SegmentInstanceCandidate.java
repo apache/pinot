@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.concurrent.Immutable;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
 
 
 /**
@@ -28,10 +31,20 @@ import javax.annotation.concurrent.Immutable;
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
+  private final int _group;
 
+  @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
     _online = online;
+    // no group
+    _group = FALLBACK_REPLICA_GROUP_ID;
+  }
+
+  public SegmentInstanceCandidate(String instance, boolean online, int group) {
+    _instance = instance;
+    _online = online;
+    _group = group;
   }
 
   public String getInstance() {
@@ -40,5 +53,9 @@ public class SegmentInstanceCandidate {
 
   public boolean isOnline() {
     return _online;
+  }
+
+  public int getReplicaGroup() {
+    return _group;
   }
 }
