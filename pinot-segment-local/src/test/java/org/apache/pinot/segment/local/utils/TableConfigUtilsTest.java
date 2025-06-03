@@ -2597,7 +2597,9 @@ public class TableConfigUtilsTest {
     e = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig2));
     assertTrue(e.getMessage()
-        .contains("IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based partitioning"));
+        .contains(
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based instance "
+                + "assignment"));
 
     when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(true);
     when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(1);

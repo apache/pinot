@@ -925,7 +925,7 @@ public final class TableConfigUtils {
         Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
             "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for REALTIME tables");
         Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased(),
-            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based partitioning");
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based instance assignment");
         Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumPartitions() == 0,
             "numPartitions should not be explicitly set when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR");
       }

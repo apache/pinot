@@ -40,6 +40,10 @@ public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroup
       InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig, String tableNameWithType,
       @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement) {
     this(tableConfig, replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement,
+        // Get the number of partitions from the first stream config
+        // TODO: Revisit this logic to better handle multiple streams in the future - either validate that they
+        //       all have the same number of partitions and use that or disallow the use of this selector in case the
+        //       partition counts differ.
         StreamConsumerFactoryProvider.create(IngestionConfigUtils.getFirstStreamConfig(tableConfig))
             .createStreamMetadataProvider(
                 ImplicitRealtimeTablePartitionSelector.class.getSimpleName() + "-" + tableNameWithType));

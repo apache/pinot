@@ -93,15 +93,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
   }
 
-  /**
-   * Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
-   * are not the purpose of the test, so combine different rebalance scenarios into one test:
-   * 1. NO_OP rebalance
-   * 2. Add servers and rebalance
-   * 3. Migrate to replica-group based segment assignment and rebalance
-   * 4. Migrate back to non-replica-group based segment assignment and rebalance
-   * 5. Remove (disable) servers and rebalance
-   */
+  ///
+  /// Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
+  /// are not the purpose of the test, so combine different rebalance scenarios into one test:
+  /// 1. NO_OP rebalance
+  /// 2. Add servers and rebalance
+  /// 3. Migrate to replica-group based segment assignment and rebalance
+  /// 4. Migrate back to non-replica-group based segment assignment and rebalance
+  /// 5. Remove (disable) servers and rebalance
+  ///
   @Test
   public void testRebalance()
       throws Exception {
