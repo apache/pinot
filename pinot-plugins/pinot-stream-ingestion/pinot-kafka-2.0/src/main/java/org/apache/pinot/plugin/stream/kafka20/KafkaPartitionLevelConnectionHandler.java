@@ -115,7 +115,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
 
   public void close()
       throws IOException {
-    // Close consumer first
     _consumer.close();
   }
 
