@@ -117,8 +117,7 @@ jobs:
           JAPICMP_VER=0.23.1
           curl -fSL \
           -o japicmp.jar \
-          "https://repo1.maven.org/maven2/org/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"
-  
+          "https://repo1.maven.org/maven2/org/japicmp/japicmp-cli/${JAPICMP_VER}/japicmp-cli-${JAPICMP_VER}-jar-with-dependencies.jar"  
           echo "Downloaded size:"
           ls -lh japicmp.jar
   
