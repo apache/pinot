@@ -36,6 +36,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
@@ -136,7 +137,6 @@ public class QueryEnvironment {
   private final TypeFactory _typeFactory = new TypeFactory();
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
-  private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
 
@@ -149,7 +149,6 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    _optProgram = getOptProgram();
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -166,6 +165,9 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    Map<String, Boolean> ruleFlags = PlannerContext.getRuleFlags(sqlNodeAndOptions.getOptions());
+    // dynamically create optProgram according to rule options
+    HepProgram optProgram = getOptProgram(ruleFlags);
     boolean usePhysicalOptimizer = PhysicalPlannerContext.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
@@ -182,7 +184,7 @@ public class QueryEnvironment {
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
     }
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
+    return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
@@ -475,7 +477,21 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  private static HepProgram getOptProgram() {
+  /**
+   * Creates and returns a HepProgram that performs mostly logical transformations.
+   * It performs several phases of rule application over the parsed decorrelated trimmed plan:
+   * - In the first phase, it prunes the logical plan first and then
+   * applies a selected subset of BASIC_RULES that are almost always helpful, controlled by queryOptions.
+   * - In the second phase, it performs predicate pushdown -> projection pushdown -> predicate pushdown.
+   * - In the third phase, the logical plan is prune again.
+   *
+   * @param ruleFlags A nullable map from rule name to boolean. a rule is disabled if the
+   *                  corresponding value is set to false. The default behavior is controlled
+   *                  in {@link PlannerContext}'s getRuleFlags method, by specifying the defaultEnabled arg
+   *                  when checking isRuleDisabled
+   * @return HepProgram that performs logical transformations
+   */
+  private static HepProgram getOptProgram(Map<String, Boolean> ruleFlags) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -488,8 +504,28 @@ public class QueryEnvironment {
     // ----
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
+
+    // Rules are enabled if its corresponding value is not specified false in ruleFlags
+    if (ruleFlags.isEmpty()) {
+      LOGGER.info("[QueryEnvironment] ruleFlags is empty, BASIC_RULES used: \n");
+      for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
+        hepProgramBuilder.addRuleInstance(relOptRule);
+      }
+    } else {
+      for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
+        String ruleName = relOptRule.getClass().getSimpleName();
+        // special cases here:
+        // rules of the same class and different configs could only be distinguished by checking String of its config
+        if (isExtendedAggregateFunctionsPushdownRule(relOptRule)) {
+          ruleName = CommonConstants.Broker.PlannerRules.AGGREGATE_JOIN_TRANSPOSE_EXTENDED;
+        }
+        // add rule if rule is not present in the map or value is true
+        if (isRuleEnabled(ruleName, ruleFlags)) {
+          hepProgramBuilder.addRuleInstance(relOptRule);
+          continue;
+        }
+        LOGGER.info("[QueryEnvironment] Basic rule disabled: \n{}", relOptRule.getClass().getName());
+      }
     }
 
     // Pushdown filters using a single HepInstruction.
@@ -506,6 +542,17 @@ public class QueryEnvironment {
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
     return hepProgramBuilder.build();
+  }
+
+  // Whether a rule is enabled
+  private static boolean isRuleEnabled(String ruleName, Map<String, Boolean> ruleFlags) {
+    return !Boolean.FALSE.equals(ruleFlags.get(ruleName));
+  }
+
+  // Whether the rule is AGGREGATE_JOIN_TRANSPOSE_EXTENDED
+  private static boolean isExtendedAggregateFunctionsPushdownRule(RelOptRule relOptRule) {
+    return (relOptRule.getClass().getSimpleName().equals(CommonConstants.Broker.PlannerRules.AGGREGATE_JOIN_TRANSPOSE)
+        && ((RelRule<?>) relOptRule).config.toString().contains("allowFunctions=true"));
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,

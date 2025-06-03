@@ -634,11 +634,24 @@ public class CommonConstants {
         // name, when that segment has multiple partitions in its columnPartitionMap.
         public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
+
+        // Knobs related to enabling / disabling Calcite rules used in optProgram
+        // Whether to enable extended AggregateJoinTransposeRule that pushes down aggregate functions
+        public static final String USE_AGGREGATE_FUNCTIONS_PUSHDOWN_RULE = "useAggregateFunctionsPushdownRule";
+        // Whether to enable PinotAggregateReduceFunctionsRule that reduces SUM or AVG to SUM0 when beneficial
+        public static final String USE_CASE_TO_FILTER_REDUCE_SUM_AND_AVG_RULE = "useCaseToFilterReduceSumAndAvgRule";
       }
 
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
+    }
+
+    // Calcite and Pinot rule names used for enable and disabling of rules
+    public static class PlannerRules {
+      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTransposeRule";
+      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeRuleExtended";
+      public static final String PINOT_AGGREGATE_REDUCE_FUNCTIONS = "PinotAggregateReduceFunctionsRule";
     }
 
     public static class FailureDetector {

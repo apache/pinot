@@ -18,35 +18,26 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlPostfixOperator;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.tools.RelBuilder;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
- * Pinot customized version of {@link AggregateReduceFunctionsRule}, which only reduce on SUM and AVG when the produced SUM0 could benefit from rewriting CASE to FILTER. The conditions are copied from {@link AggregateCaseToFilterRule}
+ * Pinot customized version of {@link AggregateReduceFunctionsRule}, which only reduce on SUM and AVG
+ * when the produced SUM0 could benefit from rewriting CASE to FILTER.
+ * The conditions are copied from {@link AggregateCaseToFilterRule}.
  * Mostly we don't want to reduce because Pinot supports all aggregation functions natively,
  * but not REGR_COUNT which can be generated during reduce.
  * But in cases that the below Project contains certain CASE WHEN expression that

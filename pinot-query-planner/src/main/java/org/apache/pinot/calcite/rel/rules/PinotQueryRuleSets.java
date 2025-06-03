@@ -36,7 +36,7 @@ public class PinotQueryRuleSets {
   //@formatter:off
   public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
-      PinotFilterIntoJoinRule.INSTANCE, // this is modified to enable smart mode to simplify outer join
+      PinotFilterIntoJoinRule.INSTANCE,
       // push filter through an aggregation
       CoreRules.FILTER_AGGREGATE_TRANSPOSE,
       // push filter through set operation
@@ -49,7 +49,7 @@ public class PinotQueryRuleSets {
       // push a filter past a project
       CoreRules.FILTER_PROJECT_TRANSPOSE,
       // push parts of the join condition to its inputs
-      PinotJoinConditionPushRule.INSTANCE, // this is modified to enable smart mode to simplify outer join
+      PinotJoinConditionPushRule.INSTANCE,
       // remove identity project
       CoreRules.PROJECT_REMOVE,
 
@@ -125,6 +125,8 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_MERGE,
       CoreRules.AGGREGATE_REMOVE,
       CoreRules.SORT_REMOVE,
+      PruneEmptyRules.CORRELATE_LEFT_INSTANCE,
+      PruneEmptyRules.CORRELATE_RIGHT_INSTANCE,
       PruneEmptyRules.AGGREGATE_INSTANCE,
       PruneEmptyRules.FILTER_INSTANCE,
       PruneEmptyRules.JOIN_LEFT_INSTANCE,
