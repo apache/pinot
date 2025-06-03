@@ -94,6 +94,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -117,6 +119,7 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
 
   static {
     // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
@@ -146,7 +149,7 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    _optProgram = getOptProgram();
+    _optProgram = getOptProgram(null);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -163,6 +166,9 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    // dynamically create optProgram according to rule options
+    HepProgram optProgram = getOptProgram(options);
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
@@ -179,7 +185,7 @@ public class QueryEnvironment {
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
     }
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
+    return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
@@ -468,34 +474,109 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  private static HepProgram getOptProgram() {
+  /**
+   * Creates and returns a HepProgram that performs mostly logical transformations.
+   * It performs several phases of rule application over the parsed decorrelated trimmed plan:
+   * - In the first phase, it prunes the applies BASIC_RULES that are almost always helpful to simplify logical plan
+   * - In the second phase, it performs predicate pushdown -> projection pushdown -> predicate pushdown.
+   * - In the third phase, the logical plan is prune with PRUNE_RULES.
+   *
+   * @param options query options
+   * @return HepProgram that performs logical transformations
+   */
+  private static HepProgram getOptProgram(@Nullable Map<String, String> options) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
+    // Rules are disabled if its corresponding value is set to false in ruleFlags
+    // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
+    List<RelOptRule> basicRules;
+    List<RelOptRule> filterPushdownRules;
+    List<RelOptRule> projectPushdownRules;
+    List<RelOptRule> pruneRules;
+    if (options == null || noRulesSkipped(options)) {
+      basicRules = PinotQueryRuleSets.BASIC_RULES;
+      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
+      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
+      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
+    } else {
+      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, options);
+      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, options);
+      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, options);
+      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, options);
+    }
+
+
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
+    for (RelOptRule relOptRule : basicRules) {
+        hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
     // Pushdown filters using a single HepInstruction.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // Pushdown projects after first filter pushdown to minimize projected columns.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(projectPushdownRules);
 
     // Pushdown filters again since filter should be pushed down at the lowest level, after project pushdown.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // ----
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+    hepProgramBuilder.addRuleCollection(pruneRules);
     return hepProgramBuilder.build();
+  }
+
+  // util func to check no rules are skipped
+  private static boolean noRulesSkipped(Map<String, String> options) {
+    for (Map.Entry<String, String> configEntry : options.entrySet()) {
+      if (configEntry.getKey().startsWith(CommonConstants.Broker.PLANNER_RULE_SKIP)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Filter static RuleSet according to query options
+   * The filtering is done via checking query option with
+   * key returning from {@link CommonConstants.Broker}.skipRule(rule description).
+   *
+   * @param rules static list of rules
+   * @param options query options
+   * @return filtered list of rules
+   */
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Map<String, String> options) {
+    List<RelOptRule> filteredRules = new ArrayList<>();
+    for (RelOptRule relOptRule : rules) {
+      String ruleName = relOptRule.toString();
+      if (isRuleSkipped(ruleName, options)) {
+        continue;
+      }
+      filteredRules.add(relOptRule);
+    }
+    return filteredRules;
+  }
+
+  /**
+   * Whether a rule is skipped, rules not skipped by default
+   * @param ruleName description of the rule
+   * @param skipMap query skipMap
+   * @return false if corresponding key is not in skipMap or the value is "false", else true
+   */
+  private static boolean isRuleSkipped(String ruleName, Map<String, String> skipMap) {
+    // can put rule-specific default behavior here
+    return Boolean.parseBoolean(
+        skipMap.getOrDefault(
+            CommonConstants.Broker.skipRule(ruleName), Boolean.FALSE.toString()
+        )
+    );
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
