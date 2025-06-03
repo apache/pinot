@@ -36,7 +36,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
 
   protected ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
       DedupContext dedupContext) {
-    super(tableNameWithType, partitionId, dedupContext, null);
+    super(tableNameWithType, partitionId, dedupContext);
   }
 
   @Override

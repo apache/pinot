@@ -58,7 +58,7 @@ public class BasePartitionDedupMetadataManagerTest {
   private static class DummyPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
 
     protected DummyPartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext context) {
-      super(tableNameWithType, partitionId, context, null);
+      super(tableNameWithType, partitionId, context);
     }
 
     @Override

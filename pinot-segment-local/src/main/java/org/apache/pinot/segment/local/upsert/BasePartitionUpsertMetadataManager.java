@@ -51,7 +51,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -91,7 +90,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
-  protected final SegmentOperationsThrottler _segmentOperationsThrottler;
 
   // Tracks all the segments managed by this manager, excluding EmptySegment and segments out of metadata TTL.
   // Basically, it's possible that some segments in the table partition are not tracked here, as their upsert metadata
@@ -136,8 +134,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
   private final long _newSegmentTrackingTimeMs;
 
-  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _context = context;
@@ -166,7 +163,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
-    _segmentOperationsThrottler = segmentOperationsThrottler;
     if (isTTLEnabled()) {
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");

@@ -61,7 +61,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   class DummyPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
     public DummyPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
-      super(tableNameWithType, partitionId, context, null);
+      super(tableNameWithType, partitionId, context);
     }
 
     @Override

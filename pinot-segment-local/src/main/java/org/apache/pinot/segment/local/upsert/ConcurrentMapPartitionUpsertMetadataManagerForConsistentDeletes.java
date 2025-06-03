@@ -73,7 +73,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   public ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(String tableNameWithType, int partitionId,
       UpsertContext context) {
-    super(tableNameWithType, partitionId, context, null);
+    super(tableNameWithType, partitionId, context);
   }
 
   @Override
