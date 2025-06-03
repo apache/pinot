@@ -101,7 +101,6 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(totalPermits, totalPermits * 2, true));
     segmentOperationsThrottlerList.add(new SegmentHandleUpsertOrDedupThrottler(totalPermits, totalPermits * 2, true));
 
-
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);

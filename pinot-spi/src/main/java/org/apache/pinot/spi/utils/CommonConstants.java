@@ -292,7 +292,6 @@ public class CommonConstants {
         String.valueOf(Integer.MAX_VALUE);
 
     // Handle upsert / dedup throttle config
-    // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_HANDLE_UPSERT_OR_DEDUP_PARALLELISM =
         "pinot.server.max.segment.handle.upsert.or.dedup.parallelism";
     // Setting to Integer.MAX_VALUE to effectively disable throttling by default
