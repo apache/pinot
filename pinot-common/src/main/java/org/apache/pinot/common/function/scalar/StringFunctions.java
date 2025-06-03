@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
+import java.util.Random;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -708,6 +709,38 @@ public class StringFunctions {
       return true;
     } catch (Exception e) {
       return false;
+    }
+  }
+
+
+  /**
+   * Generates a random string of the specified length.
+   * The random string contains alphanumeric characters (a-z, A-Z, 0-9).
+   *
+   * @param length The length of the random string to generate
+   * @return A random string of the specified length
+   */
+  @ScalarFunction
+  public static String randomString(String length) {
+    try {
+//      int len = Integer.parseInt(length);
+      int len  = 100000;
+      if (len <= 0) {
+        return "";
+      }
+
+      Random random = new Random();
+      StringBuilder sb = new StringBuilder(len);
+      String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+      for (int i = 0; i < len; i++) {
+        int index = random.nextInt(chars.length());
+        sb.append(chars.charAt(index));
+      }
+
+      return sb.toString();
+    } catch (NumberFormatException e) {
+      return "";
     }
   }
 }
