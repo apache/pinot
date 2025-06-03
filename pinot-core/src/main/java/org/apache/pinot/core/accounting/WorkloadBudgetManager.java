@@ -40,6 +40,8 @@ public class WorkloadBudgetManager {
   private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
+  private double _excessAllocationThresholdPercent;
+  private double _excessAllocationAmountPercent;
 
   public static void init(PinotConfiguration config) {
     if (INSTANCE.compareAndSet(null, new WorkloadBudgetManager(config))) {
@@ -84,6 +86,12 @@ public class WorkloadBudgetManager {
 
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
+    _excessAllocationThresholdPercent = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_WORKLOAD_EXCESS_ALLOCATION_THRESHOLD_PERCENT,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_EXCESS_ALLOCATION_THRESHOLD_PERCENT);
+    _excessAllocationAmountPercent = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_WORKLOAD_EXCESS_ALLOCATION_AMOUNT_PERCENT,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_EXCESS_ALLOCATION_AMOUNT_PERCENT);
     startBudgetResetTask();
     LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
   }
@@ -147,6 +155,65 @@ public class WorkloadBudgetManager {
     long totalMemRemaining =
         _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._memoryRemaining).sum();
     return new BudgetStats(totalCpuRemaining, totalMemRemaining);
+  }
+
+  public boolean canAdmitQuery(String workload) {
+    if (!_isEnabled) {
+      return true; // If disabled, admit all queries
+    }
+    Budget budget = _workloadBudgets.get(workload);
+    if (budget == null) {
+      LOGGER.debug("No budget found for workload: {}", workload);
+      return true; // If no budget, admit the query
+    }
+
+    BudgetStats stats = budget.getStats();
+    if (stats._cpuRemaining > 0 && stats._memoryRemaining > 0) {
+      return true; // Both CPU and memory budgets are positive
+    }
+
+    BudgetStats totalRemaining = getRemainingBudgetAcrossAllWorkloads();
+
+    boolean cpuNeeded = stats._cpuRemaining <= 0;
+    boolean memoryNeeded = stats._memoryRemaining <= 0;
+    boolean cpuAllocated = !cpuNeeded; // If not needed, consider it "allocated"
+    boolean memoryAllocated = !memoryNeeded; // If not needed, consider it "allocated"
+
+    // Calculate and allocate CPU budget if exhausted
+    if (cpuNeeded) {
+      long totalInitialCpu = _workloadBudgets.values().stream()
+          .mapToLong(Budget::getInitialCpuBudget)
+          .sum();
+      double cpuRemainingPct = ((double) totalRemaining._cpuRemaining / totalInitialCpu) * 100.0;
+      if (cpuRemainingPct > _excessAllocationThresholdPercent) {
+        long availableCpuToAllocate = (long) (cpuRemainingPct * (_excessAllocationAmountPercent / 100.0));
+        long perWorkloadCpuShare =
+            availableCpuToAllocate / _workloadBudgets.size();
+        LOGGER.info("CPU budget exhausted for workload: {}. Allocating additional CPU budget: {}ns",
+            workload, perWorkloadCpuShare);
+        budget.getCpuRemaining().getAndAdd(perWorkloadCpuShare);
+        cpuAllocated = true;
+      }
+    }
+
+    // Calculate and allocate memory budget if exhausted
+    if (memoryNeeded) {
+      long totalInitialMem = _workloadBudgets.values().stream()
+          .mapToLong(Budget::getInitialMemoryBudget)
+          .sum();
+      double memRemainingPct = ((double) totalRemaining._memoryRemaining / totalInitialMem) * 100.0;
+      if (memRemainingPct > _excessAllocationThresholdPercent) {
+        long availableMemToAllocate =
+            (long) (totalRemaining._memoryRemaining * (_excessAllocationAmountPercent / 100.0));
+        long perWorkloadMemShare = availableMemToAllocate / _workloadBudgets.size();
+        LOGGER.info("Memory budget exhausted for workload: {}. Allocating additional memory budget: {} bytes",
+            workload, perWorkloadMemShare);
+        budget.getMemoryRemaining().getAndAdd(perWorkloadMemShare);
+        memoryAllocated = true;
+      }
+    }
+    // Return true only if all needed resources were successfully allocated
+    return cpuAllocated && memoryAllocated;
   }
 
   /**
@@ -224,6 +291,22 @@ public class WorkloadBudgetManager {
      */
     public BudgetStats getStats() {
       return new BudgetStats(_cpuRemaining.get(), _memoryRemaining.get());
+    }
+
+    public long getInitialCpuBudget() {
+      return _initialCpuBudget;
+    }
+
+    public long getInitialMemoryBudget() {
+      return _initialMemoryBudget;
+    }
+
+    public AtomicLong getCpuRemaining() {
+      return _cpuRemaining;
+    }
+
+    public AtomicLong getMemoryRemaining() {
+      return _memoryRemaining;
     }
   }
 }

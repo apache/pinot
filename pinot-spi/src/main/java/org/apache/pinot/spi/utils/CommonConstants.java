@@ -1354,6 +1354,19 @@ public class CommonConstants {
     public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
         "accounting.workload.sleep.time.ms";
     public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+    // Percentage threshold (0-100) of total remaining budget (CPU or memory) above which
+    // extra budget allocation is allowed. For example, if set to 50, allocation occurs
+    // only when total remaining exceeds 50% of initial.
+    // Essentially, this is a when to allocate extra budget
+    public static final String CONFIG_OF_WORKLOAD_EXCESS_ALLOCATION_THRESHOLD_PERCENT =
+        "accounting.workload.excess.allocation.threshold.percent";
+    public static final double DEFAULT_WORKLOAD_EXCESS_ALLOCATION_THRESHOLD_PERCENT = 50;
+    // Percentage (0-100) of the remaining budget (above the threshold) to allocate to each exhausted workload.
+    // For example, if total remaining is 60% and this is 25, then 60% * 25% = 15% of initial is allocated.
+    // Essentially, this is how much of the remaining budget to allocate.
+    public static final String CONFIG_OF_WORKLOAD_EXCESS_ALLOCATION_AMOUNT_PERCENT =
+        "accounting.workload.excess.allocation.amount.percent";
+    public static final double DEFAULT_WORKLOAD_EXCESS_ALLOCATION_AMOUNT_PERCENT = 50;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
   }
