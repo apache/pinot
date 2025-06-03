@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +30,15 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.InstanceIdToSegments;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.TableScanWorkerAssignmentResult;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
@@ -239,6 +244,27 @@ public class LeafStageWorkerAssignmentRuleTest {
         List.of("s0", "s1", "s2")));
     assertEquals(List.of("s0", "s1", "s2"), LeafStageWorkerAssignmentRule.sampleSegmentsForLogging(
         List.of("s0", "s1", "s2", "s3", "s4")));
+  }
+
+  @Test
+  public void testGetLeafParentNodes() {
+    // Create parents mock RelNodes. The first node is not part of the leaf stage, while the last two nodes are.
+    PRelNode pRelNode1 = mock(PRelNode.class);
+    PRelNode pRelNode2 = mock(PRelNode.class);
+    PRelNode pRelNode3 = mock(PRelNode.class);
+    doReturn(false).when(pRelNode1).isLeafStage();
+    doReturn(true).when(pRelNode2).isLeafStage();
+    doReturn(true).when(pRelNode3).isLeafStage();
+    // Add nodes in order (top to bottom of tree).
+    Deque<PRelNode> parents = new ArrayDeque<>();
+    parents.addLast(pRelNode1);
+    parents.addLast(pRelNode2);
+    parents.addLast(pRelNode3);
+    List<PRelNode> leafParentNodes = LeafStageWorkerAssignmentRule.getLeafParentNodes(parents);
+    // nodes should be from bottom to top.
+    assertEquals(leafParentNodes.get(0), pRelNode3);
+    assertEquals(leafParentNodes.get(1), pRelNode2);
+    assertEquals(leafParentNodes.size(), 2);
   }
 
   private static void validateTableScanAssignment(TableScanWorkerAssignmentResult assignmentResult,
