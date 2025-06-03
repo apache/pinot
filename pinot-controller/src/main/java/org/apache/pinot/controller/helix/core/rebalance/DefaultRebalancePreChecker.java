@@ -59,6 +59,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
   public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
 
+  public static final int SEGMENT_ADD_THRESHOLD = 200;
+  public static final int RECOMMENDED_BATCH_SIZE = 200;
+
   private static double _diskUtilizationThreshold;
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
@@ -405,8 +408,6 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
     }
     int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
-    final int SEGMENT_ADD_THRESHOLD = 500;
-    final int RECOMMENDED_BATCH_SIZE = 200;
     if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
       if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
           || batchSizePerServer > RECOMMENDED_BATCH_SIZE) {

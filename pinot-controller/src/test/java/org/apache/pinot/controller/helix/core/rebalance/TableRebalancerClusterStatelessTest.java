@@ -1053,7 +1053,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
         "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas=0 "
-        + "for pauseless tables may cause data loss during rebalance");
+            + "for pauseless tables may cause data loss during rebalance");
 
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setMinAvailableReplicas(-3);
@@ -1081,9 +1081,47 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
+    // Add more segments
+    int additionalNumSegments = DefaultRebalancePreChecker.SEGMENT_ADD_THRESHOLD + 1;
+    for (int i = 0; i < additionalNumSegments; i++) {
+      _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + (numSegments + i)), null);
+    }
+
+    // Add one more server instance
+    String instanceId = "preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + numServers;
+    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+
+    // change num replicas from 3 to 4
+    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(4).build();
+
+    // now the new server (the 4th server) should expect to be added all the existing segments (including consuming)
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    int expectedNumSegmentsToAdd = FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS + additionalNumSegments + numSegments;
+    assertEquals(rebalanceResult.getRebalanceSummaryResult()
+        .getServerInfo()
+        .getServerSegmentChangeInfo()
+        .get(instanceId)
+        .getSegmentsAdded(), expectedNumSegmentsToAdd);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Number of segments to add to a single server (" + expectedNumSegmentsToAdd + ") is high (>"
+            + DefaultRebalancePreChecker.SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to "
+            + DefaultRebalancePreChecker.RECOMMENDED_BATCH_SIZE
+            + " or lower to avoid excessive load on servers.");
+
+    rebalanceConfig.setBatchSizePerServer(DefaultRebalancePreChecker.RECOMMENDED_BATCH_SIZE);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
-    for (int i = 0; i < numServers; i++) {
+    for (int i = 0; i < numServers + 1; i++) {
       stopAndDropFakeInstance("preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
     executorService.shutdown();
