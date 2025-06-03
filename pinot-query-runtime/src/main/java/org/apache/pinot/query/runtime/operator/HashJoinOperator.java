@@ -24,6 +24,7 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -51,11 +52,13 @@ public class HashJoinOperator extends BaseJoinOperator {
 
   private final KeySelector<?> _leftKeySelector;
   private final KeySelector<?> _rightKeySelector;
-  private final LookupTable _rightTable;
+  @Nullable
+  private LookupTable _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
   // TODO: Optimize this
-  private final Map<Object, BitSet> _matchedRightRows;
+  @Nullable
+  private Map<Object, BitSet> _matchedRightRows;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -93,6 +96,7 @@ public class HashJoinOperator extends BaseJoinOperator {
 
   @Override
   protected void addRowsToRightTable(List<Object[]> rows) {
+    assert _rightTable != null : "Right table should not be null when adding rows";
     for (Object[] row : rows) {
       _rightTable.addRow(_rightKeySelector.getKey(row), row);
     }
@@ -100,11 +104,19 @@ public class HashJoinOperator extends BaseJoinOperator {
 
   @Override
   protected void finishBuildingRightTable() {
+    assert _rightTable != null : "Right table should not be null when finishing building";
     _rightTable.finish();
   }
 
   @Override
+  protected void onEosProduced() {
+    _rightTable = null;
+    _matchedRightRows = null;
+  }
+
+  @Override
   protected List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -121,6 +133,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   private List<Object[]> buildJoinedDataBlockUniqueKeys(MseBlock.Data leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
     List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     ArrayList<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -149,6 +162,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   private List<Object[]> buildJoinedDataBlockDuplicateKeys(MseBlock.Data leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
     List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -197,6 +211,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
     List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -212,6 +227,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
     List<Object[]> leftRows = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -228,6 +244,8 @@ public class HashJoinOperator extends BaseJoinOperator {
 
   @Override
   protected List<Object[]> buildNonMatchRightRows() {
+    assert _rightTable != null : "Right table should not be null when building non-matched right rows";
+    assert _matchedRightRows != null : "Matched right rows should not be null when building non-matched right rows";
     List<Object[]> rows = new ArrayList<>();
     if (_rightTable.isKeysUnique()) {
       for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
