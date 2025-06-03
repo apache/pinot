@@ -303,7 +303,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   final String _clientId;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
-  private StreamMetadataProvider _partitionMetadataProvider = null;
+  private final AtomicReference<StreamMetadataProvider> _partitionMetadataProvider = new AtomicReference<>(null);
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
   private final Logger _segmentLogger;
@@ -1057,10 +1057,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   public Map<String, PartitionLagState> getPartitionToLagState(
       Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
-    if (_partitionMetadataProvider == null) {
-      createPartitionMetadataProvider("Get Partition Lag State");
+    StreamMetadataProvider partitionMetadataProvider =
+        getOrCreatePartitionMetadataProvider("Get Partition Lag State");
+    if (partitionMetadataProvider == null) {
+      return Collections.emptyMap();
     }
-    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+    return partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
   }
 
   /**
@@ -1318,9 +1320,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void closePartitionMetadataProvider() {
-    if (_partitionMetadataProvider != null) {
+    StreamMetadataProvider provider = _partitionMetadataProvider.getAndSet(null);
+    if (provider != null) {
       try {
-        _partitionMetadataProvider.close();
+        provider.close();
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
       }
@@ -1724,7 +1727,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       makeStreamConsumer("Starting");
-      createPartitionMetadataProvider("Starting");
+      getOrCreatePartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
@@ -1843,11 +1846,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
       boolean useDebugLog) {
-    if (_partitionMetadataProvider == null) {
-      createPartitionMetadataProvider("Fetch latest stream offset");
+    StreamMetadataProvider partitionMetadataProvider =
+        getOrCreatePartitionMetadataProvider("Fetch latest stream offset");
+    if (partitionMetadataProvider == null) {
+      return null;
     }
     try {
-      return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
+      return partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
       String logMessage = "Cannot fetch stream offset with criteria " + offsetCriteria + " for clientId " + _clientId
           + " and partitionGroupId " + _partitionGroupId + " with maxWaitTime " + maxWaitTimeMs;
@@ -1888,19 +1893,26 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
+          StreamMetadataProvider partitionMetadataProvider =
+              getOrCreatePartitionMetadataProvider("Get Partition Lag State");
+          if (partitionMetadataProvider != null) {
+            int numPartitionGroups = partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
+                Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
-          if (numPartitionGroups != numPartitions) {
-            _segmentLogger.info(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+            if (numPartitionGroups != numPartitions) {
+              _segmentLogger.info(
+                  "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
+                      + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
+              numPartitions = numPartitionGroups;
+            }
+          } else {
+            _segmentLogger.warn("Partition Metadata Provider is null, cannot get number of stream partitions. Using "
+                + "number of partitions in the partition config: {}", numPartitions);
           }
         } catch (Exception e) {
           _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
-          createPartitionMetadataProvider("Timeout getting number of stream partitions");
+          getOrCreatePartitionMetadataProvider("Timeout getting number of stream partitions");
         }
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
@@ -1956,11 +1968,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /**
    * Creates a new stream metadata provider
    */
-  private void createPartitionMetadataProvider(String reason) {
-    closePartitionMetadataProvider();
-    _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
-        _clientId, _streamPatitionGroupId);
+  private StreamMetadataProvider getOrCreatePartitionMetadataProvider(String reason) {
+    if (_streamConsumerClosed.get()) {
+      _segmentLogger.debug("Skip creating metadata provider – stream is closed ({})", reason);
+      return null;
+    }
+
+    StreamMetadataProvider provider = _partitionMetadataProvider.get();
+    if (provider != null) {
+      return provider;
+    }
+
+    // Try to create one – only the thread that wins the CAS installs it.
+    StreamMetadataProvider newProvider =
+        _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPatitionGroupId);
+    if (_partitionMetadataProvider.compareAndSet(null, newProvider)) {
+      _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
+      return newProvider;
+    }
+
+    // Another thread beat us to it; close ours and return the installed one.
+    try {
+      newProvider.close();
+    } catch (Exception e) {
+      _segmentLogger.warn("Could not close redundant metadata provider", e);
+    }
+    return _partitionMetadataProvider.get();
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {
