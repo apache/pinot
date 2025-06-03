@@ -1103,6 +1103,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .getServerSegmentChangeInfo()
         .get(instanceId)
         .getSegmentsAdded(), expectedNumSegmentsToAdd);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getMaxSegmentsAddedToASingleServer(),
+        expectedNumSegmentsToAdd);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
