@@ -398,15 +398,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
 
     // --- Batch size per server recommendation check using summary ---
-    int maxSegmentsToAddOnServer = 0;
-    if (rebalanceSummaryResult.getServerInfo() != null
-        && rebalanceSummaryResult.getServerInfo().getServerSegmentChangeInfo() != null) {
-      for (RebalanceSummaryResult.ServerSegmentChangeInfo info : rebalanceSummaryResult.getServerInfo()
-          .getServerSegmentChangeInfo()
-          .values()) {
-        maxSegmentsToAddOnServer = Math.max(maxSegmentsToAddOnServer, info.getSegmentsAdded());
-      }
-    }
+    int maxSegmentsToAddOnServer = rebalanceSummaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer();
     int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
     if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
       if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
