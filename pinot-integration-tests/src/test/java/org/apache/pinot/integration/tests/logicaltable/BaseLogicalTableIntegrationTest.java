@@ -619,7 +619,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     JsonNode response = postQueryToController(query);
     assertNoError(response);
 
-    query = "SELECT count(*) FROM " + getOfflineTableNames().get(0);
+    String tableName =
+        getOfflineTableNames().isEmpty() ? getRealtimeTableNames().get(0) : getOfflineTableNames().get(0);
+    query = "SELECT count(*) FROM " + tableName;
     response = postQueryToController(query);
     assertNoError(response);
 

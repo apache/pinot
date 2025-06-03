@@ -1709,5 +1709,7 @@ public class CommonConstants {
   public static class ZkPaths {
     public static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
     public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
+    public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+    public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
   }
 }
