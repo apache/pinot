@@ -83,6 +83,7 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -116,6 +117,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
@@ -422,6 +424,7 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+      validateLogicalTableReference(tableName, tableType);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
@@ -464,6 +467,20 @@ public class PinotTableRestletResource {
     }
     TableType typeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     return typeFromTableName == null || typeFromTableName == expectedType;
+  }
+
+  private void validateLogicalTableReference(String tableName, TableType tableType) {
+    String tableNameWithType =
+        tableType == null ? tableName : TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    List<LogicalTableConfig> allLogicalTableConfigs =
+        ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+    for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+      if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+                tableName, logicalTableConfig.getTableName()), Response.Status.CONFLICT);
+      }
+    }
   }
 
   @PUT

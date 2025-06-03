@@ -572,6 +572,11 @@
         <artifactId>pinot-timeseries-planner</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-timeseries-m3ql</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- Pinot Plug-in Modules -->
       <!-- Batch Ingestion -->
