@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.accounting;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -124,5 +125,47 @@ public class WorkloadBudgetManagerTest {
         "CPU budget mismatch after concurrent updates");
     assertEquals(initialMemBudget - totalMemCharged, remaining._memoryRemaining,
         "Memory budget mismatch after concurrent updates");
+  }
+
+  @Test
+  void testCanAdmitQuery() {
+    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+
+    // Scenario 1: Nonexistent workload should be admitted
+    assertTrue(manager.canAdmitQuery("nonexistent-workload"), "Nonexistent workload should be admitted");
+
+    // Scenario 2: No other workloads charged (remaining > threshold)
+    String workload1 = "workload1";
+    String workload2 = "workload2";
+    String workload3 = "workload3";
+    List<String> workloads = List.of(workload1, workload2, workload3);
+    long initialCpu = 100L;
+    long initialMem = 100L;
+    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
+    manager.tryCharge(workload1, initialCpu, initialMem); // deplete workload1
+    assertTrue(manager.canAdmitQuery(workload1), "Scenario2: workload1 should be admitted remaining > threshold");
+    WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload(workload1);
+    assertTrue(stats._cpuRemaining > 0, "Scenario2: CPU allocation should be > 0");
+    assertTrue(stats._memoryRemaining > 0, "Scenario2: Memory allocation should be > 0");
+
+    // Scenario 3: One other workload charged (remaining <= threshold)
+    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
+    manager.tryCharge(workload1, initialCpu, initialMem);    // deplete workload1
+    manager.tryCharge(workload2, initialCpu, initialMem);   // deplete workload2
+    assertFalse(manager.canAdmitQuery(workload1), "Scenario3: workload1 should NOT be admitted remaining <= threshold");
+
+    // Scenario 4: Two other workloads charged (remaining = 0)
+    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
+    manager.tryCharge(workload1, initialCpu, initialMem);    // deplete workload1
+    manager.tryCharge(workload2, initialCpu, initialMem);   // deplete workload2
+    manager.tryCharge(workload3, initialCpu, initialMem);   // deplete workload3
+    assertFalse(manager.canAdmitQuery(workload1), "Scenario4: workload1 should NOT be admitted no remaining capacity");
+  }
+
+  private void resetWorkloadBudgetManager(WorkloadBudgetManager workloadBudgetManager, List<String> workloads,
+                                          long cpuBudget, long memoryBudget) {
+    for (String workload : workloads) {
+      workloadBudgetManager.addOrUpdateWorkload(workload, cpuBudget, memoryBudget);
+    }
   }
 }

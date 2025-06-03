@@ -33,9 +33,7 @@ import org.slf4j.LoggerFactory;
 
 public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
-
   private static final AtomicReference<WorkloadBudgetManager> INSTANCE = new AtomicReference<>();
-
   private long _enforcementWindowMs;
   private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -150,6 +148,37 @@ public class WorkloadBudgetManager {
   }
 
   /**
+   * Determines whether a query for the given workload can be admitted under CPU-only budgets.
+   *
+   * <p>Admission rules:
+   * <ol>
+   *   <li>If the manager is disabled or no budget exists for the workload, always admit.</li>
+   *   <li>If CPU budget remains above zero, admit immediately.</li>
+   *   <li>Otherwise, reject (return false).</li>
+   * </ol>
+   *
+   * <p>Note: This method currently uses a strict check, where CPU and memory budgets must be above zero.
+   * This may be relaxed in the future to allow for a percentage of other remaining budget to be used. At that point,
+   * we can have different admission policies like: Strict, Stealing, etc.
+   *
+   * @param workload the workload identifier to check budget for
+   * @return true if the query may be accepted; false if budget is insufficient
+   */
+  public boolean canAdmitQuery(String workload) {
+    // If disabled or no budget configured, always admit
+    if (!_isEnabled) {
+      return true;
+    }
+    Budget budget = _workloadBudgets.get(workload);
+    if (budget == null) {
+      LOGGER.debug("No budget found for workload: {}", workload);
+      return true;
+    }
+    BudgetStats stats = budget.getStats();
+    return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
+  }
+
+  /**
    * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
    */
   private void startBudgetResetTask() {
@@ -166,6 +195,10 @@ public class WorkloadBudgetManager {
         budget.reset();
       });
     }, _enforcementWindowMs, _enforcementWindowMs, TimeUnit.MILLISECONDS);
+  }
+
+  public long getEnforcementWindowMs() {
+    return _enforcementWindowMs;
   }
 
   /**
