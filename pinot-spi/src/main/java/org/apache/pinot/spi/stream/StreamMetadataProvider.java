@@ -127,6 +127,10 @@ public interface StreamMetadataProvider extends Closeable {
     return result;
   }
 
+  default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis) {
+    return null;
+  }
+
   /**
    * Fetches the list of available topics/streams
    *
