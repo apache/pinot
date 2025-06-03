@@ -113,23 +113,15 @@ jobs:
         run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
       - name: Download japicmp CLI
         run: |
-          set -euxo pipefail
           JAPICMP_VER=0.23.1
           curl -fSL \
           -o japicmp.jar \
           "https://repo1.maven.org/maven2/com/github/siom79/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"  
-          echo "Downloaded size:"
-          ls -lh japicmp.jar
-  
-          echo "File type:"
-          file japicmp.jar
+
       - name: Compare API for ${{ matrix.module }}
         run: |
-          set -euxo pipefail
           OLD="pinot-master/${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
           NEW="${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
-          
-          ls -lh "$OLD" "$NEW"
           
           java -jar japicmp.jar \
             --old "$OLD" \
