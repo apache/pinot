@@ -102,7 +102,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Build SPI on PR branch
-        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
+        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests -Dproject.build.finalName="${{ matrix.module }}"
       - name: Checkout master into a subfolder
         uses: actions/checkout@v4
         with:
@@ -110,7 +110,7 @@ jobs:
           path: master-head
       - name: Build SPI on master
         working-directory: master-head
-        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
+        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests -Dproject.build.finalName="${{ matrix.module }}"
       - name: Download japicmp CLI
         run: |
           JAPICMP_VER=0.23.1
@@ -120,8 +120,8 @@ jobs:
 
       - name: Compare API for ${{ matrix.module }}
         run: |
-          OLD="master-head/${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
-          NEW="${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
+          OLD="master-head/${{ matrix.module }}/target/${{ matrix.module }}.jar"
+          NEW="${{ matrix.module }}/target/${{ matrix.module }}.jar"
           
           java -jar japicmp.jar \
             --old "$OLD" \
