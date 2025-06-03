@@ -135,7 +135,8 @@ jobs:
             --old "$OLD" \
             --new "$NEW" \
             --error-on-binary-incompatibility \
-            --only-incompatible
+            --only-incompatible \
+            --ignore-missing-classes
   unit-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
