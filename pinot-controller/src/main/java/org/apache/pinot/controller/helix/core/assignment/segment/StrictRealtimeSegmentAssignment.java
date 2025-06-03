@@ -141,7 +141,7 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
    */
   private int getPartitionId(String segmentName) {
     Integer partitionId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
+        SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     Preconditions.checkState(partitionId != null, "Failed to find partition id for segment: %s of table: %s",
         segmentName, _tableNameWithType);
     return partitionId;
