@@ -245,6 +245,32 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     assertTrue(aThrows.getMessage()
             .contains("Reason: 'refRealtimeTableName' should be null or empty when realtime tables do not exist"),
         aThrows.getMessage());
+
+    // Test ref offline table name is realtime table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refOfflineTableName' should be an offline table type"),
+        aThrows.getMessage());
+
+    // Test ref realtime table name is offline table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refRealtimeTableName' should be a realtime table type"),
+        aThrows.getMessage());
   }
 
   @Test(expectedExceptions = IOException.class,

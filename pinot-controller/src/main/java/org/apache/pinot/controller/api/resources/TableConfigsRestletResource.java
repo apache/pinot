@@ -53,6 +53,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -295,10 +296,11 @@ public class TableConfigsRestletResource {
       List<LogicalTableConfig> allLogicalTableConfigs =
           ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
       for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
-        validateRefTableName(tableName, logicalTableConfig.getRefOfflineTableName(),
-            logicalTableConfig.getTableName());
-        validateRefTableName(tableName, logicalTableConfig.getRefRealtimeTableName(),
-            logicalTableConfig.getTableName());
+        if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, tableName)) {
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+                  tableName, logicalTableConfig.getTableName()), Response.Status.CONFLICT);
+        }
       }
 
       boolean tableExists =
@@ -319,15 +321,6 @@ public class TableConfigsRestletResource {
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-  }
-
-  private void validateRefTableName(String tableName,
-      String refTableName, String logicalTableName) {
-    if (tableName.equals(TableNameBuilder.extractRawTableName(refTableName))) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
-              tableName, logicalTableName), Response.Status.CONFLICT);
     }
   }
 

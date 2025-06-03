@@ -83,6 +83,7 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -423,9 +424,7 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
-
-      validateLogicalTableReference(tableName);
-
+      validateLogicalTableReference(tableName, tableType);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
@@ -470,19 +469,16 @@ public class PinotTableRestletResource {
     return typeFromTableName == null || typeFromTableName == expectedType;
   }
 
-  private void validateLogicalTableReference(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+  private void validateLogicalTableReference(String tableName, TableType tableType) {
+    String tableNameWithType =
+        tableType == null ? tableName : TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     List<LogicalTableConfig> allLogicalTableConfigs =
         ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
     for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
-      String refOfflineTableName = logicalTableConfig.getRefOfflineTableName();
-      String refRealtimeTableName = logicalTableConfig.getRefRealtimeTableName();
-      if (tableName.equals(refOfflineTableName) || tableName.equals(refRealtimeTableName)
-          || rawTableName.equals(TableNameBuilder.extractRawTableName(refOfflineTableName))
-          || rawTableName.equals(TableNameBuilder.extractRawTableName(refRealtimeTableName))) {
+      if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
-            "Cannot delete table '" + tableName + "' because it is referenced in logical table: "
-                + logicalTableConfig.getTableName(), Response.Status.CONFLICT);
+            String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+                tableName, logicalTableConfig.getTableName()), Response.Status.CONFLICT);
       }
     }
   }
