@@ -1896,14 +1896,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           StreamMetadataProvider provider = _partitionMetadataProvider.get();
-          int numPartitionGroups = provider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
+          if (provider == null) {
+            createPartitionMetadataProvider("Set partition parameters");
+            provider = _partitionMetadataProvider.get();
+          }
+          if (provider != null) {
+            int numPartitionGroups = provider.computePartitionGroupMetadata(_clientId, _streamConfig,
+                Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
-          if (numPartitionGroups != numPartitions) {
-            _segmentLogger.info(
-                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+            if (numPartitionGroups != numPartitions) {
+              _segmentLogger.info(
+                  "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
+                      + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
+              numPartitions = numPartitionGroups;
+            }
+          } else {
+            _segmentLogger.warn("Failed to create partition metadata provider, "
+                + "using number of partitions in the partition config: {}", numPartitions);
           }
         } catch (Exception e) {
           _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
@@ -1965,10 +1974,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Creates a new stream metadata provider
    */
   private void createPartitionMetadataProvider(String reason) {
-    closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider.set(
-        _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPatitionGroupId));
+    StreamMetadataProvider newProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+        _clientId, _streamPatitionGroupId);
+    StreamMetadataProvider oldProvider = _partitionMetadataProvider.getAndSet(newProvider);
+    if (oldProvider != null) {
+      try {
+        oldProvider.close();
+      } catch (Exception e) {
+        _segmentLogger.warn("Could not close old stream metadata provider", e);
+      }
+    }
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {
