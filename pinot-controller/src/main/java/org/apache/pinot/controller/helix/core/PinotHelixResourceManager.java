@@ -1586,9 +1586,8 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
-    List<String> tableNamesWithType;
     try {
-      tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
+      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       if (reload) {
         LOGGER.info("Reloading tables with name: {}", schemaName);
         for (String tableNameWithType : tableNamesWithType) {

@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
+// TODO: To evaluate if this message should be send on any table-config updates as well
 public class TableConfigSchemaRefreshMessage extends Message {
   public static final String REFRESH_TABLE_CONFIG_AND_SCHEMA = "REFRESH_TABLE_CONFIG_AND_SCHEMA";
   private static final String TABLE_NAME_KEY = "tableName";
