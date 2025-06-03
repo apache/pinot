@@ -482,16 +482,6 @@
         <scala.compat.version>2.13</scala.compat.version>
       </properties>
     </profile>
-
-    <profile>
-      <id>binary-compat-check</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <properties>
-        <japicmp.skip>false</japicmp.skip>
-      </properties>
-    </profile>
   </profiles>
 
   <dependencyManagement>
