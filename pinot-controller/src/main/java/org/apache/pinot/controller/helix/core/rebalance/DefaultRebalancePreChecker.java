@@ -399,8 +399,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     // --- Batch size per server recommendation check using summary ---
     int maxSegmentsToAddOnServer = 0;
-    if (rebalanceSummaryResult.getServerInfo() != null &&
-        rebalanceSummaryResult.getServerInfo().getServerSegmentChangeInfo() != null) {
+    if (rebalanceSummaryResult.getServerInfo() != null
+        && rebalanceSummaryResult.getServerInfo().getServerSegmentChangeInfo() != null) {
       for (RebalanceSummaryResult.ServerSegmentChangeInfo info : rebalanceSummaryResult.getServerInfo()
           .getServerSegmentChangeInfo()
           .values()) {
@@ -489,4 +489,3 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return tableSizePerReplicaInBytes / ((long) currentAssignment.size());
   }
 }
-
