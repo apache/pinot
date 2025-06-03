@@ -217,6 +217,60 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     assertTrue(aThrows.getMessage()
             .contains("Reason: 'refRealtimeTableName' should be one of the provided realtime tables"),
         aThrows.getMessage());
+
+    // Test ref offline table is not null but offline table does not exist
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of("test_table_7_REALTIME"), BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refOfflineTableName' should be null or empty when offline tables do not exist"),
+        aThrows.getMessage());
+
+    // Test ref realtime table is not null but realtime table does not exist
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of("test_table_7_OFFLINE"), BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refRealtimeTableName' should be null or empty when realtime tables do not exist"),
+        aThrows.getMessage());
+
+    // Test ref offline table name is realtime table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refOfflineTableName' should be an offline table type"),
+        aThrows.getMessage());
+
+    // Test ref realtime table name is offline table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refRealtimeTableName' should be a realtime table type"),
+        aThrows.getMessage());
   }
 
   @Test(expectedExceptions = IOException.class,
@@ -284,14 +338,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     });
     assertTrue(throwable.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
         throwable.getMessage());
-  }
-
-  @DataProvider
-  public Object[][] tableTypeProvider() {
-    return new Object[][]{
-        {TableType.OFFLINE},
-        {TableType.REALTIME}
-    };
   }
 
   @Test(dataProvider = "tableTypeProvider")
