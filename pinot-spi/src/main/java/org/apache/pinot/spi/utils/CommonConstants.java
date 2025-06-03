@@ -664,6 +664,55 @@ public class CommonConstants {
       }
     }
 
+    /**
+     * Calcite and Pinot rule names / descriptions
+     * used for enable and disabling of rules, this will be iterated through in PlannerContext
+     * to check if rule is disabled.
+     */
+    public static class PlannerRuleNames {
+      public static final String PINOT_FILTER_INTO_JOIN = "PinotFilterIntoJoinRule";
+      public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTransposeRule";
+      public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTransposeRule";
+      public static final String PINOT_PROJECT_JOIN_TRANSPOSE = "ProjectJoinTransposeRule";
+      public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTransposeRule";
+      public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTransposeRule";
+      public static final String PINOT_JOIN_CONDITION_PUSH = "JoinConditionPushRule";
+      public static final String PROJECT_REMOVE = "ProjectRemoveRule";
+      public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindowRule";
+      public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTransposeRule";
+      public static final String PINOT_EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteralRule";
+      public static final String PINOT_EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteralRule";
+      public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressionsRule";
+      public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoinRule";
+      public static final String PINOT_SEMIN_JOIN_DISTINCT_PROJECT_RULE = "SeminJoinDistinctProjectRule";
+      public static final String UNION_TO_DISTINCT = "UnionToDistinctRule";
+      public static final String AGGREGATE_REMOVE = "AggregateRemoveRule";
+      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTransposeRule";
+      public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregateRule";
+      public static final String PINOT_AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctionsRule";
+      public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilterRule";
+      public static final String FILTER_INTO_JOIN = "FilterIntoJoinRule";
+      public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTransposeRule";
+      public static final String PROJECT_MERGE = "ProjectMergeRule";
+      public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMergeRule";
+      public static final String FILTER_MERGE = "FilterMergeRule";
+      public static final String SORT_REMOVE = "SortRemoveRule";
+      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeRuleExtended";
+      public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
+      public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
+      public static final String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
+      public static final String PRUNE_EMPTY_SORT = "PruneEmptySort";
+      public static final String PRUNE_EMPTY_UNION = "PruneEmptyUnion";
+      public static final String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
+      public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
+      public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
+      public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+    }
+    public static final String PLANNER_RULE_SKIP = "plannerRule_skip";
+    public static String skipRule(String ruleString) {
+      return PLANNER_RULE_SKIP + ruleString;
+    }
+
     public static class FailureDetector {
       public enum Type {
         // Do not detect any failure
