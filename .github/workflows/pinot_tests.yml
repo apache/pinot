@@ -48,9 +48,6 @@ jobs:
   linter-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        module: [pinot-spi, pinot-segment-spi]
     name: Pinot Linter Test Set
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +81,9 @@ jobs:
   binary-compat-check:
     runs-on: ubuntu-latest
     name: Pinot Binary Compatibility Check
+    strategy:
+      matrix:
+        module: [ pinot-spi, pinot-segment-spi ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 11
