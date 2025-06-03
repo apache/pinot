@@ -85,6 +85,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 
 
 /**
@@ -237,6 +239,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
     int incompleteRowsFound = 0;
+    int skippedRowsFound = 0;
+    int sanitizedRowsFound = 0;
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
@@ -282,6 +286,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
         _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);
         incompleteRowsFound += reusedResult.getIncompleteRowCount();
+        skippedRowsFound += reusedResult.getSkippedRowCount();
+        sanitizedRowsFound += reusedResult.getSanitizedRowCount();
       }
     } catch (Exception e) {
       _indexCreator.close();
@@ -293,6 +299,24 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (incompleteRowsFound > 0) {
       LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
           incompleteRowsFound);
+    }
+    if (skippedRowsFound > 0) {
+      LOGGER.info("Skipped {} records during transformation", skippedRowsFound);
+    }
+    if (sanitizedRowsFound > 0) {
+      LOGGER.info("Sanitized {} records during transformation", sanitizedRowsFound);
+    }
+
+    MinionMetrics metrics = MinionMetrics.get();
+    String tableNameWithType = _config.getTableConfig().getTableName();
+    if (incompleteRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, incompleteRowsFound);
+    }
+    if (skippedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, skippedRowsFound);
+    }
+    if (sanitizedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, sanitizedRowsFound);
     }
 
     LOGGER.info("Finished records indexing in IndexCreator!");
