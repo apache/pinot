@@ -303,7 +303,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   final String _clientId;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
-  private StreamMetadataProvider _partitionMetadataProvider = null;
+  // Provider for stream partition metadata, wrapped in AtomicReference for thread-safe updates
+  private final AtomicReference<StreamMetadataProvider> _partitionMetadataProvider = new AtomicReference<>();
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
   private final Logger _segmentLogger;
@@ -1057,10 +1058,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   public Map<String, PartitionLagState> getPartitionToLagState(
       Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
-    if (_partitionMetadataProvider == null) {
+    StreamMetadataProvider provider = _partitionMetadataProvider.get();
+    if (provider == null) {
       createPartitionMetadataProvider("Get Partition Lag State");
+      provider = _partitionMetadataProvider.get();
     }
-    return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+
+    return provider.getCurrentPartitionLagState(consumerPartitionStateMap);
   }
 
   /**
@@ -1318,9 +1322,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void closePartitionMetadataProvider() {
-    if (_partitionMetadataProvider != null) {
+    StreamMetadataProvider provider = _partitionMetadataProvider.getAndSet(null);
+    if (provider != null) {
       try {
-        _partitionMetadataProvider.close();
+        provider.close();
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
       }
@@ -1843,11 +1848,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @Nullable
   private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
       boolean useDebugLog) {
-    if (_partitionMetadataProvider == null) {
+    StreamMetadataProvider provider = _partitionMetadataProvider.get();
+    if (provider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
+      provider = _partitionMetadataProvider.get();
     }
     try {
-      return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
+      return provider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
       String logMessage = "Cannot fetch stream offset with criteria " + offsetCriteria + " for clientId " + _clientId
           + " and partitionGroupId " + _partitionGroupId + " with maxWaitTime " + maxWaitTimeMs;
@@ -1888,7 +1895,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
+          StreamMetadataProvider provider = _partitionMetadataProvider.get();
+          int numPartitionGroups = provider.computePartitionGroupMetadata(_clientId, _streamConfig,
               Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
           if (numPartitionGroups != numPartitions) {
@@ -1959,8 +1967,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
-        _clientId, _streamPatitionGroupId);
+    _partitionMetadataProvider.set(
+        _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPatitionGroupId));
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {
