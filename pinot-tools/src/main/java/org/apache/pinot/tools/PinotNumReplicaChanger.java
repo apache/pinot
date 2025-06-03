@@ -38,7 +38,7 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
   private boolean _dryRun;
 
   public PinotNumReplicaChanger(String zkAddress, String clusterName, boolean dryRun) {
-    super(zkAddress, clusterName);
+    super("PinotNumReplicaChanger", zkAddress, clusterName);
     _dryRun = dryRun;
   }
 

@@ -199,7 +199,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_FAILED("predownloadFailed", true),
 
   // reingestion metrics
-  SEGMENT_REINGESTION_FAILURE("segments", false);
+  SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  /**
+   * Approximate heap bytes used by the mutable JSON index at the time of index close.
+   */
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
 
   private final String _meterName;
   private final String _unit;

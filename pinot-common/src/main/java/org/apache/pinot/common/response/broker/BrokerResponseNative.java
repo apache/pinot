@@ -55,7 +55,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "replicaGroups"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -112,6 +113,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private Map<String, String> _traceInfo = new HashMap<>();
   private Set<String> _tablesQueried = Set.of();
+
+  private Set<Integer> _replicaGroups = Set.of();
 
   public BrokerResponseNative() {
   }
@@ -564,5 +567,16 @@ public class BrokerResponseNative implements BrokerResponse {
   }
   public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
     _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setReplicaGroups(@NotNull Set<Integer> replicaGroups) {
+    _replicaGroups = replicaGroups;
+  }
+
+  @Override
+  @NotNull
+  public Set<Integer> getReplicaGroups() {
+    return _replicaGroups;
   }
 }

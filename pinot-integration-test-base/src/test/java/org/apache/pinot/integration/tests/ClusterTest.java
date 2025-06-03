@@ -48,6 +48,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.client.ConnectionFactory;
@@ -87,6 +88,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Listeners;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getTimeSeriesQueryApiUrl;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -550,6 +552,22 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
+   * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
+   * This is used for testing timeseries queries.
+   */
+  public JsonNode getTimeseriesQuery(String query, long startTime, long endTime) {
+    try {
+      Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
+        String.valueOf(startTime), "end", String.valueOf(endTime));
+      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(getBrokerBaseApiUrl()), queryParams);
+      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, Map.of()));
+      return sanitizeResponse(responseJsonNode);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get timeseries query: " + query, e);
+    }
+  }
+
+  /**
    * Queries the broker's query endpoint (/query/sql)
    */
   public JsonNode queryBrokerHttpEndpoint(@Language("sql") String query)
@@ -837,5 +855,14 @@ public abstract class ClusterTest extends ControllerTest {
     if (useMultiStageQueryEngine()) {
       throw new SkipException("Some queries fail when using multi-stage engine");
     }
+  }
+
+  private static String buildQueryUrl(String baseUrl, Map<String, String> params) throws Exception {
+    URIBuilder builder = new URIBuilder(baseUrl);
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      builder.addParameter(entry.getKey(), entry.getValue());
+    }
+    URI uri = builder.build();
+    return uri.toString();
   }
 }
