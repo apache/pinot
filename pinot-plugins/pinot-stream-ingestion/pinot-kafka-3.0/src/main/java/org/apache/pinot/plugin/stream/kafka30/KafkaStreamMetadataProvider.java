@@ -100,7 +100,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    try {
+    try (AdminClient adminClient = createAdminClient()) {
       // Build the offset spec request for this partition
       Map<TopicPartition, OffsetSpec> request = new HashMap<>();
       if (offsetCriteria.isLargest()) {
@@ -117,13 +117,13 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         throw new IllegalArgumentException("Unknown offset criteria: " + offsetCriteria);
       }
       // Query via AdminClient (thread-safe)
-      ListOffsetsResult result = _adminClient.listOffsets(request);
+      ListOffsetsResult result = adminClient.listOffsets(request);
       Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsets =
           result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
       if (!isValidOffsetInfo(offsets) && (offsetCriteria.isTimestamp() || offsetCriteria.isPeriod())) {
         // fetch endOffsets as fallback
         request.put(_topicPartition, OffsetSpec.latest());
-        result = _adminClient.listOffsets(request);
+        result = adminClient.listOffsets(request);
         offsets = result.all().get(timeoutMillis, TimeUnit.MILLISECONDS);
         LOGGER.warn(
             "initial offset type is {} and its value evaluates to null hence proceeding with offset {} " + "for "
