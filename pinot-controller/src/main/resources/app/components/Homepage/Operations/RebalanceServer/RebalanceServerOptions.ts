@@ -119,7 +119,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": -1,
         "type": "INTEGER",
         "label": "Batch Size Per Server",
-        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching. Recommendation: Run Dry Run and check how many segments are to be moved per server, if this number is > 200 to 300, enable batching by setting this option to about 100 to 200, otherwise leave it at the default",
+        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching. Recommendation: Run Dry Run and check how many segments are to be moved per server, if this number is > 200, enable batching by setting this option to about 100 to 200, otherwise leave it at the default",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
