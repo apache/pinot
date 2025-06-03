@@ -42,11 +42,15 @@ on:
       - "licenses/**"
       - "licenses-binary/**"
       - "**.md"
+  workflow_dispatch: {}
 
 jobs:
   linter-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [pinot-spi, pinot-segment-spi]
     name: Pinot Linter Test Set
     steps:
       - uses: actions/checkout@v4
@@ -98,8 +102,31 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - name: Verify with binary-compatibility-check profile
-        run: mvn verify -DskipTests -Pbinary-compat-check -T1C
+      - name: Build SPI on PR branch
+        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
+      - name: Checkout master into a subfolder
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: pinot-master
+      - name: Build SPI on master
+        working-directory: pinot-master
+        run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
+      - name: Download japicmp CLI
+        run: |
+          JAPICMP_VER=0.23.1
+          curl -sLo japicmp.jar \
+            https://repo1.maven.org/maven2/org/japicmp/japicmp/$JAPICMP_VER/japicmp-$JAPICMP_VER-jar-with-dependencies.jar
+      - name: Compare API for ${{ matrix.module }}
+        run: |
+          OLD="pinot-master/${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
+          NEW="${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
+          
+          java -jar japicmp.jar \
+            --old "$OLD" \
+            --new "$NEW" \
+            --error-on-binary-incompatibility \
+            --only-incompatible
   unit-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
