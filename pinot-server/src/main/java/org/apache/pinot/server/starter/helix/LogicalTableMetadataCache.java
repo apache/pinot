@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -42,6 +43,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * LogicalTableMetadataCache maintains the cache for logical tables, that includes the logical table configs,
+ * logical table schemas, and reference offline and realtime table configs.
+ * It listens to changes in the ZK property store for all the logical table configs and updates the cache accordingly.
+ * For schema and table configs, it listens to only those configs that are required by the logical tables.
+ */
 public class LogicalTableMetadataCache {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableMetadataCache.class);
@@ -70,9 +77,32 @@ public class LogicalTableMetadataCache {
   }
 
   public void shutdown() {
+    // Unsubscribe from the logical table config creation changes
     _propertyStore.unsubscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH,
         _zkLogicalTableConfigChangeListener);
+
+    // Unsubscribe from all logical table config paths, table config paths, and schema paths
+    unsubscribeDataChanges(_logicalTableConfigMap.keySet(), ZkPaths.LOGICAL_TABLE_PATH_PREFIX,
+        _zkLogicalTableConfigChangeListener);
+    unsubscribeDataChanges(_tableConfigMap.keySet(), ZkPaths.TABLE_CONFIG_PATH_PREFIX,
+        _zkTableConfigChangeListener);
+    unsubscribeDataChanges(_schemaMap.keySet(), ZkPaths.SCHEMA_PATH_PREFIX, _zkSchemaChangeListener);
+
+    // Clear all caches
+    _logicalTableConfigMap.clear();
+    _schemaMap.clear();
+    _tableConfigMap.clear();
+    _tableNameToLogicalTableNamesMap.clear();
+
     LOGGER.info("Logical table metadata cache shutdown");
+  }
+
+  private void unsubscribeDataChanges(Set<String> resourceNames, String pathPrefix,
+      IZkDataListener changeListener) {
+    for (String resource : resourceNames) {
+      String logicalTableConfigPath = pathPrefix + resource;
+      _propertyStore.unsubscribeDataChanges(logicalTableConfigPath, changeListener);
+    }
   }
 
   public Schema getSchema(String schemaName) {
@@ -182,6 +212,7 @@ public class LogicalTableMetadataCache {
             addSchema(logicalTableName);
             String logicalTableConfigPath = ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
             _propertyStore.subscribeDataChanges(logicalTableConfigPath, _zkLogicalTableConfigChangeListener);
+            LOGGER.info("Added the logical table config: {} in cache", logicalTableName);
           } catch (Exception e) {
             LOGGER.error("Caught exception while refreshing logical table config for ZNRecord: {}", znRecord.getId(),
                 e);
@@ -198,6 +229,7 @@ public class LogicalTableMetadataCache {
       _tableConfigMap.put(tableName, tableConfig);
       String path = ZkPaths.TABLE_CONFIG_PATH_PREFIX + tableName;
       _propertyStore.subscribeDataChanges(path, _zkTableConfigChangeListener);
+      LOGGER.info("Added the table config: {} in cache for logical table: {}", tableName, logicalTableName);
     }
 
     private synchronized void addSchema(String logicalTableName) {
@@ -207,6 +239,7 @@ public class LogicalTableMetadataCache {
       _schemaMap.put(schema.getSchemaName(), schema);
       String schemaPath = ZkPaths.SCHEMA_PATH_PREFIX + schema.getSchemaName();
       _propertyStore.subscribeDataChanges(schemaPath, _zkSchemaChangeListener);
+      LOGGER.info("Added the schema: {} in cache for logical table: {}", schema.getSchemaName(), logicalTableName);
     }
 
     private synchronized void updateLogicalTableConfig(ZNRecord znRecord) {
@@ -236,6 +269,7 @@ public class LogicalTableMetadataCache {
             && !logicalTableConfig.getRefRealtimeTableName().equals(oldLogicalTableConfig.getRefRealtimeTableName())) {
           addTableConfig(logicalTableConfig.getRefRealtimeTableName(), logicalTableName);
         }
+        LOGGER.info("Updated the logical table config: {} in cache", logicalTableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception while refreshing logical table for ZNRecord: {}", znRecord.getId(), e);
       }
@@ -258,6 +292,7 @@ public class LogicalTableMetadataCache {
         // Unsubscribe from the logical table config path
         String logicalTableConfigPath = ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
         _propertyStore.unsubscribeDataChanges(logicalTableConfigPath, _zkLogicalTableConfigChangeListener);
+        LOGGER.info("Removed the logical table config: {} from cache", logicalTableName);
       }
     }
 
@@ -272,6 +307,7 @@ public class LogicalTableMetadataCache {
         _tableConfigMap.remove(tableName);
         String path = ZkPaths.TABLE_CONFIG_PATH_PREFIX + tableName;
         _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
+        LOGGER.info("Removed the table config: {} from cache", tableName);
       }
     }
 
@@ -280,6 +316,7 @@ public class LogicalTableMetadataCache {
       _schemaMap.remove(schemaName);
       String schemaPath = ZkPaths.SCHEMA_PATH_PREFIX + schemaName;
       _propertyStore.unsubscribeDataChanges(schemaPath, _zkSchemaChangeListener);
+      LOGGER.info("Removed the schema: {} from cache", schemaName);
     }
   }
 }
