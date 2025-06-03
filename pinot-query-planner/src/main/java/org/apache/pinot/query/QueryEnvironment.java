@@ -399,20 +399,25 @@ public class QueryEnvironment {
         throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
       }
       RelNode rootNode = relRoot.rel;
-      LOGGER.info("[QueryEnvironment] Logical plan after parsing: \n{}", RelOptUtil.toString(rootNode));
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("[QueryEnvironment] Logical plan after parsing: \n{}", RelOptUtil.toString(rootNode));
+      }
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
         RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
         rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
-        LOGGER.info("[QueryEnvironment] Logical plan after decorr: \n{}", RelOptUtil.toString(rootNode));
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("[QueryEnvironment] Logical plan after decorr: \n{}", RelOptUtil.toString(rootNode));
+        }
       } catch (Throwable e) {
         throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
       }
       try {
         rootNode = converter.trimUnusedFields(false, rootNode);
-        // TODO: log parsed output here
-        LOGGER.info("[QueryEnvironment] Logical plan after decorr & trim: \n{}", RelOptUtil.toString(rootNode));
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("[QueryEnvironment] Logical plan after decorr & trim: \n{}", RelOptUtil.toString(rootNode));
+        }
       } catch (Throwable e) {
         throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
       }
@@ -507,7 +512,7 @@ public class QueryEnvironment {
 
     // Rules are enabled if its corresponding value is not specified false in ruleFlags
     if (ruleFlags.isEmpty()) {
-      LOGGER.info("[QueryEnvironment] ruleFlags is empty, BASIC_RULES used: \n");
+      LOGGER.debug("[QueryEnvironment] ruleFlags is empty, BASIC_RULES used: \n");
       for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
         hepProgramBuilder.addRuleInstance(relOptRule);
       }
@@ -524,7 +529,9 @@ public class QueryEnvironment {
           hepProgramBuilder.addRuleInstance(relOptRule);
           continue;
         }
-        LOGGER.info("[QueryEnvironment] Basic rule disabled: \n{}", relOptRule.getClass().getName());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("[QueryEnvironment] Basic rule disabled: \n{}", relOptRule.getClass().getName());
+        }
       }
     }
 
