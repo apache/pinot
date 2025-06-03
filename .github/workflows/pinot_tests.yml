@@ -107,21 +107,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: master
-          path: pinot-master
+          path: master-head
       - name: Build SPI on master
-        working-directory: pinot-master
+        working-directory: master-head
         run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests
       - name: Download japicmp CLI
         run: |
           JAPICMP_VER=0.23.1
+          PROJECT_VER=1.4.0-SNAPSHOT
           curl -fSL \
           -o japicmp.jar \
           "https://repo1.maven.org/maven2/com/github/siom79/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"  
 
       - name: Compare API for ${{ matrix.module }}
         run: |
-          OLD="pinot-master/${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
-          NEW="${{ matrix.module }}/target/${{ matrix.module }}-1.4.0-SNAPSHOT.jar"
+          OLD="master-head/${{ matrix.module }}/target/${{ matrix.module }}-${{ PROJECT_VER }}.jar"
+          NEW="${{ matrix.module }}/target/${{ matrix.module }}-${{ PROJECT_VER }}.jar"
           
           java -jar japicmp.jar \
             --old "$OLD" \
