@@ -639,12 +639,158 @@ public class CommonConstants {
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
         //   a table config to enable broker pruning (it is disabled by default).
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
+
+        /**
+         * Knobs related to enabling / disabling Calcite rules used in optProgram.
+         *
+         * The naming convention for these knobs mostly follows
+         * `plannerRule.skip + <displayed name in query console>`,
+         * For example, `SET plannerRule.skipPinotFilterIntoJoinRule=true;`,
+         * except those with name `XXX(left)` are converted to `XXXLeft`,
+         * and a special case `skipAggregateJoinTransposeRuleExtended`.
+         *
+         * p.s. The displayed name in the query console is className for most rules and description for
+         * PruneEmptyRules
+         *
+         * These are shown as not-used because `plannerRule.skip + name` is used in logic checking the options,
+         * these constants are kept here so the parser would parse these options
+         */
+        public static final class RuleOptionKey {
+          private static final String SKIP = PLANNER_RULE_SKIP;
+          public static final String SKIP_PINOT_FILTER_INTO_JOIN_RULE =
+              SKIP + PlannerRules.PINOT_FILTER_INTO_JOIN;
+          public static final String SKIP_FILTER_AGGREGATE_TRANSPOSE_RULE =
+              SKIP + PlannerRules.FILTER_AGGREGATE_TRANSPOSE;
+          public static final String SKIP_FILTER_SET_OP_TRANSPOSE_RULE =
+              SKIP + PlannerRules.FILTER_SET_OP_TRANSPOSE;
+          public static final String SKIP_PINOT_PROJECT_JOIN_TRANSPOSE_RULE =
+              SKIP + PlannerRules.PINOT_PROJECT_JOIN_TRANSPOSE;
+          public static final String SKIP_PROJECT_SET_OP_TRANSPOSE_RULE =
+              SKIP + PlannerRules.PROJECT_SET_OP_TRANSPOSE;
+          public static final String SKIP_FILTER_PROJECT_TRANSPOSE_RULE =
+              SKIP + PlannerRules.FILTER_PROJECT_TRANSPOSE;
+          public static final String SKIP_PINOT_JOIN_CONDITION_PUSH_RULE =
+              SKIP + PlannerRules.PINOT_JOIN_CONDITION_PUSH;
+          public static final String SKIP_PROJECT_REMOVE_RULE =
+              SKIP + PlannerRules.PROJECT_REMOVE;
+          public static final String SKIP_PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW_RULE =
+              SKIP + PlannerRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW;
+          public static final String SKIP_PROJECT_WINDOW_TRANSPOSE_RULE =
+              SKIP + PlannerRules.PROJECT_WINDOW_TRANSPOSE;
+          public static final String SKIP_PINOT_EVALUATE_LITERAL_PROJECT_RULE =
+              SKIP + PlannerRules.PINOT_EVALUATE_LITERAL_PROJECT;
+          public static final String SKIP_PINOT_EVALUATE_LITERAL_FILTER_RULE =
+              SKIP + PlannerRules.PINOT_EVALUATE_LITERAL_FILTER;
+          public static final String SKIP_JOIN_PUSH_EXPRESSIONS_RULE =
+              SKIP + PlannerRules.JOIN_PUSH_EXPRESSIONS;
+          public static final String SKIP_PROJECT_TO_SEMI_JOIN_RULE =
+              SKIP + PlannerRules.PROJECT_TO_SEMI_JOIN;
+          public static final String SKIP_PINOT_SEMIN_JOIN_DISTINCT_PROJECT_RULE =
+              SKIP + PlannerRules.PINOT_SEMIN_JOIN_DISTINCT_PROJECT_RULE;
+          public static final String SKIP_UNION_TO_DISTINCT_RULE =
+              SKIP + PlannerRules.UNION_TO_DISTINCT;
+          public static final String SKIP_AGGREGATE_REMOVE_RULE =
+              SKIP + PlannerRules.AGGREGATE_REMOVE;
+          public static final String SKIP_AGGREGATE_JOIN_TRANSPOSE_RULE =
+              SKIP + PlannerRules.AGGREGATE_JOIN_TRANSPOSE;
+          public static final String SKIP_AGGREGATE_UNION_AGGREGATE_RULE =
+              SKIP + PlannerRules.AGGREGATE_UNION_AGGREGATE;
+          public static final String SKIP_PINOT_AGGREGATE_REDUCE_FUNCTIONS_RULE =
+              SKIP + PlannerRules.PINOT_AGGREGATE_REDUCE_FUNCTIONS;
+          public static final String SKIP_AGGREGATE_CASE_TO_FILTER_RULE =
+              SKIP + PlannerRules.AGGREGATE_CASE_TO_FILTER;
+          public static final String SKIP_AGGREGATE_JOIN_TRANSPOSE_RULE_EXTENDED =
+              SKIP + PlannerRules.AGGREGATE_JOIN_TRANSPOSE_EXTENDED;
+          public static final String SKIP_AGGREGATE_PROJECT_MERGE_RULE =
+              SKIP + PlannerRules.AGGREGATE_PROJECT_MERGE;
+          public static final String SKIP_FILTER_INTO_JOIN_RULE =
+              SKIP + PlannerRules.FILTER_INTO_JOIN;
+          public static final String SKIP_PROJECT_FILTER_TRANSPOSE_RULE =
+              SKIP + PlannerRules.PROJECT_FILTER_TRANSPOSE;
+          public static final String SKIP_PROJECT_MERGE_RULE =
+              SKIP + PlannerRules.PROJECT_MERGE;
+          public static final String SKIP_FILTER_MERGE_RULE =
+              SKIP + PlannerRules.FILTER_MERGE;
+          public static final String SKIP_SORT_REMOVE_RULE =
+              SKIP + PlannerRules.SORT_REMOVE;
+          public static final String SKIP_PRUNE_EMPTY_CORRELATE_LEFT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_CORRELATE_LEFT;
+          public static final String SKIP_PRUNE_EMPTY_CORRELATE_RIGHT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_CORRELATE_RIGHT;
+          public static final String SKIP_PRUNE_EMPTY_AGGREGATE_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_AGGREGATE;
+          public static final String SKIP_PRUNE_EMPTY_FILTER_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_FILTER;
+          public static final String SKIP_PRUNE_EMPTY_JOIN_LEFT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_JOIN_LEFT;
+          public static final String SKIP_PRUNE_EMPTY_JOIN_RIGHT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_JOIN_RIGHT;
+          public static final String SKIP_PRUNE_EMPTY_PROJECT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_PROJECT;
+          public static final String SKIP_PRUNE_EMPTY_SORT_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_SORT;
+          public static final String SKIP_PRUNE_EMPTY_UNION_RULE =
+              SKIP + PlannerRules.PRUNE_EMPTY_UNION;
+        }
       }
 
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
     }
+
+    /**
+     * Calcite and Pinot rule names / descriptions
+     * used for enable and disabling of rules, this will be iterated through in PlannerContext
+     * to check if rule is disabled.
+     */
+    public static class PlannerRules {
+      public static final String PINOT_FILTER_INTO_JOIN = "PinotFilterIntoJoinRule";
+      public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTransposeRule";
+      public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTransposeRule";
+      public static final String PINOT_PROJECT_JOIN_TRANSPOSE = "PinotProjectJoinTransposeRule";
+      public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTransposeRule";
+      public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTransposeRule";
+      public static final String PINOT_JOIN_CONDITION_PUSH = "PinotJoinConditionPushRule";
+      public static final String PROJECT_REMOVE = "ProjectRemoveRule";
+      public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindowRule";
+      public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTransposeRule";
+      // TODO: these two rules show on console as `Project` and `Filter` only, which is confusing
+      // but the knobs are not renamed for now for consistency
+      public static final String PINOT_EVALUATE_LITERAL_PROJECT = "Project";
+      public static final String PINOT_EVALUATE_LITERAL_FILTER = "Filter";
+      public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressionsRule";
+      public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoinRule";
+      public static final String PINOT_SEMIN_JOIN_DISTINCT_PROJECT_RULE = "PinotSeminJoinDistinctProjectRule";
+      public static final String UNION_TO_DISTINCT = "UnionToDistinctRule";
+      public static final String AGGREGATE_REMOVE = "AggregateRemoveRule";
+      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTransposeRule";
+      public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregateRule";
+      public static final String PINOT_AGGREGATE_REDUCE_FUNCTIONS = "PinotAggregateReduceFunctionsRule";
+      public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilterRule";
+      public static final String FILTER_INTO_JOIN = "FilterIntoJoinRule";
+      public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTransposeRule";
+      public static final String PROJECT_MERGE = "ProjectMergeRule";
+      public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMergeRule";
+      public static final String FILTER_MERGE = "FilterMergeRule";
+      public static final String SORT_REMOVE = "SortRemoveRule";
+      // this is config-based
+      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeRuleExtended";
+      // following PruneEmptyRules are config-based
+      public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
+      public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
+      public static final String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
+      public static final String PRUNE_EMPTY_SORT = "PruneEmptySort";
+      // TODO: this rule shows on console as `Union` only, which is confusing
+      // but the knobs are not renamed for now for consistency
+      public static final String PRUNE_EMPTY_UNION = "Union";
+      // these rules show as `PruneEmptyXXX(left)`, converted to `PruneEmptyXXXLeft`
+      public static final String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
+      public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
+      public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
+      public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+    }
+    public static final String PLANNER_RULE_SKIP = "plannerRule.skip";
 
     public static class FailureDetector {
       public enum Type {

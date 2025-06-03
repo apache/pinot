@@ -36,6 +36,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
@@ -94,6 +95,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -117,6 +120,7 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
 
   static {
     // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
@@ -133,7 +137,6 @@ public class QueryEnvironment {
   private final TypeFactory _typeFactory = new TypeFactory();
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
-  private final HepProgram _optProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
 
@@ -146,7 +149,6 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    _optProgram = getOptProgram();
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -163,6 +165,9 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    Map<String, Boolean> ruleFlags = PlannerContext.getRuleFlags(sqlNodeAndOptions.getOptions());
+    // dynamically create optProgram according to rule options
+    HepProgram optProgram = getOptProgram(ruleFlags);
     boolean usePhysicalOptimizer = PhysicalPlannerContext.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
@@ -179,7 +184,7 @@ public class QueryEnvironment {
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
     }
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
+    return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
@@ -468,34 +473,123 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  private static HepProgram getOptProgram() {
+  /**
+   * Creates and returns a HepProgram that performs mostly logical transformations.
+   * It performs several phases of rule application over the parsed decorrelated trimmed plan:
+   * - In the first phase, it prunes the applies BASIC_RULES that are almost always helpful to simplify logical plan
+   * - In the second phase, it performs predicate pushdown -> projection pushdown -> predicate pushdown.
+   * - In the third phase, the logical plan is prune with PRUNE_RULES.
+   *
+   * @param ruleFlags A nullable map from rule name to boolean. a rule is disabled if the
+   *                  corresponding value is set to false.
+   * @return HepProgram that performs logical transformations
+   */
+  private static HepProgram getOptProgram(Map<String, Boolean> ruleFlags) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
+    // Rules are disabled if its corresponding value is set to false in ruleFlags
+    // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
+    List<RelOptRule> basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, ruleFlags);
+    List<RelOptRule> filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, ruleFlags);
+    List<RelOptRule> projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, ruleFlags);
+    List<RelOptRule> pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, ruleFlags);
+
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
+    for (RelOptRule relOptRule : basicRules) {
+        hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
     // Pushdown filters using a single HepInstruction.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // Pushdown projects after first filter pushdown to minimize projected columns.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(projectPushdownRules);
 
     // Pushdown filters again since filter should be pushed down at the lowest level, after project pushdown.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // ----
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+    hepProgramBuilder.addRuleCollection(pruneRules);
     return hepProgramBuilder.build();
+  }
+
+  /**
+   * Filter static RuleSet according to ruleFlags
+   * The filtering is mostly done via class name, however for config-based rules
+   * (rules with same class but different configs)
+   * check is specially handled via checking its String representation / description.
+   *
+   * @param rules static list of rules
+   * @param ruleFlags map of rule name to boolean flag
+   * @return filtered list of rules
+   */
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Map<String, Boolean> ruleFlags) {
+    if (ruleFlags.isEmpty()) {
+      return rules;
+    }
+    List<RelOptRule> filteredRules = new ArrayList<>();
+    for (RelOptRule relOptRule : rules) {
+      String ruleName = relOptRule.getClass().getSimpleName();
+      // special cases here:
+      // rules of the same class and different configs could only be distinguished by checking String of its config
+      if (isExtendedAggregateFunctionsPushdownRule(relOptRule)) {
+        ruleName = CommonConstants.Broker.PlannerRules.AGGREGATE_JOIN_TRANSPOSE_EXTENDED;
+      } else if (isPruneEmptyRule(relOptRule)) {
+        ruleName = getPruneEmptyRuleName(relOptRule);
+      }
+      // add rule if rule is not present in the map or value is true
+      if (isRuleEnabled(ruleName, ruleFlags)) {
+        filteredRules.add(relOptRule);
+        continue;
+      }
+      LOGGER.debug("[QueryEnvironment] rule disabled: \n{}", relOptRule.getClass().getName());
+    }
+    return filteredRules;
+  }
+
+  // Whether a rule is enabled
+  private static boolean isRuleEnabled(String ruleName, Map<String, Boolean> ruleFlags) {
+    return !Boolean.FALSE.equals(ruleFlags.get(ruleName));
+  }
+
+  // Whether the rule is AGGREGATE_JOIN_TRANSPOSE_EXTENDED
+  private static boolean isExtendedAggregateFunctionsPushdownRule(RelOptRule relOptRule) {
+    return (relOptRule.getClass().getSimpleName().equals(CommonConstants.Broker.PlannerRules.AGGREGATE_JOIN_TRANSPOSE)
+        && ((RelRule<?>) relOptRule).config.toString().contains("allowFunctions=true"));
+  }
+
+  // util for checking PruneEmptyRules type
+  private static boolean isPruneEmptyRule(RelOptRule relOptRule) {
+    return relOptRule.getClass().getName().contains("PruneEmptyRules");
+  }
+
+  // util for getting PruneEmptyRule config description that matches queryOption value
+  private static String getPruneEmptyRuleName(RelOptRule relOptRule) {
+    String desc = ((RelRule<?>) relOptRule).config.description();
+    if (desc == null) {
+      // should be unreachable with current PruneEmtpyRules
+      return "";
+    }
+    switch (desc) {
+      case "PruneEmptyCorrelate(left)":
+        return CommonConstants.Broker.PlannerRules.PRUNE_EMPTY_CORRELATE_LEFT;
+      case "PruneEmptyCorrelate(right)":
+        return CommonConstants.Broker.PlannerRules.PRUNE_EMPTY_CORRELATE_RIGHT;
+      case "PruneEmptyJoin(left)":
+        return CommonConstants.Broker.PlannerRules.PRUNE_EMPTY_JOIN_LEFT;
+      case "PruneEmptyJoin(right)":
+        return CommonConstants.Broker.PlannerRules.PRUNE_EMPTY_JOIN_RIGHT;
+      default:
+        return desc;
+    }
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,

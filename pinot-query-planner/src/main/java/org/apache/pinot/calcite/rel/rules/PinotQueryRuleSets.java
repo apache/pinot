@@ -118,6 +118,8 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_MERGE,
       CoreRules.AGGREGATE_REMOVE,
       CoreRules.SORT_REMOVE,
+      PruneEmptyRules.CORRELATE_LEFT_INSTANCE,
+      PruneEmptyRules.CORRELATE_RIGHT_INSTANCE,
       PruneEmptyRules.AGGREGATE_INSTANCE,
       PruneEmptyRules.FILTER_INSTANCE,
       PruneEmptyRules.JOIN_LEFT_INSTANCE,
