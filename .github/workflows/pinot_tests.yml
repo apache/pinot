@@ -114,10 +114,10 @@ jobs:
       - name: Download japicmp CLI
         run: |
           set -euxo pipefail
-          JAPICMP_VER=0.23.0
+          JAPICMP_VER=0.23.1
           curl -fSL \
           -o japicmp.jar \
-          "https://repo1.maven.org/maven2/org/japicmp/japicmp-cli/${JAPICMP_VER}/japicmp-cli-${JAPICMP_VER}-jar-with-dependencies.jar"  
+          "https://repo1.maven.org/maven2/io/github/siom79/japicmp/japicmp-base/${JAPICMP_VER}/japicmp-base-${JAPICMP_VER}-jar-with-dependencies.jar"  
           echo "Downloaded size:"
           ls -lh japicmp.jar
   
