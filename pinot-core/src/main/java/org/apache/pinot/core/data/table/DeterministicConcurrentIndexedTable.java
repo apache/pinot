@@ -45,7 +45,7 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
   protected void upsertWithoutOrderBy(Key key, Record record) {
     ConcurrentSkipListMap<Key, Record> map = (ConcurrentSkipListMap<Key, Record>) _lookupMap;
 
-    if (map.size() < _resultSize) {
+    if (map.size() < _resultSize || map.containsKey(key)) {
       addOrUpdateRecord(key, record);
     } else if (!map.isEmpty() && key.compareTo(map.lastKey()) < 0) {
       addOrUpdateRecord(key, record);

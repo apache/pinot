@@ -120,7 +120,7 @@ public class CalciteSqlParser {
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
     } catch (Throwable e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql + ": " + e.getMessage(), e);
     }
   }
 

@@ -178,6 +178,46 @@ function useQuery() {
   return React.useMemo(() => new URLSearchParams(search), [search]);
 }
 
+// A mapping of error codes to their respective error types.
+// It should be compatible with org.apache.pinot.spi.exception.QueryErrorCode
+const queryErrorCodeMap = {
+  100: "JsonParsingError",
+  150: "SQLParsingError",
+  160: "SQLRuntimeError",
+  180: "AccessDenied",
+  190: "TableDoesNotExistError",
+  191: "TableIsDisabledError",
+  200: "QueryExecutionError",
+  210: "ServerShuttingDown",
+  211: "ServerOutOfCapacity",
+  230: "ServerTableMissing",
+  235: "ServerSegmentMissing",
+  240: "QuerySchedulingTimeoutError",
+  245: "ServerResourceLimitExceededError",
+  250: "ExecutionTimeoutError",
+  305: "",
+  400: "BrokerTimeoutError",
+  410: "BrokerResourceMissingError",
+  420: "BrokerInstanceMissingError",
+  425: "BrokerRequestSend",
+  427: "ServerNotResponding",
+  429: "TooManyRequests",
+  450: "InternalError",
+  500: "MergeResponseError",
+  503: "QueryCancellationError",
+  700: "QueryValidationError",
+  710: "UnknownColumnError",
+  720: "QueryPlanningError",
+  1000: "UnknownError"
+};
+
+const errorCodeDescription = (errorCode) => {
+    if (queryErrorCodeMap[errorCode]) {
+        return queryErrorCodeMap[errorCode];
+    }
+    return 'Unknown Error';
+}
+
 const QueryPage = () => {
   const classes = useStyles();
   const history = useHistory();
@@ -635,9 +675,9 @@ const QueryPage = () => {
                       >
                         {
                           resultData.columns.length > 0 ? (
-                            <Typography variant='body2'>Partial results due to exceptions. Please toggle the switch to view details.</Typography>
+                            <Typography variant='body2'>Partial results due to exceptions. Stats may be partial.</Typography>
                           ) : (
-                            <Typography variant='body2'>Query failed with exceptions. Please toggle the switch to view details.</Typography>
+                            <Typography variant='body2'>Query failed with exceptions. Stats may be partial.</Typography>
                           )
                         }
                       </Alert>
@@ -647,7 +687,7 @@ const QueryPage = () => {
                           resultError.map((error, index) => (
                               <Box key={error.errorCode ? error.errorCode : `error-${index}`} style={{paddingBottom: "10px"}}>
                                 <Alert className={classes.sqlError} severity="error">
-                                  {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
+                                  {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode} ({errorCodeDescription(error.errorCode)})</Typography>}
                                   {error.message}
                                 </Alert>
                               </Box>

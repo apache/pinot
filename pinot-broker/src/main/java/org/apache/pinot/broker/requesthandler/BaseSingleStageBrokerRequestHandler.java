@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -59,6 +61,7 @@ import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -758,6 +761,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           remainingTimeMs, serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
+    brokerResponse.setReplicaGroups(Stream.concat(
+            offlineExecutionServers != null ? offlineExecutionServers.stream() : Stream.empty(),
+            realtimeExecutionServers != null ? realtimeExecutionServers.stream() : Stream.empty())
+        .map(ServerInstance::getPool)
+        .collect(Collectors.toSet()));
 
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
@@ -799,6 +807,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
           TimeUnit.MILLISECONDS);
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+    }
+
+    for (int group : brokerResponse.getReplicaGroups()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredGroup(sqlNodeAndOptions.getOptions()), String.valueOf(group));
     }
 
     // Log query and stats

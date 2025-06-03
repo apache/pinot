@@ -324,6 +324,12 @@ public class QueryLogger {
             .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
             .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
       }
+    },
+    REPLICA_GROUPS("replicaGroups") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+          builder.append(params._response.getReplicaGroups());
+      }
     };
 
     public final String _entryName;

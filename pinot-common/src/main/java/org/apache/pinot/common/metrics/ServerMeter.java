@@ -140,6 +140,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
 
+  TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
+
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.
@@ -199,7 +201,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_FAILED("predownloadFailed", true),
 
   // reingestion metrics
-  SEGMENT_REINGESTION_FAILURE("segments", false);
+  SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  /**
+   * Approximate heap bytes used by the mutable JSON index at the time of index close.
+   */
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
 
   private final String _meterName;
   private final String _unit;
