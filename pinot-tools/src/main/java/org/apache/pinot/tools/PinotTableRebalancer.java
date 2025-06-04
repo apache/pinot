@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
@@ -55,7 +57,12 @@ public class PinotTableRebalancer extends PinotZKChanger {
   public RebalanceResult rebalance(String tableNameWithType) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-    return new TableRebalancer(_helixManager).rebalance(tableConfig, _rebalanceConfig,
-        TableRebalancer.createUniqueRebalanceJobIdentifier());
+
+    String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    ZkBasedTableRebalanceObserver rebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, jobId,
+        TableRebalanceContext.forInitialAttempt(jobId, _rebalanceConfig), _propertyStore);
+
+    return new TableRebalancer(_helixManager, rebalanceObserver, null, null, null)
+        .rebalance(tableConfig, _rebalanceConfig, jobId);
   }
 }
