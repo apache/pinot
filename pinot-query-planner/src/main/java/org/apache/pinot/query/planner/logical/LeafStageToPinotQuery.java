@@ -49,13 +49,13 @@ public class LeafStageToPinotQuery {
    * @return a {@link PinotQuery} representing the leaf stage
    */
   public static PinotQuery createPinotQuery(String tableName, RelNode leafStageRoot, boolean skipFilter) {
-    List<RelNode> nodesTopToBottom = new ArrayList<>();
-    accumulateParentNodes(leafStageRoot, nodesTopToBottom);
-    Preconditions.checkState(!nodesTopToBottom.isEmpty()
-        && nodesTopToBottom.get(nodesTopToBottom.size() - 1) instanceof TableScan, "Could not find table scan");
-    TableScan tableScan = (TableScan) nodesTopToBottom.get(nodesTopToBottom.size() - 1);
+    List<RelNode> bottomToTopNodes = new ArrayList<>();
+    accumulateParentNodes(leafStageRoot, bottomToTopNodes);
+    Preconditions.checkState(!bottomToTopNodes.isEmpty() && bottomToTopNodes.get(0) instanceof TableScan,
+        "Could not find table scan");
+    TableScan tableScan = (TableScan) bottomToTopNodes.get(0);
     PinotQuery pinotQuery = initializePinotQueryForTableScan(tableName, tableScan);
-    for (RelNode parentNode : nodesTopToBottom) {
+    for (RelNode parentNode : bottomToTopNodes) {
       if (parentNode instanceof Filter) {
         if (!skipFilter) {
           handleFilter((Filter) parentNode, pinotQuery);
@@ -68,10 +68,10 @@ public class LeafStageToPinotQuery {
   }
 
   private static void accumulateParentNodes(RelNode root, List<RelNode> parentNodes) {
-    parentNodes.add(root);
     for (RelNode input : root.getInputs()) {
       accumulateParentNodes(input, parentNodes);
     }
+    parentNodes.add(root);
   }
 
   private static PinotQuery initializePinotQueryForTableScan(String tableName, TableScan tableScan) {

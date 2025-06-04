@@ -115,8 +115,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @Override
   public PRelNode onMatch(PRelOptRuleCall call) {
     if (call._currentNode.unwrap() instanceof TableScan) {
-      PRelNode leafStageRoot = Objects.requireNonNull(extractCurrentLeafStageParent(call._parents),
-          "Unable to find root of leaf stage");
+      PRelNode leafStageRoot = extractCurrentLeafStageParent(call._parents);
+      leafStageRoot = leafStageRoot == null ? call._currentNode : leafStageRoot;
       String tableName = getActualTableName((TableScan) call._currentNode.unwrap());
       PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQuery(tableName, leafStageRoot.unwrap(),
           PhysicalPlannerContext.isUseBrokerPruning(_physicalPlannerContext.getQueryOptions()));
