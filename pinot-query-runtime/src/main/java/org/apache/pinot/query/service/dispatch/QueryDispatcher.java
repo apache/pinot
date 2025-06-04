@@ -166,7 +166,13 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
+        return result.withStats(statsFromCancel);
+      }
+      cancel(requestId, servers);
+      return result;
     } catch (Exception ex) {
       return tryRecover(context.getRequestId(), servers, ex);
     } catch (Throwable e) {
@@ -781,6 +787,14 @@ public class QueryDispatcher {
       _queryStats.add(queryStats.getCurrentStats().close());
       for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
+      }
+    }
+
+    public QueryResult withStats(MultiStageQueryStats newQueryStats) {
+      if (_processingException != null) {
+        return new QueryResult(_processingException, newQueryStats, _brokerReduceTimeMs);
+      } else {
+        return new QueryResult(_resultTable, newQueryStats, _brokerReduceTimeMs);
       }
     }
 
