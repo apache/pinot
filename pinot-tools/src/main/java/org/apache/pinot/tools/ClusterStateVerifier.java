@@ -39,7 +39,7 @@ public class ClusterStateVerifier extends PinotZKChanger {
   private static final int MAX_SLEEP_BETWEEN_CHECKS_MILLIS = 30_000;
 
   public ClusterStateVerifier(String zkAddress, String clusterName) {
-    super(zkAddress, clusterName);
+    super("ClusterStateVerifier", zkAddress, clusterName);
   }
 
   /**

@@ -126,6 +126,24 @@ public interface RequestContext {
 
   long getRealtimeThreadCpuTimeNs();
 
+  long getOfflineThreadMemAllocatedBytes();
+  void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes);
+
+  long getRealtimeThreadMemAllocatedBytes();
+  void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes);
+
+  long getOfflineResponseSerMemAllocatedBytes();
+  void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes);
+
+  long getRealtimeResponseSerMemAllocatedBytes();
+  void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes);
+
+  long getOfflineTotalMemAllocatedBytes();
+  void setOfflineTotalMemAllocatedBytes(long offlineTotalMemAllocatedBytes);
+
+  long getRealtimeTotalMemAllocatedBytes();
+  void setRealtimeTotalMemAllocatedBytes(long realtimeTotalMemAllocatedBytes);
+
   boolean isNumGroupsLimitReached();
 
   int getNumExceptions();

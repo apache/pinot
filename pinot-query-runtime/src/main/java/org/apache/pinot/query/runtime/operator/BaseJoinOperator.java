@@ -169,8 +169,14 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     }
     MseBlock mseBlock = buildJoinedDataBlock();
     LOGGER.trace("Returning {} for join operator", mseBlock);
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      onEosProduced();
+    }
     return mseBlock;
   }
+
+  protected abstract void onEosProduced();
 
   protected void buildRightTable() {
     LOGGER.trace("Building right table for join operator");

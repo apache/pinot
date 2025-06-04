@@ -35,15 +35,19 @@ public interface TimeBoundaryStrategy {
   String getName();
 
   /**
+   * Initializes the time boundary strategy with the given logical table configuration and table cache.
+   * @param logicalTableConfig The logical table configuration to use for initialization.
+   * @param tableCache The table cache to use for initialization.
+   */
+  void init(LogicalTableConfig logicalTableConfig, TableCache tableCache);
+
+  /**
    * Computes the time boundary for the given physical table names.
    *
-   * @param logicalTableConfig The logical table configuration.
-   * @param tableCache The table cache to use for fetching table metadata.
    * @param routingManager The routing manager to use for computing the time boundary.
    * @return The computed time boundary information.
    */
-  TimeBoundaryInfo computeTimeBoundary(LogicalTableConfig logicalTableConfig, TableCache tableCache,
-      RoutingManager routingManager);
+  TimeBoundaryInfo computeTimeBoundary(RoutingManager routingManager);
 
 
   /**

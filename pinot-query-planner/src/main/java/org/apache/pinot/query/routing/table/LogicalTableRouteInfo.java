@@ -32,22 +32,23 @@ import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.BaseTableRouteInfo;
+import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.timeboundary.TimeBoundaryStrategy;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class LogicalTableRouteInfo extends BaseTableRouteInfo {
-  private final LogicalTableConfig _logicalTable;
-  private List<TableRouteInfo> _offlineTables;
-  private List<TableRouteInfo> _realtimeTables;
+  private String _logicalTableName;
+  private List<ImplicitHybridTableRouteInfo> _offlineTables;
+  private List<ImplicitHybridTableRouteInfo> _realtimeTables;
   private TableConfig _offlineTableConfig;
   private TableConfig _realtimeTableConfig;
   private QueryConfig _queryConfig;
@@ -56,15 +57,9 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   private BrokerRequest _offlineBrokerRequest;
   private BrokerRequest _realtimeBrokerRequest;
+
+  private TimeBoundaryStrategy _timeBoundaryStrategy;
   private TimeBoundaryInfo _timeBoundaryInfo;
-
-  LogicalTableRouteInfo() {
-    _logicalTable = null;
-  }
-
-  public LogicalTableRouteInfo(LogicalTableConfig logicalTable) {
-    _logicalTable = logicalTable;
-  }
 
   @Override
   public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
@@ -137,6 +132,15 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     instanceRequest.setTableSegmentsInfoList(tableSegmentsInfoList);
     instanceRequest.setBrokerId(brokerId);
     return instanceRequest;
+  }
+
+  public void setLogicalTableName(String logicalTableName) {
+    _logicalTableName = logicalTableName;
+  }
+
+  @Nullable
+  public String getLogicalTableName() {
+    return _logicalTableName;
   }
 
   @Nullable
@@ -234,15 +238,15 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
   @Nullable
   @Override
   public String getOfflineTableName() {
-    return hasOffline() && _logicalTable != null ? TableNameBuilder.OFFLINE.tableNameWithType(
-        _logicalTable.getTableName()) : null;
+    return hasOffline() && _logicalTableName != null ? TableNameBuilder.OFFLINE.tableNameWithType(_logicalTableName)
+        : null;
   }
 
   @Nullable
   @Override
   public String getRealtimeTableName() {
-    return hasRealtime() && _logicalTable != null ? TableNameBuilder.REALTIME.tableNameWithType(
-        _logicalTable.getTableName()) : null;
+    return hasRealtime() && _logicalTableName != null ? TableNameBuilder.REALTIME.tableNameWithType(_logicalTableName)
+        : null;
   }
 
   @Nullable
@@ -356,20 +360,20 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
   }
 
   @Nullable
-  public List<TableRouteInfo> getOfflineTables() {
+  public List<ImplicitHybridTableRouteInfo> getOfflineTables() {
     return _offlineTables;
   }
 
-  public void setOfflineTables(List<TableRouteInfo> offlineTables) {
+  public void setOfflineTables(List<ImplicitHybridTableRouteInfo> offlineTables) {
     _offlineTables = offlineTables;
   }
 
   @Nullable
-  public List<TableRouteInfo> getRealtimeTables() {
+  public List<ImplicitHybridTableRouteInfo> getRealtimeTables() {
     return _realtimeTables;
   }
 
-  public void setRealtimeTables(List<TableRouteInfo> realtimeTables) {
+  public void setRealtimeTables(List<ImplicitHybridTableRouteInfo> realtimeTables) {
     _realtimeTables = realtimeTables;
   }
 
@@ -387,5 +391,14 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   public void setRealtimeBrokerRequest(BrokerRequest realtimeBrokerRequest) {
     _realtimeBrokerRequest = realtimeBrokerRequest;
+  }
+
+  @Nullable
+  public TimeBoundaryStrategy getTimeBoundaryStrategy() {
+    return _timeBoundaryStrategy;
+  }
+
+  public void setTimeBoundaryStrategy(TimeBoundaryStrategy timeBoundaryStrategy) {
+    _timeBoundaryStrategy = timeBoundaryStrategy;
   }
 }

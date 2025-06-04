@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -47,6 +48,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -64,6 +66,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -132,9 +135,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     initInstanceDataDir(instanceDataDir);
 
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
-    }
+    initInstanceSegmentTarDir(instanceSegmentTarDir);
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
@@ -162,7 +163,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
-  private void initInstanceDataDir(File instanceDataDir) {
+  @VisibleForTesting
+  void initInstanceDataDir(File instanceDataDir) {
     if (!instanceDataDir.exists()) {
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
@@ -186,6 +188,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+    // Ensure we can write to the instance data dir
+    Preconditions.checkState(instanceDataDir.canWrite(), "Cannot write to the instance data dir: %s", instanceDataDir);
+  }
+
+  @VisibleForTesting
+  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+    if (!instanceSegmentTarDir.exists()) {
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
+          instanceSegmentTarDir);
+    }
+    // Ensure we can write to the instance segment tar dir
+    Preconditions.checkState(instanceSegmentTarDir.canWrite(), "Cannot write to the instance segment tar dir: %s",
+        instanceSegmentTarDir);
   }
 
   @Override
@@ -516,5 +531,43 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       });
     }
+  }
+
+  // TODO: LogicalTableContext has to be cached. https://github.com/apache/pinot/issues/15859
+  @Nullable
+  @Override
+  public LogicalTableContext getLogicalTableContext(String logicalTableName) {
+    Schema schema = ZKMetadataProvider.getSchema(getPropertyStore(), logicalTableName);
+    if (schema == null) {
+      LOGGER.warn("Failed to find schema for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+    LogicalTableConfig logicalTableConfig = ZKMetadataProvider.getLogicalTableConfig(getPropertyStore(),
+        logicalTableName);
+    if (logicalTableConfig == null) {
+      LOGGER.warn("Failed to find logical table config for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+
+    TableConfig offlineTableConfig = null;
+    if (logicalTableConfig.getRefOfflineTableName() != null) {
+      offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(),
+          logicalTableConfig.getRefOfflineTableName());
+      if (offlineTableConfig == null) {
+        LOGGER.warn("Failed to find offline table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+
+    TableConfig realtimeTableConfig = null;
+    if (logicalTableConfig.getRefRealtimeTableName() != null) {
+      realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(),
+          logicalTableConfig.getRefRealtimeTableName());
+      if (realtimeTableConfig == null) {
+        LOGGER.warn("Failed to find realtime table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+    return new LogicalTableContext(logicalTableConfig, schema, offlineTableConfig, realtimeTableConfig);
   }
 }
