@@ -542,7 +542,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
-  // TODO: LogicalTableContext has to be cached. https://github.com/apache/pinot/issues/15859
   @Nullable
   @Override
   public LogicalTableContext getLogicalTableContext(String logicalTableName) {
