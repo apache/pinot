@@ -50,7 +50,7 @@ public class LeafStageToPinotQuery {
    */
   public static PinotQuery createPinotQuery(String tableName, RelNode leafStageRoot, boolean skipFilter) {
     List<RelNode> bottomToTopNodes = new ArrayList<>();
-    accumulateParentNodes(leafStageRoot, bottomToTopNodes);
+    accumulateBottomToTop(leafStageRoot, bottomToTopNodes);
     Preconditions.checkState(!bottomToTopNodes.isEmpty() && bottomToTopNodes.get(0) instanceof TableScan,
         "Could not find table scan");
     TableScan tableScan = (TableScan) bottomToTopNodes.get(0);
@@ -67,9 +67,11 @@ public class LeafStageToPinotQuery {
     return pinotQuery;
   }
 
-  private static void accumulateParentNodes(RelNode root, List<RelNode> parentNodes) {
+  private static void accumulateBottomToTop(RelNode root, List<RelNode> parentNodes) {
+    Preconditions.checkState(root.getInputs().size() <= 1,
+        "Leaf stage nodes should have at most one input, found: %s", root.getInputs().size());
     for (RelNode input : root.getInputs()) {
-      accumulateParentNodes(input, parentNodes);
+      accumulateBottomToTop(input, parentNodes);
     }
     parentNodes.add(root);
   }
