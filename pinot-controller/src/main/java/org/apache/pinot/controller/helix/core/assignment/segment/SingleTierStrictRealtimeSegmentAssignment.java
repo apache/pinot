@@ -31,10 +31,10 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 
 
 /**
- * This segment assignment method doesn't allow the table to have multiple tiers. The upsert table has to this today.
- * Because moving upsert segments that are out of TTL needs to move their associated validDocIds bitmaps as well for
- * the upsert data to stay correct on the new tiers. But once moving bitmaps is supported, the upsert table can use
- * the MultiTierStrictRealtimeSegmentAssignment to enable multiple tiers for the table.
+ * This segment assignment policy doesn't allow the table to have multiple tiers. The upsert table has to use this
+ * today. Because moving upsert table's segments that are out of TTL needs to move the segments' associated
+ * validDocIds bitmaps as well for the upsert data to stay correct on the new tiers. Once moving bitmaps is
+ * supported later, the upsert table can use the MultiTierStrictRealtimeSegmentAssignment to use multi tiers too.
  */
 public class SingleTierStrictRealtimeSegmentAssignment extends BaseStrictRealtimeSegmentAssignment {
   @Override

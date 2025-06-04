@@ -69,10 +69,10 @@ import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
+import org.apache.pinot.controller.helix.core.assignment.segment.BaseStrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -522,7 +522,7 @@ public class TableRebalancer {
         // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply the
         // same target instance state map for these segments to the new ideal state as the target assignment
         boolean segmentsToMoveChanged = false;
-        if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
+        if (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment) {
           // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment for
           // new added segments is based on the existing assignment
           segmentsToMoveChanged = true;
@@ -596,7 +596,7 @@ public class TableRebalancer {
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
-      boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+      boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof BaseStrictRealtimeSegmentAssignment);
       PartitionIdFetcher partitionIdFetcher =
           new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
               isStrictRealtimeSegmentAssignment);
