@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +43,8 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -53,6 +56,7 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -87,7 +91,6 @@ import org.slf4j.LoggerFactory;
  *   <li>Support for look-up join.</li>
  *   <li>Support for partition parallelism and the colocated join hint. See F2 in #15455.</li>
  *   <li>Support for Hybrid Tables for automatic partitioning inference.</li>
- *   <li>Server pruning based on filter predicates.</li>
  * </ul>
  */
 public class LeafStageWorkerAssignmentRule extends PRelOptRule {
@@ -112,7 +115,13 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @Override
   public PRelNode onMatch(PRelOptRuleCall call) {
     if (call._currentNode.unwrap() instanceof TableScan) {
-      return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId());
+      PRelNode leafStageRoot = extractCurrentLeafStageParent(call._parents);
+      leafStageRoot = leafStageRoot == null ? call._currentNode : leafStageRoot;
+      String tableName = getActualTableName((TableScan) call._currentNode.unwrap());
+      PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQueryForRouting(tableName, leafStageRoot.unwrap(),
+          !PhysicalPlannerContext.isUseBrokerPruning(_physicalPlannerContext.getQueryOptions()));
+      return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId(),
+          pinotQuery);
     }
     PRelNode currentNode = call._currentNode;
     Preconditions.checkState(currentNode.isLeafStage(), "Leaf stage worker assignment called for non-leaf stage node:"
@@ -124,11 +133,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return currentNode.with(currentNode.getPRelInputs(), derivedDistribution);
   }
 
-  private PhysicalTableScan assignTableScan(PhysicalTableScan tableScan, long requestId) {
+  private PhysicalTableScan assignTableScan(PhysicalTableScan tableScan, long requestId, PinotQuery pinotQuery) {
     // Step-1: Init tableName, table options, routing table and time boundary info.
     String tableName = Objects.requireNonNull(getActualTableName(tableScan), "Table not found");
     Map<String, String> tableOptions = getTableOptions(tableScan.getHints());
-    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, requestId);
+    Map<String, RoutingTable> routingTableMap = getRoutingTable(pinotQuery, requestId);
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
     // acquire time boundary info if it is a hybrid table.
     TimeBoundaryInfo timeBoundaryInfo = null;
@@ -400,6 +409,25 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return segments;
   }
 
+  @Nullable
+  static PRelNode extractCurrentLeafStageParent(Deque<PRelNode> parents) {
+    for (PRelNode parent : parents) {
+      if (parent.isLeafStage()) {
+        return parent;
+      }
+    }
+    return null;
+  }
+
+  static PinotQuery deepCopyWithTableType(PinotQuery pinotQuery, TableType tableType) {
+    PinotQuery newPinotQuery = pinotQuery.deepCopy();
+    DataSource dataSource = new DataSource();
+    dataSource.setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
+    newPinotQuery.setDataSource(dataSource);
+    return newPinotQuery;
+  }
+
   private Map<String, TablePartitionInfo> calculateTablePartitionInfo(String tableName, Set<String> tableTypes) {
     Map<String, TablePartitionInfo> result = new HashMap<>();
     if (tableTypes.contains("OFFLINE")) {
@@ -422,25 +450,28 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   /**
    * Acquire routing table for items listed in TableScanNode.
    *
-   * @param tableName table name with or without type suffix.
+   * @param pinotQuery the PinotQuery with filters, project and table-scan information.
    * @return keyed-map from table type(s) to routing table(s).
    */
-  private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId) {
+  private Map<String, RoutingTable> getRoutingTable(PinotQuery pinotQuery, long requestId) {
+    String tableName = pinotQuery.getDataSource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
     RoutingTable routingTable;
     if (tableType == null) {
-      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE, requestId);
+      PinotQuery offlineTableTypeQuery = deepCopyWithTableType(pinotQuery, TableType.OFFLINE);
+      routingTable = getRoutingTableSingleTableType(offlineTableTypeQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.OFFLINE.name(), routingTable);
       }
-      routingTable = getRoutingTable(rawTableName, TableType.REALTIME, requestId);
+      PinotQuery realtimeTableTypeQuery = deepCopyWithTableType(pinotQuery, TableType.REALTIME);
+      routingTable = getRoutingTableSingleTableType(realtimeTableTypeQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.REALTIME.name(), routingTable);
       }
     } else {
-      routingTable = getRoutingTable(tableName, tableType, requestId);
+      routingTable = getRoutingTableSingleTableType(pinotQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(tableType.name(), routingTable);
       }
@@ -448,11 +479,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return routingTableMap;
   }
 
-  private RoutingTable getRoutingTable(String tableName, TableType tableType, long requestId) {
-    String tableNameWithType =
-        TableNameBuilder.forType(tableType).tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
-    return _routingManager.getRoutingTable(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""), requestId);
+  private RoutingTable getRoutingTableSingleTableType(PinotQuery pinotQuery, long requestId) {
+    return _routingManager.getRoutingTable(CalciteSqlCompiler.convertToBrokerRequest(pinotQuery), requestId);
   }
 
   private Map<String, String> getTableOptions(List<RelHint> hints) {
