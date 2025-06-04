@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -30,8 +29,6 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
