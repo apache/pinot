@@ -126,6 +126,34 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
+  @Test
+  public void testSkipNullOrInvalidGeometry()
+      throws Exception {
+    String columnName = "skipInvalid";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Invalid serialized bytes should be skipped without throwing exception
+      creator.add(new byte[]{1, 2, 3}, -1);
+
+      // Explicit null geometry should also be skipped
+      creator.add((Geometry) null);
+
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      long h3Id = H3Utils.H3_CORE.latLngToCell(20, 10, res);
+      Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
+    }
+  }
+
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(H3IndexConfig expected) {
