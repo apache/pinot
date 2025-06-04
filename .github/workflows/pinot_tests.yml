@@ -42,6 +42,7 @@ on:
       - "licenses/**"
       - "licenses-binary/**"
       - "**.md"
+  workflow_dispatch: {}
 
 jobs:
   linter-test:
@@ -78,7 +79,6 @@ jobs:
         run: .github/workflows/scripts/.pinot_linter.sh
 
   binary-compat-check:
-    if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest
     name: Pinot Binary Compatibility Check
     strategy:
