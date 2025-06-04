@@ -104,12 +104,21 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   @Override
   public Geometry deserialize(byte[] bytes) {
-    return GeometrySerializer.deserialize(bytes);
+    try {
+      return GeometrySerializer.deserialize(bytes);
+    } catch (Exception e) {
+      // For invalid serialized geometry, return null so that the doc can be skipped
+      return null;
+    }
   }
 
   @Override
   public void add(Geometry geometry)
       throws IOException {
+    if (geometry == null) {
+      _nextDocId++;
+      return;
+    }
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
