@@ -101,6 +101,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      # Build the PR branch's module to get a new JAR to compare
       - name: Build SPI on PR branch
         run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests -Dproject.build.finalName="${{ matrix.module }}"
       - name: Checkout master into a subfolder
@@ -108,16 +109,18 @@ jobs:
         with:
           ref: master
           path: master-head
+      # Build the same module on master to produce the baseline JAR
       - name: Build SPI on master
         working-directory: master-head
         run: mvn clean package -T1C -pl ${{ matrix.module }} -am -DskipTests -Dproject.build.finalName="${{ matrix.module }}"
+      # Download the japicmp standalone JAR which will be used to compare APIs
       - name: Download japicmp CLI
         run: |
           JAPICMP_VER=0.23.1
           curl -fSL \
           -o japicmp.jar \
-          "https://repo1.maven.org/maven2/com/github/siom79/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"  
-
+          "https://repo1.maven.org/maven2/com/github/siom79/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"
+      # Locate the old JAR (from master) and the new JAR (PR) and run japicmp to compare
       - name: Compare API for ${{ matrix.module }}
         run: |
           OLD=$(ls master-head/${{ matrix.module }}/target/${{ matrix.module }}-*.jar | grep -v '\-tests.jar' | head -1)
