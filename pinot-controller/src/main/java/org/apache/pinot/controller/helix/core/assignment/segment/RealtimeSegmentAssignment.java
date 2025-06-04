@@ -28,6 +28,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -106,8 +107,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int segmentPartitionId =
-        SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
-            _partitionColumn);
+        SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     return assignConsumingSegment(segmentPartitionId, instancePartitions);
   }
 

@@ -58,26 +58,17 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
-  private LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, String creationTime,
-      String segmentName) {
-    _tableName = tableName;
-    _partitionGroupId = partitionGroupId;
-    _sequenceNumber = sequenceNumber;
-    _creationTime = creationTime;
-    _segmentName = segmentName;
-  }
-
   /**
    * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
    * represent an LLC segment.
    */
   @Nullable
   public static LLCSegmentName of(String segmentName) {
-    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    if (parts.length != 4) {
+    try {
+      return new LLCSegmentName(segmentName);
+    } catch (Exception e) {
       return null;
     }
-    return new LLCSegmentName(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), parts[3], segmentName);
   }
 
   /**
