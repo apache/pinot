@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -55,6 +56,8 @@ public class UpsertContext {
   private final long _newSegmentTrackingTimeMs;
   @Nullable
   private final Map<String, String> _metadataManagerConfigs;
+  @Nullable
+  private final Function<String, Long> _segmentZKCreationTimeProvider;
 
   /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
   @Deprecated
@@ -72,7 +75,8 @@ public class UpsertContext {
       boolean enableDeletedKeysCompactionConsistency, UpsertConfig.ConsistencyMode consistencyMode,
       long upsertViewRefreshIntervalMs, long newSegmentTrackingTimeMs,
       @Nullable Map<String, String> metadataManagerConfigs, boolean allowPartialUpsertConsumptionDuringCommit,
-      @Nullable TableDataManager tableDataManager, File tableIndexDir) {
+      @Nullable TableDataManager tableDataManager, File tableIndexDir,
+      @Nullable Function<String, Long> segmentZKCreationTimeProvider) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -94,6 +98,7 @@ public class UpsertContext {
     _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
     _tableDataManager = tableDataManager;
     _tableIndexDir = tableIndexDir;
+    _segmentZKCreationTimeProvider = segmentZKCreationTimeProvider;
   }
 
   public TableConfig getTableConfig() {
@@ -190,6 +195,11 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  @Nullable
+  public Function<String, Long> getSegmentZKCreationTimeProvider() {
+    return _segmentZKCreationTimeProvider;
+  }
+
   @Override
   public String toString() {
     return new ToStringBuilder(this)
@@ -211,6 +221,7 @@ public class UpsertContext {
         .append("metadataManagerConfigs", _metadataManagerConfigs)
         .append("allowPartialUpsertConsumptionDuringCommit", _allowPartialUpsertConsumptionDuringCommit)
         .append("tableIndexDir", _tableIndexDir)
+        .append("segmentZKCreationTimeProvider", _segmentZKCreationTimeProvider)
         .toString();
   }
 
@@ -237,6 +248,7 @@ public class UpsertContext {
     private boolean _allowPartialUpsertConsumptionDuringCommit;
     private TableDataManager _tableDataManager;
     private File _tableIndexDir;
+    private Function<String, Long> _segmentZKCreationTimeProvider;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -344,6 +356,11 @@ public class UpsertContext {
       return this;
     }
 
+    public Builder setSegmentZKCreationTimeProvider(Function<String, Long> segmentZKCreationTimeProvider) {
+      _segmentZKCreationTimeProvider = segmentZKCreationTimeProvider;
+      return this;
+    }
+
     public UpsertContext build() {
       Preconditions.checkState(_tableConfig != null, "Table config must be set");
       Preconditions.checkState(_schema != null, "Schema must be set");
@@ -359,7 +376,8 @@ public class UpsertContext {
           _partialUpsertHandler, _deleteRecordColumn, _dropOutOfOrderRecord, _outOfOrderRecordColumn, _enableSnapshot,
           _enablePreload, _metadataTTL, _deletedKeysTTL, _enableDeletedKeysCompactionConsistency, _consistencyMode,
           _upsertViewRefreshIntervalMs, _newSegmentTrackingTimeMs, _metadataManagerConfigs,
-          _allowPartialUpsertConsumptionDuringCommit, _tableDataManager, _tableIndexDir);
+          _allowPartialUpsertConsumptionDuringCommit, _tableDataManager, _tableIndexDir,
+          _segmentZKCreationTimeProvider);
     }
   }
 }

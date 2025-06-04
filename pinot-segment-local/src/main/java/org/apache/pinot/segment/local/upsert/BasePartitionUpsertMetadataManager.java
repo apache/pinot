@@ -134,6 +134,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
   private final long _newSegmentTrackingTimeMs;
 
+  // Cache for segment creation times from ZK metadata to avoid repeated controller calls
+  private final Map<String, Long> _segmentCreationTimeCache = new ConcurrentHashMap<>();
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
@@ -347,6 +350,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
+
+    // Cache the creation time from ZK metadata to avoid repeated controller calls during upsert operations
+    cacheSegmentCreationTimeFromZK(segmentName);
+
     if (isTTLEnabled()) {
       double maxComparisonValue = getMaxComparisonValue(segment);
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
@@ -412,6 +419,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     String segmentName = segment.getSegmentName();
     _logger.info("Preloading segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
+
+    // Cache the creation time from ZK metadata to avoid repeated controller calls during upsert operations
+    cacheSegmentCreationTimeFromZK(segmentName);
 
     MutableRoaringBitmap validDocIds = segment.loadValidDocIdsFromSnapshot();
     Preconditions.checkState(validDocIds != null,
@@ -496,6 +506,66 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
     addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+  }
+
+  /**
+   * Caches the segment creation time from ZK metadata if available.
+   * This should be called when a segment is added to avoid repeated controller calls during upsert operations.
+   *
+   * @param segmentName the segment name to cache creation time for
+   */
+  protected void cacheSegmentCreationTimeFromZK(String segmentName) {
+    if (_context.getSegmentZKCreationTimeProvider() != null) {
+      try {
+        Long zkCreationTime = _context.getSegmentZKCreationTimeProvider().apply(segmentName);
+        if (zkCreationTime != null) {
+          _segmentCreationTimeCache.put(segmentName, zkCreationTime);
+          _logger.debug("Cached ZK creation time {} for segment: {}", zkCreationTime, segmentName);
+        }
+      } catch (Exception e) {
+        _logger.warn("Failed to cache creation time from ZK metadata for segment: {}", segmentName, e);
+      }
+    }
+  }
+
+  /**
+   * Gets the segment creation time from cache (if available), otherwise tries ZK metadata provider,
+   * and finally falls back to local segment metadata.
+   *
+   * @param segment the segment to get creation time for
+   * @return creation time in milliseconds
+   */
+  protected long getSegmentCreationTime(IndexSegment segment) {
+    String segmentName = segment.getSegmentName();
+
+    // Try cached ZK creation time first
+    Long cachedCreationTime = _segmentCreationTimeCache.get(segmentName);
+    if (cachedCreationTime != null) {
+      return cachedCreationTime;
+    }
+
+    // Try to get creation time from ZK metadata provider
+    if (_context.getSegmentZKCreationTimeProvider() != null) {
+      _logger.info("Getting segment creation time from ZK metadata provider for segment: {}", segmentName);
+      Long zkCreationTime = _context.getSegmentZKCreationTimeProvider().apply(segmentName);
+      if (zkCreationTime != null) {
+        // Cache the ZK creation time for future use
+        _segmentCreationTimeCache.put(segmentName, zkCreationTime);
+        return zkCreationTime;
+      }
+    }
+
+    // Fallback to local segment metadata
+    return segment.getSegmentMetadata().getIndexCreationTime();
+  }
+
+  /**
+   * Removes the cached creation time for a segment when it's removed.
+   *
+   * @param segmentName the segment name to remove from cache
+   */
+  protected void removeCachedSegmentCreationTime(String segmentName) {
+    _segmentCreationTimeCache.remove(segmentName);
   }
 
   /**
@@ -588,6 +658,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Replacing {} segment: {}, current primary key count: {}",
         oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
+
+    // Cache the creation time from ZK metadata for the new segment and clean up cache for old segment
+    cacheSegmentCreationTimeFromZK(segmentName);
 
     if (segment instanceof EmptyIndexSegment) {
       _logger.info("Skip adding empty segment: {}", segmentName);
@@ -712,6 +785,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         doRemoveSegment(segment);
       }
       _trackedSegments.remove(segment);
+
+      // Clean up cached creation time
+      removeCachedSegmentCreationTime(segmentName);
     } finally {
       finishOperation();
     }
