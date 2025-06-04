@@ -33,9 +33,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
- * This segment assignment method allows the table to use multiple tiers when rebalancing table. This can be used for
- * dedup table for now, as its segments out of TTL can be moved to new tiers w/o messing up the dedup metadata
- * tracked on the CONSUMING servers.
+ * This segment assignment policy allows the table to use multiple tiers when rebalancing table. This can be used for
+ * dedup table, whose segments out of TTL can be moved to new tiers without messing up the dedup metadata tracked on
+ * the CONSUMING servers.
  */
 public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtimeSegmentAssignment {
   @Override
@@ -48,13 +48,11 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
         _tableNameWithType);
     Preconditions.checkArgument(config.isIncludeConsuming(),
         "Consuming segment must be included when rebalancing table: %s using multi-tier "
-            + "StrictRealtimeSegmentAssignment",
-        _tableNameWithType);
+            + "StrictRealtimeSegmentAssignment", _tableNameWithType);
     boolean bootstrap = config.isBootstrap();
     _logger.info("Rebalancing table: {} with instance partitions: {}, bootstrap: {}", _tableNameWithType,
         instancePartitions, bootstrap);
-    // Rebalance tiers first. Only completed segments are moved to other tiers, although the last parameter of
-    // rebalanceTiers() method, i.e. InstancePartitionsType.COMPLETED, is not checked at all under the hood.
+    // Rebalance tiers first. Only completed segments are moved to other tiers.
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
         rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,
             InstancePartitionsType.COMPLETED);
