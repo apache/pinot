@@ -120,8 +120,10 @@ jobs:
 
       - name: Compare API for ${{ matrix.module }}
         run: |
+          set -euxo pipefail
           OLD=$(ls master-head/${{ matrix.module }}/target/${{ matrix.module }}-*.jar | head -2)
           NEW=$(ls ${{ matrix.module }}/target/${{ matrix.module }}-*.jar | head -2)
+          ls -lh "$OLD" "$NEW"
           
           java -jar japicmp.jar \
             --old "$OLD" \
