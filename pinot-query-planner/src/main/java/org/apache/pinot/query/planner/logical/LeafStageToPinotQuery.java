@@ -41,14 +41,15 @@ public class LeafStageToPinotQuery {
   }
 
   /**
-   * Converts a leaf stage root to a {@link PinotQuery}.
+   * Converts a leaf stage root to a {@link PinotQuery}. This method only handles Project, Filter and TableScan nodes.
+   * Other node types are ignored since they don't impact routing.
    *
    * @param tableName the name of the table. Needs to be provided separately since it needs TableCache.
    * @param leafStageRoot the root of the leaf stage
    * @param skipFilter whether to skip the filter in the query
    * @return a {@link PinotQuery} representing the leaf stage
    */
-  public static PinotQuery createPinotQuery(String tableName, RelNode leafStageRoot, boolean skipFilter) {
+  public static PinotQuery createPinotQueryForRouting(String tableName, RelNode leafStageRoot, boolean skipFilter) {
     List<RelNode> bottomToTopNodes = new ArrayList<>();
     accumulateBottomToTop(leafStageRoot, bottomToTopNodes);
     Preconditions.checkState(!bottomToTopNodes.isEmpty() && bottomToTopNodes.get(0) instanceof TableScan,
