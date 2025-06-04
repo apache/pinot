@@ -54,8 +54,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  *   </li>
  * </ul>
  *
- * The rebalanceTable() method is left to be implemented by the subclasses for dedup and upsert tables separately, as
- * they require different handling.
+ * The rebalanceTable() method is to be implemented by subclasses to support multi tiers differently.
  */
 public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
 
