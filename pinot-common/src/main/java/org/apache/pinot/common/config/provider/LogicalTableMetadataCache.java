@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.common.config.provider;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -56,7 +55,7 @@ public class LogicalTableMetadataCache {
   private final Map<String, LogicalTableConfig> _logicalTableConfigMap = new ConcurrentHashMap<>();
   private final Map<String, Schema> _schemaMap = new ConcurrentHashMap<>();
   private final Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();
-  private final Map<String, List<Pair<String, String>>> _tableNameToLogicalTableNamesMap = new ConcurrentHashMap<>();
+  private final Map<String, List<String>> _tableNameToLogicalTableNamesMap = new ConcurrentHashMap<>();
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private ZkTableConfigChangeListener _zkTableConfigChangeListener;
@@ -70,22 +69,19 @@ public class LogicalTableMetadataCache {
     _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
 
     // Add child listeners to the property store for logical table config changes
-    _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH,
-        _zkLogicalTableConfigChangeListener);
+    _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
 
     LOGGER.info("Logical table metadata cache initialized");
   }
 
   public void shutdown() {
     // Unsubscribe from the logical table config creation changes
-    _propertyStore.unsubscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH,
-        _zkLogicalTableConfigChangeListener);
+    _propertyStore.unsubscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
 
     // Unsubscribe from all logical table config paths, table config paths, and schema paths
     unsubscribeDataChanges(_logicalTableConfigMap.keySet(), ZkPaths.LOGICAL_TABLE_PATH_PREFIX,
         _zkLogicalTableConfigChangeListener);
-    unsubscribeDataChanges(_tableConfigMap.keySet(), ZkPaths.TABLE_CONFIG_PATH_PREFIX,
-        _zkTableConfigChangeListener);
+    unsubscribeDataChanges(_tableConfigMap.keySet(), ZkPaths.TABLE_CONFIG_PATH_PREFIX, _zkTableConfigChangeListener);
     unsubscribeDataChanges(_schemaMap.keySet(), ZkPaths.SCHEMA_PATH_PREFIX, _zkSchemaChangeListener);
 
     // Clear all caches
@@ -200,7 +196,6 @@ public class LogicalTableMetadataCache {
           try {
             LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
             String logicalTableName = logicalTableConfig.getTableName();
-            _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
 
             if (logicalTableConfig.getRefOfflineTableName() != null) {
               addTableConfig(logicalTableConfig.getRefOfflineTableName(), logicalTableName);
@@ -210,6 +205,7 @@ public class LogicalTableMetadataCache {
             }
 
             addSchema(logicalTableName);
+            _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
             String logicalTableConfigPath = ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName;
             _propertyStore.subscribeDataChanges(logicalTableConfigPath, _zkLogicalTableConfigChangeListener);
             LOGGER.info("Added the logical table config: {} in cache", logicalTableName);
@@ -225,7 +221,7 @@ public class LogicalTableMetadataCache {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
       Preconditions.checkArgument(tableConfig != null, "Failed to find table config for table: %s", tableName);
       _tableNameToLogicalTableNamesMap.computeIfAbsent(tableName, k -> new ArrayList<>())
-          .add(Pair.of(tableName, logicalTableName));
+          .add(logicalTableName);
       _tableConfigMap.put(tableName, tableConfig);
       String path = ZkPaths.TABLE_CONFIG_PATH_PREFIX + tableName;
       _propertyStore.subscribeDataChanges(path, _zkTableConfigChangeListener);
@@ -282,7 +278,7 @@ public class LogicalTableMetadataCache {
         String offlineTableName = logicalTableConfig.getRefOfflineTableName();
         String realtimeTableName = logicalTableConfig.getRefRealtimeTableName();
         if (offlineTableName != null) {
-          removeTableConfig(offlineTableName, offlineTableName);
+          removeTableConfig(offlineTableName, logicalTableName);
         }
         if (realtimeTableName != null) {
           removeTableConfig(realtimeTableName, logicalTableName);
@@ -298,17 +294,16 @@ public class LogicalTableMetadataCache {
 
     private synchronized void removeTableConfig(String tableName, String logicalTableName) {
       _tableNameToLogicalTableNamesMap.computeIfPresent(tableName, (k, v) -> {
-        v.remove(Pair.of(tableName, logicalTableName));
+        v.remove(logicalTableName);
+        if (v.isEmpty()) {
+          _tableConfigMap.remove(tableName);
+          String path = ZkPaths.TABLE_CONFIG_PATH_PREFIX + tableName;
+          _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
+          LOGGER.info("Removed the table config: {} from cache", tableName);
+          return null;
+        }
         return v;
       });
-
-      if (_tableNameToLogicalTableNamesMap.getOrDefault(tableName, List.of()).isEmpty()) {
-        _tableNameToLogicalTableNamesMap.remove(tableName);
-        _tableConfigMap.remove(tableName);
-        String path = ZkPaths.TABLE_CONFIG_PATH_PREFIX + tableName;
-        _propertyStore.unsubscribeDataChanges(path, _zkTableConfigChangeListener);
-        LOGGER.info("Removed the table config: {} from cache", tableName);
-      }
     }
 
     private synchronized void removeSchema(LogicalTableConfig logicalTableConfig) {
