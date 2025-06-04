@@ -904,6 +904,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   break;
                 }
                 if (_segmentBuildDescriptor == null) {
+                  // This can happen if Table data manager is already shut down.
                   handleSegmentBuildFailure();
                   break;
                 }
@@ -1130,9 +1131,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
     } catch (InterruptedException e) {
       String errorMessage = "Interrupted while waiting for semaphore";
-      _segmentLogger.error(errorMessage, e);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+      reportSegmentBuildFailure(errorMessage, e);
       throw new SegmentBuildFailureException(errorMessage, e);
     }
     try {
@@ -1158,14 +1157,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         converter.build(_segmentVersion, _serverMetrics);
       } catch (Exception e) {
         String errorMessage = "Could not build segment";
-        _segmentLogger.error(errorMessage, e);
         FileUtils.deleteQuietly(tempSegmentFolder);
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         if (e instanceof IllegalStateException) {
           // Precondition checks fail, the segment build would fail consistently
           _segmentBuildFailedWithDeterministicError = true;
         }
-        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+        reportSegmentBuildFailure(errorMessage, e);
         throw new SegmentBuildFailureException(errorMessage, e);
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
@@ -1185,9 +1182,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       } catch (IOException e) {
         String errorMessage = "Caught exception while moving index directory from: " + tempIndexDir + " to: "
             + indexDir;
-        _segmentLogger.error(errorMessage, e);
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+        reportSegmentBuildFailure(errorMessage, e);
         throw new SegmentBuildFailureException(errorMessage, e);
       } finally {
         FileUtils.deleteQuietly(tempSegmentFolder);
@@ -1206,9 +1201,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } catch (IOException e) {
           String errorMessage = "Caught exception while taring index directory from: " + indexDir + " to: "
               + segmentTarFile;
-          _segmentLogger.error(errorMessage, e);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-          _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+          reportSegmentBuildFailure(errorMessage, e);
           throw new SegmentBuildFailureException(errorMessage, e);
         }
 
@@ -1216,18 +1209,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         if (metadataFile == null) {
           String errorMessage = "Failed to find file: " + V1Constants.MetadataKeys.METADATA_FILE_NAME
               + " under index directory: " + indexDir;
-          _segmentLogger.error(errorMessage);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, null));
-          _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+          reportSegmentBuildFailure(errorMessage, null);
           throw new SegmentBuildFailureException(errorMessage);
         }
         File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
         if (creationMetaFile == null) {
           String errorMessage = "Failed to find file: " + V1Constants.SEGMENT_CREATION_META + " under index directory: "
               + indexDir;
-          _segmentLogger.error(errorMessage);
-          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, null));
-          _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
+          reportSegmentBuildFailure(errorMessage, null);
           throw new SegmentBuildFailureException(errorMessage);
         }
         Map<String, File> metadataFiles = new HashMap<>();
@@ -1248,6 +1237,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Decrement llc simultaneous segment builds.
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, -1L);
     }
+  }
+
+  private void reportSegmentBuildFailure(String errorMessage, @Nullable Exception e) {
+    _segmentLogger.error(errorMessage, e);
+    _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.SEGMENT_BUILD_FAILURE, 1);
   }
 
   @VisibleForTesting
