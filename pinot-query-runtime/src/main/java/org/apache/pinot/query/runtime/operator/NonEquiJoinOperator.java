@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -39,6 +40,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   private final List<Object[]> _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
+  @Nullable
   private BitSet _matchedRightRows;
 
   public NonEquiJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
@@ -65,6 +67,11 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     if (needUnmatchedRightRows()) {
       _matchedRightRows = new BitSet(_rightTable.size());
     }
+  }
+
+  @Override
+  protected void onEosProduced() {
+    _matchedRightRows = null;
   }
 
   @Override
@@ -106,6 +113,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
 
   @Override
   protected List<Object[]> buildNonMatchRightRows() {
+    assert _matchedRightRows != null : "Matched right rows should not be null when building non-matched right rows";
     int numRightRows = _rightTable.size();
     int numMatchedRightRows = _matchedRightRows.cardinality();
     if (numMatchedRightRows == numRightRows) {
