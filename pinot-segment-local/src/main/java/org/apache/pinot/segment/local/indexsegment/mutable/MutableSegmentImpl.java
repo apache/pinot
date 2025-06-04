@@ -67,8 +67,8 @@ import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
+import org.apache.pinot.segment.local.utils.IndexSegmentUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -1052,13 +1052,13 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public DataSource getDataSource(String column, Schema schema) {
+  public DataSource getDataSource(String column, Schema tableSchema) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
     if (indexContainer != null) {
       // Physical column
       return indexContainer.toDataSource();
     } else {
-      return SegmentPreloadUtils.getVirtualDataSource(schema, column, _segmentMetadata.getTotalDocs());
+      return IndexSegmentUtils.getVirtualDataSource(tableSchema, _schema, column, _segmentMetadata.getTotalDocs());
     }
   }
 

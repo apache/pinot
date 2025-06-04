@@ -221,10 +221,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, ValueCache valueCache, QueryContext queryContext) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
+    DataSource dataSource = segment.getDataSourceNullable(column);
     dataSourceCache.putIfAbsent(column, dataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
-    assert dataSource != null;
+    if (dataSource == null) {
+      return false;
+    }
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
     // Check bloom filter
@@ -245,10 +247,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     }
     String column = inPredicate.getLhs().getIdentifier();
     DataSource dataSource = segment instanceof ImmutableSegment
-        ? segment.getDataSource(column, queryContext.getSchema())
-        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSource(column, queryContext.getSchema()));
+        ? segment.getDataSourceNullable(column)
+        : dataSourceCache.computeIfAbsent(column, col -> segment.getDataSourceNullable(column));
     // NOTE: Column must exist after DataSchemaSegmentPruner
-    assert dataSource != null;
+    if (dataSource == null) {
+      return false;
+    }
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
     // Check bloom filter

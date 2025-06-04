@@ -62,7 +62,7 @@ public interface IndexSegment {
   Set<String> getPhysicalColumnNames();
 
   /// Returns the [DataSource] for the given column.
-  /// Keeping this around for testing and usage during non query execution code paths.
+  /// This api is used when the column is guaranteed to exist in the segment.
   default DataSource getDataSource(String column) {
     DataSource dataSource = getDataSourceNullable(column);
     Preconditions.checkState(dataSource != null, "Failed to find data source for column: ", column);
