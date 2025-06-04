@@ -178,10 +178,11 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create/modify/remove multi-col text index if required.
-      processMultiColTextIndex(indexDir, _indexLoadingConfig.getFieldIndexConfigByColName(),
-          _indexLoadingConfig.getTableConfig(), segmentWriter);
-      _segmentDirectory.reloadMetadata();
-      segmentWriter.save();
+      if (processMultiColTextIndex(indexDir, _indexLoadingConfig.getFieldIndexConfigByColName(),
+          _indexLoadingConfig.getTableConfig(), segmentWriter, segmentOperationsThrottler)) {
+        _segmentDirectory.reloadMetadata();
+        segmentWriter.save();
+      }
     }
   }
 
@@ -312,8 +313,9 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
-  private void processMultiColTextIndex(File indexDir, Map<String, FieldIndexConfigs> configsByCol,
-      TableConfig tableConfig, SegmentDirectory.Writer segmentWriter)
+  private boolean processMultiColTextIndex(File indexDir, Map<String, FieldIndexConfigs> configsByCol,
+      TableConfig tableConfig, SegmentDirectory.Writer segmentWriter,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
@@ -333,20 +335,34 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
     }
-
-    if (remove) {
-      LOGGER.info("Removing multi-column text index from segment: {}", segmentName);
-      removeMultiColumnTextIndex(indexDir);
-    } else if (create) {
-      if (oldConfig != null) {
-        // Drop existing multi-column text index before creating a new one
-        // TODO: if props are the same, we might only need to add and/or remove columns (compute diff!)
-        removeMultiColumnTextIndex(indexDir);
-      }
-      MultiColumnTextIndexHandler multiColumnTextIndexHandler =
-          new MultiColumnTextIndexHandler(_segmentDirectory, configsByCol, newConfig, tableConfig);
-      multiColumnTextIndexHandler.updateIndices(segmentWriter);
+    if (!remove && !create) {
+      LOGGER.info("No change detected in multi-column text index for segment: {}", segmentName);
+      return false;
     }
+
+    if (segmentOperationsThrottler != null) {
+      segmentOperationsThrottler.getSegmentMultiColTextIndexPreprocessThrottler().acquire();
+    }
+    try {
+      if (remove) {
+        LOGGER.info("Removing multi-column text index from segment: {}", segmentName);
+        removeMultiColumnTextIndex(indexDir);
+      } else if (create) {
+        if (oldConfig != null) {
+          // Drop existing multi-column text index before creating a new one
+          // TODO: if props are the same, we might only need to add and/or remove columns (compute diff!)
+          removeMultiColumnTextIndex(indexDir);
+        }
+        MultiColumnTextIndexHandler multiColumnTextIndexHandler =
+            new MultiColumnTextIndexHandler(_segmentDirectory, configsByCol, newConfig, tableConfig);
+        multiColumnTextIndexHandler.updateIndices(segmentWriter);
+      }
+    } finally {
+      if (segmentOperationsThrottler != null) {
+        segmentOperationsThrottler.getSegmentMultiColTextIndexPreprocessThrottler().release();
+      }
+    }
+    return true;
   }
 
   private void removeMultiColumnTextIndex(File indexDir)
