@@ -87,6 +87,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         }
       }
     } else {
+      boolean useFixedReplica = isUseFixedReplica(queryOptions);
       for (String segment : segments) {
         List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
         // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
@@ -95,7 +96,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           continue;
         }
         int selectedIdx;
-        if (isUseFixedReplica(queryOptions)) {
+        if (useFixedReplica) {
           // candidates array is always sorted
           selectedIdx = _tableNameHashForFixedReplicaRouting % candidates.size();
         } else {

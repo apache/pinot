@@ -59,6 +59,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
   public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
 
+  public static final int SEGMENT_ADD_THRESHOLD = 200;
+  public static final int RECOMMENDED_BATCH_SIZE = 200;
+
   private static double _diskUtilizationThreshold;
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
@@ -101,7 +104,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
             preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
-        preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment()));
+        preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
+        preCheckContext.getRebalanceSummaryResult()));
 
     preCheckResult.put(REPLICA_GROUPS_INFO, checkReplicaGroups(tableConfig, rebalanceConfig));
 
@@ -335,7 +339,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   }
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
-      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      RebalanceSummaryResult rebalanceSummaryResult) {
     List<String> warnings = new ArrayList<>();
     boolean pass = true;
     if (rebalanceConfig.isBestEfforts()) {
@@ -390,6 +395,19 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && !rebalanceConfig.isUpdateTargetTier()) {
       pass = false;
       warnings.add("updateTargetTier should be enabled when tier configs are present");
+    }
+
+    // --- Batch size per server recommendation check using summary ---
+    int maxSegmentsToAddOnServer = rebalanceSummaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer();
+    int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
+    if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
+      if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
+          || batchSizePerServer > RECOMMENDED_BATCH_SIZE) {
+        pass = false;
+        warnings.add("Number of segments to add to a single server (" + maxSegmentsToAddOnServer + ") is high (>"
+            + SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to " + RECOMMENDED_BATCH_SIZE
+            + " or lower to avoid excessive load on servers.");
+      }
     }
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
