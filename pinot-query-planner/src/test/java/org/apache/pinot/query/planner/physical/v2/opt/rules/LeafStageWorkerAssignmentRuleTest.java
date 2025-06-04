@@ -247,7 +247,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   @Test
-  public void testGetLeafParentNodes() {
+  public void testExtractLeafStageRoot() {
     // Create parents mock RelNodes. The first node is not part of the leaf stage, while the last two nodes are.
     PRelNode pRelNode1 = mock(PRelNode.class);
     PRelNode pRelNode2 = mock(PRelNode.class);
@@ -260,11 +260,8 @@ public class LeafStageWorkerAssignmentRuleTest {
     parents.addLast(pRelNode1);
     parents.addLast(pRelNode2);
     parents.addLast(pRelNode3);
-    List<PRelNode> leafParentNodes = LeafStageWorkerAssignmentRule.getLeafParentNodes(parents);
-    // nodes should be from bottom to top.
-    assertEquals(leafParentNodes.get(0), pRelNode3);
-    assertEquals(leafParentNodes.get(1), pRelNode2);
-    assertEquals(leafParentNodes.size(), 2);
+    PRelNode leafStageRoot = LeafStageWorkerAssignmentRule.extractCurrentLeafStageParent(parents);
+    assertEquals(leafStageRoot, pRelNode2);
   }
 
   private static void validateTableScanAssignment(TableScanWorkerAssignmentResult assignmentResult,
