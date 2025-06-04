@@ -98,10 +98,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
-    int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
-    int replicaOffset = 0;
     Map<Integer, Integer> replicaGroupToSegmentCount = new HashMap<>();
+    boolean useFixedReplica = isUseFixedReplica(ctx.getQueryOptions());
+    Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
+    int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
+    int replicaOffset = 0;
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
@@ -113,9 +114,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       int numCandidates = candidates.size();
       int instanceIdx;
 
-      if (isUseFixedReplica(ctx.getQueryOptions())) {
+      if (useFixedReplica) {
         // candidates array is always sorted
-        instanceIdx = _tableNameHashForFixedReplicaRouting % numCandidates;
+        instanceIdx = (_tableNameHashForFixedReplicaRouting + replicaOffset) % numCandidates;
       } else {
         instanceIdx = (requestId + replicaOffset) % numCandidates;
       }
