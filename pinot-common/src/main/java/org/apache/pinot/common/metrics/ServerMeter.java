@@ -108,6 +108,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
+  /** Number of rows skipped due to null or invalid geometry */
+  NULL_GEOMETRY_ROWS("rows", true),
+
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
