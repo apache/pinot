@@ -122,6 +122,10 @@ public class PhysicalPlannerContext {
     return _useLiteMode;
   }
 
+  private QueryServerInstance getBrokerQueryServerInstance() {
+    return new QueryServerInstance(_instanceId, _hostName, _port, _port);
+  }
+
   public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {
     if (queryOptions == null) {
       return false;
@@ -129,8 +133,11 @@ public class PhysicalPlannerContext {
     return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
   }
 
-  private QueryServerInstance getBrokerQueryServerInstance() {
-    return new QueryServerInstance(_instanceId, _hostName, _port, _port);
+  public static boolean isUseBrokerPruning(@Nullable Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return false;
+    }
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
   }
 
   private static boolean useLiteMode(@Nullable Map<String, String> queryOptions) {

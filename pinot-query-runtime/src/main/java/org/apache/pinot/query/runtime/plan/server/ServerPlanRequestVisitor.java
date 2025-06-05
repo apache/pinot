@@ -78,7 +78,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         pinotQuery.setGroupByList(groupByList);
       }
       List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
-          node.getFilterArgs(), pinotQuery);
+          node.getFilterArgs(), pinotQuery.getSelectList());
       for (Expression expression : selectList) {
         applyTimestampIndex(expression, pinotQuery);
       }
@@ -131,7 +131,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
-        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery);
+        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(),
+            pinotQuery.getSelectList());
         applyTimestampIndex(expression, pinotQuery);
         pinotQuery.setFilterExpression(expression);
       } else {
@@ -197,7 +198,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery);
+      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(),
+          pinotQuery.getSelectList());
       for (Expression expression : selectList) {
         applyTimestampIndex(expression, pinotQuery);
       }
