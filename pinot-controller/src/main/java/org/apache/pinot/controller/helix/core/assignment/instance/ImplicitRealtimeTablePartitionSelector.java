@@ -74,10 +74,8 @@ public class ImplicitRealtimeTablePartitionSelector extends InstanceReplicaGroup
 
   @Override
   protected int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
-    if (_tableConfig.isUpsertEnabled()) {
-      return 1; // For upsert enabled tables, we enforce one instance per partition
-    } else {
-      return super.getNumInstancesPerPartition(numInstancesPerReplicaGroup);
-    }
+    // This partition selector should only be used for CONSUMING instance partitions, and we enforce a single instance
+    // per partition in this case.
+    return 1;
   }
 }

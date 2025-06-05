@@ -919,11 +919,16 @@ public final class TableConfigUtils {
     if (tableConfig.getInstanceAssignmentConfigMap() == null) {
       return;
     }
-    for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+    for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
+        : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+      String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
+      InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
           == InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR) {
         Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
             "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for REALTIME tables");
+        Preconditions.checkState(InstancePartitionsType.CONSUMING.name().equalsIgnoreCase(instancePartitionsType),
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for CONSUMING instance partitions type");
         Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased(),
             "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based instance assignment");
         Preconditions.checkState(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumPartitions() == 0,
