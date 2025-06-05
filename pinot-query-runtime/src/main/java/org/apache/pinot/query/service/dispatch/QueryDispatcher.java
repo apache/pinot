@@ -170,13 +170,14 @@ public class QueryDispatcher {
       QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
+        cancelled = true;
         return result.withStats(statsFromCancel);
       }
       return result;
     } catch (Exception ex) {
-      QueryResult newResult = tryRecover(context.getRequestId(), servers, ex);
+      QueryResult queryResult = tryRecover(context.getRequestId(), servers, ex);
       cancelled = true;
-      return newResult;
+      return queryResult;
     } finally {
       if (!cancelled) {
         cancel(requestId, servers);
@@ -203,7 +204,6 @@ public class QueryDispatcher {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
       // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
-      cancel(requestId, servers);
       throw ex;
     }
     // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
