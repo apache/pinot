@@ -32,6 +32,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -39,7 +40,6 @@ import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -54,8 +54,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
 
   public LiteModeWorkerAssignmentRule(PhysicalPlannerContext context) {
     _context = context;
-    _runInBroker = Boolean.parseBoolean(context.getQueryOptions().getOrDefault(
-        CommonConstants.Broker.Request.QueryOptionKey.RUN_IN_BROKER, "false"));
+    _runInBroker = QueryOptionsUtils.isRunInBroker(context.getQueryOptions());
   }
 
   @Override
