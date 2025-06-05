@@ -60,7 +60,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
-            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false));
+            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false,
+                false));
       } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
@@ -202,7 +203,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       TenantRebalanceObserver observer) {
     try {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
-      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
+      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true, true);
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {
