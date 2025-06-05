@@ -124,7 +124,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    splitAndSend(block, serializedStats);
+    try {
+      splitAndSend(block, serializedStats);
+    } catch (IOException e) {
+      LOGGER.warn("Failed to split and send mailbox", e);
+      throw e;
+    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
@@ -207,9 +212,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
         boolean waitForMore = byteStringIt.hasNext();
         sendContent(byteString, waitForMore);
       }
-    } catch (Throwable t) {
-      LOGGER.warn("Caught exception while serializing block: {}", block, t);
-      throw t;
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
