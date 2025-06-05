@@ -234,21 +234,21 @@ public class RateLimiterUtilsTest {
 
     // 1 query every 3 seconds (0.333... qps)
     {
-      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 1.0/3.0);
+      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 1.0 / 3.0);
       assertEquals(config.getLimitRefreshPeriod(), Duration.ofSeconds(3));
       assertEquals(config.getLimitForPeriod(), 1);
     }
 
     // 1 query every 30 seconds (0.033... qps)
     {
-      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 1.0/30.0);
+      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 1.0 / 30.0);
       assertEquals(config.getLimitRefreshPeriod(), Duration.ofSeconds(30));
       assertEquals(config.getLimitForPeriod(), 1);
     }
 
     // 2 queries every 3 seconds (0.666... qps)
     {
-      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 2.0/3.0);
+      RateLimiterConfig config = RateLimiterUtils.createRateLimiterConfig(TimeUnit.SECONDS, 1.0, 2.0 / 3.0);
       assertEquals(config.getLimitRefreshPeriod(), Duration.ofSeconds(3));
       assertEquals(config.getLimitForPeriod(), 2);
     }
