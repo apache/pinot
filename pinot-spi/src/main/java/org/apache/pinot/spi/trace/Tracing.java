@@ -232,9 +232,8 @@ public class Tracing {
     public ThreadExecutionContext getThreadExecutionContext() {
       return new ThreadExecutionContext() {
         @Override
-        @Nullable
         public String getQueryId() {
-          return null;
+          return "unknown";
         }
 
         @Override
