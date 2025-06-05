@@ -49,8 +49,7 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
    */
   public SegmentDownloadThrottler(int maxDownloadConcurrency, int maxDownloadConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
-    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries,
-        ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, LOGGER);
+    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries, LOGGER);
   }
 
   @Override
@@ -68,5 +67,15 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentDownloadThrottler configs with latest clusterConfigs");
+  }
+
+  @Override
+  public void updateThresholdMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, value);
+  }
+
+  @Override
+  public void updateCountMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_DOWNLOAD_COUNT, value);
   }
 }

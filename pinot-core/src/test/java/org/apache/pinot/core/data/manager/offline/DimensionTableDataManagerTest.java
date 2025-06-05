@@ -44,7 +44,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentHandleUpsertOrDedupThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
@@ -87,7 +86,7 @@ public class DimensionTableDataManagerTest {
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
   private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
       new SegmentAllIndexPreprocessThrottler(1, 2, true), new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(1, 2, true), new SegmentHandleUpsertOrDedupThrottler(1, 2, true));
+      new SegmentDownloadThrottler(1, 2, true));
 
   private File _indexDir;
   private SegmentZKMetadata _segmentZKMetadata;

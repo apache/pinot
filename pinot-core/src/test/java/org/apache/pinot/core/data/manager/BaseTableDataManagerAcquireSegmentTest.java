@@ -38,7 +38,6 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentHandleUpsertOrDedupThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
@@ -128,8 +127,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).build();
     SegmentOperationsThrottler segmentOperationsThrottler =
         new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(8, 10, true),
-            new SegmentStarTreePreprocessThrottler(4, 8, true), new SegmentDownloadThrottler(10, 20, true),
-            new SegmentHandleUpsertOrDedupThrottler(10, 20, true));
+            new SegmentStarTreePreprocessThrottler(4, 8, true), new SegmentDownloadThrottler(10, 20, true));
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottler);
