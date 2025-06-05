@@ -305,7 +305,8 @@ public class QuotaConfigTest {
 
     // Test combined storage and rate limiter config
     {
-      String quotaConfigStr = "{\"storage\":\"200G\",\"rateLimiterUnit\":\"SECONDS\",\"rateLimiterDuration\":5,\"rateLimits\":50}";
+      String quotaConfigStr =
+              "{\"storage\":\"200G\",\"rateLimiterUnit\":\"SECONDS\",\"rateLimiterDuration\":5,\"rateLimits\":50}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       assertEquals(quotaConfig.getStorage(), "200G");
       assertEquals(quotaConfig.getRateLimiterUnit(), TimeUnit.SECONDS);
