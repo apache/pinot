@@ -73,6 +73,9 @@ public class SegmentProcessorFramework {
   private final File _segmentsOutputDir;
   private final SegmentNumRowProvider _segmentNumRowProvider;
   private int _segmentSequenceId = 0;
+  private int _incompleteRowsFound = 0;
+  private int _skippedRowsFound = 0;
+  private int _sanitizedRowsFound = 0;
 
   /**
    * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
@@ -185,6 +188,9 @@ public class SegmentProcessorFramework {
       long mapStartTimeInMs = System.currentTimeMillis();
       logToObserver(MAP_STAGE, "Starting Map phase for iteration " + iterationCount);
       Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
+      _incompleteRowsFound += mapper.getIncompleteRowsFound();
+      _skippedRowsFound += mapper.getSkippedRowsFound();
+      _sanitizedRowsFound += mapper.getSanitizedRowsFound();
 
       // Log the time taken to map.
       logMessage = "Finished Map phase for iteration " + iterationCount + " in "
@@ -337,6 +343,9 @@ public class SegmentProcessorFramework {
           driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
               TransformPipeline.getPassThroughPipeline());
           driver.build();
+          _incompleteRowsFound += driver.getIncompleteRowsFound();
+          _skippedRowsFound += driver.getSkippedRowsFound();
+          _sanitizedRowsFound += driver.getSanitizedRowsFound();
           outputSegmentDirs.add(driver.getOutputDirectory());
           _segmentNumRowProvider.updateSegmentInfo(driver.getSegmentStats().getTotalDocCount(),
               FileUtils.sizeOfDirectory(driver.getOutputDirectory()));
@@ -347,5 +356,17 @@ public class SegmentProcessorFramework {
     }
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
+  }
+
+  public int getIncompleteRowsFound() {
+    return _incompleteRowsFound;
+  }
+
+  public int getSkippedRowsFound() {
+    return _skippedRowsFound;
+  }
+
+  public int getSanitizedRowsFound() {
+    return _sanitizedRowsFound;
   }
 }
