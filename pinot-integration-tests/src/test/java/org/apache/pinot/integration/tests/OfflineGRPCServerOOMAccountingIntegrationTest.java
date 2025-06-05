@@ -39,4 +39,8 @@ public class OfflineGRPCServerOOMAccountingIntegrationTest extends OfflineGRPCSe
     serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
   }
+
+  protected void overrideBrokerConf(PinotConfiguration serverConf) {
+    overrideServerConf(serverConf);
+  }
 }
