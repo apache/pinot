@@ -164,6 +164,7 @@ public class QueryDispatcher {
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+    boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
@@ -171,17 +172,14 @@ public class QueryDispatcher {
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
         return result.withStats(statsFromCancel);
       }
-      cancel(requestId, servers);
       return result;
     } catch (Exception ex) {
-      return tryRecover(context.getRequestId(), servers, ex);
-    } catch (Throwable e) {
-      // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId);
-      throw e;
+      QueryResult newResult = tryRecover(context.getRequestId(), servers, ex);
+      cancelled = true;
+      return newResult;
     } finally {
-      if (isQueryCancellationEnabled()) {
-        _serversByQuery.remove(requestId);
+      if (!cancelled) {
+        cancel(requestId, servers);
       }
     }
   }
