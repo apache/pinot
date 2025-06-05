@@ -31,6 +31,19 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * LogicalTableConfig represents the configuration for a logical table in Pinot.
+ * tableName: The name of the logical table.
+ * physicalTableConfigMap: A map of physical table names to their configurations.
+ * brokerTenant: The tenant for the broker.
+ * queryConfig: Configuration for query execution on the logical table.
+ * quotaConfig: Configuration for quota management on the logical table.
+ * refOfflineTableName: The name of the offline table whose table config is referenced by this logical table.
+ * refRealtimeTableName: The name of the realtime table whose table config is referenced by this logical table.
+ * timeBoundaryConfig: Configuration for time boundaries of the logical table. This is used to determine the time
+ * boundaries for queries on the logical table, especially in hybrid scenarios where both offline and realtime
+ * data are present.
+ */
 public class LogicalTableConfig extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -105,6 +118,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _quotaConfig = quotaConfig;
   }
 
+  @Nullable
   public String getRefOfflineTableName() {
     return _refOfflineTableName;
   }
@@ -113,6 +127,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _refOfflineTableName = refOfflineTableName;
   }
 
+  @Nullable
   public String getRefRealtimeTableName() {
     return _refRealtimeTableName;
   }
@@ -121,6 +136,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _refRealtimeTableName = refRealtimeTableName;
   }
 
+  @Nullable
   public TimeBoundaryConfig getTimeBoundaryConfig() {
     return _timeBoundaryConfig;
   }

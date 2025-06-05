@@ -347,6 +347,5 @@ public class TableCacheTest {
   @AfterClass
   public void tearDown() {
     TEST_INSTANCE.cleanup();
-    TEST_INSTANCE.stopSharedTestSetup();
   }
 }

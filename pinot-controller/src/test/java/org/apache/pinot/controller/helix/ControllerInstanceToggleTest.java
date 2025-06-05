@@ -133,6 +133,5 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     DEFAULT_INSTANCE.cleanup();
-    DEFAULT_INSTANCE.stopSharedTestSetup();
   }
 }

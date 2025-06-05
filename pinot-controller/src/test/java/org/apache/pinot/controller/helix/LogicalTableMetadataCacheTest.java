@@ -64,7 +64,7 @@ public class LogicalTableMetadataCacheTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    INSTANCE.startSharedTestSetup();
+    INSTANCE.setupSharedStateAndValidate();
   }
 
   @AfterClass

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -101,14 +102,17 @@ public class LogicalTableMetadataCache {
     }
   }
 
+  @Nullable
   public Schema getSchema(String schemaName) {
     return _schemaMap.get(schemaName);
   }
 
+  @Nullable
   public TableConfig getTableConfig(String tableName) {
     return _tableConfigMap.get(tableName);
   }
 
+  @Nullable
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName) {
     return _logicalTableConfigMap.get(logicalTableName);
   }
