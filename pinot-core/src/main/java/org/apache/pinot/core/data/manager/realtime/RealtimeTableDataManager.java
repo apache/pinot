@@ -437,8 +437,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in upsert-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId)
-        .preloadSegments(indexLoadingConfig);
+    _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
   }
 
   /**
@@ -452,8 +451,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(partitionId != null,
         "Failed to get partition id for segment: %s in dedup-enabled table: %s", zkMetadata.getSegmentName(),
         _tableNameWithType);
-    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId)
-        .preloadSegments(indexLoadingConfig);
+    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
   }
 
   protected void doAddOnlineSegment(String segmentName)
@@ -554,12 +552,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager != null
-            ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager != null
-            ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
+        _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
