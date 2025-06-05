@@ -49,7 +49,6 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +66,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     return new PerQueryCPUMemResourceUsageAccountant(config, instanceId, instanceType);
   }
 
-  public static class PerQueryCPUMemResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
+  public static class PerQueryCPUMemResourceUsageAccountant implements ThreadResourceUsageAccountant {
 
     /**
      * MemoryMXBean to get total heap used memory
@@ -254,6 +253,22 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    @Override
+    public boolean isAnchorThreadInterrupted() {
+      ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
+      if (context != null && context.getAnchorThread() != null) {
+        return context.getAnchorThread().isInterrupted();
+      }
+
+      return false;
+    }
+
+    @Override
+    @Deprecated
+    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+    }
+
     /**
      * for testing only
      */
@@ -349,8 +364,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       threadEntry.setToIdle();
       // clear threadResourceUsageProvider
       _threadResourceUsageProvider.remove();
-      // clear _anchorThread
-      super.clear();
     }
 
     @Override
