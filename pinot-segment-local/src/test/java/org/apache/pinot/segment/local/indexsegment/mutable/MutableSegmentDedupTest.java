@@ -77,7 +77,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0, null) : null;
+        (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
     try {
       _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, true, TIME_COLUMN, null,
           partitionDedupMetadataManager);
@@ -119,7 +119,8 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
         .build();
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
-    return TableDedupMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema, tableDataManager);
+    return TableDedupMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema, tableDataManager,
+        null);
   }
 
   public List<Map<String, String>> loadJsonFile(String filePath)

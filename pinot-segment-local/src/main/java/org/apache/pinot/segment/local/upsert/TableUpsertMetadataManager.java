@@ -41,10 +41,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface TableUpsertMetadataManager extends Closeable {
 
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
-  PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+  PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertContext getContext();
 

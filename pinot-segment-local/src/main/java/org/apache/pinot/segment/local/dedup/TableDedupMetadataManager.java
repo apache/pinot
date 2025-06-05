@@ -32,13 +32,12 @@ public interface TableDedupMetadataManager extends Closeable {
    * Initialize TableDedupMetadataManager.
    */
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   /**
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
    */
-  PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+  PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
 
   DedupContext getContext();
 

@@ -42,11 +42,13 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
   protected DedupContext _context;
+  protected SegmentOperationsThrottler _segmentOperationsThrottler;
 
   @Override
   public void init(PinotConfiguration instanceDedupConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager) {
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     _tableNameWithType = tableConfig.getTableName();
+    _segmentOperationsThrottler = segmentOperationsThrottler;
 
     Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s",
         _tableNameWithType);
@@ -112,18 +114,16 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   }
 
   @Override
-  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k ->
-      createPartitionDedupMetadataManager(partitionId, segmentOperationsThrottler)
+      createPartitionDedupMetadataManager(partitionId)
     );
   }
 
   /**
    * Create PartitionDedupMetadataManager for given partition id.
    */
-  protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+  protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
 
   @Override
   public DedupContext getContext() {
