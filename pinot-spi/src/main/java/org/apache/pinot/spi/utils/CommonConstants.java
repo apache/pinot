@@ -632,6 +632,7 @@ public class CommonConstants {
         // records to stream partitions, which can make a segment have multiple partitions. The scale of this is
         // usually low, and this query option allows the MSE Optimizer to infer the partition of a segment based on its
         // name, when that segment has multiple partitions in its columnPartitionMap.
+        @Deprecated
         public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
         // For realtime tables, this infers the segment partition for all segments. The partition column, function,
         // and number of partitions still rely on the Table's segmentPartitionConfig. This is useful if you have
