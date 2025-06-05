@@ -171,17 +171,9 @@ public class Tracing {
    */
   public static class DefaultThreadResourceUsageAccountant implements ThreadResourceUsageAccountant {
 
-    // worker thread's corresponding anchor thread, worker will also interrupt if it finds anchor's flag is raised
-    private final ThreadLocal<Thread> _anchorThread;
-
-    public DefaultThreadResourceUsageAccountant() {
-      _anchorThread = new ThreadLocal<>();
-    }
-
     @Override
     public boolean isAnchorThreadInterrupted() {
-      Thread thread = _anchorThread.get();
-      return thread != null && thread.isInterrupted();
+      return false;
     }
 
     @Override
@@ -196,7 +188,6 @@ public class Tracing {
 
     @Override
     public void clear() {
-      _anchorThread.remove();
     }
 
     @Override
@@ -217,35 +208,17 @@ public class Tracing {
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
-      _anchorThread.set(Thread.currentThread());
     }
 
     @Override
     public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {
-      if (parentContext != null) {
-        _anchorThread.set(parentContext.getAnchorThread());
-      }
     }
 
     @Override
+    @Nullable
     public ThreadExecutionContext getThreadExecutionContext() {
-      return new ThreadExecutionContext() {
-        @Override
-        public String getQueryId() {
-          return "unknown";
-        }
-
-        @Override
-        public Thread getAnchorThread() {
-          return _anchorThread.get();
-        }
-
-        @Override
-        public TaskType getTaskType() {
-          return TaskType.UNKNOWN;
-        }
-      };
+      return null;
     }
 
     @Override
