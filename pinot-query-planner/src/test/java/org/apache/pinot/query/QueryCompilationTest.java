@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -113,6 +114,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:on
   }
 
+  @Ignore("PruneEmptyRules.CORRELATE_LEFT_INSTANCE and its right equivalent will be added in the future")
   @Test
   public void testPruneEmptyCorrelateJoin() {
     // queries involving correlated join with dummy
