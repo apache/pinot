@@ -115,9 +115,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
 
   @Override
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k ->
-      createPartitionDedupMetadataManager(partitionId)
-    );
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
   }
 
   /**
