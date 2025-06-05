@@ -141,7 +141,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       creator.add(new byte[]{1, 2, 3}, -1);
 
       // Explicit null geometry should also be skipped
-      creator.add((Geometry) null);
+      creator.add(null);
 
       creator.seal();
     }
