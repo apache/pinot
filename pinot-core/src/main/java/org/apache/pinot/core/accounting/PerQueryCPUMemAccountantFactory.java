@@ -311,7 +311,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
-      super.setupRunner(queryId, taskId, taskType);
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
         _threadLocalEntry.get()
@@ -322,7 +321,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {
-      super.setupWorker(taskId, taskType, parentContext);
       _threadLocalEntry.get()._errorStatus.set(null);
       if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
