@@ -189,6 +189,11 @@ public class Tracing {
         @Nullable ThreadExecutionContext parentContext) {
     }
 
+    @Deprecated
+    public void createExecutionContextInner(@Nullable String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
+    }
+
     @Override
     public void clear() {
       _anchorThread.remove();
