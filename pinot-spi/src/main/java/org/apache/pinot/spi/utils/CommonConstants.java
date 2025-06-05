@@ -634,6 +634,11 @@ public class CommonConstants {
         // name, when that segment has multiple partitions in its columnPartitionMap.
         public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
+        // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
+        // new MSE query optimizer.
+        // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
+        //   a table config to enable broker pruning (it is disabled by default).
+        public static final String USE_BROKER_PRUNING = "useBrokerPruning";
       }
 
       public static class QueryOptionValue {
