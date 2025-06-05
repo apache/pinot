@@ -413,8 +413,7 @@ public class SegmentOperationsThrottlerTest {
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
               ? Integer.parseInt(
                   CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(
-                      CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
       // We set isServingQueries to false when the server is not yet ready to server queries. In this scenario ideally
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
@@ -632,8 +631,7 @@ public class SegmentOperationsThrottlerTest {
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
               ? Integer.parseInt(
               CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(
-                      CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
       // Default is too high: Integer.MAX_VALUE, take a limited number of permits so that the test doesn't take too
       // long to finish
       int numPermitsToTake = 10000;
