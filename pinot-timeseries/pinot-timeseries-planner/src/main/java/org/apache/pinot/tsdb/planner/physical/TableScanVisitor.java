@@ -111,16 +111,14 @@ public class TableScanVisitor {
    */
   @Nullable
   private String getTableNameWithType(TableRouteInfo routeInfo) {
-    if (!routeInfo.isExists()) {
-      return null;
-    }
+    Preconditions.checkState(!routeInfo.isHybrid(),
+      "Hybrid tables are not supported yet for timeseries queries");
     if (routeInfo.isOffline()) {
       return routeInfo.getOfflineTableName();
     }
     if (routeInfo.isRealtime()) {
       return routeInfo.getRealtimeTableName();
     }
-    // TODO: Add support for hybrid tables if needed.
     return null;
   }
 

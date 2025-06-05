@@ -76,7 +76,7 @@ public class TimeSeriesQueryEnvironment {
         throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
       }
     }
-    // TODO: Add support for logical tables in the future.
+    // TODO(timeseries): Add support for logical tables in the future.
     TableScanVisitor.INSTANCE.init(_routingManager, new ImplicitHybridTableRouteProvider(), _tableCache);
   }
 
