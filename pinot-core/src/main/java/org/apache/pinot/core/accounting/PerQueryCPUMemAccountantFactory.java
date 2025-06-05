@@ -310,22 +310,28 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void createExecutionContextInner(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
+    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      super.setupRunner(queryId, taskId, taskType);
       _threadLocalEntry.get()._errorStatus.set(null);
-      if (parentContext == null) {
-        // is anchor thread
-        assert queryId != null;
+      if (queryId != null) {
         _threadLocalEntry.get()
             .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
-      } else {
-        // not anchor thread
-        _threadLocalEntry.get().setThreadTaskStatus(queryId, taskId, parentContext.getTaskType(),
+      }
+    }
+
+    @Override
+    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+      super.setupWorker(taskId, taskType, parentContext);
+      _threadLocalEntry.get()._errorStatus.set(null);
+      if (parentContext != null && parentContext.getQueryId() != null) {
+        _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
             parentContext.getAnchorThread());
       }
     }
 
     @Override
+    @Nullable
     public ThreadExecutionContext getThreadExecutionContext() {
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
     }
