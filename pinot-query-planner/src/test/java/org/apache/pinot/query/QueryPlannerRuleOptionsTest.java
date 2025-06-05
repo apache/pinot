@@ -22,13 +22,14 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.skipRule;
 import static org.testng.Assert.*;
 
 
@@ -55,8 +56,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     // Tests that when skipAggregateCaseToFilterRule=true,
     // CASE WHEN should not be optimized
     String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a";
-    String explain = explainQueryWithRuleDisabled(query,
-        CommonConstants.Broker.Request.QueryOptionKey.RuleOptionKey.SKIP_AGGREGATE_CASE_TO_FILTER_RULE);
+    String explain = explainQueryWithRuleDisabled(query, skipRule(PlannerRuleNames.AGGREGATE_CASE_TO_FILTER));
 
     //@formatter:off
     assertEquals(explain,
@@ -77,7 +77,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 3 ELSE 0 END) FROM a";
 
     String explain = explainQueryWithRuleDisabled(query,
-        CommonConstants.Broker.Request.QueryOptionKey.RuleOptionKey.SKIP_PINOT_AGGREGATE_REDUCE_FUNCTIONS_RULE);
+        skipRule(PlannerRuleNames.PINOT_AGGREGATE_REDUCE_FUNCTIONS));
     //@formatter:off
     assertEquals(explain,
       "Execution Plan\n"
@@ -100,7 +100,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "JOIN a ON c.col1 = a.col1 ;\n";
 
     String explain = explainQueryWithRuleDisabled(query,
-        CommonConstants.Broker.Request.QueryOptionKey.RuleOptionKey.SKIP_PRUNE_EMPTY_JOIN_LEFT_RULE);
+        skipRule(PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT));
     //@formatter:off
     assertEquals(explain,
       "Execution Plan\n"
@@ -109,6 +109,87 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
           + "    LogicalValues(tuples=[[]])\n"
           + "  PinotLogicalExchange(distribution=[hash[0]])\n"
           + "    PinotLogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testDisablePruneEmptyUnion() {
+    // Test the description of PruneEmptyRules.UNION_INSTANCE
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT col1 FROM a\n"
+        + "WHERE 1 = 0\n"
+        + "UNION\n"
+        + "SELECT col1 FROM b;\n";
+
+    String explain = explainQueryWithRuleDisabled(query,
+        skipRule(PlannerRuleNames.PRUNE_EMPTY_UNION));
+    //@formatter:off
+    assertEquals(explain,
+      "Execution Plan\n"
+          + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+          + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+          + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+          + "      LogicalUnion(all=[true])\n"
+          + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+          + "          LogicalValues(tuples=[[]])\n"
+          + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+          + "          LogicalProject(col1=[$0])\n"
+          + "            PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testDisablePinotEvaluateProjectLiteralRule() {
+    // Test the knob of turning off PinotEvaluateLiteralRule.Project
+    // works with the customized description
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT col1, ABS(-1) FROM b;\n";
+
+    String explain = explainQueryWithRuleDisabled(query, skipRule(PlannerRuleNames.PINOT_EVALUATE_LITERAL_PROJECT));
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(col1=[$0], EXPR$1=[ABS(-1)])\n"
+            + "  PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testDisablePinotEvaluateFilterLiteralRule() {
+    // Test the knob of turning off PinotEvaluateLiteralRule.Filter
+    // works with the customized description
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT col1 FROM b WHERE col1=ABS(-1);\n";
+
+    String explain = explainQueryWithRuleDisabled(query, skipRule(PlannerRuleNames.PINOT_EVALUATE_LITERAL_FILTER));
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(col1=[$0])\n"
+            + "  LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, ABS(-1))])\n"
+            + "    PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testDisablePinotProjectJoinTransposeRule() {
+    // Test the knob of turning off PinotProjectJoinTransposeRule
+    // works with default description
+    String query = "EXPLAIN PLAN FOR \n"
+        + "SELECT CASE WHEN a.col1=1 THEN 1 ELSE 0 END, b.col2 FROM a JOIN b ON a.col1=b.col1;\n";
+
+    String explain = explainQueryWithRuleDisabled(query, skipRule(PlannerRuleNames.PINOT_PROJECT_JOIN_TRANSPOSE));
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[CASE(=(CAST($0):INTEGER NOT NULL, 1), 1, 0)], col2=[$2])\n"
+            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0])\n"
+            + "        PinotLogicalTableScan(table=[[default, a]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "      LogicalProject(col1=[$0], col2=[$1])\n"
+            + "        PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
   }
 }

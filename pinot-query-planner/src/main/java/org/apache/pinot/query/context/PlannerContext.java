@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.context;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +35,6 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -92,58 +89,6 @@ public class PlannerContext implements AutoCloseable {
 
   public Map<String, String> getOptions() {
     return _options;
-  }
-
-  /**
-   * Checks rule enabling options and set ruleFlags correspondingly.
-   * The ruleFlags is passed to {@link QueryEnvironment}'s getOptProgram
-   * to decide which rules are enabled / disabled dynamically.
-   *
-   * Currently, this applies to all rules used in optProgram.
-   * All rules are enabled by default, and disabled if skipXXX option is set to true
-   *
-   * @param options options from sqlNodeAndOptions
-   * @return the ruleFlags map used by getOptProgram of {@link QueryEnvironment}
-   */
-  public static Map<String, Boolean> getRuleFlags(@Nullable Map<String, String> options) {
-    // To disable a rule, put {className, false} into ruleFlags
-    Map<String, Boolean> ruleFlags = new HashMap<>();
-    // iterate through {@link CommonConstants.Broker.Request.QueryOptionKey.RuleOptionKey}
-    try {
-      for (Field declaredField : CommonConstants.Broker.PlannerRules.class.getDeclaredFields()) {
-        if (!declaredField.getType().equals(String.class)) {
-          continue;
-        }
-        int mods = declaredField.getModifiers();
-        if (!(Modifier.isStatic(mods) && Modifier.isFinal(mods))) {
-          continue;
-        }
-        // the class name
-        String ruleName = (String) declaredField.get(null);
-        // check if rule is disabled, put {className, false} if is disabled
-        if (isRuleDisabled(CommonConstants.Broker.PLANNER_RULE_SKIP + ruleName, false, options)) {
-          ruleFlags.put(ruleName, false);
-        }
-      }
-    } catch (IllegalAccessException e) {
-      throw new RuntimeException("Cannot get RuleOptionKeys constants", e);
-    }
-    return ruleFlags;
-  }
-
-  /**
-   * checks if rule is disabled
-   * @param ruleOptionKey corresponding QueryOptionKey of the rule
-   * @param defaultDisabled is the rule enabled by default
-   * @param options parsed queryOptions, or null
-   * @return whether the rule is enabled
-   */
-  private static boolean isRuleDisabled(String ruleOptionKey, Boolean defaultDisabled,
-      @Nullable Map<String, String> options) {
-    if (options == null) {
-      return defaultDisabled;
-    }
-    return Boolean.parseBoolean(options.getOrDefault(ruleOptionKey, defaultDisabled.toString()));
   }
 
   @Override
