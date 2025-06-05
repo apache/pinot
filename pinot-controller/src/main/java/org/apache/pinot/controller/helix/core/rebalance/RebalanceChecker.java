@@ -279,6 +279,10 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       }
       TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
       TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
+      if (!jobCtx.getAllowRetries()) {
+        LOGGER.debug("Skip rebalance job: {} as it does not allow retries", jobId);
+        continue;
+      }
       long jobStartTimeMs = jobStats.getStartTimeMs();
       if (latestStartedJob == null || latestStartedJob.getRight() < jobStartTimeMs) {
         latestStartedJob = Pair.of(jobId, jobStartTimeMs);

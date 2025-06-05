@@ -233,7 +233,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // We're not using the async rebalance API here because we want to run this on a separate thread pool from the
       // rebalance thread pool that is used for user initiated rebalances.
       RebalanceResult rebalance = _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
-          TableRebalancer.createUniqueRebalanceJobIdentifier(), false);
+          TableRebalancer.createUniqueRebalanceJobIdentifier(), true, false);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);

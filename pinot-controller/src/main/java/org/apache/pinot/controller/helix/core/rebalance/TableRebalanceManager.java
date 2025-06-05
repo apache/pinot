@@ -79,12 +79,19 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
    * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
+   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
    * @return result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
-      String rebalanceJobId, boolean trackRebalanceProgress)
+      String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
+    if (allowRetries && !trackRebalanceProgress) {
+      throw new IllegalArgumentException(
+          "Rebalance retries are only supported when rebalance progress is tracked in ZK");
+    }
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
@@ -93,7 +100,7 @@ public class TableRebalanceManager {
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig),
+          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig, allowRetries),
           _resourceManager.getPropertyStore());
     }
     return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
@@ -109,11 +116,14 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
    * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
+   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
    * @return a CompletableFuture that will complete with the result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType,
-      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress)
+      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -125,7 +135,8 @@ public class TableRebalanceManager {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress);
+            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress,
+                allowRetries);
           } catch (TableNotFoundException e) {
             // Should not happen since we already checked for table existence
             throw new RuntimeException(e);
@@ -147,6 +158,7 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param zkBasedTableRebalanceObserver observer to track rebalance progress in ZK
    * @return a CompletableFuture that will complete with the result of the rebalance operation
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType, TableConfig tableConfig,
       String rebalanceJobId, RebalanceConfig rebalanceConfig,
