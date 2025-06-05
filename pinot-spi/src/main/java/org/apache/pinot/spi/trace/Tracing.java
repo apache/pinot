@@ -185,6 +185,11 @@ public class Tracing {
     }
 
     @Override
+    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+    }
+
+    @Override
     public void clear() {
       _anchorThread.remove();
     }

@@ -324,7 +324,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         @Nullable ThreadExecutionContext parentContext) {
       super.setupWorker(taskId, taskType, parentContext);
       _threadLocalEntry.get()._errorStatus.set(null);
-      if (parentContext != null && parentContext.getQueryId() != null) {
+      if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
             parentContext.getAnchorThread());
       }

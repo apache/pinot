@@ -37,6 +37,14 @@ public interface ThreadResourceUsageAccountant {
   boolean isAnchorThreadInterrupted();
 
   /**
+   * This method has been deprecated and replaced by {@link setupRunner(String, int, ThreadExecutionContext.TaskType)}
+   * and {@link setupWorker(int, ThreadExecutionContext.TaskType, ThreadExecutionContext)}.
+   */
+  @Deprecated
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
+
+  /**
    * Set up the thread execution context for an anchor a.k.a runner thread.
    * @param queryId query id string
    * @param taskId a unique task id
