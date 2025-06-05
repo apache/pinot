@@ -2070,6 +2070,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _forceCommitMessageReceived = true;
   }
 
+  public StreamMetadataProvider getPartitionMetadataProvider() {
+    return _partitionMetadataProvider;
+  }
+
   @VisibleForTesting
   AtomicBoolean getConsumerSemaphoreAcquired() {
     return _consumerSemaphoreAcquired;
