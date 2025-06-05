@@ -603,5 +603,23 @@
         ]
       }
     ]
+  },
+  "physical_opt_broker_pruning": {
+    "queries": [
+      {
+        "description": "Broker pruning example (smoke test)",
+        "sql": "SET usePhysicalOptimizer=true; SET useBrokerPruning=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' ORDER BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(sort0=[$0], dir0=[ASC])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
   }
 }
