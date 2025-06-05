@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import javax.annotation.Nullable;
+
+
 /**
  * The context for task execution information of a thread
  */
@@ -38,12 +41,14 @@ public interface ThreadExecutionContext {
     * get query id of the execution context
     * @return query id in string
     */
+   @Nullable
    String getQueryId();
 
    /**
     *
     * @return get the anchor thread of execution context
     */
+   @Nullable
    Thread getAnchorThread();
 
    TaskType getTaskType();
