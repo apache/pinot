@@ -148,6 +148,10 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, recordReader);
       driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "transformation stats - incomplete:" + driver.getIncompleteRowsFound()
+              + ", dropped:" + driver.getSkippedRowsFound() + ", sanitized:"
+              + driver.getSanitizedRowsFound());
     }
 
     File refreshedSegmentFile = new File(workingDir, segmentName);
