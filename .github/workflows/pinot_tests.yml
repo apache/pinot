@@ -113,9 +113,9 @@ jobs:
       - name: Build SPI on master
         working-directory: master-head
         run: |
-        for mod in pinot-spi pinot-segment-spi; do
-          mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
-        done
+          for mod in pinot-spi pinot-segment-spi; do
+            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
+          done
       # Download the japicmp standalone JAR which will be used to compare APIs
       - name: Download japicmp CLI
         run: |
