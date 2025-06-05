@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -53,7 +54,8 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
 
   public LiteModeWorkerAssignmentRule(PhysicalPlannerContext context) {
     _context = context;
-    _runInBroker = Boolean.parseBoolean(context.getQueryOptions().getOrDefault("runInBroker", "false"));
+    _runInBroker = Boolean.parseBoolean(context.getQueryOptions().getOrDefault(
+        CommonConstants.Broker.Request.QueryOptionKey.RUN_IN_BROKER, "false"));
   }
 
   @Override

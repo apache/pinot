@@ -579,7 +579,6 @@ public class QueryDispatcher {
       long timeoutMs,
       Map<String, String> queryOptions,
       MailboxService mailboxService) {
-
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
@@ -589,11 +588,13 @@ public class QueryDispatcher {
     List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
     Preconditions.checkState(workerMetadata.size() == 1,
         "Expecting single worker for reduce stage, got: %s", workerMetadata.size());
+
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
             workerMetadata.get(0), null, parentContext, true);
+
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();
     int numColumns = resultFields.size();
@@ -605,6 +606,7 @@ public class QueryDispatcher {
       columnTypes[i] = sourceSchema.getColumnDataType(field.getKey());
     }
     DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
+
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
