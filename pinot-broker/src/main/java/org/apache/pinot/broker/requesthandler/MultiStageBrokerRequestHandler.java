@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,6 +94,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 
 /**
@@ -101,6 +104,19 @@ import org.slf4j.LoggerFactory;
  */
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+  /// Disabled by default, but can be enabled with
+  ///```xml
+  ///  <MarkerFilter marker="MSE_STATS_MARKER" onMatch="ACCEPT" onMismatch="NEUTRAL"/>
+  ///  ...
+  ///  <Loggers>
+  ///    <Logger name="org.apache.pinot" level="debug" additivity="false">
+  ///      <AppenderRef ref="console">
+  ///        <MarkerFilter marker="MSE_STATS_MARKER"/>
+  ///      </AppenderRef>
+  ///    </Logger>
+  ///  </Loggers>
+  /// ```
+  private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
@@ -170,9 +186,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext, httpHeaders);
       if (!brokerResponse.getExceptions().isEmpty()) {
         // a _green_ error (see handleRequestThrowing javadoc)
-        LOGGER.info("Request {} failed in a controlled manner: {}", requestId, brokerResponse.getExceptions());
         onFailedRequest(brokerResponse.getExceptions());
       }
+      summarizeQuery(requestId, brokerResponse);
       return brokerResponse;
     } catch (WebApplicationException e) {
       // a _yellow_ error (see handleRequestThrowing javadoc)
@@ -197,6 +213,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           QueryErrorCode.UNKNOWN, ExceptionUtils.consolidateExceptionMessages(e));
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
+    }
+  }
+
+  private void summarizeQuery(long requestId, BrokerResponse brokerResponse) {
+    ObjectNode stats = brokerResponse instanceof BrokerResponseNativeV2
+        ? ((BrokerResponseNativeV2) brokerResponse).getStageStats()
+        : JsonNodeFactory.instance.objectNode();
+    if (brokerResponse.getExceptions().isEmpty()) {
+      LOGGER.debug(MSE_STATS_MARKER, "Request {} finished in {}ms. Errors: {}. Stats: {}",
+          requestId, brokerResponse.getTimeUsedMs(), brokerResponse.getExceptions(), stats);
+    } else {
+      LOGGER.info(MSE_STATS_MARKER, "Request {} finished in {}ms. Errors: {}. Stats: {}",
+          requestId, brokerResponse.getTimeUsedMs(), brokerResponse.getExceptions(), stats);
     }
   }
 
