@@ -30,9 +30,9 @@ import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -120,7 +120,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
     if (geometry == null) {
       ServerMetrics metrics = ServerMetrics.get();
       if (metrics != null) {
-        metrics.addMeteredGlobalValue(ServerMeter.NULL_GEOMETRY_ROWS, 1);
+        metrics.addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
       }
       _nextDocId++;
       return;
