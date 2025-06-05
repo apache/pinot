@@ -37,8 +37,7 @@ import static org.mockito.Mockito.spy;
 
 public class SegmentOperationsThrottlerTest {
 
-  private fina
-  l ServerMetrics _serverMetrics = ServerMetrics.get();
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
   private final List<String> _thresholdGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
