@@ -259,7 +259,7 @@ public class PinotRealtimeTableResource {
       controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
           JsonUtils.objectToString(segmentsYetToBeCommitted));
       _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
-          ControllerJobType.FORCE_COMMIT, prev -> true);
+          ControllerJobType.FORCE_COMMIT);
     }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);

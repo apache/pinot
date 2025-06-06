@@ -27,24 +27,45 @@ public class TableRebalanceContext {
   private String _originalJobId;
   private RebalanceConfig _config;
   private int _attemptId;
+  // Default to true for all user initiated rebalances, so that they can be retried if they fail or get stuck.
+  private boolean _allowRetries = true;
 
-  public static TableRebalanceContext forInitialAttempt(String originalJobId, RebalanceConfig config) {
-    return new TableRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID);
+  /**
+   * Creates a new TableRebalanceContext for the initial attempt of a rebalance job.
+   *
+   * @param originalJobId The original job ID for the rebalance job.
+   * @param config The rebalance configuration.
+   * @param allowRetries Whether retries are allowed for this rebalance job. This isn't part of {@link RebalanceConfig}
+   *                     because user initiated rebalances should always support retries for failed and stuck jobs.
+   * @return A new TableRebalanceContext instance.
+   */
+  public static TableRebalanceContext forInitialAttempt(String originalJobId, RebalanceConfig config,
+      boolean allowRetries) {
+    return new TableRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID, allowRetries);
   }
 
+  /**
+   * Creates a new TableRebalanceContext for a retry attempt of a rebalance job.
+   *
+   * @param originalJobId The original job ID for the rebalance job.
+   * @param config The rebalance configuration.
+   * @param attemptId The attempt ID for the retry.
+   * @return A new TableRebalanceContext instance.
+   */
   public static TableRebalanceContext forRetry(String originalJobId, RebalanceConfig config, int attemptId) {
-    return new TableRebalanceContext(originalJobId, config, attemptId);
+    return new TableRebalanceContext(originalJobId, config, attemptId, true);
   }
 
   public TableRebalanceContext() {
     // For JSON deserialization.
   }
 
-  private TableRebalanceContext(String originalJobId, RebalanceConfig config, int attemptId) {
+  private TableRebalanceContext(String originalJobId, RebalanceConfig config, int attemptId, boolean allowRetries) {
     _jobId = createAttemptJobId(originalJobId, attemptId);
     _originalJobId = originalJobId;
     _config = config;
     _attemptId = attemptId;
+    _allowRetries = allowRetries;
   }
 
   public int getAttemptId() {
@@ -79,10 +100,18 @@ public class TableRebalanceContext {
     _config = config;
   }
 
+  public boolean getAllowRetries() {
+    return _allowRetries;
+  }
+
+  public void setAllowRetries(boolean allowRetries) {
+    _allowRetries = allowRetries;
+  }
+
   @Override
   public String toString() {
     return "TableRebalanceContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
-        + ", _config=" + _config + ", _attemptId=" + _attemptId + '}';
+        + ", _config=" + _config + ", _attemptId=" + _attemptId + ", _allowRetries=" + _allowRetries + "}";
   }
 
   private static String createAttemptJobId(String originalJobId, int attemptId) {

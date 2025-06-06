@@ -74,7 +74,8 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
