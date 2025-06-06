@@ -78,6 +78,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
+  private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
   private String _timeColumn;
   private TimeUnit _timeUnit;
   private Duration _timeGranularity;
@@ -378,6 +379,23 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getIndexCreationTime() {
     return _creationTime;
+  }
+
+  /**
+   * Returns the ZooKeeper creation time for upsert consistency.
+   * This is used to ensure consistent creation time across replicas for upsert operations.
+   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  public long getZkCreationTime() {
+    return _zkCreationTime;
+  }
+
+  /**
+   * Sets the ZooKeeper creation time for upsert consistency.
+   * @param zkCreationTime ZK creation time in milliseconds
+   */
+  public void setZkCreationTime(long zkCreationTime) {
+    _zkCreationTime = zkCreationTime;
   }
 
   @Override

@@ -71,6 +71,8 @@ import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -691,7 +693,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         segmentName, _tableNameWithType);
 
     if (isUpsertEnabled()) {
-      handleUpsert(immutableSegment);
+      handleUpsert(immutableSegment, zkMetadata);
       return;
     }
 
@@ -730,9 +732,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  private void handleUpsert(ImmutableSegment immutableSegment) {
+  private void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {} with upsert enabled", segmentName);
+
+    // Set the ZK creation time for upsert consistency across replicas
+    setZkCreationTimeIfAvailable(immutableSegment, zkMetadata);
 
     Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
     Preconditions.checkNotNull(partitionId, "Failed to get partition id for segment: " + segmentName
@@ -809,6 +814,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /**
+   * Sets the ZK creation time in the segment metadata if available, to ensure consistent
+   * creation times across replicas for upsert operations.
+   */
+  private void setZkCreationTimeIfAvailable(ImmutableSegment segment, @Nullable SegmentZKMetadata zkMetadata) {
+    if (zkMetadata != null && zkMetadata.getCreationTime() > 0) {
+      SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+      if (segmentMetadata instanceof SegmentMetadataImpl) {
+        SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+        segmentMetadataImpl.setZkCreationTime(zkMetadata.getCreationTime());
+        _logger.info("Set ZK creation time {} for segment: {} in upsert table", zkMetadata.getCreationTime(),
+            zkMetadata.getSegmentName());
+      }
+    }
+  }
+
+  /**
    * Replaces the CONSUMING segment with a downloaded committed one.
    */
   public void downloadAndReplaceConsumingSegment(SegmentZKMetadata zkMetadata)
@@ -832,7 +853,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File indexDir = new File(_indexDir, segmentName);
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
+
+    // Fetch ZK metadata to pass to addSegment so that ZK creation time is set automatically
+    SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
+    addSegment(immutableSegment, zkMetadata);
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
   }
 
