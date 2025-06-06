@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -77,7 +78,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @Test
   public void testAggregateCaseToFilter() {
-    // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
+    // queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
     // "SELECT COUNT(a) FROM a WHERE col1 = 'a'"
     String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a";
 
@@ -91,6 +92,49 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          PinotLogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testAggregateCaseToFilter2() {
+    // queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN cnt ELSE 0 END) FROM a" are rewritten to
+    // "SELECT SUM0(cnt) FROM a WHERE col1 = 'a'"
+    String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 3 ELSE 0 END) FROM a";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+      "Execution Plan\n"
+          + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+          + "  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
+          + "    PinotLogicalExchange(distribution=[hash])\n"
+          + "      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0) FILTER $1], agg#1=[COUNT()], aggType=[LEAF])\n"
+          + "        LogicalProject($f1=[3], $f2=[=($0, _UTF-8'a')])\n"
+          + "          PinotLogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
+  }
+
+  @Ignore("PruneEmptyRules.CORRELATE_LEFT_INSTANCE and its right equivalent will be added in the future")
+  @Test
+  public void testPruneEmptyCorrelateJoin() {
+    // queries involving correlated join with dummy
+    // should be optimized to dummy by PruneEmptyRules.CORRELATE_LEFT_INSTANCE
+    // or its right equivalence
+    String query = "EXPLAIN PLAN FOR SELECT *\n"
+        + "FROM (\n"
+        + "  SELECT * FROM a WHERE 1 = 0\n"
+        + ") t1\n"
+        + "WHERE EXISTS (\n"
+        + "  SELECT 1\n"
+        + "  FROM a\n"
+        + "  WHERE a.col1 = t1.col1\n"
+        + ");\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n");
     //@formatter:on
   }
 
