@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -85,8 +87,6 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.metrics.MinionMetrics;
 
 
 /**
@@ -278,7 +278,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
           } else {
-        _incompleteRowsFound++;
+            _incompleteRowsFound++;
             LOGGER.debug("Error occurred while reading row during indexing", e);
             continue;
           }
