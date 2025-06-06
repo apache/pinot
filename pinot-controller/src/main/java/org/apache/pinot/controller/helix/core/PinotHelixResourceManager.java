@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -27,8 +29,12 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Sets;
+
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -48,8 +54,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -62,6 +71,11 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -118,6 +132,7 @@ import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -130,6 +145,8 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -137,6 +154,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -166,7 +184,9 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TablePageCacheWarmupRequest;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -181,6 +201,8 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -188,6 +210,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -247,11 +270,12 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private final String _pageCacheWarmupDataDir;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
+      @Nullable ExecutorService executorService, double diskUtilizationThreshold, @Nullable String pageCacheWarmupDataDir) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -276,6 +300,7 @@ public class PinotHelixResourceManager {
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
+    _pageCacheWarmupDataDir = pageCacheWarmupDataDir;
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -284,7 +309,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.getPageCacheWarmupDataDir());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -293,7 +318,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.getPageCacheWarmupDataDir());
   }
 
   /**
@@ -4420,7 +4445,123 @@ public class PinotHelixResourceManager {
    */
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    triggerPageCacheWarmup(tableNameWithType, segmentsTo);
+  }
+
+  protected void triggerPageCacheWarmup(String tableNameWithType, List<String> segmentsTo) {
+    String rawTableName = null;
+    try {
+      rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      assert tableType == TableType.OFFLINE;
+      TableConfig tableConfig = getOfflineTableConfig(rawTableName);
+      if (tableConfig == null) {
+        return;
+      }
+
+      PageCacheWarmupConfig pageCacheWarmupConfig = getPageCacheWarmupConfig(tableConfig);
+      if (pageCacheWarmupConfig == null || !pageCacheWarmupConfig.isRefreshEnabled()) {
+        return;
+      }
+
+      long maxWarmupDurationMs = pageCacheWarmupConfig.getMaxWarmupDurationSeconds() * 1000L;
+      ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+      final String finalRawTableName = rawTableName;
+      CompletableFuture<Void> warmupFuture = CompletableFuture.runAsync(() -> {
+        LOGGER.info("Starting page cache warmup for table: {}, maxWarmupDurationMs: {}", finalRawTableName, maxWarmupDurationMs);
+        _controllerMetrics.addMeteredTableValue(finalRawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
+
+        PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_pageCacheWarmupDataDir).getScheme());
+        // TODO: Add support to create file using PinotFS
+        File queryFile = new File(new File(_pageCacheWarmupDataDir, tableNameWithType), "queries.txt");
+        try (InputStream inputStream = pinotFS.open(queryFile.toURI())) {
+          List<String> queries = OBJECT_MAPPER.readValue(inputStream, new TypeReference<>() { });
+          if (queries.isEmpty()) {
+            throw new RuntimeException("No queries found for tableName: " + finalRawTableName);
+          }
+
+          TablePageCacheWarmupRequest warmupRequest =
+              new TablePageCacheWarmupRequest(appendSecondaryWorkload(queries), segmentsTo);
+
+          List<String> serverInstancesForTable = getServerInstancesForTable(finalRawTableName, tableType);
+          BiMap<String, String> serverToEndPoints = getDataInstanceAdminEndpoints(new HashSet<>(serverInstancesForTable));
+          BiMap<String, String> endpointsToServers = serverToEndPoints.inverse();
+
+          CompletableFuture.allOf(endpointsToServers.keySet().stream()
+                  .map(serverInstance -> {
+                    try {
+                      URI warmupUri = new URI(serverInstance + "/tables/" + tableNameWithType + "/triggerWarmup");
+                      return CompletableFuture.runAsync(() ->
+                          sendWarmupRequestWithRetry(warmupUri, warmupRequest, serverInstance, finalRawTableName));
+                    } catch (Exception e) {
+                      throw new CompletionException("Invalid URI for server: " + serverInstance, e);
+                    }
+                  })
+                  .toArray(CompletableFuture[]::new))
+              .join();
+        } catch (Exception e) {
+          throw new CompletionException(e);
+        }
+      });
+      warmupFuture.get(maxWarmupDurationMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_TIMEOUT, 1);
+      LOGGER.error("Global warmup timed out for table: {}", rawTableName);
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_ERRORS, 1);
+      LOGGER.error("Failed to serve queries for table: {}", tableNameWithType, e);
+    }
+  }
+
+  private PageCacheWarmupConfig getPageCacheWarmupConfig(TableConfig tableConfig) throws JsonProcessingException {
+    Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+    if (customConfigs == null || customConfigs.get("pageCacheWarmupConfig") == null) {
+      return null;
+    }
+    ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    return OBJECT_MAPPER.readValue(customConfigs.get("pageCacheWarmupConfig"), PageCacheWarmupConfig.class);
+  }
+
+  private void sendWarmupRequestWithRetry(URI uri, TablePageCacheWarmupRequest request, String serverInstance, String tableName) {
+    try {
+      ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        try {
+          ClassicHttpRequest httpRequest = ClassicRequestBuilder.post(uri)
+              .setVersion(HttpVersion.HTTP_1_1)
+              .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
+              .setEntity(OBJECT_MAPPER.writeValueAsString(request))
+              .build();
+          LOGGER.info("Sending warmup request to server: {} for table: {}", serverInstance, tableName);
+          SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendRequest(httpRequest));
+          if (response.getStatusCode() == HttpStatus.SC_OK) {
+            LOGGER.info("Successfully sent warmup request to server: {} for table: {}", serverInstance, tableName);
+            return true;
+          } else {
+            LOGGER.error("Failed to warmup server: {} for table: {} with response: {}, retrying..", serverInstance, tableName,
+                response);
+            return false;
+          }
+        } catch (Exception e) {
+          LOGGER.error("Error sending warmup request to server: {} for table: {}, retrying..", serverInstance, tableName, e);
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_ERRORS, 1);
+      LOGGER.error("Error sending warmup request to server: {} for table: {}", serverInstance, tableName, e);
+    }
+  }
+
+  // Append SecondaryWorkload option to each query, to indicate that the query should be executed in the secondary queue
+  // on the server, since we don't want to block the primary queue that is serving live queries with warmup queries.
+  private static List<String> appendSecondaryWorkload(List<String> queries) {
+    List<String> modifiedQueries = new ArrayList<>();
+    for (String query : queries) {
+      modifiedQueries.add("SET isSecondaryWorkload=true;" + query);
+    }
+    return modifiedQueries;
   }
 
   /**
