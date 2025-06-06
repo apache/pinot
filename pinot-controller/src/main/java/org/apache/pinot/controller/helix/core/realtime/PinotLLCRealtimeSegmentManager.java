@@ -2434,7 +2434,8 @@ public class PinotLLCRealtimeSegmentManager {
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
    * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig) {
+  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
+      boolean repairErrorSegmentsForPartialUpsertOrDedup) {
     String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
@@ -2516,7 +2517,7 @@ public class PinotLLCRealtimeSegmentManager {
     boolean isPartialUpsertEnabled =
         tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
     boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
-    if ((isPartialUpsertEnabled || isDedupEnabled)) {
+    if ((isPartialUpsertEnabled || isDedupEnabled) && !repairErrorSegmentsForPartialUpsertOrDedup) {
       // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
@@ -2525,6 +2526,11 @@ public class PinotLLCRealtimeSegmentManager {
           realtimeTableName);
       return;
     } else {
+      if ((isPartialUpsertEnabled || isDedupEnabled)) {
+        LOGGER.info(
+            "Repairing error segments in table: {} as repairErrorSegmentForPartialUpsertOrDedup is set to true",
+            realtimeTableName);
+      }
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
     }
