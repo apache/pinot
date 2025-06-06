@@ -534,8 +534,8 @@ public class InstanceAssignmentTest {
     StreamMetadataProvider streamMetadataProvider = mock(StreamMetadataProvider.class);
     when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(numPartitions);
     InstancePartitionSelector instancePartitionSelector =
-        new ImplicitRealtimeTablePartitionSelector(tableConfig, replicaGroupPartitionConfig, tableConfig.getTableName(),
-            null, true, streamMetadataProvider);
+        new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig, tableConfig.getTableName(), null, true,
+            streamMetadataProvider);
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
     InstancePartitions instancePartitions =
         driver.getInstancePartitions(InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME),
@@ -569,7 +569,7 @@ public class InstanceAssignmentTest {
     // Increase the number of partitions from 6 to 9. Expect no data movement for existing partitions.
     numPartitions = 9;
     when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(numPartitions);
-    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(tableConfig, replicaGroupPartitionConfig,
+    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig,
         tableConfig.getTableName(), instancePartitions, true, streamMetadataProvider);
     instancePartitions = driver.getInstancePartitions(
         InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME), instanceAssignmentConfig,
@@ -613,7 +613,7 @@ public class InstanceAssignmentTest {
       instanceConfigs.add(instanceConfig);
     }
 
-    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(tableConfig, replicaGroupPartitionConfig,
+    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig,
         tableConfig.getTableName(), instancePartitions, true, streamMetadataProvider);
     instancePartitions = driver.getInstancePartitions(
         InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME), instanceAssignmentConfig,
