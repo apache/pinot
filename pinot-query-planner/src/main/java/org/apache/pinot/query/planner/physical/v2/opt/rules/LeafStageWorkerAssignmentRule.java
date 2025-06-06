@@ -182,8 +182,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         routingTableMap.keySet());
     boolean inferInvalidPartitionSegment = QueryOptionsUtils.isInferInvalidSegmentPartition(
         _physicalPlannerContext.getQueryOptions());
+    boolean inferRealtimeSegmentPartition = QueryOptionsUtils.isInferRealtimeSegmentPartition(
+        _physicalPlannerContext.getQueryOptions());
     TableScanWorkerAssignmentResult workerAssignmentResult = assignTableScan(tableName, fieldNames,
-        instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment);
+        instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
     TableScanMetadata metadata = new TableScanMetadata(Set.of(tableName), workerAssignmentResult._workerIdToSegmentsMap,
         tableOptions, segmentUnavailableMap, timeBoundaryInfo);
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
@@ -196,7 +198,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult assignTableScan(String tableName, List<String> fieldNames,
       InstanceIdToSegments instanceIdToSegments, Map<String, TablePartitionInfo> tpiMap,
-      boolean inferInvalidPartitionSegment) {
+      boolean inferInvalidPartitionSegment, boolean inferRealtimeSegmentPartition) {
     Set<String> tableTypes = instanceIdToSegments.getActiveTableTypes();
     Set<String> partitionedTableTypes = tableTypes.stream().filter(tpiMap::containsKey).collect(Collectors.toSet());
     Preconditions.checkState(!tableTypes.isEmpty(), "No routing entry for offline or realtime type");
@@ -209,7 +211,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         TablePartitionInfo tpi = tpiMap.get(tableType);
         TableScanWorkerAssignmentResult assignmentResult = attemptPartitionedDistribution(tableNameWithType,
             fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)), tpi,
-            inferInvalidPartitionSegment);
+            inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
         if (tpi != null && CollectionUtils.isNotEmpty(tpi.getSegmentsWithInvalidPartition())) {
           // Use SegmentPartitionMetadataManager's logs to find the segments with invalid partitions.
           BROKER_METRICS.addMeteredTableValue(tableNameWithType, BrokerMeter.INVALID_SEGMENT_PARTITION_IN_QUERY,
@@ -259,13 +261,22 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
       List<String> fieldNames, Map<String, List<String>> instanceIdToSegmentsMap,
-      @Nullable TablePartitionInfo tablePartitionInfo, boolean inferInvalidSegmentPartition) {
+      @Nullable TablePartitionInfo tablePartitionInfo, boolean inferInvalidSegmentPartition,
+      boolean inferRealtimeSegmentPartition) {
     if (tablePartitionInfo == null) {
       return null;
     }
     String tableType =
         Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType),
             "Illegal state: expected table name with type").toString();
+    if (TableType.valueOf(tableType) == TableType.REALTIME && inferRealtimeSegmentPartition) {
+      // If we are inferring partitioning for realtime segments, we need to build the TPI with inferred partitions.
+      tablePartitionInfo = buildTablePartitionInfoWithInferredPartitions(tableNameWithType, instanceIdToSegmentsMap,
+          tablePartitionInfo);
+      if (tablePartitionInfo == null) {
+        return null;
+      }
+    }
     int numPartitions = tablePartitionInfo.getNumPartitions();
     int keyIndex = fieldNames.indexOf(tablePartitionInfo.getPartitionColumn());
     String function = tablePartitionInfo.getPartitionFunctionName();
@@ -355,6 +366,36 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     PinotDataDistribution dataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         workers, workers.hashCode(), ImmutableSet.of(desc), null);
     return new TableScanWorkerAssignmentResult(dataDistribution, workerIdToSegmentsMap);
+  }
+
+  @VisibleForTesting
+  @Nullable
+  static TablePartitionInfo buildTablePartitionInfoWithInferredPartitions(String tableNameWithType,
+      Map<String, List<String>> instanceIdToSegmentsMap, TablePartitionInfo tablePartitionInfo) {
+    Preconditions.checkState(TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType)),
+        "Table %s is not a realtime table. Cannot infer partitions for invalid segments", tableNameWithType);
+    String partitionColumn = tablePartitionInfo.getPartitionColumn();
+    String partitionFunctionName = tablePartitionInfo.getPartitionFunctionName();
+    int numPartitions = tablePartitionInfo.getNumPartitions();
+    List<String> segmentsWithInvalidPartition = List.of();
+    // compute segmentsByPartition by getting segments from the map and inferring partition from segment name.
+    List<List<String>> segmentsByPartition = new ArrayList<>();
+    for (int i = 0; i < numPartitions; i++) {
+      segmentsByPartition.add(new ArrayList<>());
+    }
+    for (Map.Entry<String, List<String>> entry : instanceIdToSegmentsMap.entrySet()) {
+      List<String> segments = entry.getValue();
+      for (String segment : segments) {
+        int partitionId = inferPartitionId(segment, numPartitions);
+        if (partitionId == -1) {
+          return null;
+        } else {
+          segmentsByPartition.get(partitionId).add(segment);
+        }
+      }
+    }
+    return new TablePartitionInfo(tableNameWithType, partitionColumn, partitionFunctionName, numPartitions,
+        segmentsByPartition, segmentsWithInvalidPartition);
   }
 
   /**
