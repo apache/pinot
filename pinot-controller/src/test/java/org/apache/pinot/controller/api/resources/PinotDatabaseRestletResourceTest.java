@@ -112,7 +112,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testSetDatabaseQuotaWithMaxQueriesPerSecond() throws Exception {
+  public void testSetDatabaseQuotaWithMaxQueriesPerSecond()
+      throws Exception {
     // Test setting database quota using traditional maxQueriesPerSecond parameter
     String queryQuota = "100";
     when(_resourceManager.getDatabaseConfig(DATABASE)).thenReturn(null);
@@ -127,7 +128,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testSetDatabaseQuotaWithFlexibleParameters() throws Exception {
+  public void testSetDatabaseQuotaWithFlexibleParameters()
+      throws Exception {
     // Test setting database quota using flexible parameters
     String rateLimiterUnit = "SECONDS";
     Double rateLimiterDuration = 5.0;
@@ -146,7 +148,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testSetDatabaseQuotaWithMinutesTimeUnit() throws Exception {
+  public void testSetDatabaseQuotaWithMinutesTimeUnit()
+      throws Exception {
     // Test setting database quota with MINUTES time unit
     String rateLimiterUnit = "MINUTES";
     Double rateLimiterDuration = 10.0;
@@ -164,7 +167,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testSetDatabaseQuotaWithFractionalRates() throws Exception {
+  public void testSetDatabaseQuotaWithFractionalRates()
+      throws Exception {
     // Test setting database quota with fractional rate limits
     String rateLimiterUnit = "SECONDS";
     Double rateLimiterDuration = 1.0;
@@ -182,7 +186,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testSetDatabaseQuotaWithComplexDurationAndRate() throws Exception {
+  public void testSetDatabaseQuotaWithComplexDurationAndRate()
+      throws Exception {
     // Test setting database quota with complex duration and rate combination
     String rateLimiterUnit = "SECONDS";
     Double rateLimiterDuration = 5.0;
@@ -200,7 +205,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testUpdateExistingDatabaseQuota() throws Exception {
+  public void testUpdateExistingDatabaseQuota()
+      throws Exception {
     // Test updating an existing database quota
     DatabaseConfig existingConfig = new DatabaseConfig(DATABASE,
         new QuotaConfig(null, TimeUnit.SECONDS, 1.0, 50.0));
@@ -217,7 +223,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testUpdateExistingDatabaseQuotaWithFlexibleParams() throws Exception {
+  public void testUpdateExistingDatabaseQuotaWithFlexibleParams()
+      throws Exception {
     // Test updating an existing database quota with flexible parameters
     DatabaseConfig existingConfig = new DatabaseConfig(DATABASE,
         new QuotaConfig(null, TimeUnit.SECONDS, 1.0, 50.0));
@@ -237,7 +244,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testGetDatabaseQuotaWhenConfigExists() throws Exception {
+  public void testGetDatabaseQuotaWhenConfigExists()
+      throws Exception {
     // Test getting database quota when config exists
     QuotaConfig quotaConfig = new QuotaConfig(null, TimeUnit.SECONDS, 5.0, 100.0);
     DatabaseConfig databaseConfig = new DatabaseConfig(DATABASE, quotaConfig);
@@ -252,7 +260,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testGetDatabaseQuotaWithDefaultClusterConfig() throws Exception {
+  public void testGetDatabaseQuotaWithDefaultClusterConfig()
+      throws Exception {
     // Test getting database quota when no specific config exists but cluster default exists
     when(_resourceManager.getDatabaseConfig(DATABASE)).thenReturn(null);
     // The actual implementation will fetch cluster config, but we're testing the basic flow
@@ -264,7 +273,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testDatabaseQuotaWithVerySmallFractionalRates() throws Exception {
+  public void testDatabaseQuotaWithVerySmallFractionalRates()
+      throws Exception {
     // Test setting very small fractional rates
     String rateLimiterUnit = "SECONDS";
     Double rateLimiterDuration = 1.0;
@@ -282,7 +292,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test
-  public void testDatabaseQuotaWithCommonFractionalScenarios() throws Exception {
+  public void testDatabaseQuotaWithCommonFractionalScenarios()
+      throws Exception {
     // Test common real-world fractional scenarios
 
     // Scenario 1: 1 query every 3 seconds (0.333... qps)
@@ -317,7 +328,8 @@ public class PinotDatabaseRestletResourceTest {
   }
 
   @Test(expectedExceptions = NumberFormatException.class)
-  public void testSetDatabaseQuotaWithInvalidQueryQuota() throws Exception {
+  public void testSetDatabaseQuotaWithInvalidQueryQuota()
+      throws Exception {
     // Test handling of invalid query quota string
     String invalidQueryQuota = "invalid_number";
 

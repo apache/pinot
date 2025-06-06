@@ -72,7 +72,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = CommonConstants.DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotDatabaseRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotDatabaseRestletResource.class);
@@ -150,7 +151,7 @@ public class PinotDatabaseRestletResource {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
       QuotaConfig quotaConfig = new QuotaConfig(null, TimeUnit.SECONDS, 1d, Double.valueOf(queryQuota));
       if (databaseConfig == null) {
-         databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
         _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
       } else {
         databaseConfig.setQuotaConfig(quotaConfig);
@@ -173,14 +174,14 @@ public class PinotDatabaseRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
   @ApiOperation(value = "Update database quotas", notes = "Update database quotas")
   public SuccessResponse setDatabaseQuota(
-          @PathParam("databaseName") String databaseName,
-          @QueryParam("ratelimiterUnit") String ratelimiterUnit,
-          @QueryParam("ratelimiterDuration") Double ratelimiterDuration,
-          @QueryParam("maxQueriesValue") Double maxQueriesValue,
-          @Context HttpHeaders httpHeaders) {
+      @PathParam("databaseName") String databaseName,
+      @QueryParam("ratelimiterUnit") String ratelimiterUnit,
+      @QueryParam("ratelimiterDuration") Double ratelimiterDuration,
+      @QueryParam("maxQueriesValue") Double maxQueriesValue,
+      @Context HttpHeaders httpHeaders) {
     if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {
       throw new ControllerApplicationException(LOGGER, "Database config name and request context does not match",
-              Response.Status.BAD_REQUEST);
+          Response.Status.BAD_REQUEST);
     }
     try {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
@@ -223,7 +224,7 @@ public class PinotDatabaseRestletResource {
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     String defaultQueryQuota = helixAdmin.getConfig(configScope,
             Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
-            .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
+        .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
     return new QuotaConfig(null, TimeUnit.SECONDS, null, Double.valueOf(defaultQueryQuota));
   }
 }
