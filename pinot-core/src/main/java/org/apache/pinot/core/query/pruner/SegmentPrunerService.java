@@ -137,7 +137,7 @@ public class SegmentPrunerService {
    * @return the new list with filtered elements. This is the list that have to be used.
    */
   private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments, QueryContext query,
-      SegmentPrunerStatistics stats) {
+                                                          SegmentPrunerStatistics stats) {
     int selected = 0;
     int invalid = 0;
     for (IndexSegment segment : segments) {
@@ -157,7 +157,12 @@ public class SegmentPrunerService {
     return segment.getSegmentMetadata().getTotalDocs() == 0;
   }
 
+  /**
+   * Checks if the segment is invalid for the given query.
+   * Returns true if the columns in the query are not present both in segment and table schema.
+   */
   private static boolean isInvalidSegment(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
+    return !segment.getColumnNames().containsAll(query.getColumns())
+        && !query.getSchema().getColumnNames().containsAll(query.getColumns());
   }
 }

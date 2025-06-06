@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
@@ -100,6 +101,9 @@ public class SegmentPrunerServiceTest {
     String query = "select not_present from t1";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    Schema schema = mock(Schema.class);
+    when(schema.getColumnNames()).thenReturn(new java.util.TreeSet<>(Arrays.asList("col1", "col2")));
+    queryContext.setSchema(schema);
 
     List<IndexSegment> actual = service.prune(indexes, queryContext, stats);
 
