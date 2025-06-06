@@ -299,7 +299,7 @@
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.10</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
-    <plexus-utils.version>4.0.2</plexus-utils.version>
+    <plexus-utils.version>3.6.0</plexus-utils.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
