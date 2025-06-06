@@ -293,12 +293,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private Thread _consumerThread;
   // _partitionGroupId represents the Pinot's internal partition number which will eventually be used as part of
   // segment name.
-  // _streamPatitionGroupId represents the partition number in the stream topic, which could be derived from the
+  // _streamPartitionId represents the partition number in the stream topic, which could be derived from the
   // _partitionGroupId and identify which partition of the stream topic this consumer is consuming from.
   // Note that in traditional single topic ingestion mode, those two concepts were identical which got separated
   // in multi-topic ingestion mode.
   private final int _partitionGroupId;
-  private final int _streamPatitionGroupId;
+  private final int _streamPartitionId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
@@ -1638,9 +1638,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
-    _streamPatitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMaps(_tableConfig)
-        .get(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId)));
+    List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(_tableConfig);
+    int numStreams = streamConfigMaps.size();
+    if (numStreams == 1) {
+      // Single stream
+      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
+      // larger than 10000.
+      _streamPartitionId = _partitionGroupId;
+      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(0));
+    } else {
+      // Multiple streams
+      _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
+      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
+          _tableNameWithType);
+      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
+    }
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
@@ -1655,9 +1668,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId + "-" + clientIdSuffix;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId + "-" + clientIdSuffix;
     } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPartitionId;
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
@@ -1977,8 +1990,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
-        _clientId, _streamPatitionGroupId);
+    _partitionMetadataProvider =
+        _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {
