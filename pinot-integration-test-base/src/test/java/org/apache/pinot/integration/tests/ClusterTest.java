@@ -445,7 +445,8 @@ public abstract class ClusterTest extends ControllerTest {
         }
       } else {
         // Upload all segments in parallel
-        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.min(numSegments, Runtime.getRuntime()
+            .availableProcessors()));
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
           futures.add(executorService.submit(() -> {
