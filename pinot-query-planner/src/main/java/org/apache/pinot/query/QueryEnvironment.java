@@ -475,13 +475,6 @@ public class QueryEnvironment {
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
-    // Prune the plan for one round first, this is helpful for rule matching
-    // TODO: this is disabled for now because it introduces redundant Project and Exchange
-    //    "Enabling this introduces changes to ~50 hardcoded plans in ResourceBasedQueriesTest."
-    //    "It is also needed to investigate why there would be redundant Project and Exchange"
-    //     "when the extra pruning is enabled"
-//    hepProgramBuilder.addRuleCollection(pruneRules);
-
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
