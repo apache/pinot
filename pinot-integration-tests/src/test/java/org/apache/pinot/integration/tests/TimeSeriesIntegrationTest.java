@@ -152,6 +152,18 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     );
   }
 
+  @Test
+  public void testTableWithoutType() {
+    String query = String.format(
+      "fetch{table=\"mytable\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        + " | max{%s} | transformNull{0} | keepLastValue{}",
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
+      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
+    );
+  }
+
   private void runGroupedTimeSeriesQuery(String query, int expectedGroups, TimeSeriesValidator validator) {
     JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC);
     System.out.println(result);
