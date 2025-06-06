@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -49,10 +50,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -248,14 +246,21 @@ public class RebalanceCheckerTest {
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
     when(helixManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(helixManager.getAllJobs(any(), any())).thenReturn(allJobMetadata);
-    RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getPropertyStore()).thenReturn(propertyStore);
+    TableRebalanceManager tableRebalanceManager = mock(TableRebalanceManager.class);
+    when(tableRebalanceManager.rebalanceTableAsync(anyString(), any(TableConfig.class), anyString(),
+        any(RebalanceConfig.class), any(ZkBasedTableRebalanceObserver.class))).thenReturn(
+        CompletableFuture.completedFuture(null));
+    RebalanceChecker checker = new RebalanceChecker(tableRebalanceManager, helixManager, leadController, cfg, metrics);
     // Although job1_3 was submitted most recently but job1 had exceeded maxAttempts. Chose job3 to retry, which got
     // stuck at in progress status.
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // The new retry job is for job3 and attemptId is increased to 2.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, times(1)).rebalanceTableAsync(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
     ZkBasedTableRebalanceObserver observer = observerCaptor.getValue();
     jobCtx = observer.getTableRebalanceContext();
     assertEquals(jobCtx.getOriginalJobId(), "job3");
@@ -286,12 +291,19 @@ public class RebalanceCheckerTest {
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
     TableConfig tableConfig = mock(TableConfig.class);
     when(helixManager.getTableConfig(tableName)).thenReturn(tableConfig);
-    RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getPropertyStore()).thenReturn(propertyStore);
+    TableRebalanceManager tableRebalanceManager = mock(TableRebalanceManager.class);
+    when(tableRebalanceManager.rebalanceTableAsync(anyString(), any(TableConfig.class), anyString(),
+        any(RebalanceConfig.class), any(ZkBasedTableRebalanceObserver.class))).thenReturn(
+        CompletableFuture.completedFuture(null));
+    RebalanceChecker checker = new RebalanceChecker(tableRebalanceManager, helixManager, leadController, cfg, metrics);
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // Retry for job1 is delayed with 5min backoff.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(0)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, never()).rebalanceTable(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
 
     // Set initial delay to 0 to disable retry backoff.
     jobCfg.setRetryInitialDelayInMs(0);
@@ -300,7 +312,8 @@ public class RebalanceCheckerTest {
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // Retry for job1 is delayed with 0 backoff.
     observerCaptor = ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, times(1)).rebalanceTableAsync(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
   }
 
   @Test

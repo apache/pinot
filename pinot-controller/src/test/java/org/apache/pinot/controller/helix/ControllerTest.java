@@ -69,6 +69,8 @@ import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -158,6 +160,8 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected TableRebalanceManager _tableRebalanceManager;
+  protected TableSizeReader _tableSizeReader;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -303,6 +307,8 @@ public class ControllerTest {
       _controllerDataDir = _controllerConfig.getDataDir();
       _helixResourceManager = _controllerStarter.getHelixResourceManager();
       _helixManager = _controllerStarter.getHelixControllerManager();
+      _tableRebalanceManager = _controllerStarter.getTableRebalanceManager();
+      _tableSizeReader = _controllerStarter.getTableSizeReader();
       _helixDataAccessor = _helixManager.getHelixDataAccessor();
       ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
       // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
