@@ -477,8 +477,11 @@ public class SortOperatorTest {
   public void shouldPreservePrecision() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{LONG});
-    // Insert 3 large long values which will be the same if converted to double due to precision loss.
+    // Insert 3 consecutive large numbers that are represented by the same double value if converted to double due to
+    // precision loss.
     long largeValue = 1L << 60;
+    //noinspection ConstantValue
+    assert (double) largeValue == (double) (largeValue + 1) && (double) largeValue == (double) (largeValue + 2);
     when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{largeValue + 2}, new Object[]{largeValue}, new Object[]{largeValue + 1}))
         .thenReturn(SuccessMseBlock.INSTANCE);
