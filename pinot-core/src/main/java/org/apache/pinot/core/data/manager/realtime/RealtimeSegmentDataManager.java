@@ -1082,7 +1082,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (messageBatch.hasDataLoss()) {
       _serverMetrics.setValueOfTableGauge(_tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
       String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
-          + _tableNameWithType + " startOffset: " + _startOffset + " batchFirstOffset: "
+          + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
           + messageBatch.getFirstMessageOffset();
       _segmentLogger.error(message);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
