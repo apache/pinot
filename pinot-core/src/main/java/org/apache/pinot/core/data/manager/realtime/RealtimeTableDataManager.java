@@ -20,7 +20,9 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -61,6 +63,7 @@ import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -71,6 +74,7 @@ import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -830,10 +834,59 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
+
+    // Fix creation time consistency before loading the locally built segment (for upsert tables)
+    if (isUpsertEnabled()) {
+      fixCreationTimeConsistencyForLocalSegment(segmentName, indexDir);
+    }
+
     // Get a new index loading config with latest table config and schema to load the segment
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
+  }
+
+  /**
+   * Fixes creation time consistency for locally built segments in upsert tables.
+   * This ensures that slower replicas have consistent creation times for proper upsert comparison.
+   */
+  private void fixCreationTimeConsistencyForLocalSegment(String segmentName, File indexDir) {
+    try {
+      SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+      long segmentCreationTimeFromZK = zkMetadata.getCreationTime();
+
+      // Check if local creation.meta file exists
+      File creationMetaFile = new File(indexDir, V1Constants.SEGMENT_CREATION_META);
+      if (!creationMetaFile.exists()) {
+        _logger.debug("creation.meta file does not exist for segment: {}, skipping fix", segmentName);
+        return;
+      }
+
+      // Read current creation time and CRC from the local creation.meta file
+      long localCreationTime;
+      long currentCrc;
+      try (DataInputStream dataInputStream = new DataInputStream(new FileInputStream(creationMetaFile))) {
+        currentCrc = dataInputStream.readLong();
+        localCreationTime = dataInputStream.readLong();
+      }
+
+      if (segmentCreationTimeFromZK != localCreationTime) {
+        _logger.info("Segment: {} has creation time mismatch. ZK: {}, Local: {}. " + "Fixing local creation.meta file.",
+            segmentName, segmentCreationTimeFromZK, localCreationTime);
+
+        // Update creation.meta file with creation time from ZK, keeping the same CRC
+        SegmentIndexCreationDriverImpl.persistCreationMeta(indexDir, currentCrc, segmentCreationTimeFromZK);
+
+        _logger.info("Successfully fixed creation time for segment: {} to {}", segmentName, segmentCreationTimeFromZK);
+      } else {
+        _logger.debug("Segment: {} already has consistent creation time: {}", segmentName, segmentCreationTimeFromZK);
+      }
+    } catch (Exception e) {
+      _logger.warn(
+          "Failed to fix creation time consistency for segment: {}. Error: {}. " + "Proceeding with local segment.",
+          segmentName, e.getMessage());
+      // Don't throw exception - proceed with local segment even if fix fails
+    }
   }
 
   public String getServerInstance() {
