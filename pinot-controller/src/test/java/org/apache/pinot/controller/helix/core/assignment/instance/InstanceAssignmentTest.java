@@ -47,11 +47,15 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
@@ -59,6 +63,7 @@ public class InstanceAssignmentTest {
   private static final String RAW_TABLE_NAME = "myTable";
   private static final String TENANT_NAME = "tenant";
   private static final String OFFLINE_TAG = TagNameUtils.getOfflineTagForTenant(TENANT_NAME);
+  private static final String REALTIME_TAG = TagNameUtils.getRealtimeTagForTenant(TENANT_NAME);
   private static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   private static final String SERVER_INSTANCE_POOL_PREFIX = "_pool_";
   private static final String TABLE_NAME_ZERO_HASH_COMPLEMENT = "12";
@@ -497,6 +502,154 @@ public class InstanceAssignmentTest {
     assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(9, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 6));
     assertEquals(instancePartitions.getInstances(9, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 7));
+  }
+
+  @Test
+  public void testMinimizeDataMovementImplicitRealtimeTablePartitionSelector() {
+    int numReplicas = 2;
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, true, null);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig(REALTIME_TAG, false, 0, null), null,
+            replicaGroupPartitionConfig,
+            InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME)
+            .setNumReplicas(numReplicas)
+            .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+            .build();
+
+    int numInstances = 12;
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(REALTIME_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    // Start without existing InstancePartitions:
+    // Instances should be assigned to 2 replica-groups in a round-robin fashion, each with 6 instances. Then these 6
+    // instances should be assigned to 6 partitions, each with 1 instances
+    int numPartitions = 6;
+    StreamMetadataProvider streamMetadataProvider = mock(StreamMetadataProvider.class);
+    when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(numPartitions);
+    InstancePartitionSelector instancePartitionSelector =
+        new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig, tableConfig.getTableName(), null, true,
+            streamMetadataProvider);
+    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
+    InstancePartitions instancePartitions =
+        driver.getInstancePartitions(InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME),
+            instanceAssignmentConfig, instanceConfigs, null, true, instancePartitionSelector);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // Math.abs("myTable_REALTIME".hashCode()) % 12 = 0
+
+    // [i0, i1, i10, i11, i2, i3, i4, i5, i6, i7, i8, i9]
+    //  r0  r1  r0   r1   r0  r1  r0  r1  r0  r1  r0  r1
+    // r0: [i0, i10, i2, i4, i6, i8]
+    //      p0  p1   p2  p3  p4  p5
+    //
+    // r1: [i1, i11, i3, i5, i7, i9]
+    //      p0  p1   p2  p3  p4  p5
+
+    assertEquals(instancePartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 10));
+    assertEquals(instancePartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 11));
+    assertEquals(instancePartitions.getInstances(2, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(2, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(3, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(3, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(4, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 6));
+    assertEquals(instancePartitions.getInstances(4, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 7));
+    assertEquals(instancePartitions.getInstances(5, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 8));
+    assertEquals(instancePartitions.getInstances(5, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 9));
+
+    // Increase the number of partitions from 6 to 9. Expect no data movement for existing partitions.
+    numPartitions = 9;
+    when(streamMetadataProvider.fetchPartitionCount(anyLong())).thenReturn(numPartitions);
+    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig,
+        tableConfig.getTableName(), instancePartitions, true, streamMetadataProvider);
+    instancePartitions = driver.getInstancePartitions(
+        InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME), instanceAssignmentConfig,
+        instanceConfigs, instancePartitions, true, instancePartitionSelector);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // [i0, i1, i10, i11, i2, i3, i4, i5, i6, i7, i8, i9]
+    //  r0  r1  r0   r1   r0  r1  r0  r1  r0  r1  r0  r1
+    // r0: [i0, i10, i2, i4, i6, i8]
+    //      p0  p1   p2  p3  p4  p5
+    //      p6  p7   p8
+    //
+    // r1: [i1, i11, i3, i5, i7, i9]
+    //      p0  p1   p2  p3  p4  p5
+    //      p6  p7   p8
+
+    assertEquals(instancePartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 10));
+    assertEquals(instancePartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 11));
+    assertEquals(instancePartitions.getInstances(2, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(2, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(3, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(3, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(4, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 6));
+    assertEquals(instancePartitions.getInstances(4, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 7));
+    assertEquals(instancePartitions.getInstances(5, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 8));
+    assertEquals(instancePartitions.getInstances(5, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 9));
+    assertEquals(instancePartitions.getInstances(6, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(6, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(7, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 10));
+    assertEquals(instancePartitions.getInstances(7, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 11));
+    assertEquals(instancePartitions.getInstances(8, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+
+    // Add 6 new instances
+    for (int i = numInstances; i < numInstances + 6; i++) {
+      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
+      instanceConfig.addTag(REALTIME_TAG);
+      instanceConfigs.add(instanceConfig);
+    }
+
+    instancePartitionSelector = new ImplicitRealtimeTablePartitionSelector(replicaGroupPartitionConfig,
+        tableConfig.getTableName(), instancePartitions, true, streamMetadataProvider);
+    instancePartitions = driver.getInstancePartitions(
+        InstancePartitionsType.CONSUMING.getInstancePartitionsName(RAW_TABLE_NAME), instanceAssignmentConfig,
+        instanceConfigs, instancePartitions, true, instancePartitionSelector);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // We're using the minimize data movement based algorithm, so only the new partitions should be moved to the new
+    // instances, and the existing partition assignments should remain unchanged.
+    //
+    // [i0, i1, i10, i11, i2, i3, i4, i5, i6, i7, i8, i9]
+    //  r0  r1  r0   r1   r0  r1  r0  r1  r0  r1  r0  r1
+    // r0: [i0, i10, i2, i4, i6, i8, i12, i14, i16]
+    //      p0  p1   p2  p3  p4  p5  p6   p7   p8
+    //
+    // r1: [i1, i11, i3, i5, i7, i9, i13, i15, i17]
+    //      p0  p1   p2  p3  p4  p5  p6   p7   p8
+
+    assertEquals(instancePartitions.getInstances(0, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 0));
+    assertEquals(instancePartitions.getInstances(0, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 1));
+    assertEquals(instancePartitions.getInstances(1, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 10));
+    assertEquals(instancePartitions.getInstances(1, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 11));
+    assertEquals(instancePartitions.getInstances(2, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 2));
+    assertEquals(instancePartitions.getInstances(2, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 3));
+    assertEquals(instancePartitions.getInstances(3, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 4));
+    assertEquals(instancePartitions.getInstances(3, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 5));
+    assertEquals(instancePartitions.getInstances(4, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 6));
+    assertEquals(instancePartitions.getInstances(4, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 7));
+    assertEquals(instancePartitions.getInstances(5, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 8));
+    assertEquals(instancePartitions.getInstances(5, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 9));
+    assertEquals(instancePartitions.getInstances(6, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 12));
+    assertEquals(instancePartitions.getInstances(6, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 13));
+    assertEquals(instancePartitions.getInstances(7, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 14));
+    assertEquals(instancePartitions.getInstances(7, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 15));
+    assertEquals(instancePartitions.getInstances(8, 0), List.of(SERVER_INSTANCE_ID_PREFIX + 16));
+    assertEquals(instancePartitions.getInstances(8, 1), List.of(SERVER_INSTANCE_ID_PREFIX + 17));
   }
 
   public void testMirrorServerSetBasedRandom()
