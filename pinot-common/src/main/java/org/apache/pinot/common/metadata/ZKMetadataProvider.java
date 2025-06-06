@@ -845,8 +845,8 @@ public class ZKMetadataProvider {
             if (quotaConfig != null) {
               result.put(applicationName, quotaConfig);
             } else {
-                LOGGER.error("Deserialized QuotaConfig is null for application '{}'. JSON: '{}'. "
-                    + "This entry will be skipped.", applicationName, quotaJsonString);
+              LOGGER.error("Deserialized QuotaConfig is null for application '{}'. JSON: '{}'. "
+                  + "This entry will be skipped.", applicationName, quotaJsonString);
             }
           } catch (JsonProcessingException e) {
             throw new RuntimeException("Error deserializing QuotaConfig for application '" + applicationName

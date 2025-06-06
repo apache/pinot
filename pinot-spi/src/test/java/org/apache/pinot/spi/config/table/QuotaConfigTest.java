@@ -67,43 +67,91 @@ public class QuotaConfigTest {
   }
 
   @Test
-  public void testQPSQuota()
+  public void testValidQuotaDeserialization()
       throws IOException {
+    // Test Case 1: An integer rate, specified per second.
+    // This directly corresponds to the old "maxQueriesPerSecond": "100"
     {
-      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"100\"}";
+      String quotaConfigStr = "{\"rateLimits\": 100.0, \"rateLimiterUnit\": \"SECONDS\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       assertEquals(quotaConfig.getRateLimits(), 100.0);
+      assertEquals(quotaConfig.getRateLimiterUnit(), TimeUnit.SECONDS);
     }
+
+    // Test Case 2: A fractional rate, specified per minute to show flexibility.
+    // This corresponds to the old "maxQueriesPerSecond": "0.5" logic.
     {
-      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"0.5\"}";
+      String quotaConfigStr = "{\"rateLimits\": 0.5, \"rateLimiterUnit\": \"SECONDS\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       assertEquals(quotaConfig.getRateLimits(), 0.5);
+      assertEquals(quotaConfig.getRateLimiterUnit(), TimeUnit.SECONDS);
     }
+
+    // Test Case 3: An empty config should result in default values.
+    // This logic is preserved from the original test.
     {
       String quotaConfigStr = "{}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       assertEquals(quotaConfig.getRateLimits(), -1.0);
+      assertNull(quotaConfig.getRateLimiterUnit());
+      assertNull(quotaConfig.getRateLimiterDuration());
     }
   }
 
   @Test
-  public void testInvalidQPSQuota() {
+  public void testInvalidQuotaConfig() {
+    // === Category 1: Individually Invalid Parameters ===
+
+    // Test for a semantically invalid negative value for 'rateLimits'
     try {
-      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"InvalidQpsQuota\"}";
+      String quotaConfigStr = "{\"rateLimits\": -1.0, \"rateLimiterUnit\": \"SECONDS\"}";
       JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       fail();
     } catch (Exception e) {
       // Expected
     }
+
+    // Test for a semantically invalid negative value for 'rateLimiterDuration'
     try {
-      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"-1.0\"}";
+      String quotaConfigStr = "{\"rateLimits\": 10.0, \"rateLimiterDuration\": -1.0}";
       JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       fail();
     } catch (Exception e) {
       // Expected
     }
+
+    // Test for an invalid enum value for 'rateLimiterUnit'
     try {
-      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"1.0Test\"}";
+      String quotaConfigStr = "{\"rateLimits\": 10.0, \"rateLimiterUnit\": \"DECADES\"}";
+      JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // === Category 2: Logically Invalid Combinations ===
+
+    // Test for specifying rateLimits WITHOUT a time unit or duration
+    try {
+      String quotaConfigStr = "{\"rateLimits\": 100.0}";
+      JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Test for specifying a time unit WITHOUT rateLimits
+    try {
+      String quotaConfigStr = "{\"rateLimiterUnit\": \"MINUTES\"}";
+      JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Test for specifying a duration WITHOUT rateLimits
+    try {
+      String quotaConfigStr = "{\"rateLimiterDuration\": 5.0}";
       JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       fail();
     } catch (Exception e) {
@@ -306,7 +354,7 @@ public class QuotaConfigTest {
     // Test combined storage and rate limiter config
     {
       String quotaConfigStr =
-              "{\"storage\":\"200G\",\"rateLimiterUnit\":\"SECONDS\",\"rateLimiterDuration\":5,\"rateLimits\":50}";
+          "{\"storage\":\"200G\",\"rateLimiterUnit\":\"SECONDS\",\"rateLimiterDuration\":5,\"rateLimits\":50}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       assertEquals(quotaConfig.getStorage(), "200G");
       assertEquals(quotaConfig.getRateLimiterUnit(), TimeUnit.SECONDS);

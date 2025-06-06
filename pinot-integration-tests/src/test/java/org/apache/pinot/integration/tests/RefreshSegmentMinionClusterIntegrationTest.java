@@ -67,7 +67,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   protected final File _segmentTarDir = new File(_tempDir, "segmentTarDir");
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDataDir, _segmentTarDir);
 
     // Start the Pinot cluster
@@ -97,7 +98,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopMinion();
     stopServer();
     stopBroker();
@@ -148,7 +150,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   }
 
   @Test(priority = 2)
-  public void testValidDatatypeChange() throws Exception {
+  public void testValidDatatypeChange()
+      throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     // Change datatype from INT -> LONG for airlineId
@@ -218,7 +221,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   }
 
   @Test(priority = 3)
-  public void testIndexChanges() throws Exception {
+  public void testIndexChanges()
+      throws Exception {
     /**
      * Adding bare-minimum tests for addition and removal of indexes. The segment generation code already
      * has enough tests and testing each index addition/removal does not seem necessary.
@@ -271,7 +275,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   }
 
   @Test(priority = 4)
-  public void checkColumnAddition() throws Exception {
+  public void checkColumnAddition()
+      throws Exception {
     Schema schema = createSchema();
     schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDs", FieldSpec.DataType.INT, false));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDsString", FieldSpec.DataType.STRING, false));
@@ -366,7 +371,8 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   }
 
   @Test(priority = 5)
-  public void checkRefreshNotNecessary() throws Exception {
+  public void checkRefreshNotNecessary()
+      throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     Map<String, Long> segmentCrc = new HashMap<>();

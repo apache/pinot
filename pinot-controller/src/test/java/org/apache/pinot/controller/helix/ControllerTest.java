@@ -231,7 +231,7 @@ public class ControllerTest {
   public ControllerRequestClient getControllerRequestClient() {
     if (_controllerRequestClient == null) {
       _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
-        getControllerRequestClientHeaders());
+          getControllerRequestClientHeaders());
     }
     return _controllerRequestClient;
   }
@@ -966,7 +966,7 @@ public class ControllerTest {
     LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
     assertEquals(taskIds.size(), 1,
         String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
-        taskType, tableNameWithType, taskIds.size()));
+            taskType, tableNameWithType, taskIds.size()));
     return taskIds.get(0);
   }
 

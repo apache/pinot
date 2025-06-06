@@ -110,7 +110,6 @@ public class StorageQuotaCheckerTest {
     mockTableSizeResult(REALTIME_TABLE_NAME, 4 * 1024, 1);
     assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
 
-
     // Exceed quota and with missing segments, should fail without updating metrics
     mockTableSizeResult(REALTIME_TABLE_NAME, 8 * 1024, 1);
     assertTrue(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
@@ -156,7 +155,6 @@ public class StorageQuotaCheckerTest {
     assertFalse(
         MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
-
 
     // Exceed quota and with missing segments, should fail without updating metrics
     mockTableSizeResult(OFFLINE_TABLE_NAME, 8 * 1024, 1);

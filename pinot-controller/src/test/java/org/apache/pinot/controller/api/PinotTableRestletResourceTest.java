@@ -30,10 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.task.TaskState;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -698,7 +698,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // table delete with raw table name and type also should fail
     msg = expectThrows(IOException.class,
         () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName + "?type=" + tableType)))
-            .getMessage();
+        .getMessage();
     assertTrue(msg.contains(
         "Cannot delete table config: " + tableName + " because it is referenced in logical table: logicalTable"), msg);
 
@@ -1080,11 +1080,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-            .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-                    MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-                    ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
-                            CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
-            .build();
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+                CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
+        .build();
 
     // First create the table successfully
     sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
@@ -1099,7 +1099,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Now try to create another table with same name (simulating re-creation with dangling tasks)
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-            .forTableDelete(tableName + "?ignoreActiveTasks=true"));
+        .forTableDelete(tableName + "?ignoreActiveTasks=true"));
 
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
@@ -1111,12 +1111,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Clean up any remaining tasks
     try {
       sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-              .forTableDelete(tableName + "?ignoreActiveTasks=true"));
+          .forTableDelete(tableName + "?ignoreActiveTasks=true"));
     } catch (Exception ignored) {
       // Ignore if table doesn't exist
     }
   }
-  
+
   public void testCreateOfflineTableWithFlexibleQuotaConfig()
       throws Exception {
     // Test creating OFFLINE table with flexible quota configuration using SECONDS
@@ -1519,7 +1519,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String deleteResponse = sendDeleteRequest(
         DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
-=======
+  }
+
   public void testBothOfflineAndRealtimeTablesWithDifferentQuotaConfigs()
       throws Exception {
     // Test creating both OFFLINE and REALTIME tables with different quota configurations
@@ -1589,7 +1590,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   @AfterMethod
   public void cleanUp()
-          throws IOException {
+      throws IOException {
     // Delete all tables after each test
     DEFAULT_INSTANCE.cleanup();
   }
