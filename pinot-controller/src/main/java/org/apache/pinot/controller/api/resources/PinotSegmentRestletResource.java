@@ -118,7 +118,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *       <li>"/segments/{tableName}/servers": get a map from server to segments hosted by the server</li>
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
- *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
+ *       <li>"/segments/{tableName}/metadata</li>
  *       <li>"/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table</li>
  *       <li>"/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table</li>
  *       <li>"/segments/{tableName}/tiers": get storage tier for all segments in the table</li>
@@ -926,7 +926,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-          List<String> columns, @Context HttpHeaders headers) {
+      List<String> columns, @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments")
+  Set<String> segments, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -935,7 +936,7 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     String segmentsMetadata;
     try {
-      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns);
+      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns, segments);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
@@ -1162,7 +1163,25 @@ public class PinotSegmentRestletResource {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader
-        .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+        .getSegmentsMetadata(tableNameWithType, columns,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  /**
+   * This is a helper method to get the metadata for all segments for a given table name.
+   * @param tableNameWithType name of the table along with its type
+   * @param columns name of the columns
+   * @param segmentsToInclude name of the segments to include in metadata
+   * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
+   */
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns,
+      Set<String> segmentsToInclude)
+      throws InvalidConfigException, IOException {
+    TableMetadataReader tableMetadataReader =
+        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader
+        .getSegmentsMetadata(tableNameWithType, columns, segmentsToInclude,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @POST
