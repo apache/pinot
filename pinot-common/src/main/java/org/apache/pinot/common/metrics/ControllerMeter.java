@@ -75,7 +75,11 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Total Bytes written to deep store
   DEEP_STORE_WRITE_BYTES_COMPLETED("deepStoreWriteBytesCompleted", true),
   // Tracks failures encountered while fetching partition group metadata
-  PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true);
+  PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true),
+  // Page cache warmup metrics
+  PAGE_CACHE_WARMUP_REQUESTS("requests", true),
+  PAGE_CACHE_WARMUP_REQUESTS_TIMEOUT("requestsTimeout", true),
+  PAGE_CACHE_WARMUP_REQUESTS_ERRORS("requestsErrors", true);
 
   private final String _brokerMeterName;
   private final String _unit;

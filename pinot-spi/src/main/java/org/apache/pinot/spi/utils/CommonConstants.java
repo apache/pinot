@@ -1101,6 +1101,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS =
         "pinot.server.messagesCount.refreshIntervalSeconds";
     public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
+    // Max PageCache Warmup duration
+    public static final String MAX_PAGECACHE_WARMUP_DURATION_MS = "pinot.server..max.pagecache.warmup.duration.ms";
+    // Refresh warmup rate of the total allowed replica QPS rate
+    // Example, if QPS-quota = 100, ReplicaCount = 2, RefreshWarmupQpsRate = 0.2 then refresh warmup qps would be 10 (100/2 * 0.2)
+    public static final String MAX_PAGECACHE_REFRESH_WARMUP_QPS_RATE = "pinot.server.max.pagecache.refresh.warmup.qps.rate";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
@@ -1217,6 +1222,9 @@ public class CommonConstants {
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
     public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION = "pinot.controller.segment.completion";
+    // Page Cache Warmup queries data directory
+    public static final String PAGE_CACHE_WARMUP_QUERIES_DATA_DIR =
+        "pinot.controller.page.cache.warmup.queries.dataDir";
   }
 
   public static class Minion {

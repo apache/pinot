@@ -27,6 +27,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Sets;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -162,6 +163,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.util.PageCacheWarmupExecutor;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -247,11 +249,13 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private final PageCacheWarmupExecutor _pageCacheWarmupExecutor;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
+      @Nullable ExecutorService executorService, double diskUtilizationThreshold,
+      @Nullable String pageCacheWarmupQueriesDataDir) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -276,6 +280,7 @@ public class PinotHelixResourceManager {
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
+    _pageCacheWarmupExecutor = new PageCacheWarmupExecutor(this, _controllerMetrics, pageCacheWarmupQueriesDataDir);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -284,7 +289,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.getPageCacheWarmupDataDir());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -293,7 +298,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold(), controllerConf.getPageCacheWarmupDataDir());
   }
 
   /**
@@ -4420,7 +4425,7 @@ public class PinotHelixResourceManager {
    */
   protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
       List<String> segmentsFrom) {
-    // No-op by default
+    _pageCacheWarmupExecutor.triggerPageCacheWarmup(tableNameWithType, segmentsTo);
   }
 
   /**

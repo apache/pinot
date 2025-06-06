@@ -378,6 +378,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
+  public static final String DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR = "/home/pinot/data/pageCacheWarmupQueries";
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
 
@@ -1310,5 +1311,10 @@ public class ControllerConf extends PinotConfiguration {
   public boolean isEnableSwagger() {
     String enableSwagger = getProperty(CONSOLE_SWAGGER_ENABLE);
     return enableSwagger == null || Boolean.parseBoolean(enableSwagger);
+  }
+
+  public String getPageCacheWarmupDataDir() {
+    return getProperty(CommonConstants.Controller.PAGE_CACHE_WARMUP_QUERIES_DATA_DIR,
+        DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR);
   }
 }

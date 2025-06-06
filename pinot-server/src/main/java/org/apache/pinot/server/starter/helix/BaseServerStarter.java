@@ -99,6 +99,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.server.warmup.PageCacheWarmupQueryExecutor;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -833,8 +834,23 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
+    triggerPageCacheWarmup();
     _segmentOperationsThrottler.startServingQueries();
   }
+
+  protected void triggerPageCacheWarmup() {
+    try {
+      ServerInstance serverInstance = getServerInstance();
+      serverInstance.startQueryServer();
+      PageCacheWarmupQueryExecutor pageCacheWarmupQueryExecutor
+          = new PageCacheWarmupQueryExecutor(serverInstance, getConfig());
+      pageCacheWarmupQueryExecutor.startWarmupOnRestart();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while pre-serving queries,", e);
+    }
+  }
+
+
 
   @Override
   public void stop() {

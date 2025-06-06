@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -28,6 +29,7 @@ import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
+import org.apache.pinot.spi.config.table.TablePageCacheWarmupRequest;
 
 
 /**
@@ -73,6 +75,18 @@ public class ServerResourceUtils {
     }
     if (!hasDataAccess) {
       throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
+    }
+  }
+
+  /**
+   * Validates the parsed ServerWarmupRequest object.
+   * Throws a BadRequestException if validation fails.
+   */
+  public static void validateRequest(TablePageCacheWarmupRequest warmupRequest) throws BadRequestException {
+    if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
+      throw new BadRequestException("Queries cannot be null or empty.");
+    } else if (warmupRequest.getSegments() == null || warmupRequest.getSegments().isEmpty()) {
+      throw new BadRequestException("Segments cannot be null or empty.");
     }
   }
 }
