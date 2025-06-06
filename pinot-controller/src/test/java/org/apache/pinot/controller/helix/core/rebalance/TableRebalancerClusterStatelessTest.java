@@ -781,7 +781,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, true, null);
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, false, null);
     InstanceAssignmentConfig instanceAssignmentConfig =
         new InstanceAssignmentConfig(
             new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(null), false, 0, null), null,
@@ -862,9 +862,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       newServers.add(instanceId);
     }
 
-    // Rebalance with reassignInstances and minimizeDataMovement enabled
+    // Check number of segments moved when minimizeDataMovement is not enabled
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setIncludeConsuming(true);
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    // Most of the segments end up being moved when minimizeDataMovement is not enabled due to the round robin way in
+    // which partitions are assigned to instances (see InstanceReplicaGroupPartitionSelector)
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getTotalSegmentsToBeMoved(), 130);
+
+    // Rebalance with reassignInstances and minimizeDataMovement enabled
+    rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
+    rebalanceConfig.setDryRun(false);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     instanceAssignment = rebalanceResult.getInstanceAssignment();
