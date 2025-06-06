@@ -96,6 +96,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
+import org.slf4j.event.Level;
 
 
 /**
@@ -188,7 +189,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         // a _green_ error (see handleRequestThrowing javadoc)
         onFailedRequest(brokerResponse.getExceptions());
       }
-      summarizeQuery(requestId, brokerResponse);
+      summarizeQuery(brokerResponse, successfulSummarizeLevel(sqlNodeAndOptions));
       return brokerResponse;
     } catch (WebApplicationException e) {
       // a _yellow_ error (see handleRequestThrowing javadoc)
@@ -216,16 +217,49 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private void summarizeQuery(long requestId, BrokerResponse brokerResponse) {
+  private static Level successfulSummarizeLevel(SqlNodeAndOptions sqlNodeAndOptions) {
+    String key = CommonConstants.MultiStageQueryRunner.KEY_OF_SUCCESSFUL_SUMMARIZE_LOG;
+    String defaultValue = CommonConstants.MultiStageQueryRunner.DEFAULT_OF_SUCCESSFUL_SUMMARIZE_LOG;
+    String str = sqlNodeAndOptions.getOptions().getOrDefault(key, defaultValue);
+    try {
+      return Level.valueOf(StringUtils.upperCase(str));
+    } catch (IllegalArgumentException e) {
+      // If the value is not a valid Level, default to DEBUG
+      return Level.DEBUG;
+    }
+  }
+
+  private void summarizeQuery(BrokerResponse brokerResponse, Level successfulSummarizeLevel) {
     ObjectNode stats = brokerResponse instanceof BrokerResponseNativeV2
         ? ((BrokerResponseNativeV2) brokerResponse).getStageStats()
         : JsonNodeFactory.instance.objectNode();
-    if (brokerResponse.getExceptions().isEmpty()) {
-      LOGGER.debug(MSE_STATS_MARKER, "Request {} finished in {}ms. Errors: {}. Stats: {}",
-          requestId, brokerResponse.getTimeUsedMs(), brokerResponse.getExceptions(), stats);
+    String successfullyStr = brokerResponse.getExceptions().isEmpty()
+        ? "successfully"
+        : "with errors " + brokerResponse.getExceptions();
+    String logTemplate = "Request finished {} in {}ms. Stats: {}";
+    // We use the dynamic logging level in case there are no exceptions or the successfulSummarizeLevel is
+    // INFO, WARN or ERROR (remember that ERROR < WARN < INFO).
+    if (brokerResponse.getExceptions().isEmpty() || successfulSummarizeLevel.compareTo(Level.INFO) <= 0) {
+      switch (successfulSummarizeLevel) {
+        case TRACE:
+          LOGGER.trace(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          break;
+        case INFO:
+          LOGGER.info(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          break;
+        case WARN:
+          LOGGER.warn(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          break;
+        case ERROR:
+          LOGGER.error(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          break;
+        case DEBUG:
+        default:
+          LOGGER.debug(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          break;
+      }
     } else {
-      LOGGER.info(MSE_STATS_MARKER, "Request {} finished in {}ms. Errors: {}. Stats: {}",
-          requestId, brokerResponse.getTimeUsedMs(), brokerResponse.getExceptions(), stats);
+      LOGGER.info(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
     }
   }
 

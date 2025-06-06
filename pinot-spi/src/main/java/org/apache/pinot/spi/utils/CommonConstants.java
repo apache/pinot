@@ -1624,6 +1624,26 @@ public class CommonConstants {
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+    /// Specifies the log level of the summarize log.
+    ///
+    /// When an MSE query is executed, the stats are collected and logged.
+    /// By default, successful queries are logged in the DEBUG level, while errors are logged in the INFO level.
+    ///
+    /// This property allows to override the log level of the successful query summarize log. If set to WARN or ERROR,
+    /// it will also modify the log level of error logs.
+    ///
+    /// Finer grained control of these logs can be achieved by using the MSE_STATS_MARKER slf4j marker, which is used
+    /// in both the successful and error logs.
+    ///
+    /// Valid values are (in lower or upper case) the ones defined in [Level][org.slf4j.event.Level]:
+    /// - "TRACE"
+    /// - "DEBUG"
+    /// - "INFO"
+    /// - "WARN"
+    /// - "ERROR"
+    public static final String KEY_OF_SUCCESSFUL_SUMMARIZE_LOG = "summarizeLevel";
+    public static final String DEFAULT_OF_SUCCESSFUL_SUMMARIZE_LOG = "DEBUG";
+
     public enum JoinOverFlowMode {
       THROW, BREAK
     }
