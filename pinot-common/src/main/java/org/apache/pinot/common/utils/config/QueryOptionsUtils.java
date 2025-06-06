@@ -405,7 +405,7 @@ public class QueryOptionsUtils {
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
   }
-  
+
   public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, "false"));
   }
