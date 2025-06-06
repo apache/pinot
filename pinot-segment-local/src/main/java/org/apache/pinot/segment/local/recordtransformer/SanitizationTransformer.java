@@ -86,6 +86,10 @@ public class SanitizationTransformer implements RecordTransformer {
     for (Map.Entry<String, SanitizedColumnInfo> entry : _columnToColumnInfoMap.entrySet()) {
       String columnName = entry.getKey();
       Object value = record.getValue(columnName);
+      if (value == null) {
+        // Skip sanitization for null values
+        continue;
+      }
       Pair<?, Boolean> result;
       if (value instanceof byte[]) {
         // Single-values BYTES column

@@ -271,7 +271,10 @@
           ["bar", 2, 2, 2, "alice", "alice", "alice"],
           ["alice", 2, 2, 2, null, null, null],
           [null, 4, 4, 4, null, null, null],
-          ["bob", null, null, null, null, null, null]
+          ["bob", null, null, null, null, null, null],
+          ["alice", 2, 2, 2, null, null, "null"],
+          [null, 4, 4, 4, null, null, "null"],
+          ["bob", null, null, -2147483648, null, null, "null"]
         ]
       },
       "tbl2" : {

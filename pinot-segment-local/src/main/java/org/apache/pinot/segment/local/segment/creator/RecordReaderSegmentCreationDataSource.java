@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
+import java.util.Set;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
@@ -63,12 +64,17 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
               .getIngestionConfig().isContinueOnError();
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
+      Set<String> notNullColumns = SegmentCreatorUtils.extractNotNullColumns(statsCollectorConfig.getSchema());
       while (_recordReader.hasNext()) {
         reuse.clear();
         try {
           reuse = _recordReader.next(reuse);
           transformPipeline.processRow(reuse, reusedResult);
           for (GenericRow row : reusedResult.getTransformedRows()) {
+            if (SegmentCreatorUtils.shouldSkipRowForNotNull(notNullColumns, row)) {
+              throw new RuntimeException("Row contains null value in a not-null column, and "
+                  + "`TableConfig.IngestionConfig.continueOnError` is set to false. Row: " + row);
+            }
             collector.collectRow(row);
           }
         } catch (Exception e) {

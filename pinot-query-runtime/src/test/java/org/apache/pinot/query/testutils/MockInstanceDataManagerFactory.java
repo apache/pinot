@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -194,7 +195,9 @@ public class MockInstanceDataManagerFactory {
   private TableConfig createTableConfig(String tableNameWithType) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
     return new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
-        .setNullHandlingEnabled(true).build();
+        .setNullHandlingEnabled(true).setIngestionConfig(ingestionConfig).build();
   }
 }

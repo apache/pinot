@@ -62,6 +62,7 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.segment.local.segment.creator.SegmentCreatorUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -478,12 +479,19 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       for (int i = 0; i < h2FieldNamesAndTypes.size() - 1; i++) {
         params.append(",?");
       }
+      Set<String> notNullColumns = SegmentCreatorUtils.extractNotNullColumns(schema);
       PreparedStatement h2Statement =
           _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
 
       // insert data into table
       for (GenericRow row : rows) {
         int h2Index = 1;
+        if (SegmentCreatorUtils.shouldSkipRowForNotNull(notNullColumns, row)) {
+          // Skip the row if a column is defined as not-null but the row has null value for that column.
+          // This is to mimic the behavior of Pinot segment creation where rows with null values in not-null columns are
+          // skipped.
+          continue;
+        }
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
           if (value instanceof List) {

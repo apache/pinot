@@ -234,7 +234,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         LOGGER.info("Column: {} is nullable", columnName);
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       } else {
-        LOGGER.info("Column: {} is not nullable", columnName);
+        if (schema.isEnableColumnBasedNullHandling()) {
+          LOGGER.info("Column: {} is not nullable, null value will trigger ingestion failure", columnName);
+        } else {
+          LOGGER.info("Column: {} is not nullable, null value will be filled with default null value", columnName);
+        }
       }
     }
   }
