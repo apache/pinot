@@ -1,0 +1,68 @@
+{
+  "schema": {
+    "dateTimeFieldSpecs": [
+      {
+        "dataType": "LONG",
+        "format": "1:MILLISECONDS:EPOCH",
+        "granularity": "1:MILLISECONDS",
+        "name": "timestampMillis",
+        "cardinality": 10000
+      }
+    ],
+    "dimensionFieldSpecs": [
+      {
+        "averageLength": 8,
+        "cardinality": 40000,
+        "dataType": "STRING",
+        "name": "colA"
+      },
+      {
+        "averageLength": 16,
+        "cardinality": 200,
+        "dataType": "STRING",
+        "name": "colB"
+      },
+      {
+        "averageLength": 50,
+        "cardinality": 100000,
+        "dataType": "STRING",
+        "name": "colC"
+      },
+      {
+        "averageLength": 25,
+        "cardinality": 5000,
+        "dataType": "INT",
+        "name": "partition"
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "cardinality": 5000,
+        "dataType": "LONG",
+        "name": "metricA"
+      },
+      {
+        "cardinality": 5000,
+        "dataType": "LONG",
+        "name": "metricB"
+      }
+    ],
+    "schemaName": "myTable"
+  },
+  "queriesWithWeights":{
+    "select colC, \"partition\" as partitionNum, max(metricA) as maxMetricA,avg(metricA) as avgMetricA, avg(metricB) as avgMetricB from myTable where colA='valA' and timestampMillis > now() - 3600000 and colB='valB' and timestampMillis < now() group by colB,colC,\"partition\" order by max(metricA) desc limit 10000": 1,
+    "select colC, \"partition\" as partitionNum, max(metricA) as maxMetricA,avg(metricA) as avgMetricA from myTable where colA='val1' and timestampMillis > now() - 3600000 and colB='valB' and timestampMillis < now() and maxMetricA > 2000 group by colB,colC,\"partition\" order by max(metricA) desc limit 10000": 1,
+    "select timestampMillis, sum(metricB) from myTable where (colC='A' or colC='B') and (timestampMillis >= 123) group by timestampMillis order by timestampMillis asc": 1,
+    "select colA, \"partition\" as partitionNum from myTable where colA='valA'": 50,
+    "select colA, colB from myTable where colA='valB'": 30
+  },
+  "qps": 400,
+  "tableType": "REALTIME",
+  "latencySLA": 500,
+  "rulesToExecute": {
+    "recommendPinotTablePartition": true
+  },
+  "numMessagesPerSecInKafkaTopic":50000,
+  "overWrittenConfigs": {
+  }
+}
