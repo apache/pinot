@@ -648,6 +648,9 @@ public class CommonConstants {
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
         //   a table config to enable broker pruning (it is disabled by default).
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
+        // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
+        // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
+        public static final String RUN_IN_BROKER = "runInBroker";
       }
 
       public static class QueryOptionValue {
