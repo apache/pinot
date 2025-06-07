@@ -75,6 +75,10 @@ public class PinotQueryRuleSets {
       CoreRules.PROJECT_TO_SEMI_JOIN,
       PinotSeminJoinDistinctProjectRule.INSTANCE,
 
+      // Consider semijoin optimizations first before push transitive predicate
+      // Pinot version doesn't push predicates to the right in case of lookup join
+      PinotJoinPushTransitivePredicatesRule.INSTANCE,
+
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
 
@@ -97,7 +101,8 @@ public class PinotQueryRuleSets {
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
   // single HepInstruction.
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
-      CoreRules.FILTER_INTO_JOIN,
+      // Do not push predicate to the right in case of lookup join
+      PinotFilterIntoJoinRule.INSTANCE,
       CoreRules.FILTER_AGGREGATE_TRANSPOSE,
       CoreRules.FILTER_SET_OP_TRANSPOSE,
       CoreRules.FILTER_PROJECT_TRANSPOSE
@@ -118,6 +123,8 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_MERGE,
       CoreRules.AGGREGATE_REMOVE,
       CoreRules.SORT_REMOVE,
+      PruneEmptyRules.CORRELATE_LEFT_INSTANCE,
+      PruneEmptyRules.CORRELATE_RIGHT_INSTANCE,
       PruneEmptyRules.AGGREGATE_INSTANCE,
       PruneEmptyRules.FILTER_INSTANCE,
       PruneEmptyRules.JOIN_LEFT_INSTANCE,
