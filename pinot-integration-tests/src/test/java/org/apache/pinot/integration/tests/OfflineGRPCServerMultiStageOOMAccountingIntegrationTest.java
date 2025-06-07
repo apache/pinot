@@ -16,35 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.accounting;
+package org.apache.pinot.integration.tests;
 
-/**
- * The context for task execution information of a thread
- */
-public interface ThreadExecutionContext {
+import org.testng.annotations.BeforeTest;
 
-   /**
-    * SSE: Single Stage Engine
-    * MSE: Multi Stage Engine
-    * UNKNOWN: Default
-    */
-   enum TaskType {
-      SSE,
-      MSE,
-      UNKNOWN
-   }
 
-   /**
-    * get query id of the execution context
-    * @return query id in string
-    */
-   String getQueryId();
-
-   /**
-    *
-    * @return get the anchor thread of execution context
-    */
-   Thread getAnchorThread();
-
-   TaskType getTaskType();
+public class OfflineGRPCServerMultiStageOOMAccountingIntegrationTest
+    extends OfflineGRPCServerOOMAccountingIntegrationTest {
+  @BeforeTest
+  void enableMultiStage() {
+    setUseMultiStageQueryEngine(true);
+  }
 }
