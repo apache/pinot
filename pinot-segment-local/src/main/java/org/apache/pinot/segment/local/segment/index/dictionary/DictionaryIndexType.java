@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -75,6 +76,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.FALFInterner;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -102,14 +104,23 @@ public class DictionaryIndexType
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    if (dictionaryConfig.isEnabled() && dictionaryConfig.getUseVarLengthDictionary()) {
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.BYTES,
+          "Cannot create var-length dictionary on column: %s of stored type other than STRING or BYTES",
+          fieldSpec.getName());
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return getId();
   }
 
   @Override
-  public ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializer() {
-    ColumnConfigDeserializer<DictionaryIndexConfig> fromIndexes =
-        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+  protected ColumnConfigDeserializer<DictionaryIndexConfig> createDeserializerForLegacyConfigs() {
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictionaryConfigs =
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getNoDictionaryConfig(),
             (accum, column, value) -> accum.put(column, DictionaryIndexConfig.DISABLED));
@@ -138,8 +149,9 @@ public class DictionaryIndexType
       }
       return dictionaryIndexConfigMap;
     };
-    return fromIndexes.withExclusiveAlternative(fromNoDictionaryConfigs.withFallbackAlternative(fromNoDictionaryColumns)
-        .withFallbackAlternative(fromFieldConfigs).withFallbackAlternative(fromIndexingConfig));
+    return fromNoDictionaryConfigs.withFallbackAlternative(fromNoDictionaryColumns)
+        .withFallbackAlternative(fromFieldConfigs)
+        .withFallbackAlternative(fromIndexingConfig);
   }
 
   @Override
@@ -152,24 +164,24 @@ public class DictionaryIndexType
     if (indexConfig.getUseVarLengthDictionary()) {
       return true;
     }
-    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
-    if (storedType != FieldSpec.DataType.BYTES && storedType != FieldSpec.DataType.BIG_DECIMAL) {
+    DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    if (storedType != DataType.BYTES && storedType != DataType.BIG_DECIMAL) {
       return false;
     }
     return !context.isFixedLength();
   }
 
   public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      FieldSpec.DataType columnStoredType, ColumnStatistics columnProfile) {
+      DataType storedType, ColumnStatistics columnProfile) {
     if (varLengthDictColumns.contains(columnName)) {
       return true;
     }
 
-    return shouldUseVarLengthDictionary(columnStoredType, columnProfile);
+    return shouldUseVarLengthDictionary(storedType, columnProfile);
   }
 
-  public static boolean shouldUseVarLengthDictionary(FieldSpec.DataType columnStoredType, ColumnStatistics profile) {
-    if (columnStoredType == FieldSpec.DataType.BYTES || columnStoredType == FieldSpec.DataType.BIG_DECIMAL) {
+  public static boolean shouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
+    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
       return !profile.isFixedLength();
     }
 
@@ -180,10 +192,8 @@ public class DictionaryIndexType
    * Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
    * concerns.
    */
-  public static boolean optimizeTypeShouldUseVarLengthDictionary(FieldSpec.DataType columnStoredType,
-      ColumnStatistics profile) {
-    if (columnStoredType == FieldSpec.DataType.BYTES || columnStoredType == FieldSpec.DataType.BIG_DECIMAL
-        || columnStoredType == FieldSpec.DataType.STRING) {
+  public static boolean optimizeTypeShouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
+    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL || storedType == DataType.STRING) {
       return !profile.isFixedLength();
     }
 
@@ -291,7 +301,7 @@ public class DictionaryIndexType
       DictionaryIndexConfig indexConfig, String internIdentifierStr)
       throws IOException {
 
-    FieldSpec.DataType dataType = metadata.getDataType();
+    DataType dataType = metadata.getDataType();
     boolean loadOnHeap = indexConfig.isOnHeap();
     String columnName = metadata.getColumnName();
 
@@ -474,7 +484,7 @@ public class DictionaryIndexType
     }
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
-    FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    DataType storedType = context.getFieldSpec().getDataType().getStoredType();
     int dictionaryColumnSize;
     if (storedType.isFixedWidth()) {
       dictionaryColumnSize = storedType.size();

@@ -127,6 +127,7 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   // If null, there won't be any index
+  // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
     INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, VECTOR, RANGE
   }

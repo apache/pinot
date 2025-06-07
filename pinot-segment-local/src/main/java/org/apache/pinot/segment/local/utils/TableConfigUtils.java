@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,20 +43,22 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -66,6 +67,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -158,27 +160,28 @@ public final class TableConfigUtils {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    // skip all validation if skip type ALL is selected.
-    if (!skipTypes.contains(ValidationType.ALL)) {
-      validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema);
-      if (tableConfig.getTableType() == TableType.REALTIME) {
-        validateStreamConfigMaps(tableConfig);
-      }
-      validateTierConfigList(tableConfig.getTierConfigsList());
-      validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-      validateFieldConfigList(tableConfig, schema);
-      validateInstancePartitionsTypeMapConfig(tableConfig);
-      validatePartitionedReplicaGroupInstance(tableConfig);
-      validateInstanceAssignmentConfigs(tableConfig);
-      if (!skipTypes.contains(ValidationType.UPSERT)) {
-        validateUpsertAndDedupConfig(tableConfig, schema);
-        validatePartialUpsertStrategies(tableConfig, schema);
-      }
+    if (skipTypes.contains(ValidationType.ALL)) {
+      return;
+    }
 
-      if (_enforcePoolBasedAssignment) {
-        validateInstancePoolsNReplicaGroups(tableConfig);
-      }
+    validateValidationConfig(tableConfig, schema);
+    validateIngestionConfig(tableConfig, schema);
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      validateStreamConfigMaps(tableConfig);
+    }
+    validateTierConfigList(tableConfig.getTierConfigsList());
+    validateIndexingConfigAndFieldConfigList(tableConfig, schema);
+    validateInstancePartitionsTypeMapConfig(tableConfig);
+    validatePartitionedReplicaGroupInstance(tableConfig);
+    validateInstanceAssignmentConfigs(tableConfig);
+
+    if (!skipTypes.contains(ValidationType.UPSERT)) {
+      validateUpsertAndDedupConfig(tableConfig, schema);
+      validatePartialUpsertStrategies(tableConfig, schema);
+    }
+
+    if (_enforcePoolBasedAssignment) {
+      validateInstancePoolsNReplicaGroups(tableConfig);
     }
   }
 
@@ -1065,361 +1068,208 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Validates the Indexing Config
-   * Ensures that every referred column name exists in the corresponding schema.
-   * Also ensures proper dependency between index types (eg: Inverted Index columns
-   * cannot be present in no-dictionary columns).
-   */
-  private static void validateIndexingConfig(IndexingConfig indexingConfig, Schema schema) {
-    ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
-    Set<String> noDictionaryColumnsSet = new HashSet<>();
-
-    if (indexingConfig.getNoDictionaryColumns() != null) {
-      for (String columnName : indexingConfig.getNoDictionaryColumns()) {
-        columnNameToConfigMap.put(columnName, "No Dictionary Column Config");
-        noDictionaryColumnsSet.add(columnName);
-      }
-    }
-    Set<String> bloomFilterColumns = new HashSet<>();
-    if (indexingConfig.getBloomFilterColumns() != null) {
-      bloomFilterColumns.addAll(indexingConfig.getBloomFilterColumns());
-    }
-    if (indexingConfig.getBloomFilterConfigs() != null) {
-      bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
-    }
-    for (String bloomFilterColumn : bloomFilterColumns) {
-      columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
-    }
-    if (indexingConfig.getInvertedIndexColumns() != null) {
-      for (String columnName : indexingConfig.getInvertedIndexColumns()) {
-        if (noDictionaryColumnsSet.contains(columnName)) {
-          throw new IllegalStateException("Cannot create an Inverted index on column " + columnName
-              + " specified in the noDictionaryColumns config");
-        }
-        columnNameToConfigMap.put(columnName, "Inverted Index Config");
-      }
-    }
-
-    if (indexingConfig.getOnHeapDictionaryColumns() != null) {
-      for (String columnName : indexingConfig.getOnHeapDictionaryColumns()) {
-        columnNameToConfigMap.put(columnName, "On Heap Dictionary Column Config");
-      }
-    }
-    if (indexingConfig.getRangeIndexColumns() != null) {
-      for (String columnName : indexingConfig.getRangeIndexColumns()) {
-        columnNameToConfigMap.put(columnName, "Range Column Config");
-      }
-    }
-    if (indexingConfig.getSortedColumn() != null) {
-      for (String columnName : indexingConfig.getSortedColumn()) {
-        columnNameToConfigMap.put(columnName, "Sorted Column Config");
-      }
-    }
-    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
-      for (String columnName : indexingConfig.getVarLengthDictionaryColumns()) {
-        columnNameToConfigMap.put(columnName, "Var Length Column Config");
-      }
-    }
-    if (indexingConfig.getSegmentPartitionConfig() != null
-        && indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap() != null) {
-      for (String columnName : indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap().keySet()) {
-        columnNameToConfigMap.put(columnName, "Segment Partition Config");
-      }
-    }
-    Set<String> jsonIndexColumns = new HashSet<>();
-    // Ignore jsonIndexColumns when jsonIndexConfigs is configured
-    if (indexingConfig.getJsonIndexConfigs() != null) {
-      jsonIndexColumns.addAll(indexingConfig.getJsonIndexConfigs().keySet());
-    } else {
-      if (indexingConfig.getJsonIndexColumns() != null) {
-        jsonIndexColumns.addAll(indexingConfig.getJsonIndexColumns());
-      }
-    }
-    for (String columnName : jsonIndexColumns) {
-      columnNameToConfigMap.put(columnName, "Json Index Config");
-    }
-
-    validateStarTreeIndexConfigs(indexingConfig, columnNameToConfigMap);
-
-    for (Map.Entry<String, String> entry : columnNameToConfigMap.entries()) {
-      String columnName = entry.getKey();
-      String configName = entry.getValue();
-      FieldSpec columnFieldSpec = schema.getFieldSpecFor(columnName);
-      Preconditions.checkState(columnFieldSpec != null,
-          "Column Name " + columnName + " defined in " + configName + " must be a valid column defined in the schema");
-      if (configName.equals(STAR_TREE_CONFIG_NAME)) {
-        Preconditions.checkState(columnFieldSpec.isSingleValueField(),
-            "Column Name " + columnName + " defined in " + configName + " must be a single value column");
-      }
-    }
-
-    // Range index semantic validation
-    // Range index can be defined on numeric columns and any column with a dictionary
-    if (indexingConfig.getRangeIndexColumns() != null) {
-      for (String rangeIndexCol : indexingConfig.getRangeIndexColumns()) {
-        Preconditions.checkState(
-            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet.contains(
-                rangeIndexCol), "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
-      }
-    }
-
-    // Var length dictionary semantic validation
-    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
-      for (String varLenDictCol : indexingConfig.getVarLengthDictionaryColumns()) {
-        FieldSpec varLenDictFieldSpec = schema.getFieldSpecFor(varLenDictCol);
-        switch (varLenDictFieldSpec.getDataType().getStoredType()) {
-          case STRING:
-          case BYTES:
-            continue;
-          default:
-            throw new IllegalStateException(
-                "var length dictionary can only be created for columns of type STRING and BYTES. Invalid for column "
-                    + varLenDictCol);
-        }
-      }
-    }
-
-    for (String bloomFilterColumn : bloomFilterColumns) {
-      Preconditions.checkState(schema.getFieldSpecFor(bloomFilterColumn).getDataType() != FieldSpec.DataType.BOOLEAN,
-          "Cannot create bloom filter on BOOLEAN column: " + bloomFilterColumn);
-    }
-
-    for (String jsonIndexColumn : jsonIndexColumns) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexColumn);
-      Preconditions.checkState(
-          fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
-          "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexColumn);
-    }
-  }
-
-  private static void validateStarTreeIndexConfigs(IndexingConfig indexingConfig,
-      ArrayListMultimap<String, String> columnNameToConfigMap) {
-    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
-    if (starTreeIndexConfigList != null) {
-      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
-        // Dimension split order cannot be null
-        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
-          columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-        }
-        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
-        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
-        Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
-            "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
-        Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
-        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
-        if (functionColumnPairs != null) {
-          for (String functionColumnPair : functionColumnPairs) {
-            AggregationFunctionColumnPair columnPair;
-            try {
-              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-            } catch (Exception e) {
-              throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
-                  + "in the form <Aggregation function>__<Column name>");
-            }
-
-            if (functionColumnPairsSet.contains(columnPair)) {
-              throw new IllegalStateException("Duplicate function column pair: " + functionColumnPair);
-            } else {
-              functionColumnPairsSet.add(columnPair);
-            }
-
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (!storedTypes.add(storedType)) {
-              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, storedType);
-            }
-            String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-            }
-          }
-        }
-        if (aggregationConfigs != null) {
-          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
-            AggregationFunctionColumnPair columnPair;
-            try {
-              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
-            } catch (Exception e) {
-              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
-            }
-
-            if (functionColumnPairsSet.contains(columnPair)) {
-              throw new IllegalStateException("Duplicate function column pair: " + columnPair + ". If you want multiple"
-                  + " pre-aggregations on the same column with the same aggregation function but with different"
-                  + " configuration parameters, specify them in separate star-tree index configurations");
-            } else {
-              functionColumnPairsSet.add(columnPair);
-            }
-
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (!storedTypes.add(storedType)) {
-              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, storedType);
-            }
-            String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-            }
-          }
-        }
-        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
-        if (skipDimensionList != null) {
-          for (String columnName : skipDimensionList) {
-            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Validates the Field Config List in the given TableConfig
-   * Ensures that every referred column name exists in the corresponding schema
-   * Additional checks for TEXT and FST index types
-   * Validates index compatibility for forward index disabled columns
-   */
-  private static void validateFieldConfigList(TableConfig tableConfig, Schema schema) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+  /// Validates [IndexingConfig] and [FieldConfig]s, ensures that:
+  /// - No conflicting index configs
+  /// - All referenced columns exist in the schema
+  /// - Proper dependency between index types (e.g. inverted index columns must have dictionary)
+  private static void validateIndexingConfigAndFieldConfigList(TableConfig tableConfig, Schema schema) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    TableType tableType = tableConfig.getTableType();
-    if (fieldConfigList == null) {
-      return;
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (CollectionUtils.isNotEmpty(fieldConfigs)) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        String column = fieldConfig.getName();
+        Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
+      }
+      validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
-    assert indexingConfig != null;
 
-    for (FieldConfig fieldConfig : fieldConfigList) {
-      String columnName = fieldConfig.getName();
-      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      Preconditions.checkState(fieldSpec != null,
-          "Column: %s defined in field config list must be a valid column defined in the schema", columnName);
-      EncodingType encodingType = fieldConfig.getEncodingType();
-      Preconditions.checkArgument(encodingType != null, "Encoding type must be specified for column: %s", columnName);
-      CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
-      switch (encodingType) {
-        case RAW:
-          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
-                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
-                  || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4,
-              "Compression codec: %s is not applicable to raw index",
-              compressionCodec);
-          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
-              || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4)) {
-            Preconditions.checkArgument(fieldSpec.getDataType().getStoredType() == DataType.STRING,
-                "CLP compression codec can only be applied to string columns");
-          }
-          break;
-        case DICTIONARY:
-          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
-              "Compression codec: %s is not applicable to dictionary encoded index", compressionCodec);
-          List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-          Preconditions.checkArgument(noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
-              "FieldConfig encoding type is different from indexingConfig for column: %s", columnName);
-          Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
-          Preconditions.checkArgument(noDictionaryConfig == null || !noDictionaryConfig.containsKey(columnName),
-              "FieldConfig encoding type is different from indexingConfig for column: %s", columnName);
-          break;
-        default:
-          break;
+    Map<String, FieldIndexConfigs> indexConfigsMap;
+    try {
+      indexConfigsMap = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to create FieldIndexConfigs", e);
+    }
+    List<IndexType<?, ?, ?>> allIndexes = IndexService.getInstance().getAllIndexes();
+    for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsMap.entrySet()) {
+      String column = entry.getKey();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema", column);
+      FieldIndexConfigs indexConfigs = entry.getValue();
+      for (IndexType<?, ?, ?> indexType : allIndexes) {
+        indexType.validate(indexConfigs, fieldSpec, tableConfig);
       }
+    }
 
-      // Validate the forward index disabled compatibility with other indexes if enabled for this column
-      validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
+    // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
+    List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+    if (CollectionUtils.isNotEmpty(starTreeIndexConfigs)) {
+      validateStarTreeIndexConfigs(starTreeIndexConfigs, indexConfigsMap, schema);
+    }
 
-      // Validate bloom filter is not added to boolean column
-      if (fieldConfig.getIndexes() != null && fieldConfig.getIndexes().has("bloom")) {
-        Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
-          "Cannot create a bloom filter on boolean column " + columnName);
+    // TIMESTAMP index is not managed by FieldIndexConfigs, and we need to validate it separately.
+    if (CollectionUtils.isNotEmpty(fieldConfigs)) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        TimestampConfig timestampConfig = fieldConfig.getTimestampConfig();
+        if (timestampConfig != null) {
+          String column = fieldConfig.getName();
+          FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+          Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema", column);
+          Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.LONG,
+              "Cannot create TIMESTAMP index on column: %s of stored type other than LONG", column);
+          Preconditions.checkState(fieldSpec.isSingleValueField(),
+              "Cannot create TIMESTAMP index on multi-value column: %s", column);
+        }
       }
+    }
 
-      if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
-        for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
-          switch (indexType) {
-            case INVERTED:
-              Preconditions.checkState(fieldConfig.getEncodingType() == EncodingType.DICTIONARY,
-                  "Cannot create inverted index on column: %s, it can only be applied to dictionary encoded columns",
-                  columnName);
-              break;
-            case TEXT:
-              Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.STRING,
-                  "Cannot create text index on column: %s, it can only be applied to string columns", columnName);
-              break;
-            case FST:
-              Preconditions.checkState(
-                  fieldConfig.getEncodingType() == EncodingType.DICTIONARY && fieldSpec.isSingleValueField()
-                      && fieldSpec.getDataType().getStoredType() == DataType.STRING,
-                  "Cannot create FST index on column: %s, it can only be applied to dictionary encoded single value "
-                      + "string columns", columnName);
-              break;
-            case TIMESTAMP:
-              Preconditions.checkState(fieldSpec.getDataType() == DataType.TIMESTAMP,
-                  "Cannot create timestamp index on column: %s, it can only be applied to timestamp columns",
-                  columnName);
-              break;
-            default:
-              break;
-          }
+    // Sorted column is not managed by FieldIndexConfigs, and we need to validate it separately.
+    List<String> sortedColumns = indexingConfig.getSortedColumn();
+    if (CollectionUtils.isNotEmpty(sortedColumns)) {
+      for (String column : sortedColumns) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
+        Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
+      }
+    }
+
+    // Partition column is not managed by FieldIndexConfigs, and we need to validate it separately.
+    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      if (MapUtils.isNotEmpty(columnPartitionMap)) {
+        for (String column : columnPartitionMap.keySet()) {
+          FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+          Preconditions.checkState(fieldSpec != null, "Failed to find partition column: %s in schema", column);
+          Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
+              column);
         }
       }
     }
   }
 
-  /**
-   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
-   * compatibility mismatch. The checks performed are:
-   *
-   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
-   *       multi-value column (since multi-value defaults to index v1).
-   *
-   * To rebuild the forward index when it has been disabled the dictionary and inverted index must be enabled for the
-   * given column. If either the inverted index or dictionary are disabled then the only way to get the forward index
-   * back or generate a new index for existing segments is to either refresh or back-fill the segments.
-   */
-  private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
-      IndexingConfig indexingConfig, Schema schema, TableType tableType) {
-    Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
-    if (fieldConfigProperties == null) {
-      return;
+  /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
+  /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
+  private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
+      List<FieldConfig> fieldConfigs) {
+    Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
+    if (indexingConfig.getNoDictionaryColumns() != null) {
+      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
     }
-
-    boolean forwardIndexDisabled = Boolean.parseBoolean(
-        fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
-            FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
-    if (!forwardIndexDisabled) {
-      return;
+    if (indexingConfig.getNoDictionaryConfig() != null) {
+      noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryConfig().keySet());
     }
-
-    // For tables with columnMajorSegmentBuilderEnabled being true, the forward index should not be disabled.
-    Preconditions.checkState(tableType != TableType.REALTIME,
-        String.format("Cannot disable forward index for column %s, as the table type is REALTIME.", columnName));
-
-    FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-    // Check for the range index since the index itself relies on the existence of the forward index to work.
-    if (indexingConfig.getRangeIndexColumns() != null && indexingConfig.getRangeIndexColumns().contains(columnName)) {
-      Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
-          + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
-          + "column to use this feature.", columnName));
-      Preconditions.checkState(indexingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
-          String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
-              + "forward index for column %s. Either disable range index or create range index with"
-              + " version >= 2 to use this feature.", columnName));
+    if (!noDictionaryColumnsFromIndexingConfig.isEmpty()) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        String column = fieldConfig.getName();
+        EncodingType encodingType = fieldConfig.getEncodingType();
+        if (encodingType == EncodingType.DICTIONARY) {
+          Preconditions.checkState(!noDictionaryColumnsFromIndexingConfig.contains(column),
+              "FieldConfig encoding type is different from indexingConfig for column: %s", column);
+        }
+      }
     }
+  }
 
-    Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
-        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-            + " not supported with forward index for column: %s, disabled", columnName));
+  /// Validates [StarTreeIndexConfig]s, ensures that:
+  /// - Dimensions must be dictionary encoded
+  /// - 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
+  /// - Either functionColumnPairs or aggregationConfigs must be specified, but not both
+  /// - All referenced columns exist in the schema and are single-valued
+  private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
+      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+    Set<String> referencedColumns = new HashSet<>();
+    for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
+      // Validate dimension columns are dictionary encoded
+      List<String> dimensionsSplitOrder = starTreeIndexConfig.getDimensionsSplitOrder();
+      assert CollectionUtils.isNotEmpty(dimensionsSplitOrder);
+      for (String dimension : dimensionsSplitOrder) {
+        FieldIndexConfigs indexConfigs = indexConfigsMap.get(dimension);
+        Preconditions.checkState(indexConfigs != null,
+            "Failed to find dimension column: %s specified in star-tree index config in schema", dimension);
+        Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+            "Cannot create star-tree index on dimension column: %s without dictionary", dimension);
+        referencedColumns.add(dimension);
+      }
 
-    boolean hasDictionary = fieldConfig.getEncodingType() == EncodingType.DICTIONARY;
-    boolean hasInvertedIndex =
-        indexingConfig.getInvertedIndexColumns() != null && indexingConfig.getInvertedIndexColumns()
-            .contains(columnName);
+      // Validate 'dimensionsSplitOrder' contains all dimensions in 'skipStarNodeCreationForDimensions'
+      List<String> skipStarNodeCreationForDimensions = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
+      if (CollectionUtils.isNotEmpty(skipStarNodeCreationForDimensions)) {
+        //noinspection SlowListContainsAll
+        Preconditions.checkState(dimensionsSplitOrder.containsAll(skipStarNodeCreationForDimensions),
+            "Can not skip star-node creation for dimensions not in the split order, dimensionsSplitOrder: %s, "
+                + "skipStarNodeCreationForDimensions: %s", dimensionsSplitOrder, skipStarNodeCreationForDimensions);
+      }
 
-    if (!hasDictionary || !hasInvertedIndex) {
-      LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
-              + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
-              + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
-          columnName,
-          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+      List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+      List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+      Preconditions.checkState(
+          (functionColumnPairs != null && aggregationConfigs == null) || (functionColumnPairs == null
+              && aggregationConfigs != null),
+          "Either 'functionColumnPairs' or 'aggregationConfigs' must be specified, but not both");
+      Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
+      Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
+      if (functionColumnPairs != null) {
+        for (String functionColumnPair : functionColumnPairs) {
+          AggregationFunctionColumnPair columnPair;
+          try {
+            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                + "in the form <Aggregation function>__<Column name>");
+          }
+
+          if (!functionColumnPairsSet.add(columnPair)) {
+            throw new IllegalStateException("Duplicate function column pair: " + functionColumnPair);
+          }
+
+          AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+          if (!storedTypes.add(storedType)) {
+            LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                columnPair, storedType);
+          }
+          String column = columnPair.getColumn();
+          if (!column.equals(AggregationFunctionColumnPair.STAR)) {
+            referencedColumns.add(column);
+          }
+        }
+      }
+      if (aggregationConfigs != null) {
+        for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
+          AggregationFunctionColumnPair columnPair;
+          try {
+            columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+          }
+
+          if (!functionColumnPairsSet.add(columnPair)) {
+            throw new IllegalStateException("Duplicate function column pair: " + columnPair + ". If you want multiple"
+                + " pre-aggregations on the same column with the same aggregation function but with different"
+                + " configuration parameters, specify them in separate star-tree index configurations");
+          }
+
+          AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+          if (!storedTypes.add(storedType)) {
+            LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                columnPair, storedType);
+          }
+          String column = columnPair.getColumn();
+          if (!column.equals(AggregationFunctionColumnPair.STAR)) {
+            referencedColumns.add(column);
+          }
+        }
+      }
+
+      // Validate all referenced columns exist in the schema and are single-valued
+      for (String column : referencedColumns) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        Preconditions.checkState(fieldSpec != null,
+            "Failed to find column: %s specified in star-tree index config in schema", column);
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Star-tree index can only be created on single-value columns, but found multi-value column: %s", column);
+        Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
+            "Star-tree index cannot be created on MAP column: %s", column);
+      }
     }
   }
 
