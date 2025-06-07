@@ -41,8 +41,9 @@ import org.slf4j.MDC;
  * <p>It is used to pass information between different layers of the query execution stack without changing the
  * method signatures. This is also used to populate the {@link MDC} context for logging.
  *
- * Use {@link #open()} to initialize the empty context. As any other {@link AutoCloseable} object, it should be used
- * within a try-with-resources block to ensure the context is properly closed and removed from the thread-local storage.
+ * Use {@link #open(String)} to initialize the empty context. As any other {@link AutoCloseable} object, it should be
+ * used within a try-with-resources block to ensure the context is properly closed and removed from the thread-local
+ * storage.
  *
  * Sometimes it is necessary to copy the state of the {@link QueryThreadContext} from one thread to another. In this
  * case, use the {@link #createMemento()} method to capture the state of the {@link QueryThreadContext} in the current
@@ -73,7 +74,7 @@ public class QueryThreadContext {
   /**
    * Private constructor to prevent instantiation.
    *
-   * Use {@link #open()} to initialize the context instead.
+   * Use {@link #open(String)} to initialize the context instead.
    */
   private QueryThreadContext() {
   }
@@ -125,8 +126,8 @@ public class QueryThreadContext {
   /**
    * Returns {@code true} if the {@link QueryThreadContext} is initialized in the current thread.
    *
-   * Initializing the context means that the {@link #open()} method was called and the returned object is not closed
-   * yet.
+   * Initializing the context means that the {@link #open(String)} method was called and the returned object is not
+   * closed yet.
    */
   public static boolean isInitialized() {
     return THREAD_LOCAL.get() != null;
@@ -156,11 +157,23 @@ public class QueryThreadContext {
    * @throws IllegalStateException if the {@link QueryThreadContext} is already initialized.
    */
   public static CloseableContext open() {
-    return open(null);
+    return open("unknown");
   }
 
+  public static CloseableContext open(String instanceId) {
+    CloseableContext open = open((Memento) null);
+    get()._instanceId = instanceId;
+    return open;
+  }
+
+  /// Just kept for backward compatibility.
+  @Deprecated
   public static CloseableContext openFromRequestMetadata(Map<String, String> requestMetadata) {
-    CloseableContext open = open();
+    return openFromRequestMetadata("unknown", requestMetadata);
+  }
+
+  public static CloseableContext openFromRequestMetadata(String instanceId, Map<String, String> requestMetadata) {
+    CloseableContext open = open(instanceId);
     String cid = requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID);
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     if (cid == null) {
@@ -210,6 +223,7 @@ public class QueryThreadContext {
       context.setCid(memento._cid);
       context.setSql(memento._sql);
       context.setQueryEngine(memento._queryEngine);
+      context.setInstanceId(memento._instanceId);
     }
 
     THREAD_LOCAL.set(context);
@@ -416,6 +430,18 @@ public class QueryThreadContext {
   }
 
   /**
+   * Returns the instanceid of the query.
+   *
+   * This is usually the id that identifies the server, broker, controller, etc.
+   *
+   * The default value of {@code null} means the instanceid is not set.
+   * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
+   */
+  public static String getInstanceId() {
+    return get().getInstanceId();
+  }
+
+  /**
    * This private class stores the actual state of the {@link QueryThreadContext} in a safe way.
    *
    * As part of the paranoid design of the {@link QueryThreadContext}, this class is used to store the state of the
@@ -436,6 +462,7 @@ public class QueryThreadContext {
     private String _cid;
     private String _sql;
     private String _queryEngine;
+    private String _instanceId;
 
     public long getStartTimeMs() {
       return _startTimeMs;
@@ -508,6 +535,16 @@ public class QueryThreadContext {
       _queryEngine = queryType;
     }
 
+    public void setInstanceId(String instanceId) {
+      Preconditions.checkState(_instanceId == null, "Service id already set to %s, cannot set again",
+          getInstanceId());
+      _instanceId = instanceId;
+    }
+
+    public String getInstanceId() {
+      return _instanceId;
+    }
+
     @Override
     public String toString() {
       try {
@@ -569,6 +606,11 @@ public class QueryThreadContext {
     }
 
     @Override
+    public void setInstanceId(String instanceId) {
+      LOGGER.debug("Setting instance id to {} in a fake context", instanceId);
+    }
+
+    @Override
     public void close() {
       // Do nothing
     }
@@ -584,9 +626,9 @@ public class QueryThreadContext {
    *
    * Given the only way to create a {@link QueryThreadContext} with known state is through the {@link Memento} class,
    * we can be sure that the state is always copied between threads. The alternative would be to create an
-   * {@link #open()} method that accepts a {@link QueryThreadContext} as an argument, but that would allow the receiver
-   * thread to use the received {@link QueryThreadContext} directly, which is not safe because it belongs to another
-   * thread.
+   * {@link #open(String)} method that accepts a {@link QueryThreadContext} as an argument, but that would allow the
+   * receiver thread to use the received {@link QueryThreadContext} directly, which is not safe because it belongs to
+   * another thread.
    */
   public static class Memento {
     private final long _startTimeMs;
@@ -596,6 +638,7 @@ public class QueryThreadContext {
     private final String _cid;
     private final String _sql;
     private final String _queryEngine;
+    private final String _instanceId;
 
     private Memento(Instance instance) {
       _startTimeMs = instance.getStartTimeMs();
@@ -605,6 +648,7 @@ public class QueryThreadContext {
       _cid = instance.getCid();
       _sql = instance.getSql();
       _queryEngine = instance.getQueryEngine();
+      _instanceId = instance.getInstanceId();
     }
   }
 

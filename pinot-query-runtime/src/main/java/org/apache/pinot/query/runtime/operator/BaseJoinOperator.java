@@ -333,13 +333,15 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected static void throwForJoinRowLimitExceeded(String reason) {
     throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
         reason
-        + ". Consider increasing the limit for the maximum number of rows in a join either via the query option '"
-        + QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"
-        + PinotHintOptions.JOIN_HINT_OPTIONS
-        + "'. Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
-        + JoinOverFlowMode.BREAK.name() + "' either via the query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE
-        + "' or the '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
-        + "'.");
+            + ".\nConsider increasing the limit for the maximum number of rows in a join either via:\n"
+            + "  - The query option '" + QueryOptionKey.MAX_ROWS_IN_JOIN + "'\n"
+            + "  - The hint '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
+            + "\n"
+            + "'Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
+            + JoinOverFlowMode.BREAK.name() + "' either via:\n"
+            + "  - The query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE + "'\n"
+            + "  - The hint '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' in the '"
+            + PinotHintOptions.JOIN_HINT_OPTIONS + "'\n");
   }
 
   public enum StatKey implements StatMap.Key {

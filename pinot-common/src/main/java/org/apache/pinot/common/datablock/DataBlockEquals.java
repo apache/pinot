@@ -172,6 +172,29 @@ public class DataBlockEquals {
           }
           return false;
         }
+        MetadataBlock leftMeta = (MetadataBlock) left;
+        MetadataBlock rightMeta = (MetadataBlock) right;
+        if (!Objects.equals(leftMeta.getStageId(), rightMeta.getStageId())) {
+          if (_failOnFalse) {
+            throw new IllegalArgumentException("Different stages: " + leftMeta.getStageId() + " and "
+                + rightMeta.getStageId());
+          }
+          return false;
+        }
+        if (!Objects.equals(leftMeta.getWorkerId(), rightMeta.getWorkerId())) {
+          if (_failOnFalse) {
+            throw new IllegalArgumentException("Different workers: " + leftMeta.getWorkerId() + " and "
+                + rightMeta.getWorkerId());
+          }
+          return false;
+        }
+        if (!Objects.equals(leftMeta.getServerId(), rightMeta.getServerId())) {
+          if (_failOnFalse) {
+            throw new IllegalArgumentException("Different server IDs: " + leftMeta.getServerId() + " and "
+                + rightMeta.getServerId());
+          }
+          return false;
+        }
       } else {
         if (rightType == DataBlock.Type.METADATA) {
           if (_failOnFalse) {

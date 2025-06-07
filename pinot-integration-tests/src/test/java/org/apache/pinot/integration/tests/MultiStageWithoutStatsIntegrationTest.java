@@ -122,7 +122,7 @@ public class MultiStageWithoutStatsIntegrationTest extends BaseClusterIntegratio
   }
 
   /// This is a regression test. In older versions there were issues with stats in intersection queries.
-  /// Now that this is fixed, we this tests looks trivial, but it is important to keep it to ensure that
+  /// Now that this is fixed, this tests looks trivial, but it is important to keep it to ensure that
   /// we don't regress.
   @Test
   public void testIntersection()
@@ -152,8 +152,7 @@ public class MultiStageWithoutStatsIntegrationTest extends BaseClusterIntegratio
     assertEquals(children.size(), 1);
 
     JsonNode child = children.get(0);
-    assertEquals(child.get("type").asText(), "MAILBOX_SEND");
+    assertEquals(child.get("type").asText(), "EMPTY_MAILBOX_SEND");
     assertEquals(child.get("stage").asInt(), 1);
-    assertEquals(child.get("children").size(), 1);
   }
 }

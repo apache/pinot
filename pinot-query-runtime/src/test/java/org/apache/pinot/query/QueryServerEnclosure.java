@@ -78,7 +78,8 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap, ThreadExecutionContext parentContext) {
-    try (QueryThreadContext.CloseableContext closeMe1 = QueryThreadContext.openFromRequestMetadata(requestMetadataMap);
+    try (QueryThreadContext.CloseableContext closeMe1 =
+        QueryThreadContext.openFromRequestMetadata("test", requestMetadataMap);
         QueryThreadContext.CloseableContext closeMe2 = MseWorkerThreadContext.open()) {
       return _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext);
     }
