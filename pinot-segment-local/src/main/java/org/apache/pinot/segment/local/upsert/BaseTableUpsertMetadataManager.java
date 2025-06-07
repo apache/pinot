@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.function.Function;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -111,6 +113,23 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
           instanceUpsertConfig.getProperty(Upsert.DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT, false);
     }
 
+    // Create ZK creation time provider to get authoritative creation times from controller
+    Function<String, Long> segmentZKCreationTimeProvider = (segmentName) -> {
+      try {
+        // Use TableDataManager's fetchZKMetadata to get segment creation time from controller
+        SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segmentName);
+        if (segmentZKMetadata != null) {
+          LOGGER.debug("Retrieved ZK creation time {} for segment: {}", segmentZKMetadata.getCreationTime(),
+              segmentName);
+          return segmentZKMetadata.getCreationTime();
+        }
+        return null;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get ZK creation time for segment: {}", segmentName, e);
+        return null;
+      }
+    };
+
     _context = new UpsertContext.Builder()
         .setTableConfig(tableConfig)
         .setSchema(schema)
@@ -131,6 +150,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setUpsertViewRefreshIntervalMs(upsertConfig.getUpsertViewRefreshIntervalMs())
         .setNewSegmentTrackingTimeMs(upsertConfig.getNewSegmentTrackingTimeMs())
         .setMetadataManagerConfigs(upsertConfig.getMetadataManagerConfigs())
+        .setSegmentZKCreationTimeProvider(segmentZKCreationTimeProvider)
         .setAllowPartialUpsertConsumptionDuringCommit(allowPartialUpsertConsumptionDuringCommit)
         .build();
     LOGGER.info("Initialized {} for table: {} with: {}", getClass().getSimpleName(), _tableNameWithType, _context);
