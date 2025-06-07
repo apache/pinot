@@ -19,20 +19,15 @@
 package org.apache.pinot.controller.api.access;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
-import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
+import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -45,7 +40,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  *
  */
 public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
-  private static final String HEADER_AUTHORIZATION = "Authorization";
 
   private AccessControl _accessControl;
 
@@ -65,8 +59,7 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
   /**
    * Access Control using header-based basic http authentication
    */
-  private static class BasicAuthAccessControl implements AccessControl {
-    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+  private static class BasicAuthAccessControl extends AbstractBasicAuthAccessControl {
     private final AccessControlUserCache _userCache;
 
     public BasicAuthAccessControl(AccessControlUserCache userCache) {
@@ -74,48 +67,8 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean protectAnnotatedOnly() {
-      return false;
-    }
-
-    @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).filter(
-          p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName))
-              && p.hasPermission(Objects.toString(accessType))).isPresent();
-    }
-
-    @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).isPresent();
-    }
-
-    private Optional<ZkBasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
-      if (headers == null) {
-        return Optional.empty();
-      }
-
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig()).stream()
-          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
-
-      List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
-      if (authHeaders == null) {
-        return Optional.empty();
-      }
-      Map<String, String> name2password = authHeaders.stream().collect(
-          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal =
-          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
-
-      return password2principal.entrySet().stream().filter(
-          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
-              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
-    }
-
-    @Override
-    public AuthWorkflowInfo getAuthWorkflowInfo() {
-      return new AuthWorkflowInfo(AccessControl.WORKFLOW_BASIC);
+    protected Optional<ZkBasicAuthPrincipal> getPrincipal(HttpHeaders httpHeaders) {
+      return BasicAuthUtils.getPrincipal(getTokens(httpHeaders), _userCache, ComponentType.CONTROLLER);
     }
   }
 }
