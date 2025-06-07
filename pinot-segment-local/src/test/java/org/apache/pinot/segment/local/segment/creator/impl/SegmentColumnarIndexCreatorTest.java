@@ -33,12 +33,14 @@ import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -129,6 +131,77 @@ public class SegmentColumnarIndexCreatorTest implements PinotBuffersAfterClassCh
       if (indexSegment != null) {
         indexSegment.destroy();
       }
+      FileUtils.deleteQuietly(new File(indexDirPath));
+    }
+  }
+
+  @Test
+  public void testNotNullColumn()
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder()
+            .addSingleValueDimension("col1", DataType.STRING)
+            .addSingleValueDimension("col2", DataType.STRING)
+            .setEnableColumnBasedNullHandling(true)
+            .build();
+    schema.getFieldSpecFor("col1").setNotNull(true);
+    schema.getFieldSpecFor("col2").setNotNull(false);
+
+    // Create rows with some null values
+    GenericRow row0 = new GenericRow(); // Should be skipped
+    GenericRow row1 = new GenericRow();
+    row1.putValue("col1", "1");
+    row1.putValue("col2", "1");
+    GenericRow row2 = new GenericRow();  // Should be skipped
+    row2.putValue("col1", null);
+    row2.putValue("col2", "2");
+    GenericRow row3 = new GenericRow();
+    row3.putValue("col1", "3");
+    row3.putValue("col2", null);
+    GenericRow row4 = new GenericRow();  // Should be skipped
+    row4.putValue("col2", "4");
+    List<GenericRow> rows = ImmutableList.of(row0, row1, row2, row3, row4);
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test")
+        .setIngestionConfig(ingestionConfig).build();
+
+    String segmentName = "testSegment";
+    String indexDirPath = new File(TEMP_DIR, segmentName).getAbsolutePath();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(indexDirPath);
+    config.setSegmentName(segmentName);
+    IndexSegment indexSegment = null;
+
+    try {
+      FileUtils.deleteQuietly(new File(indexDirPath));
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      driver.build();
+      indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
+      SegmentMetadata md = indexSegment.getSegmentMetadata();
+      Assert.assertEquals(md.getTotalDocs(), 2);
+    } finally {
+      if (indexSegment != null) {
+        indexSegment.destroy();
+      }
+      FileUtils.deleteQuietly(new File(indexDirPath));
+    }
+
+    TableConfig tableConfigWithoutContinueOnError =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    segmentName = "testSegment2";
+    indexDirPath = new File(TEMP_DIR, segmentName).getAbsolutePath();
+    config = new SegmentGeneratorConfig(tableConfigWithoutContinueOnError, schema);
+    config.setOutDir(indexDirPath);
+    config.setSegmentName(segmentName);
+    try {
+      FileUtils.deleteQuietly(new File(indexDirPath));
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, new GenericRowRecordReader(rows));
+      Assert.expectThrows(RuntimeException.class, driver::build);
+    } finally {
       FileUtils.deleteQuietly(new File(indexDirPath));
     }
   }

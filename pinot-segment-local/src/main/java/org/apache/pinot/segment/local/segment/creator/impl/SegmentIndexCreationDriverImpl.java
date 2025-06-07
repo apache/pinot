@@ -37,6 +37,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
+import org.apache.pinot.segment.local.segment.creator.SegmentCreatorUtils;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -257,6 +258,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
+      Set<String> notNullColumns = SegmentCreatorUtils.extractNotNullColumns(_dataSchema);
       while (_recordReader.hasNext()) {
         long recordReadStopTimeNs;
         reuse.clear();
@@ -278,6 +280,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
 
         for (GenericRow row : reusedResult.getTransformedRows()) {
+          if (SegmentCreatorUtils.shouldSkipRowForNotNull(notNullColumns, row)) {
+            // Skip the row if it contains null value in a not-null column
+            // The stats collector has already thrown an exception if `continueOnError` is false
+            continue;
+          }
           _indexCreator.indexRow(row);
         }
         _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);

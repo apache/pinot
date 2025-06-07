@@ -46,6 +46,11 @@ public class NullValueTransformer implements RecordTransformer {
       if (!fieldSpec.isVirtualColumn() && !fieldSpec.getName().equals(timeColumnName)) {
         String fieldName = fieldSpec.getName();
         Object defaultNullValue = fieldSpec.getDefaultNullValue();
+        if (schema.isEnableColumnBasedNullHandling() && fieldSpec.isNotNull()) {
+          // For strict not-null columns, we do not set default null value for the column, so that the
+          // ingestion pipeline can fail if the column value is null.
+          continue;
+        }
         if (fieldSpec.isSingleValueField()) {
           _defaultNullValues.put(fieldName, defaultNullValue);
         } else {
