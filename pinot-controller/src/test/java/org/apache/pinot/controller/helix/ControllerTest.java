@@ -800,6 +800,11 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    getControllerRequestClient().deleteLogicalTable(logicalTableName);
+  }
+
   public void waitForEVToAppear(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) != null, 60_000L,
         "Failed to create the external view for table: " + tableNameWithType);

@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -960,6 +961,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   private String constructLogicalTableConfigPath(String tableName) {
-    return "/LOGICAL/TABLE/" + tableName;
+    return ZkPaths.LOGICAL_TABLE_PATH_PREFIX + tableName;
   }
 }
