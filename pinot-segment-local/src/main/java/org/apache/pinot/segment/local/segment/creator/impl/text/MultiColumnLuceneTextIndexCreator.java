@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.text;
 
+import it.unimi.dsi.fastutil.booleans.BooleanList;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -43,28 +48,35 @@ import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader.ColumnConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This is used to create Lucene based text index.
+ * This class is used to create Lucene-based multi-column text index.
  * Used for both offline from {@link SegmentColumnarIndexCreator}
  * and realtime from {@link RealtimeLuceneTextIndex}
+ *
+ * TODO: refactor
  */
-public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
+public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends AbstractTextIndexCreator*/ {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
-  private final String _textColumn;
+  private final List<String> _textColumns;
+  // per-column isSingleValue boolean flag
+  private final BooleanList _textColumnsSV;
   private final boolean _commitOnClose;
   private final boolean _reuseMutableIndex;
   private final File _indexFile;
@@ -86,7 +98,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * when building an offline segment. Similar to how it creates per column
    * dictionary, forward and inverted index, a text index is also created
    * if text search is enabled on a column.
-   * @param column column name
+   * @param columns column names
+   * @param columnsSV per-column flags, true->single value, false-> multi-value
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
    *               been added), false if index should not be committed
@@ -106,12 +119,22 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    *               no need to commit the index from the realtime side. So when the realtime segment
    *               is destroyed (which is after the realtime segment has been committed and converted
    *               to offline), we close this lucene index writer to release resources but don't commit.
-   * @param config the text index config
+   * @param mcTextConfig the text index config
    */
-  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
-    _textColumn = column;
+  public MultiColumnLuceneTextIndexCreator(
+      List<String> columns,
+      BooleanList columnsSV,
+      File segmentIndexDir,
+      boolean commit,
+      boolean realtimeConversion,
+      @Nullable File consumerDir,
+      @Nullable int[] immutableToMutableIdMap,
+      MultiColumnTextIndexConfig mcTextConfig) {
+    _textColumns = columns;
+    _textColumnsSV = columnsSV;
     _commitOnClose = commit;
+
+    TextIndexConfig config = new TextIndexConfigBuilder().withProperties(mcTextConfig.getProperties()).build();
 
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
@@ -124,7 +147,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         TextIndexUtils.writeConfigToPropertiesFile(_indexFile, config);
       }
 
-      Analyzer luceneAnalyzer = TextIndexUtils.getAnalyzer(config);
+      Map<String, ColumnConfig> perColConfigs =
+          MultiColumnLuceneTextIndexReader.buildColumnConfigs(mcTextConfig.getPerColumnProperties());
+
+      Analyzer luceneAnalyzer = MultiColumnLuceneTextIndexReader.buildAnalyzer(config, perColConfigs);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
@@ -143,7 +169,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // and (2) happens during realtime segment conversion
       _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion;
       if (_reuseMutableIndex) {
-        LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
+        LOGGER.info("Reusing the realtime lucene index for segment {} and column [{}]", segmentIndexDir, columns);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
         convertMutableSegment(segmentIndexDir, consumerDir, immutableToMutableIdMap, indexWriterConfig);
         return;
@@ -155,8 +181,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         // reducing the number of small writes.
         int bufSize = config.getLuceneNRTCachingDirectoryMaxBufferSizeMB();
         LOGGER.info(
-            "Using NRTCachingDirectory for realtime lucene index for segment {} and column {} with buffer size: {}MB",
-            segmentIndexDir, column, bufSize);
+            "Using NRTCachingDirectory for realtime lucene index for segment {} and columns [{}] with buffer size: "
+                + "{}MB",
+            segmentIndexDir, columns, bufSize);
         NRTCachingDirectory dir = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
         indexWriterConfig.setMergePolicy(new LuceneNRTCachingMergePolicy(dir));
         _indexDirectory = dir;
@@ -173,16 +200,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
-          "Failed to instantiate " + luceneAnalyzerClass + " lucene analyzer for column: " + column, e);
+          "Failed to instantiate " + luceneAnalyzerClass + " lucene analyzer for column: " + columns, e);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
+          "Caught exception while instantiating the LuceneTextIndexCreator for column: " + columns, e);
     }
-  }
-
-  public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
-    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        context.isRealtimeConversion(), context.getConsumerDir(), context.getImmutableToMutableIdMap(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {
@@ -213,7 +235,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         indexWriter.forceMerge(1, true);
         indexWriter.commit();
 
-        buildMappingFile(segmentIndexDir, _textColumn, destDirectory, immutableToMutableIdMap);
+        buildMappingFile(segmentIndexDir, _textColumns, destDirectory, immutableToMutableIdMap);
       } catch (Exception e) {
         throw new RuntimeException("Failed to build the mapping file during segment conversion: " + e);
       }
@@ -226,11 +248,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
    * the immutableToMutableIdMap from segment conversion
    * @param segmentIndexDir segment index directory
-   * @param column column name
+   * @param columns column name
    * @param directory directory of the index
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    */
-  private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
+  private void buildMappingFile(File segmentIndexDir, List<String> columns, Directory directory,
       @Nullable int[] immutableToMutableIdMap)
       throws IOException {
     IndexReader indexReader = DirectoryReader.open(directory);
@@ -239,8 +261,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     int numDocs = indexSearcher.getIndexReader().numDocs();
     int length = Integer.BYTES * numDocs;
     File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-        column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    String desc = "Text index docId mapping buffer: " + column;
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME
+            + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    String desc = "Text index docId mapping buffer: " + columns;
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
         ByteOrder.LITTLE_ENDIAN, desc)) {
       try {
@@ -248,72 +271,60 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         // Therefore, the mapping file can be built without doing an additional docId conversion
         if (immutableToMutableIdMap == null) {
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.storedFields().document(i);
-            int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+            Document document = indexSearcher.doc(i);
+            int pinotDocId =
+                Integer.parseInt(document.get(MultiColumnLuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
             buffer.putInt(i * Integer.BYTES, pinotDocId);
           }
           return;
         }
 
         for (int i = 0; i < numDocs; i++) {
-          Document document = indexSearcher.storedFields().document(i);
+          Document document = indexSearcher.doc(i);
           int mutablePinotDocId =
-              Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+              Integer.parseInt(document.get(MultiColumnLuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
           int immutablePinotDocId = immutableToMutableIdMap[mutablePinotDocId];
           buffer.putInt(i * Integer.BYTES, immutablePinotDocId);
         }
       } catch (Exception e) {
         throw new RuntimeException(
-            "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
+            "Caught exception while building mutable to immutable doc id mapping for text index column: " + columns, e);
       }
     } finally {
       indexReader.close();
     }
   }
 
-  @Override
-  public void add(String document) {
+  // documents -> list of values for all text columns (either String or String[])
+  public void add(List<Object> documents) {
     if (_reuseMutableIndex) {
       return; // no-op
     }
 
     // text index on SV column
     Document docToIndex = new Document();
-    docToIndex.add(new TextField(_textColumn, document, Field.Store.NO));
+    for (int i = 0, n = _textColumns.size(); i < n; i++) {
+      if (_textColumnsSV.getBoolean(i)) {
+        docToIndex.add(new TextField(_textColumns.get(i), (String) documents.get(i), Field.Store.NO));
+      } else {
+        String column = _textColumns.get(i);
+        String[] values = (String[]) documents.get(i);
+        for (String value : values) {
+          docToIndex.add(new TextField(column, value, Field.Store.NO));
+        }
+      }
+    }
+
     docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
+          "Caught exception while adding a new document to the Lucene index for columns: " + _textColumns, e);
     }
   }
 
-  @Override
-  public void add(String[] documents, int length) {
-    if (_reuseMutableIndex) {
-      return; // no-op
-    }
-
-    Document docToIndex = new Document();
-
-    // Whenever multiple fields with the same name appear in one document, both the
-    // inverted index and term vectors will logically append the tokens of the
-    // field to one another, in the order the fields were added.
-    for (int i = 0; i < length; i++) {
-      docToIndex.add(new TextField(_textColumn, documents[i], Field.Store.NO));
-    }
-    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-
-    try {
-      _indexWriter.addDocument(docToIndex);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + _textColumn, e);
-    }
-  }
-
-  @Override
+  //@Override
   public void seal() {
     if (_reuseMutableIndex) {
       return;  // no-op
@@ -336,11 +347,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // as opposed to per column index.
       _indexWriter.forceMerge(1);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while sealing the Lucene index for column: " + _textColumn, e);
+      throw new RuntimeException("Caught exception while sealing the Lucene index for column: " + _textColumns, e);
     }
   }
 
-  @Override
+  //@Override
   public void close()
       throws IOException {
     if (_reuseMutableIndex) {
@@ -351,7 +362,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       _indexWriter.close();
       _indexDirectory.close();
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while closing the Lucene index for column: " + _textColumn, e);
+      throw new RuntimeException("Caught exception while closing the Lucene index for column: " + _textColumns, e);
     } finally {
       // remove leftover write.lock file, as well as artifacts from .commit() being called on the realtime index
       if (!_commitOnClose) {
@@ -361,14 +372,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory =
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 
   private File getMutableIndexDir(File indexDir, File consumerDir) {
     String segmentName = getSegmentName(indexDir);
     return new File(new File(consumerDir, segmentName),
-        _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
   }
 
   private String getSegmentName(File indexDir) {
@@ -379,5 +391,16 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public int getNumDocs() {
     return _nextDocId;
+  }
+
+  public Object2IntOpenHashMap getMapping() {
+    Object2IntOpenHashMap<Object> mapping = new Object2IntOpenHashMap<>();
+    mapping.defaultReturnValue(-1);
+
+    for (int i = 0; i < _textColumns.size(); i++) {
+      mapping.put(_textColumns.get(i), i);
+    }
+
+    return mapping;
   }
 }

@@ -34,4 +34,16 @@ public interface TextIndexReader extends IndexReader {
    * Returns the matching document ids for the given search query.
    */
   MutableRoaringBitmap getDocIds(String searchQuery);
+
+  /**
+   * Returns the matching document ids for the given search query against given column.
+   * Note: single-column text indexes ignore column parameter.
+   */
+  default MutableRoaringBitmap getDocIds(String column, String searchQuery) {
+    return getDocIds(searchQuery);
+  }
+
+  default boolean isMultiColumn() {
+    return false;
+  }
 }

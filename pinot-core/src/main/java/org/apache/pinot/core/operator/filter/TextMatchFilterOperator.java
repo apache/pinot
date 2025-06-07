@@ -40,20 +40,28 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
+  // name of text column to query, used with multi-column text indexes.
+  private final String _column;
   private final TextIndexReader _textIndexReader;
   private final int _numDocs;
   private final TextMatchPredicate _predicate;
 
-  public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
+  public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
+      int numDocs) {
     super(numDocs, false);
+    _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;
   }
 
+  public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
+    this(null, textIndexReader, predicate, numDocs);
+  }
+
   @Override
   protected BlockDocIdSet getTrues() {
-    return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs);
+    return new BitmapDocIdSet(_textIndexReader.getDocIds(_column, _predicate.getValue()), _numDocs);
   }
 
   @Override
@@ -63,7 +71,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    return _textIndexReader.getDocIds(_predicate.getValue()).getCardinality();
+    return _textIndexReader.getDocIds(_column, _predicate.getValue()).getCardinality();
   }
 
   @Override
@@ -73,7 +81,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap = _textIndexReader.getDocIds(_predicate.getValue());
+    ImmutableRoaringBitmap bitmap = _textIndexReader.getDocIds(_column, _predicate.getValue());
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
   }
@@ -85,10 +93,13 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:text_index");
-    stringBuilder.append(",operator:").append(_predicate.getType());
-    stringBuilder.append(",predicate:").append(_predicate.toString());
-    return stringBuilder.append(')').toString();
+    StringBuilder sb = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:text_index");
+    sb.append(",operator:").append(_predicate.getType());
+    if (_column != null) {
+      sb.append(",column:").append(_column);
+    }
+    sb.append(",predicate:").append(_predicate.toString());
+    return sb.append(')').toString();
   }
 
   @Override
@@ -97,11 +108,12 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
-    super.explainAttributes(attributeBuilder);
-    attributeBuilder.putString("indexLookUp", "text_index");
-    attributeBuilder.putString("operator", _predicate.getType().name());
-    attributeBuilder.putString("predicate", _predicate.toString());
+  protected void explainAttributes(ExplainAttributeBuilder builder) {
+    super.explainAttributes(builder);
+    builder.putString("indexLookUp", "text_index");
+    builder.putString("operator", _predicate.getType().name());
+    builder.putString("column", _column);
+    builder.putString("predicate", _predicate.toString());
   }
 
   private void record(ImmutableRoaringBitmap matches) {

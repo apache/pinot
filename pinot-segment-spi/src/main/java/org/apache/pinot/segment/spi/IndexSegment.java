@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
@@ -86,6 +87,12 @@ public interface IndexSegment {
    */
   @Nullable
   List<StarTreeV2> getStarTrees();
+
+  /**
+   * If exists, Returns shared text index, otherwise returns null.
+   */
+  @Nullable
+  TextIndexReader getMultiColumnTextIndex();
 
   /**
    * Returns a bitmap of the valid document ids. Valid document is the document that holds the latest timestamp (or
