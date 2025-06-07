@@ -207,14 +207,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (tableConfig.isDedupEnabled()) {
       _tableDedupMetadataManager =
           TableDedupMetadataManagerFactory.create(_instanceDataManagerConfig.getDedupConfig(), tableConfig, schema,
-              this);
+              this, _segmentOperationsThrottler);
     }
     if (tableConfig.isUpsertEnabled()) {
       Preconditions.checkState(_tableDedupMetadataManager == null,
           "Dedup and upsert cannot be both enabled for table: %s", _tableNameWithType);
       _tableUpsertMetadataManager =
           TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
-              this);
+              this, _segmentOperationsThrottler);
     }
 
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();

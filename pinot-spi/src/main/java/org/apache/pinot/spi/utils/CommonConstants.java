@@ -268,6 +268,7 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
     // Preprocess throttle config specifically for StarTree index rebuild
     public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.startree.preprocess.parallelism";
@@ -278,6 +279,8 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // Download throttle config
     public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
         "pinot.server.max.segment.download.parallelism";
     // Setting to Integer.MAX_VALUE to effectively disable throttling by default

@@ -119,7 +119,8 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
         .build();
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
-    return TableDedupMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema, tableDataManager);
+    return TableDedupMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema, tableDataManager,
+        null);
   }
 
   public List<Map<String, String>> loadJsonFile(String filePath)
