@@ -77,6 +77,9 @@ public class SegmentMapper {
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
   private final AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private int _incompleteRowsFound = 0;
+  private int _skippedRowsFound = 0;
+  private int _sanitizedRowsFound = 0;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
@@ -192,6 +195,9 @@ public class SegmentMapper {
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           writeRecord(transformedRow);
         }
+        _incompleteRowsFound += reusedResult.getIncompleteRowCount();
+        _skippedRowsFound += reusedResult.getSkippedRowCount();
+        _sanitizedRowsFound += reusedResult.getSanitizedRowCount();
       } catch (Exception e) {
         String logMessage = "Caught exception while reading data.";
         observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
@@ -202,6 +208,7 @@ public class SegmentMapper {
           throw new RuntimeException(logMessage, e);
         } else {
           LOGGER.debug(logMessage, e);
+          _incompleteRowsFound++;
           continue;
         }
       }
@@ -249,5 +256,17 @@ public class SegmentMapper {
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);
+  }
+
+  public int getIncompleteRowsFound() {
+    return _incompleteRowsFound;
+  }
+
+  public int getSkippedRowsFound() {
+    return _skippedRowsFound;
+  }
+
+  public int getSanitizedRowsFound() {
+    return _sanitizedRowsFound;
   }
 }
