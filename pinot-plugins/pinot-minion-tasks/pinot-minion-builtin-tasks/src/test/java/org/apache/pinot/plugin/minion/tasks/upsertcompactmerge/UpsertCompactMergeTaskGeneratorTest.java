@@ -171,8 +171,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     segmentWithNoDownloadUrl.setTotalDocs(100L);
     segmentWithNoDownloadUrl.setCrc(1000);
     segmentWithNoDownloadUrl.setDownloadUrl("");
-    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs,
-        List.of(segmentWithNoDownloadUrl), System.currentTimeMillis());
+    candidateSegments =
+        UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, List.of(segmentWithNoDownloadUrl),
+            System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
 
     // candidates are within buffer period
@@ -184,8 +185,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     segmentWithinBufferPeriod.setTotalDocs(100L);
     segmentWithinBufferPeriod.setCrc(1000);
     segmentWithinBufferPeriod.setDownloadUrl("fs://testTable__3");
-    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs,
-        List.of(segmentWithinBufferPeriod), System.currentTimeMillis());
+    candidateSegments =
+        UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, List.of(segmentWithinBufferPeriod),
+            System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
 
     // no completed segment
@@ -195,8 +197,8 @@ public class UpsertCompactMergeTaskGeneratorTest {
     incompleteSegment.setTimeUnit(TimeUnit.MILLISECONDS);
     incompleteSegment.setTotalDocs(100L);
     incompleteSegment.setCrc(1000);
-    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs,
-        List.of(incompleteSegment), System.currentTimeMillis());
+    candidateSegments = UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, List.of(incompleteSegment),
+        System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
   }
 
@@ -207,15 +209,14 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList), "");
 
     // single segment
-    segmentMergerMetadataList =
-        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000));
+    segmentMergerMetadataList = List.of(
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000, 12345678));
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList), "fs://testTable__0");
 
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
-    );
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000, 12345678),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000, 12345678));
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList),
         "fs://testTable__0,fs://testTable__1");
   }
@@ -227,15 +228,14 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "");
 
     // single segment
-    segmentMergerMetadataList =
-        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000));
+    segmentMergerMetadataList = List.of(
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000, 12345678));
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000");
 
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
-    );
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000, 12345678),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000, 12345678));
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000,2000");
   }
 }
