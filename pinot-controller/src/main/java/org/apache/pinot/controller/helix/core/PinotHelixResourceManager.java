@@ -2995,14 +2995,30 @@ public class PinotHelixResourceManager {
     Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
 
+    List<String> instanceFailedList = null;
     for (String instance : instanceSet) {
       if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Skipping resetting for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
             instance);
       } else {
         LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
-        resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
+        try {
+          resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
+        } catch (Exception e) {
+          if (instanceFailedList == null) {
+            instanceFailedList = new ArrayList<>();
+          }
+          instanceFailedList.add(instance);
+          LOGGER.error("Failed to reset segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
+              instance, e);
+        }
       }
+    }
+
+    if (instanceFailedList != null) {
+      throw new RuntimeException(
+          "Reset segment failed for table: " + tableNameWithType + ", segment: " + segmentName + ", instances: "
+              + instanceFailedList);
     }
   }
 
@@ -3043,12 +3059,27 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Resetting segments: {} of table: {}", instanceToResetSegmentsMap, tableNameWithType);
+
+    List<String> instanceFailedList = null;
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
-      resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
+      try {
+        resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
+      } catch (Exception e) {
+        if (instanceFailedList == null) {
+          instanceFailedList = new ArrayList<>();
+        }
+        instanceFailedList.add(entry.getKey());
+        LOGGER.error("Failed to reset segments of table: {} on instance: {}", tableNameWithType, entry.getKey(), e);
+      }
     }
 
     LOGGER.info("Reset segments for table {} finished. With the following segments skipped: {}", tableNameWithType,
         instanceToSkippedSegmentsMap);
+
+    if (instanceFailedList != null) {
+      throw new RuntimeException(
+          "Reset segment failed for table: " + tableNameWithType + ", instances: " + instanceFailedList);
+    }
   }
 
   private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
@@ -3067,7 +3098,8 @@ public class PinotHelixResourceManager {
    * This util is similar to {@link HelixAdmin#resetPartition(String, String, String, List)}.
    * However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
    */
-  private void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+  @VisibleForTesting
+  void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
     LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
         resetPartitionNames == null ? "NULL" : resetPartitionNames, resourceName, instanceName, _helixClusterName);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
