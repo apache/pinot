@@ -1311,4 +1311,8 @@ public class ControllerConf extends PinotConfiguration {
     String enableSwagger = getProperty(CONSOLE_SWAGGER_ENABLE);
     return enableSwagger == null || Boolean.parseBoolean(enableSwagger);
   }
+
+  public String getPageCacheWarmupDataDir() {
+    return getProperty(CommonConstants.Controller.PAGE_CACHE_WARMUP_DATA_DIR);
+  }
 }
