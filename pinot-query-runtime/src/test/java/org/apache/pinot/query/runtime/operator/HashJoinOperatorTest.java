@@ -442,6 +442,170 @@ public class HashJoinOperatorTest {
         "Max rows in join should be reached");
   }
 
+  @Test
+  public void shouldHandleHashJoinKeyCollisionLeftJoinWithNulls() {
+    // Test LEFT join with both hash collision AND null values
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(1, "Aa")    // Hash collision string
+            .addRow(2, "BB")    // Hash collision string
+            .addRow(3, null)    // Null key
+            .addRow(4, "CC")    // Non-collision string
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(2, "Aa")    // Hash collision match
+            .addRow(2, "BB")    // Hash collision match
+            .addRow(3, null)    // Null key - should NOT match left null
+            .addRow(5, "DD")    // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 4);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});     // Hash collision match
+    assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});     // Hash collision match
+    assertEquals(resultRows.get(2), new Object[]{3, null, null, null});  // Left null preserved, no match
+    assertEquals(resultRows.get(3), new Object[]{4, "CC", null, null});  // Left unmatched preserved
+  }
+
+  @Test
+  public void shouldHandleRightJoinWithNulls() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(1, "Aa")
+            .addRow(2, null)
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(2, "Aa")
+            .addRow(3, null)
+            .addRow(4, "BB")
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of());
+
+    // First block: only non-null match
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(1, resultRows1.size());
+    assertTrue(containsRow(resultRows1, new Object[]{1, "Aa", 2, "Aa"}));
+
+    // Second block: unmatched right rows
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(2, resultRows2.size());
+    assertTrue(containsRow(resultRows2, new Object[]{null, null, 3, null}));
+    assertTrue(containsRow(resultRows2, new Object[]{null, null, 4, "BB"}));
+
+    // Third block should be EOS
+    assertTrue(operator.nextBlock().isSuccess());
+  }
+
+  @Test
+  public void shouldHandleFullJoinWithNulls() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(1, "Aa")
+            .addRow(2, null)
+            .addRow(4, "CC")
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(2, "Aa")
+            .addRow(2, null)
+            .addRow(3, "BB")
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING});
+
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.FULL, List.of(1), List.of(1), List.of());
+
+    // First block
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(3, resultRows1.size());
+
+    assertTrue(containsRow(resultRows1, new Object[]{1, "Aa", 2, "Aa"}));   // Match
+    assertTrue(containsRow(resultRows1, new Object[]{2, null, null, null})); // Left null unmatched
+    assertTrue(containsRow(resultRows1, new Object[]{4, "CC", null, null})); // Left unmatched
+
+    // Second block
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(2, resultRows2.size());
+
+    assertTrue(containsRow(resultRows2, new Object[]{null, null, 2, null})); // Right null unmatched
+    assertTrue(containsRow(resultRows2, new Object[]{null, null, 3, "BB"})); // Right unmatched
+  }
+
+  private boolean containsRow(List<Object[]> rows, Object[] expectedRow) {
+    for (Object[] row : rows) {
+      if (java.util.Arrays.equals(row, expectedRow)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  @Test
+  public void shouldHandleSemiJoinWithNulls() {
+    // Test SEMI join - should not match null keys
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(1, "Aa")
+            .addRow(2, null)    // Null key
+            .addRow(4, "CC")    // No match in right
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(2, "Aa")    // Match for left row 1
+            .addRow(3, null)    // Null - should NOT match left null
+            .addRow(5, "BB")    // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa"}); // Only non-null match
+  }
+
+  @Test
+  public void shouldHandleAntiJoinWithNulls() {
+    // Test ANTI join - null keys should be preserved (not matched)
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(1, "Aa")    // Has match in right
+            .addRow(2, null)    // Null key - no match
+            .addRow(4, "CC")    // No match in right
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+            .addRow(2, "Aa")    // Match for left row 1
+            .addRow(3, null)    // Null - should NOT match left null
+            .addRow(5, "BB")    // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2, null}); // Left null preserved (no match)
+    assertEquals(resultRows.get(1), new Object[]{4, "CC"}); // Left unmatched preserved
+  }
+
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       PlanNode.NodeHint nodeHint) {
