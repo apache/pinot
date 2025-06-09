@@ -1269,15 +1269,16 @@ public class PinotSegmentRestletResource {
   @ApiOperation(value = "Remove ingestion metrics for a specific segment",
       notes = "Removes ingestion-related metrics for a given segment under the specified table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
+      @ApiResponse(code = 200, message = "Successfully sent remove ingestion-metrics message. Response includes a "
+          + "'status' field describing the operation result."),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public SuccessResponse removeIngestionMetrics(
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "Instance name (optional) of the server", required = false) @QueryParam("instance")
-      String instance,
+      @ApiParam(value = "Instance name (optional) of the server") @QueryParam("serverInstanceName")
+      String serverInstanceName,
       @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
@@ -1291,15 +1292,16 @@ public class PinotSegmentRestletResource {
     }
     Set<String> serverInstances = new HashSet<>();
     try {
-      if (StringUtils.isEmpty(instance)) {
+      if (StringUtils.isEmpty(serverInstanceName)) {
         Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
         if (instanceStateMap == null) {
-          throw new ControllerApplicationException(LOGGER, "No instance mapping found in ideal state for the segment: " + segmentName,
-              Status.BAD_REQUEST);
+          throw new ControllerApplicationException(LOGGER,
+              "No instance mapping found in ideal state for the segment: " + segmentName + ", table: "
+                  + tableNameWithType, Status.BAD_REQUEST);
         }
         serverInstances.addAll(instanceStateMap.keySet());
       } else {
-        serverInstances.add(instance);
+        serverInstances.add(serverInstanceName);
       }
       _pinotLLCRealtimeSegmentManager.sendRemoveIngestionMetricsMessageToServers(tableNameWithType, segmentName,
           serverInstances);
