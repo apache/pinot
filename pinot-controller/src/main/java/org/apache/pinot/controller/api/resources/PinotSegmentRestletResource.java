@@ -1294,20 +1294,20 @@ public class PinotSegmentRestletResource {
     Set<String> serverInstances = new HashSet<>();
     try {
       if (StringUtils.isEmpty(serverInstanceName)) {
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
-        if (instanceStateMap == null) {
+        Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+        if (instanceSet == null) {
           throw new ControllerApplicationException(LOGGER,
               "No instance mapping found in ideal state for the segment: " + segmentName + ", table: "
                   + tableNameWithType, Status.BAD_REQUEST);
         }
-        serverInstances.addAll(instanceStateMap.keySet());
+        serverInstances.addAll(instanceSet);
       } else {
         serverInstances.add(serverInstanceName);
       }
       _pinotLLCRealtimeSegmentManager.sendRemoveIngestionMetricsMessageToServers(tableNameWithType, segmentName,
           serverInstances);
       return new SuccessResponse(
-          "Sent ingestion-metrics remove message for table: " + tableNameWithType + ", segment: " + segmentName
+          "Successfully sent ingestion-metrics remove message for table: " + tableNameWithType + ", segment: " + segmentName
               + " to instance(s): " + serverInstances);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
