@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -83,6 +84,7 @@ import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.auth.MultiTableRowColAuthResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -342,6 +344,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
+      }
+      AccessControl accessControl = _accessControlFactory.create();
+      MultiTableRowColAuthResult rowColFilters = accessControl.getRowColFilters(requesterIdentity, tables);
+      for (String tableName : tables) {
+        Optional<Map<String, List<String>>> rlsFilterForTableMaybe = rowColFilters.getRLSFilterForTable(tableName);
+        if (rlsFilterForTableMaybe.isPresent()) {
+          Map<String, List<String>> rowFilters = rlsFilterForTableMaybe.get();
+          StringBuilder sb = new StringBuilder();
+
+          for (String policyId : rowFilters.keySet()) {
+            List<String> filters = rowFilters.get(policyId);
+            for (int i = 0; i < filters.size(); i++) {
+              sb.append(filters.get(i));
+              if (i < filters.size() - 1) {
+                sb.append(" AND ");
+              }
+            }
+          }
+          String key = String.format("%s-%s",CommonConstants.RLS_FILTERS,tableName);
+          compiledQuery.getOptions().put(key, sb.toString());
+        }
       }
     }
   }

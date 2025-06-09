@@ -20,6 +20,7 @@ package org.apache.pinot.broker.broker;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +33,8 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -101,9 +104,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
         failedTables.add(brokerRequest.getQuerySource().getTableName());
       }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
+//      if (failedTables.isEmpty()) {
+//        return TableAuthorizationResult.success();
+//      }
       return new TableAuthorizationResult(failedTables);
     }
 
@@ -125,10 +128,41 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
           failedTables.add(table);
         }
       }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
+//      if (failedTables.isEmpty()) {
+//        return TableAuthorizationResult.success();
+//      }
       return new TableAuthorizationResult(failedTables);
+    }
+
+    @Override
+    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
+
+      if (principalOpt.isEmpty()) {
+        throw new NotAuthorizedException("Basic");
+      }
+
+      if (table == null) {
+        return TableRowColAuthResultImpl.unrestricted();
+      }
+
+      TableRowColAuthResult tableRowColAuthResult = new TableRowColAuthResultImpl();
+
+      BasicAuthPrincipal principal = principalOpt.get();
+
+      //precondition: The principal should have the table.
+      Preconditions.checkArgument(principal.hasTable(table),
+          "Principal: " + principal.getName() + " does not have access to table: " + table);
+
+      Optional<Map<String, List<String>>> rlsFiltersMaybe = principal.getRLSFilters(table);
+      Optional<Map<String, List<String>>> visibleColsMaybe = principal.getVisibleCols(table);
+      Optional<Map<String, List<String>>> maskedColsMaybe = principal.getMaskedCols(table);
+
+      rlsFiltersMaybe.ifPresent(tableRowColAuthResult::setRLSFilters);
+      visibleColsMaybe.ifPresent(tableRowColAuthResult::setVisibleCols);
+      maskedColsMaybe.ifPresent(tableRowColAuthResult::setMaskedCols);
+
+      return tableRowColAuthResult;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
