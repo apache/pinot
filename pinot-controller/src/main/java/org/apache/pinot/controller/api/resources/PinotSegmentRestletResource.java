@@ -95,7 +95,6 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
-import org.apache.pinot.server.api.resources.ErrorInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -1263,13 +1262,14 @@ public class PinotSegmentRestletResource {
   }
 
   @DELETE
-  @Path("/tables/{tableNameWithType}/{segmentName}/ingestion-metrics")
+  @Path("/segments/{tableNameWithType}/{segmentName}/ingestion-metrics")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove ingestion metrics for a specific segment",
       notes = "Removes ingestion-related metrics for a given segment under the specified table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
-      @ApiResponse(code = 500, message = "Internal Server Error", response = ErrorInfo.class)
+      @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public SuccessResponse removeIngestionMetrics(
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
@@ -1279,22 +1279,32 @@ public class PinotSegmentRestletResource {
       String instance,
       @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    Preconditions.checkState(TableNameBuilder.isRealtimeTableResource(tableNameWithType),
-        "Table should be a realtime table.");
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " should be a realtime table.",
+          Status.BAD_REQUEST);
+    }
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Ideal State does not exist for table " + tableNameWithType,
+          Status.BAD_REQUEST);
+    }
     Set<String> serverInstances = new HashSet<>();
     try {
-      IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
-      assert idealState != null;
       if (StringUtils.isEmpty(instance)) {
-        serverInstances.addAll(idealState.getInstanceStateMap(segmentName).keySet());
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+        if (instanceStateMap == null) {
+          throw new ControllerApplicationException(LOGGER, "No instance mapping found in ideal state for the segment: " + segmentName,
+              Status.BAD_REQUEST);
+        }
+        serverInstances.addAll(instanceStateMap.keySet());
       } else {
         serverInstances.add(instance);
       }
       _pinotLLCRealtimeSegmentManager.sendRemoveIngestionMetricsMessageToServers(tableNameWithType, segmentName,
           serverInstances);
       return new SuccessResponse(
-          "Sent ingestion metrics remove message for table: " + tableNameWithType + " , segment: " + segmentName
-              + " to instances: " + serverInstances);
+          "Sent ingestion-metrics remove message for table: " + tableNameWithType + ", segment: " + segmentName
+              + " to instance(s): " + serverInstances);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
