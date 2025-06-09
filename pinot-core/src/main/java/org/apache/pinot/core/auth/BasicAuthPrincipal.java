@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.auth;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,14 +34,22 @@ public class BasicAuthPrincipal {
   private final Set<String> _tables;
   private final Set<String> _excludeTables;
   private final Set<String> _permissions;
+  //key: table name, val: list of RLS filters applicable for that table.
+  private final Map<String, Map<String, List<String>>> _rlsFilters;
+  private final Map<String, Map<String, List<String>>> _visibleCols;
+  private final Map<String, Map<String, List<String>>> _maskedCols;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
-      Set<String> permissions) {
+      Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters,
+      Map<String, Map<String, List<String>>> visibleCols, Map<String, Map<String, List<String>>> maskedCols) {
     _name = name;
     _token = token;
     _tables = tables;
     _excludeTables = excludeTables;
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
+    _rlsFilters = rlsFilters;
+    _visibleCols = visibleCols;
+    _maskedCols = maskedCols;
   }
 
   public String getName() {
@@ -65,13 +76,37 @@ public class BasicAuthPrincipal {
     return _permissions.isEmpty() || _permissions.contains(permission.toLowerCase());
   }
 
+  /**
+   * Gets the Row-Level Security (RLS) filter configured for the given table.
+   * The RLS filter is applied only if the user has access to the table
+   * (as determined by {@link #hasTable(String)}).
+   *
+   * @param tableName The name of the table.
+   * @return An {@link java.util.Optional} containing the RLS filter string if configured for this principal and table,
+   * otherwise {@link java.util.Optional#empty()}.
+   */
+  public Optional<Map<String, List<String>>> getRLSFilters(String tableName) {
+    return Optional.ofNullable(_rlsFilters.get(tableName));
+  }
+
+  public Optional<Map<String, List<String>>> getVisibleCols(String tableName) {
+    return Optional.ofNullable(_visibleCols.get(tableName));
+  }
+
+  public Optional<Map<String, List<String>>> getMaskedCols(String tableName) {
+    return Optional.ofNullable(_maskedCols.get(tableName));
+  }
+
   @Override
   public String toString() {
     return "BasicAuthPrincipal{"
         + "_name='" + _name + '\''
         + ", _token='" + _token + '\''
         + ", _tables=" + _tables
-        + ", _permissions=" + _permissions
+        + ", _permissions=" + _permissions + '\''
+        + ",_rlsFilters=" + _rlsFilters + '\''
+        + ",_visibleCols=" + _visibleCols + '\''
+        + ",_maskedCols=" + _maskedCols
         + '}';
   }
 }

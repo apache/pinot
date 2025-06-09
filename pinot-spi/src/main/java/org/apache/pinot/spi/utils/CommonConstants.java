@@ -75,6 +75,8 @@ public class CommonConstants {
 
   public static final String JFR = "pinot.jfr";
 
+  public static final String RLS_FILTERS = "rlsFilters";
+
   /**
    * The state of the consumer for a given segment
    */
