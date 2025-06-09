@@ -289,7 +289,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
     //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
     // finish, so it may be breaking some of the OOM protection assumptions.
-    Tracing.ThreadAccountantOps.setupRunner(requestIdStr, ThreadExecutionContext.TaskType.MSE);
+    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE);
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
 
     try {
