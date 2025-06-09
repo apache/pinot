@@ -359,8 +359,9 @@ public class TextMatchTransformFunctionTest {
                 + "PROJECT(agent, startTime, part) | 5 | 4\n"
                 + "DOC_ID_SET | 6 | 5\n"
                 + "FILTER_AND | 7 | 6\n"
-                + "FILTER_FULL_SCAN(operator:RANGE,predicate:startTime BETWEEN '0' AND '1000000') | 8 | 7\n"
-                + "FILTER_FULL_SCAN(operator:EQ,predicate:customerId = 'XYZ') | 9 | 7"
+                + "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:customerId = 'XYZ') | 8 | 7\n"
+                + "FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:startTime BETWEEN '0' AND "
+                + "'1000000') | 9 | 7"
         ).whenQuery(query)
         .thenResultTextIs("val[STRING]\n"
             + "N/A\n"
