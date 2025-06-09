@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Sets;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -26,8 +28,10 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -131,6 +135,117 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResults, config.isVerboseResult());
   }
 
+  public TenantRebalanceResult rebalanceWithParallelAndSequential(TenantRebalanceConfig config) {
+    Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
+    Set<String> tables = getTenantTables(config.getTenantName());
+    tables.forEach(table -> {
+      try {
+        RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+        rebalanceConfig.setDryRun(true);
+        rebalanceResult.put(table,
+            _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
+                false));
+      } catch (TableNotFoundException exception) {
+        rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
+            null, null, null, null, null));
+      }
+    });
+    if (config.isDryRun()) {
+      return new TenantRebalanceResult(null, rebalanceResult, config.isVerboseResult());
+    } else {
+      for (String table : rebalanceResult.keySet()) {
+        RebalanceResult result = rebalanceResult.get(table);
+        if (result.getStatus() == RebalanceResult.Status.DONE) {
+          rebalanceResult.put(table, new RebalanceResult(result.getJobId(), RebalanceResult.Status.IN_PROGRESS,
+              "In progress, check controller task status for the", result.getInstanceAssignment(),
+              result.getTierInstanceAssignment(), result.getSegmentAssignment(), result.getPreChecksResult(),
+              result.getRebalanceSummaryResult()));
+        }
+      }
+    }
+
+    String tenantRebalanceJobId = createUniqueRebalanceJobIdentifier();
+    TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, config.getTenantName(),
+        tables, _pinotHelixResourceManager);
+    observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
+    final Deque<String> sequentialQueue = new LinkedList<>();
+    final Deque<String> parallelQueue = new ConcurrentLinkedDeque<>();
+    // ensure atleast 1 thread is created to run the sequential table rebalance operations
+    int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
+    Set<String> dimTables = getDimensionalTables(config.getTenantName());
+    AtomicInteger activeThreads = new AtomicInteger(parallelism);
+    try {
+      if (parallelism > 1) {
+        Set<String> parallelTables;
+        if (!config.getParallelWhitelist().isEmpty()) {
+          parallelTables = new HashSet<>(config.getParallelWhitelist());
+        } else {
+          parallelTables = new HashSet<>(tables);
+        }
+        if (!config.getParallelBlacklist().isEmpty()) {
+          parallelTables = Sets.difference(parallelTables, config.getParallelBlacklist());
+        }
+        parallelTables.forEach(table -> {
+          if (dimTables.contains(table)) {
+            // prioritise dimension tables
+            parallelQueue.addFirst(table);
+          } else {
+            parallelQueue.addLast(table);
+          }
+        });
+        Sets.difference(tables, parallelTables).forEach(table -> {
+          if (dimTables.contains(table)) {
+            // prioritise dimension tables
+            sequentialQueue.addFirst(table);
+          } else {
+            sequentialQueue.addLast(table);
+          }
+        });
+      } else {
+        tables.forEach(table -> {
+          if (dimTables.contains(table)) {
+            // prioritise dimension tables
+            sequentialQueue.addFirst(table);
+          } else {
+            sequentialQueue.addLast(table);
+          }
+        });
+      }
+
+      for (int i = 0; i < parallelism; i++) {
+        _executorService.submit(() -> {
+          while (true) {
+            String table = parallelQueue.pollFirst();
+            if (table == null) {
+              break;
+            }
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
+            rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
+          }
+          // Last parallel thread to finish the table rebalance job will pick up the
+          // sequential table rebalance execution
+          if (activeThreads.decrementAndGet() == 0) {
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
+            while (true) {
+              String table = sequentialQueue.pollFirst();
+              if (table == null) {
+                break;
+              }
+              rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
+            }
+            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
+          }
+        });
+      }
+    } catch (Exception exception) {
+      observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
+          exception.getMessage()));
+    }
+    return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResult, config.isVerboseResult());
+  }
+
   private Set<String> getDimensionalTables(String tenantName) {
     Set<String> dimTables = new HashSet<>();
     for (String table : _pinotHelixResourceManager.getAllTables()) {
@@ -183,8 +298,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     }
   }
 
-   @VisibleForTesting
-   ConcurrentLinkedQueue<String> createTableQueue(TenantRebalanceConfig config,
+  @VisibleForTesting
+  ConcurrentLinkedQueue<String> createTableQueue(TenantRebalanceConfig config,
       Map<String, RebalanceResult> dryRunResults) {
     Queue<String> firstQueue = new LinkedList<>();
     Queue<String> queue = new LinkedList<>();
