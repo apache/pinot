@@ -67,6 +67,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
@@ -717,6 +718,13 @@ public class PinotTenantRestletResource {
     if (blockTables != null) {
       config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0)).map(String::strip).collect(
           Collectors.toSet()));
+    }
+    if (!config.getParallelWhitelist().isEmpty() || !config.getParallelBlacklist().isEmpty()) {
+      // If the parallel whitelist or blacklist is set, the old tenant rebalance logic will be used
+      // TODO: Deprecate the support for this in the future
+      LOGGER.warn("Using the old tenant rebalance logic because parallel whitelist or blacklist is set. "
+          + "This will be deprecated in the future.");
+      return ((DefaultTenantRebalancer) _tenantRebalancer).rebalanceWithParallelAndSequential(config);
     }
     return _tenantRebalancer.rebalance(config);
   }
