@@ -1264,7 +1264,8 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Path("/segments/{tableNameWithType}/{segmentName}/ingestion-metrics")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DELETE_INGESTION_METRICS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action =
+      Actions.Table.DELETE_INGESTION_METRICS)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove ingestion metrics for a specific segment",
       notes = "Removes ingestion-related metrics for a given segment under the specified table")
