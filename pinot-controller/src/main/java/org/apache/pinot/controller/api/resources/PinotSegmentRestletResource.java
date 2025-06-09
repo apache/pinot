@@ -1307,8 +1307,8 @@ public class PinotSegmentRestletResource {
       _pinotLLCRealtimeSegmentManager.sendRemoveIngestionMetricsMessageToServers(tableNameWithType, segmentName,
           serverInstances);
       return new SuccessResponse(
-          "Successfully sent ingestion-metrics remove message for table: " + tableNameWithType + ", segment: " + segmentName
-              + " to instance(s): " + serverInstances);
+          "Successfully sent ingestion-metrics remove message for table: " + tableNameWithType + ", segment: "
+              + segmentName + " to instance(s): " + serverInstances);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
