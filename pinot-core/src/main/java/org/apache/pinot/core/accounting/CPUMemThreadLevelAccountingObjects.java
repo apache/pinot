@@ -43,6 +43,10 @@ public class CPUMemThreadLevelAccountingObjects {
     volatile long _currentThreadCPUTimeSampleMS = 0;
     volatile long _currentThreadMemoryAllocationSampleBytes = 0;
 
+    // reference point for start time/bytes
+    long _startTimeNs;
+    long _startBytesAllocated;
+
     // previous query_id, task_id of the thread, this field should only be accessed by the accountant
     TaskEntry _previousThreadTaskStatus = null;
     // previous cpu time and memory allocation of the thread
