@@ -203,7 +203,8 @@ public class Tracing {
     }
 
     @Override
-    public void updateQueryUsageConcurrently(String queryId) {
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
+      // No-op for default accountant
     }
 
     @Override
@@ -256,7 +257,6 @@ public class Tracing {
     }
 
     public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       Tracing.getThreadAccountant().setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType);
     }
 
@@ -276,7 +276,6 @@ public class Tracing {
      */
     public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext threadExecutionContext) {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       Tracing.getThreadAccountant().setupWorker(taskId, taskType, threadExecutionContext);
     }
 
@@ -326,12 +325,13 @@ public class Tracing {
       sample();
     }
 
-    public static void updateQueryUsageConcurrently(String queryId) {
-      Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId);
+    public static void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
+      Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId, cpuTimeNs, allocatedBytes);
     }
 
+    @Deprecated
     public static void setThreadResourceUsageProvider() {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
+      Tracing.getThreadAccountant().setThreadResourceUsageProvider(null);
     }
 
     // Check for thread interruption, every time after merging 8192 keys

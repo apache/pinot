@@ -34,7 +34,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.ThreadResourceContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -103,8 +103,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-
+          ThreadResourceContext resourceContext = new ThreadResourceContext();
           Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
           // Register the task to the phaser
@@ -115,7 +114,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             Tracing.ThreadAccountantOps.clear();
             return;
           }
-          try {
+          try (resourceContext) {
             processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
@@ -133,11 +132,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();
+            _totalWorkerThreadCpuTimeNs.getAndAdd(resourceContext.getCpuTimeNanos());
+            _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceContext.getAllocatedBytes());
             Tracing.ThreadAccountantOps.clear();
           }
-
-          _totalWorkerThreadCpuTimeNs.getAndAdd(threadResourceUsageProvider.getThreadTimeNs());
-          _totalWorkerThreadMemAllocatedBytes.getAndAdd(threadResourceUsageProvider.getThreadAllocatedBytes());
         }
       });
     }

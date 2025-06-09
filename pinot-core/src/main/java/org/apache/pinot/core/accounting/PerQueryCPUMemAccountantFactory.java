@@ -114,9 +114,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
     );
 
-    // ThreadResourceUsageProvider(ThreadMXBean wrapper) per runner/worker thread
-    private final ThreadLocal<ThreadResourceUsageProvider> _threadResourceUsageProvider;
-
     // track thread cpu time
     private final boolean _isThreadCPUSamplingEnabled;
 
@@ -167,9 +164,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
-
-      // ThreadMXBean wrapper
-      _threadResourceUsageProvider = new ThreadLocal<>();
 
       // task/query tracking
       _inactiveQuery = new HashSet<>();
@@ -277,14 +271,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void updateQueryUsageConcurrently(String queryId) {
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
       if (_isThreadCPUSamplingEnabled) {
-        long cpuUsageNS = getThreadResourceUsageProvider().getThreadTimeNs();
         _concurrentTaskCPUStatsAggregator.compute(queryId,
-            (key, value) -> (value == null) ? cpuUsageNS : (value + cpuUsageNS));
+            (key, value) -> (value == null) ? cpuTimeNs : (value + cpuTimeNs));
       }
       if (_isThreadMemorySamplingEnabled) {
-        long memoryAllocatedBytes = getThreadResourceUsageProvider().getThreadAllocatedBytes();
         _concurrentTaskMemStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? memoryAllocatedBytes : (value + memoryAllocatedBytes));
       }
@@ -297,9 +289,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadCPUSamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = provider.getThreadTimeNs();
+      if (_isThreadCPUSamplingEnabled) {
+        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS =
+            ThreadResourceUsageProvider.getCurrentThreadCpuTime() - _threadLocalEntry.get()._startTimeNs;
       }
     }
 
@@ -309,24 +301,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadMemorySamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes = provider.getThreadAllocatedBytes();
+      if (_isThreadMemorySamplingEnabled) {
+        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes =
+            ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() - _threadLocalEntry.get()._startBytesAllocated;
       }
-    }
-
-    private ThreadResourceUsageProvider getThreadResourceUsageProvider() {
-      return _threadResourceUsageProvider.get();
-    }
-
-    @Override
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-      _threadResourceUsageProvider.set(threadResourceUsageProvider);
     }
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
       _threadLocalEntry.get()._errorStatus.set(null);
+      _threadLocalEntry.get()._startTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
+      _threadLocalEntry.get()._startBytesAllocated = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
       if (queryId != null) {
         _threadLocalEntry.get()
             .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
@@ -337,6 +322,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {
       _threadLocalEntry.get()._errorStatus.set(null);
+      _threadLocalEntry.get()._startTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
+      _threadLocalEntry.get()._startBytesAllocated = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
       if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
             parentContext.getAnchorThread());
@@ -347,6 +334,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Nullable
     public ThreadExecutionContext getThreadExecutionContext() {
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
+    }
+
+    @Override
+    @Deprecated
+    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
     }
 
     public CPUMemThreadLevelAccountingObjects.ThreadEntry getThreadEntry() {
@@ -362,8 +354,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
       // clear task info + stats
       threadEntry.setToIdle();
-      // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.remove();
     }
 
     @Override
