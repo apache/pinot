@@ -74,11 +74,11 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   private TenantRebalanceResult rebalanceWithIncludeExcludeTables(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> dryRunResults = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
-    Set<String> allowTables = config.getAllowTables();
-    if (!allowTables.isEmpty()) {
-      tables.retainAll(allowTables);
+    Set<String> includeTables = config.getIncludeTables();
+    if (!includeTables.isEmpty()) {
+      tables.retainAll(includeTables);
     }
-    tables.removeAll(config.getBlockTables());
+    tables.removeAll(config.getExcludeTables());
     tables.forEach(table -> {
       try {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);

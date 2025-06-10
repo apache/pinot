@@ -43,12 +43,12 @@ public class TenantRebalanceConfig extends RebalanceConfig {
   @ApiModelProperty(hidden = true)
   private Set<String> _parallelWhitelist = new HashSet<>();
   // If empty, default to allow all tables
-  @JsonProperty("allowTables")
+  @JsonProperty("includeTables")
   @ApiModelProperty(hidden = true)
-  private Set<String> _allowTables = new HashSet<>();
-  @JsonProperty("blockTables")
+  private Set<String> _includeTables = new HashSet<>();
+  @JsonProperty("excludeTables")
   @ApiModelProperty(hidden = true)
-  private Set<String> _blockTables = new HashSet<>();
+  private Set<String> _excludeTables = new HashSet<>();
 
   private boolean _verboseResult = false;
 
@@ -89,21 +89,21 @@ public class TenantRebalanceConfig extends RebalanceConfig {
   }
 
   @ApiModelProperty(hidden = true)
-  public Set<String> getAllowTables() {
-    return _allowTables;
+  public Set<String> getIncludeTables() {
+    return _includeTables;
   }
 
-  public void setAllowTables(Set<String> allowTables) {
-    _allowTables = allowTables;
+  public void setIncludeTables(Set<String> includeTables) {
+    _includeTables = includeTables;
   }
 
   @ApiModelProperty(hidden = true)
-  public Set<String> getBlockTables() {
-    return _blockTables;
+  public Set<String> getExcludeTables() {
+    return _excludeTables;
   }
 
-  public void setBlockTables(Set<String> blockTables) {
-    _blockTables = blockTables;
+  public void setExcludeTables(Set<String> excludeTables) {
+    _excludeTables = excludeTables;
   }
 
   @ApiModelProperty(hidden = true)

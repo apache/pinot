@@ -67,7 +67,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
@@ -714,16 +713,16 @@ public class PinotTenantRestletResource {
       config.setVerboseResult(verboseResult);
     }
     if (allowTables != null) {
-      config.setAllowTables(Arrays.stream(StringUtil.split(allowTables, ',', 0))
+      config.setIncludeTables(Arrays.stream(StringUtil.split(allowTables, ',', 0))
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
     if (blockTables != null) {
-      config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0))
+      config.setExcludeTables(Arrays.stream(StringUtil.split(blockTables, ',', 0))
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
-    if ((!config.getBlockTables().isEmpty() || !config.getAllowTables().isEmpty()) && (
+    if ((!config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty()) && (
         !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty())) {
       throw new ControllerApplicationException(LOGGER,
           "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time."
