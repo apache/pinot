@@ -436,60 +436,8 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       _metadataStart = _variableSizeDataStart + _variableSizeDataLength;
     }
 
-    public int getFirstInt() {
-      return _firstInt;
-    }
-
-    public int getNumRows() {
-      return _numRows;
-    }
-
-    public int getNumColumns() {
-      return _numColumns;
-    }
-
     public int getExceptionsStart() {
       return Header.BYTES; // exceptions are always codified after the end of the header
-    }
-
-    public int getExceptionsLength() {
-      return _exceptionsLength;
-    }
-
-    public int getDictionaryStart() {
-      return _dictionaryStart;
-    }
-
-    public int getDictionaryLength() {
-      return _dictionaryLength;
-    }
-
-    public int getDataSchemaStart() {
-      return _dataSchemaStart;
-    }
-
-    public int getDataSchemaLength() {
-      return _dataSchemaLength;
-    }
-
-    public int getFixedSizeDataStart() {
-      return _fixedSizeDataStart;
-    }
-
-    public int getFixedSizeDataLength() {
-      return _fixedSizeDataLength;
-    }
-
-    public int getVariableSizeDataStart() {
-      return _variableSizeDataStart;
-    }
-
-    public int getVariableSizeDataLength() {
-      return _variableSizeDataLength;
-    }
-
-    public int getMetadataStart() {
-      return _metadataStart;
     }
   }
 
