@@ -150,6 +150,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentName;
     _schema = schema;
     _creationTime = creationTime;
+    _zkCreationTime = creationTime;
   }
 
   /**
@@ -383,7 +384,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   /**
    * Returns the ZooKeeper creation time for upsert consistency.
-   * This is used to ensure consistent creation time across replicas for upsert operations.
+   * This refers to the time set by controller while creating the consuming segment. It is used to ensure consistent
+   * creation time across replicas for upsert operations.
    * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
    */
   public long getZkCreationTime() {

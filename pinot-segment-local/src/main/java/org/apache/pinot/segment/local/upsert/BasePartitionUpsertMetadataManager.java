@@ -1151,11 +1151,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   /**
    * Returns the ZooKeeper creation time for upsert consistency.
-   * This refers to the time set by the controller when creating new consuming
-   * segment.
+   * This refers to the time set by the controller when creating new consuming segment.
    * This is used to ensure consistent creation time across replicas for upsert
    * operations.
-   *
    * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
    */
   protected long getAuthoritativeCreationTime(IndexSegment segment) {

@@ -736,7 +736,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {} with upsert enabled", segmentName);
 
-    // Set the ZK creation time for upsert consistency across replicas
+    // Set the ZK creation time so that same creation time can be used to break the comparison ties across replicas,
+    // to ensure data consistency of replica.
     setZkCreationTimeIfAvailable(immutableSegment, zkMetadata);
 
     Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
@@ -850,9 +851,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Deprecated
   public void replaceConsumingSegment(String segmentName)
       throws Exception {
-    // Fetch ZK metadata to pass to addSegment so that ZK creation time is set automatically
-    SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
-    replaceConsumingSegment(segmentName, zkMetadata);
+    replaceConsumingSegment(segmentName, null);
   }
 
   /**
