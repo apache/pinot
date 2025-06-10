@@ -691,12 +691,14 @@ public class PinotTenantRestletResource {
       @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
       @ApiParam(value =
           "Comma separated list of tables with type that should be included in this tenant rebalance"
-              + " job. Leaving blank defaults to include all tables from the tenant. Example: table1_REALTIME, table2_REALTIME",
+              + " job. Leaving blank defaults to include all tables from the tenant. Example: table1_REALTIME, "
+              + "table2_REALTIME",
           example = "")
       @QueryParam("includeTables") String allowTables,
       @ApiParam(value =
           "Comma separated list of tables with type that would be excluded in this tenant rebalance"
-              + " job. These tables will be removed from includeTables (that said, if a table appears in both list, it will be excluded). Example: table1_REALTIME, table2_REALTIME",
+              + " job. These tables will be removed from includeTables (that said, if a table appears in both list, "
+              + "it will be excluded). Example: table1_REALTIME, table2_REALTIME",
           example = "")
       @QueryParam("excludeTables") String blockTables,
       @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
