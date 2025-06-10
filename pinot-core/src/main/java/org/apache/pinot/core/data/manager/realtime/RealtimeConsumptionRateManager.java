@@ -93,19 +93,18 @@ public class RealtimeConsumptionRateManager {
 
   private ConsumptionRateLimiter createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     if (serverRateLimit > 0) {
-      LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}.", serverRateLimit);
+      LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
       MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
       return new RateLimiterImpl(serverRateLimit, metricEmitter);
     } else {
-      LOGGER.info("ConsumptionRateLimiter is disabled.");
+      LOGGER.info("ConsumptionRateLimiter is disabled");
       return NOOP_RATE_LIMITER;
     }
   }
 
-  public void updateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
-    LOGGER.info("Updating serverRateLimiter to new rate limit: {}, Prev serverRateLimiter: {}.", serverRateLimit,
-        _serverRateLimiter);
-    _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
+  public void updateServerRateLimiter(double newServerRateLimit, ServerMetrics serverMetrics) {
+    LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newServerRateLimit);
+    _serverRateLimiter = createServerRateLimiter(newServerRateLimit, serverMetrics);
   }
 
   public ConsumptionRateLimiter getServerRateLimiter() {

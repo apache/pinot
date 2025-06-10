@@ -38,7 +38,7 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
-      LOGGER.info("ChangedConfigs: {} does not contain: {}. Skipping updates.", changedConfigs,
+      LOGGER.info("ChangedConfigs: {} does not contain: {}. Skipping updates", changedConfigs,
           CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT);
       return;
     }
@@ -49,7 +49,7 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
         serverRateLimit =
             Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change.",
+        LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change",
             clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT), e);
         return;
       }
