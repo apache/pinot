@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.LogicalTableMetadataCache;
@@ -114,7 +115,7 @@ public class LogicalTableMetadataCacheTest {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap();
     physicalTableConfigMap.put(_extraOfflineTableConfig.getTableName(), new PhysicalTableConfig());
     physicalTableConfigMap.put(_extraRealtimeTableConfig.getTableName(), new PhysicalTableConfig());
-    assertNotEquals(CACHE.getLogicalTableConfig(logicalTableName), logicalTableName);
+    assertNotEquals(CACHE.getLogicalTableConfig(logicalTableName), logicalTableConfig);
     INSTANCE.updateLogicalTableConfig(logicalTableConfig);
     TestUtils.waitForCondition(
         aVoid -> CACHE.getLogicalTableConfig(logicalTableName).equals(logicalTableConfig),
@@ -133,22 +134,29 @@ public class LogicalTableMetadataCacheTest {
     // Update offline table configs and verify the cache is updated (update retention)
     _offlineTableConfig.getValidationConfig().setRetentionTimeValue("10");
     assertNotEquals(
-        CACHE.getTableConfig(_offlineTableConfig.getTableName()).getValidationConfig().getRetentionTimeValue(),
-        _offlineTableConfig.getValidationConfig());
+        Objects.requireNonNull(CACHE.getTableConfig(_offlineTableConfig.getTableName()))
+            .getValidationConfig()
+            .getRetentionTimeValue(),
+        _offlineTableConfig.getValidationConfig().getRetentionTimeValue());
     INSTANCE.updateTableConfig(_offlineTableConfig);
     TestUtils.waitForCondition(
-        aVoid -> CACHE.getTableConfig(_offlineTableConfig.getTableName()).getValidationConfig().getRetentionTimeValue()
+        aVoid -> Objects.requireNonNull(CACHE.getTableConfig(_offlineTableConfig.getTableName()))
+            .getValidationConfig()
+            .getRetentionTimeValue()
             .equals(_offlineTableConfig.getValidationConfig().getRetentionTimeValue()),
         10_000L, "Offline table config not updated in cache");
 
     // Update realtime table configs and verify the cache is updated (update retention)
     _realtimeTableConfig.getValidationConfig().setRetentionTimeValue("20");
     assertNotEquals(
-        CACHE.getTableConfig(_realtimeTableConfig.getTableName()).getValidationConfig().getRetentionTimeValue(),
-        _realtimeTableConfig.getValidationConfig());
+        Objects.requireNonNull(CACHE.getTableConfig(_realtimeTableConfig.getTableName()))
+            .getValidationConfig()
+            .getRetentionTimeValue(),
+        _realtimeTableConfig.getValidationConfig().getRetentionTimeValue());
     INSTANCE.updateTableConfig(_realtimeTableConfig);
     TestUtils.waitForCondition(
-        aVoid -> CACHE.getTableConfig(_realtimeTableConfig.getTableName()).getValidationConfig().getRetentionTimeValue()
+        aVoid -> Objects.requireNonNull(CACHE.getTableConfig(_realtimeTableConfig.getTableName()))
+            .getValidationConfig().getRetentionTimeValue()
             .equals(_realtimeTableConfig.getValidationConfig().getRetentionTimeValue()),
         10_000L, "Realtime table config not updated in cache");
 

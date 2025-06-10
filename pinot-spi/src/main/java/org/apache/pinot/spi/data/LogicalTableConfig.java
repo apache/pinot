@@ -32,17 +32,24 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * LogicalTableConfig represents the configuration for a logical table in Pinot.
- * tableName: The name of the logical table.
- * physicalTableConfigMap: A map of physical table names to their configurations.
- * brokerTenant: The tenant for the broker.
- * queryConfig: Configuration for query execution on the logical table.
- * quotaConfig: Configuration for quota management on the logical table.
- * refOfflineTableName: The name of the offline table whose table config is referenced by this logical table.
- * refRealtimeTableName: The name of the realtime table whose table config is referenced by this logical table.
- * timeBoundaryConfig: Configuration for time boundaries of the logical table. This is used to determine the time
- * boundaries for queries on the logical table, especially in hybrid scenarios where both offline and realtime
- * data are present.
+ * Represents the configuration for a logical table in Pinot.
+ *
+ * <p>
+ * <ul>
+ *   <li><b>tableName</b>: The name of the logical table.</li>
+ *   <li><b>physicalTableConfigMap</b>: A map of physical table names to their configurations.</li>
+ *   <li><b>brokerTenant</b>: The tenant for the broker.</li>
+ *   <li><b>queryConfig</b>: Configuration for query execution on the logical table.</li>
+ *   <li><b>quotaConfig</b>: Configuration for quota management on the logical table.</li>
+ *   <li><b>refOfflineTableName</b>: The name of the offline table whose table config is referenced by this logical
+ *   table.</li>
+ *   <li><b>refRealtimeTableName</b>: The name of the realtime table whose table config is referenced by this logical
+ *   table.</li>
+ *   <li><b>timeBoundaryConfig</b>: Configuration for time boundaries of the logical table. This is used to determine
+ *   the time boundaries for queries on the logical table, especially in hybrid scenarios where both offline and
+ *   realtime data are present.</li>
+ * </ul>
+ * </p>
  */
 public class LogicalTableConfig extends BaseJsonConfig {
 
