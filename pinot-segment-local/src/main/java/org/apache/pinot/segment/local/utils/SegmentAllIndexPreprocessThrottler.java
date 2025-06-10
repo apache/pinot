@@ -40,8 +40,7 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThr
    */
   public SegmentAllIndexPreprocessThrottler(int maxPreprocessConcurrency,
       int maxPreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
-    super(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries,
-        ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, LOGGER);
+    super(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries, LOGGER);
   }
 
   @Override
@@ -59,5 +58,15 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThr
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
+  }
+
+  @Override
+  public void updateThresholdMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, value);
+  }
+
+  @Override
+  public void updateCountMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, value);
   }
 }
