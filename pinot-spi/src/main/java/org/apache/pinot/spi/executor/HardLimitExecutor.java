@@ -23,12 +23,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
  */
 public class HardLimitExecutor extends DecoratorExecutorService {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HardLimitExecutor.class);
 
   private final AtomicInteger _running;
   private final int _max;
@@ -46,7 +50,7 @@ public class HardLimitExecutor extends DecoratorExecutorService {
    */
   public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
     try {
-      int maxThreads = Integer.parseInt(config.getProperty(
+      int maxThreadsFromClusterConfig = Integer.parseInt(config.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
       ));
@@ -54,13 +58,23 @@ public class HardLimitExecutor extends DecoratorExecutorService {
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
       ));
-      if (maxThreads <= 0 || hardLimitFactor <= 0) {
-        return 0;
+
+      int clusterConfigLimit = maxThreadsFromClusterConfig * hardLimitFactor;
+      int serverConfigLimit = config.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
+              CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS);
+
+      if (clusterConfigLimit <= 0) {
+        return serverConfigLimit;
       }
-      return maxThreads * hardLimitFactor;
+      if (serverConfigLimit <= 0) {
+        return clusterConfigLimit;
+      }
+      return Math.min(serverConfigLimit, maxThreadsFromClusterConfig * hardLimitFactor);
     } catch (NumberFormatException e) {
-      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)
-          * Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR);
+      int defaultLimitFromClusterConfig =
+              Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)
+              * Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR);
+      return Math.min(CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS, defaultLimitFromClusterConfig);
     }
   }
 
