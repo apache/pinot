@@ -23,6 +23,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -59,6 +60,16 @@ public class PinotTableRebalancer extends PinotZKChanger {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
 
     String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+
+    if (!_rebalanceConfig.isDryRun()) {
+      String rebalanceJobInProgress = TableRebalanceManager.rebalanceJobInProgress(tableNameWithType, _propertyStore);
+      if (rebalanceJobInProgress != null) {
+        String errorMsg = "Rebalance job is already in progress for table: " + tableNameWithType + ", jobId: "
+            + rebalanceJobInProgress + ". Please wait for the job to complete or cancel it before starting a new one.";
+        return new RebalanceResult(jobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null, null);
+      }
+    }
+
     ZkBasedTableRebalanceObserver rebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, jobId,
         TableRebalanceContext.forInitialAttempt(jobId, _rebalanceConfig), _propertyStore);
 

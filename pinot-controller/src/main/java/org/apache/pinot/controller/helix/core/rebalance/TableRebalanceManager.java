@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -198,19 +200,25 @@ public class TableRebalanceManager {
     return cancelledJobIds;
   }
 
+  @Nullable
+  private String rebalanceJobInProgress(String tableNameWithType) {
+    return rebalanceJobInProgress(tableNameWithType, _resourceManager.getPropertyStore());
+  }
+
   /**
    * Checks if there is an ongoing rebalance job for the given table.
    *
    * @param tableNameWithType name of the table to check for ongoing rebalance jobs
+   * @param propertyStore ZK property store to read the job metadata from
    * @return jobId of the ongoing rebalance job if one exists, {@code null} otherwise
    */
   @Nullable
-  private String rebalanceJobInProgress(String tableNameWithType) {
+  public static String rebalanceJobInProgress(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // Get all jobMetadata for the given table with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
-        _resourceManager.getAllJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
+        PinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
             jobMetadata -> tableNameWithType.equals(
-                jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)));
+                jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)), propertyStore);
 
     for (Map.Entry<String, Map<String, String>> entry : allJobMetadataByJobId.entrySet()) {
       String jobId = entry.getKey();

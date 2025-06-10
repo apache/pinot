@@ -2388,10 +2388,19 @@ public class PinotHelixResourceManager {
    */
   public Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker) {
+    return getAllJobs(jobTypes, jobMetadataChecker, _propertyStore);
+  }
+
+  /**
+   * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
+   * @return A Map of jobId to job properties
+   */
+  public static Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
+      Predicate<Map<String, String>> jobMetadataChecker, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
     for (String jobType : jobTypes) {
       String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-      ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+      ZNRecord jobsZnRecord = propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
       if (jobsZnRecord == null) {
         continue;
       }
