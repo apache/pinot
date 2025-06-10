@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -168,15 +169,20 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
         new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx,
             _pinotHelixResourceManager.getPropertyStore());
 
-    _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig, observer)
-        .whenComplete((result, throwable) -> {
-          if (throwable != null) {
-            LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, throwable);
-          } else {
-            LOGGER.info("New attempt: {} for table: {} is done with result status: {}", attemptJobId, tableNameWithType,
-                result.getStatus());
-          }
-        });
+    try {
+      _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
+              observer)
+          .whenComplete((result, throwable) -> {
+            if (throwable != null) {
+              LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, throwable);
+            } else {
+              LOGGER.info("New attempt: {} for table: {} is done with result status: {}", attemptJobId,
+                  tableNameWithType, result.getStatus());
+            }
+          });
+    } catch (RebalanceInProgressException e) {
+      LOGGER.warn("Rebalance job for table: {} is already in progress. Skipping retry.", tableNameWithType, e);
+    }
   }
 
   @VisibleForTesting

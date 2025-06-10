@@ -26,6 +26,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.tier.TierFactory;
@@ -1275,7 +1277,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // about avoiding this edge case race condition as long as in most cases we are able to prevent users from
     // triggering a rebalance for a table that already has an in-progress rebalance job.
     String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
-    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(getTableName());
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(getTableName());
     TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
     progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     Map<String, String> jobMetadata = new HashMap<>();
@@ -1288,9 +1290,17 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
         prevJobMetadata -> true);
 
+    // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
+    // rebalance is not a NO_OP
+    BaseServerStarter serverStarter = startOneServer(NUM_SERVERS);
+    createServerTenant(getServerTenant(), 1, 0);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    assertTrue(response.contains("Rebalance job is already in progress for table"));
+    rebalanceConfig.setReassignInstances(true);
+
+    Pair<Integer, String> response =
+        postRequestWithStatusCode(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
+    assertEquals(response.getLeft(), Response.Status.CONFLICT.getStatusCode());
+    assertTrue(response.getRight().contains("Rebalance job is already in progress for table"));
 
     // Update the job status to DONE to allow other tests to run
     progressStats.setStatus(RebalanceResult.Status.DONE);
@@ -1298,6 +1308,12 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         JsonUtils.objectToString(progressStats));
     ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
         prevJobMetadata -> true);
+
+    // Stop the added server
+    serverStarter.stop();
+    TestUtils.waitForCondition(
+        aVoid -> getHelixResourceManager().dropInstance(serverStarter.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
   }
 
   private String getReloadJobIdFromResponse(String response) {

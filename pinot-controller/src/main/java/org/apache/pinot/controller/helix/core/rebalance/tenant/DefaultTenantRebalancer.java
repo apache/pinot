@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -61,7 +62,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
             _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false));
-      } catch (TableNotFoundException exception) {
+      } catch (TableNotFoundException | RebalanceInProgressException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
       }

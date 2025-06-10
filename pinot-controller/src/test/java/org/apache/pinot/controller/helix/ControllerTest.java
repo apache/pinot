@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.entity.EntityBuilder;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -1025,6 +1026,17 @@ public class ControllerTest {
           getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
       throw new IOException(e);
     }
   }

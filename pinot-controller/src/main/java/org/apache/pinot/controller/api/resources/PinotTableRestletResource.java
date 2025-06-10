@@ -73,6 +73,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -739,6 +740,8 @@ public class PinotTableRestletResource {
       }
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (RebalanceInProgressException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT);
     }
   }
 

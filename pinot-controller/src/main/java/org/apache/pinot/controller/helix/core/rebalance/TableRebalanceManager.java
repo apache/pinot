@@ -33,6 +33,7 @@ import javax.ws.rs.NotFoundException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -82,7 +83,7 @@ public class TableRebalanceManager {
    */
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
       String rebalanceJobId, boolean trackRebalanceProgress)
-      throws TableNotFoundException {
+      throws TableNotFoundException, RebalanceInProgressException {
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
@@ -112,10 +113,13 @@ public class TableRebalanceManager {
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType,
       RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress)
-      throws TableNotFoundException {
+      throws TableNotFoundException, RebalanceInProgressException {
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
+    }
+    if (!rebalanceConfig.isDryRun()) {
+      checkRebalanceJobInProgress(tableNameWithType);
     }
     return CompletableFuture.supplyAsync(
         () -> {
@@ -123,6 +127,8 @@ public class TableRebalanceManager {
             return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress);
           } catch (TableNotFoundException e) {
             // Should not happen since we already checked for table existence
+            throw new RuntimeException(e);
+          } catch (RebalanceInProgressException e) {
             throw new RuntimeException(e);
           }
         },
@@ -143,25 +149,31 @@ public class TableRebalanceManager {
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType, TableConfig tableConfig,
       String rebalanceJobId, RebalanceConfig rebalanceConfig,
-      @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+      @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver)
+      throws RebalanceInProgressException {
+    if (!rebalanceConfig.isDryRun()) {
+      checkRebalanceJobInProgress(tableNameWithType);
+    }
+
     return CompletableFuture.supplyAsync(
-        () -> rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
-            zkBasedTableRebalanceObserver),
+        () -> {
+          try {
+            return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
+                zkBasedTableRebalanceObserver);
+          } catch (RebalanceInProgressException e) {
+            throw new RuntimeException(e);
+          }
+        },
         _executorService);
   }
 
   @VisibleForTesting
   RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
-      RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+      RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver)
+      throws RebalanceInProgressException {
 
     if (!rebalanceConfig.isDryRun()) {
-      String rebalanceJobInProgress = rebalanceJobInProgress(tableNameWithType);
-      if (rebalanceJobInProgress != null) {
-        String errorMsg = "Rebalance job is already in progress for table: " + tableNameWithType + ", jobId: "
-            + rebalanceJobInProgress + ". Please wait for the job to complete or cancel it before starting a new one.";
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
-            null);
-      }
+      checkRebalanceJobInProgress(tableNameWithType);
     }
 
     Map<String, Set<String>> tierToSegmentsMap;
@@ -246,9 +258,14 @@ public class TableRebalanceManager {
     return serverRebalanceJobStatusResponse;
   }
 
-  @Nullable
-  private String rebalanceJobInProgress(String tableNameWithType) {
-    return rebalanceJobInProgress(tableNameWithType, _resourceManager.getPropertyStore());
+  private void checkRebalanceJobInProgress(String tableNameWithType)
+      throws RebalanceInProgressException {
+    String rebalanceJobInProgress = rebalanceJobInProgress(tableNameWithType, _resourceManager.getPropertyStore());
+    if (rebalanceJobInProgress != null) {
+      String errorMsg = "Rebalance job is already in progress for table: " + tableNameWithType + ", jobId: "
+          + rebalanceJobInProgress + ". Please wait for the job to complete or cancel it before starting a new one.";
+      throw new RebalanceInProgressException(errorMsg);
+    }
   }
 
   /**
