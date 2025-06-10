@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
@@ -50,8 +49,6 @@ import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.get
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
   private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ";
   public static final Map<String, String> AUTH_HEADER_USER_2 = Map.of("Authorization", AUTH_TOKEN_USER_2);
-  private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "2";
-  private static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
 
   protected List<File> _avroFiles;
   private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTest.class);
@@ -67,7 +64,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     properties.put("controller.admin.access.control.principals.user2.password", "notSoSecret");
     properties.put("controller.admin.access.control.principals.user.tables", DEFAULT_TABLE_NAME);
     properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    properties.put("controller.admin.access.control.principals.user2.tables", "mytable, mytable2");
+    properties.put("controller.admin.access.control.principals.user2.tables", "mytable");
     properties.put("controller.admin.access.control.principals.user2.permissions", "read");
   }
 
@@ -82,8 +79,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     brokerConf.setProperty("pinot.broker.access.control.principals.user.tables", DEFAULT_TABLE_NAME);
     brokerConf.setProperty("pinot.broker.access.control.principals.user.permissions", "read");
     brokerConf.setProperty("pinot.broker.access.control.principals.user.mytable.rls", "AirlineID='19805'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.mytable2.rls", "AirlineID='19805'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.tables", "mytable, mytable2");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user2.tables", "mytable");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.permissions", "read");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable.rls",
         "AirlineID='19805', DestStateName='California'");
@@ -132,7 +128,6 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     // Set up a table for testing different principals.
     setupTable(DEFAULT_TABLE_NAME);
-//    setupTable(DEFAULT_TABLE_NAME + "2");
 
     waitForAllDocsLoaded(600_000L);
   }
@@ -223,8 +218,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return response;
   }
 
-  private boolean compareRows(JsonNode expectedResponse, JsonNode response)
-      throws JsonProcessingException {
+  private boolean compareRows(JsonNode expectedResponse, JsonNode response) {
     JsonNode responseRow = response.get("resultTable").get("rows").get(0);
     JsonNode expectedRow = expectedResponse.get("resultTable").get("rows").get(0);
 
