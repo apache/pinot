@@ -49,18 +49,18 @@ public class MetadataBlock extends BaseDataBlock {
     return new MetadataBlock();
   }
 
-  public static MetadataBlock newError(int stage, int worker, @Nullable String serverId,
+  public static MetadataBlock newError(int stageId, int workerId, @Nullable String serverId,
       Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock(stage, worker, serverId);
+    MetadataBlock errorBlock = new MetadataBlock(stageId, workerId, serverId);
     for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
       errorBlock.addException(exception.getKey(), exception.getValue());
     }
     return errorBlock;
   }
 
-  public static MetadataBlock newErrorWithStats(int stage, int worker, @Nullable String serverId,
+  public static MetadataBlock newErrorWithStats(int stageId, int workerId, @Nullable String serverId,
       Map<Integer, String> exceptions, List<DataBuffer> statsByStage) {
-    MetadataBlock errorBlock = newError(stage, worker, serverId, exceptions);
+    MetadataBlock errorBlock = newError(stageId, workerId, serverId, exceptions);
     errorBlock._statsByStage = statsByStage;
     return errorBlock;
   }
