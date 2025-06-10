@@ -238,6 +238,11 @@ public class TableViews {
     return tableViewResult;
   }
 
+  public List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
+      Map<String, Map<String, String>> idealStateMap) {
+    return getSegmentStatuses(externalViewMap, idealStateMap, null);
+  }
+
   private List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
       Map<String, Map<String, String>> idealStateMap, @Nullable String filterStatus) {
     List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
@@ -254,11 +259,6 @@ public class TableViews {
     }
 
     return segmentStatusInfoList;
-  }
-
-  public List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
-      Map<String, Map<String, String>> idealStateMap) {
-    return getSegmentStatuses(externalViewMap, idealStateMap, null);
   }
 
   private String computeDisplayStatus(Map<String, String> externalView, Map<String, String> idealView) {
