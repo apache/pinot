@@ -1030,6 +1030,13 @@ public class ControllerTest {
     }
   }
 
+  /**
+   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
+   * stringified response.
+   * @param urlString the URL to send the POST request to
+   * @param payload the payload to send in the POST request
+   * @return a Pair containing the status code and the stringified response
+   */
   public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
       throws IOException {
     try {

@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.helix.AccessOption;
@@ -75,5 +77,35 @@ public class ControllerZkHelixUtils {
       jobsZnRecord.setMapField(jobId, jobMetadata);
       return propertyStore.set(jobResourcePath, jobsZnRecord, AccessOption.PERSISTENT);
     }
+  }
+
+  /**
+   * Get all controller jobs from ZK for a given set of job types.
+   * @param jobTypes the set of job types to filter
+   * @param jobMetadataChecker a predicate to filter the job metadata
+   * @param propertyStore the ZK property store to read from
+   * @return a map of jobId to job metadata for all the jobs that match the given job types and metadata checker
+   */
+  public static Map<String, Map<String, String>> getAllControllerJobs(Set<String> jobTypes,
+      Predicate<Map<String, String>> jobMetadataChecker, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    Map<String, Map<String, String>> controllerJobs = new HashMap<>();
+    for (String jobType : jobTypes) {
+      String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+      ZNRecord jobsZnRecord = propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+      if (jobsZnRecord == null) {
+        continue;
+      }
+      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+      for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
+        String jobId = jobMetadataEntry.getKey();
+        Map<String, String> jobMetadata = jobMetadataEntry.getValue();
+        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType),
+            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType, jobResourcePath, jobId);
+        if (jobMetadataChecker.test(jobMetadata)) {
+          controllerJobs.put(jobId, jobMetadata);
+        }
+      }
+    }
+    return controllerJobs;
   }
 }

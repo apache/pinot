@@ -2388,34 +2388,7 @@ public class PinotHelixResourceManager {
    */
   public Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker) {
-    return getAllJobs(jobTypes, jobMetadataChecker, _propertyStore);
-  }
-
-  /**
-   * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
-   * @return A Map of jobId to job properties
-   */
-  public static Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
-      Predicate<Map<String, String>> jobMetadataChecker, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    Map<String, Map<String, String>> controllerJobs = new HashMap<>();
-    for (String jobType : jobTypes) {
-      String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-      ZNRecord jobsZnRecord = propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
-      if (jobsZnRecord == null) {
-        continue;
-      }
-      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
-      for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
-        String jobId = jobMetadataEntry.getKey();
-        Map<String, String> jobMetadata = jobMetadataEntry.getValue();
-        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType),
-            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType, jobResourcePath, jobId);
-        if (jobMetadataChecker.test(jobMetadata)) {
-          controllerJobs.put(jobId, jobMetadata);
-        }
-      }
-    }
-    return controllerJobs;
+    return ControllerZkHelixUtils.getAllControllerJobs(jobTypes, jobMetadataChecker, _propertyStore);
   }
 
   /**

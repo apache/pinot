@@ -39,6 +39,7 @@ import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -279,7 +280,7 @@ public class TableRebalanceManager {
   public static String rebalanceJobInProgress(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // Get all jobMetadata for the given table with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
-        PinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
+        ControllerZkHelixUtils.getAllControllerJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
             jobMetadata -> tableNameWithType.equals(
                 jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)), propertyStore);
 
