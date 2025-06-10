@@ -104,9 +104,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
         failedTables.add(brokerRequest.getQuerySource().getTableName());
       }
-//      if (failedTables.isEmpty()) {
-//        return TableAuthorizationResult.success();
-//      }
+      if (failedTables.isEmpty()) {
+        return TableAuthorizationResult.success();
+      }
       return new TableAuthorizationResult(failedTables);
     }
 
@@ -128,9 +128,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
           failedTables.add(table);
         }
       }
-//      if (failedTables.isEmpty()) {
-//        return TableAuthorizationResult.success();
-//      }
+      if (failedTables.isEmpty()) {
+        return TableAuthorizationResult.success();
+      }
       return new TableAuthorizationResult(failedTables);
     }
 
