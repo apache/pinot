@@ -146,6 +146,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResults, config.isVerboseResult());
   }
 
+  // This method implements the old logic for tenant rebalance using parallel whitelist/blacklist.
+  // Usage of this method is now deprecated and will be removed in the future.
   private TenantRebalanceResult rebalanceWithParallelAndSequential(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
@@ -154,9 +156,9 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
-            _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
+            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
                 false));
-      } catch (TableNotFoundException exception) {
+      } catch (TableNotFoundException | RebalanceInProgressException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
       }
