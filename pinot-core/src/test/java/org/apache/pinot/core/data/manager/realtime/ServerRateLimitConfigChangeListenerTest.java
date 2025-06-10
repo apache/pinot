@@ -35,19 +35,19 @@ import static org.testng.Assert.assertEquals;
 
 public class ServerRateLimitConfigChangeListenerTest {
 
-  private static final PinotConfiguration SERVER_CONFIG_1 = mock(PinotConfiguration.class);
+  private static final PinotConfiguration SERVER_CONFIG = mock(PinotConfiguration.class);
   private static final double DELTA = 0.0001;
   private static final ServerMetrics MOCK_SERVER_METRICS = mock(ServerMetrics.class);
 
   static {
-    when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+    when(SERVER_CONFIG.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
   }
 
   @Test
   public void testRateLimitUpdate() {
     // Initial state
-    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(SERVER_CONFIG_1, null);
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(SERVER_CONFIG, null);
     RealtimeConsumptionRateManager.RateLimiterImpl serverRateLimiter = getServerRateLimiter();
     double initialRate = serverRateLimiter.getRate();
     assertEquals(initialRate, 5.0, DELTA);
@@ -60,7 +60,7 @@ public class ServerRateLimitConfigChangeListenerTest {
         new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
     listener.onChange(changedConfigSet, newConfig);
 
-    // Verify that new rate is applied
+    // Verify that old rate remains same and the new rate is applied
     double rate = serverRateLimiter.getRate();
     assertEquals(rate, 5.0, DELTA);
 
