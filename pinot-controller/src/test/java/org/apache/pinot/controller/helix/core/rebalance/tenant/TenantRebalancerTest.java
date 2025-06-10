@@ -151,7 +151,7 @@ public class TenantRebalancerTest extends ControllerTest {
   }
 
   @Test
-  public void testAllowAndBlockTables()
+  public void testIncludeAndExcludeTables()
       throws Exception {
     int numServers = 3;
     for (int i = 0; i < numServers; i++) {
@@ -186,8 +186,8 @@ public class TenantRebalancerTest extends ControllerTest {
     config.setDryRun(true);
 
     // leave allow and block tables empty
-    config.setAllowTables(Collections.emptySet());
-    config.setBlockTables(Collections.emptySet());
+    config.setIncludeTables(Collections.emptySet());
+    config.setExcludeTables(Collections.emptySet());
 
     TenantRebalanceResult tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
@@ -201,7 +201,7 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(rebalanceResultB.getStatus(), RebalanceResult.Status.DONE);
 
     // block table B
-    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setExcludeTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
 
     tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
@@ -213,11 +213,11 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(rebalanceResultA.getStatus(), RebalanceResult.Status.DONE);
 
     // allow all tables explicitly, block table B, this should result the same as above case
-    Set<String> allowTables = new HashSet<>();
-    allowTables.add(OFFLINE_TABLE_NAME_A);
-    allowTables.add(OFFLINE_TABLE_NAME_B);
-    config.setAllowTables(allowTables);
-    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    Set<String> includeTables = new HashSet<>();
+    includeTables.add(OFFLINE_TABLE_NAME_A);
+    includeTables.add(OFFLINE_TABLE_NAME_B);
+    config.setIncludeTables(includeTables);
+    config.setExcludeTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
 
     tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
@@ -229,8 +229,8 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(rebalanceResultA.getStatus(), RebalanceResult.Status.DONE);
 
     // allow table B
-    config.setAllowTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
-    config.setBlockTables(Collections.emptySet());
+    config.setIncludeTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setExcludeTables(Collections.emptySet());
 
     tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
@@ -243,16 +243,16 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(rebalanceResultB.getStatus(), RebalanceResult.Status.DONE);
 
     // allow table B, also block table B
-    config.setAllowTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
-    config.setBlockTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setIncludeTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
+    config.setExcludeTables(Collections.singleton(OFFLINE_TABLE_NAME_B));
 
     tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
     assertTrue(tenantRebalanceResult.getRebalanceTableResults().isEmpty());
 
     // allow a non-existing table
-    config.setAllowTables(Collections.singleton("TableDoesNotExist_OFFLINE"));
-    config.setBlockTables(Collections.emptySet());
+    config.setIncludeTables(Collections.singleton("TableDoesNotExist_OFFLINE"));
+    config.setExcludeTables(Collections.emptySet());
 
     tenantRebalanceResult = tenantRebalancer.rebalance(config);
 
