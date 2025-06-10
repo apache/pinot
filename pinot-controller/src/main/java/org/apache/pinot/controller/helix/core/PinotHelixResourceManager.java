@@ -1586,6 +1586,12 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
+      // For logical table schemas, we do not need to reload segments or send schema refresh messages
+      LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
+          schemaName);
+      return;
+    }
     try {
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       if (reload) {
