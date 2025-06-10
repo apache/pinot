@@ -113,6 +113,9 @@ public class QueryLoggerTest {
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
         + "queryEngine=singleStage,"
+        + "offlineMemAllocatedBytes(total/thread/resSer):0/0/0,"
+        + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
+        + "replicaGroups=[],"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }

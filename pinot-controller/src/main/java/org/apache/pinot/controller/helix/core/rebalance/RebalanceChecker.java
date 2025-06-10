@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -54,15 +54,15 @@ import org.slf4j.LoggerFactory;
 public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RebalanceChecker.class);
   private static final double RETRY_DELAY_SCALE_FACTOR = 2.0;
-  private final ExecutorService _executorService;
+  private final TableRebalanceManager _tableRebalanceManager;
 
-  public RebalanceChecker(PinotHelixResourceManager pinotHelixResourceManager,
-      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService) {
+  public RebalanceChecker(TableRebalanceManager tableRebalanceManager,
+      PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
+      ControllerConf config, ControllerMetrics controllerMetrics) {
     super(RebalanceChecker.class.getSimpleName(), config.getRebalanceCheckerFrequencyInSeconds(),
         config.getRebalanceCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
-    _executorService = executorService;
+    _tableRebalanceManager = tableRebalanceManager;
   }
 
   @Override
@@ -152,14 +152,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // thread, in order to avoid unnecessary ZK reads and making too many ZK reads in a short time.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
-    _executorService.submit(() -> {
-      // Retry rebalance in another thread as rebalance can take time.
-      try {
-        retryRebalanceTableWithContext(tableNameWithType, tableConfig, jobCtx);
-      } catch (Throwable t) {
-        LOGGER.error("Failed to retry rebalance for table: {} asynchronously", tableNameWithType, t);
-      }
-    });
+    retryRebalanceTableWithContext(tableNameWithType, tableConfig, jobCtx);
   }
 
   private void retryRebalanceTableWithContext(String tableNameWithType, TableConfig tableConfig,
@@ -173,12 +166,23 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
         attemptJobId);
     _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_RETRY, 1L);
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx, _pinotHelixResourceManager);
-    RebalanceResult result =
-        _pinotHelixResourceManager.rebalanceTable(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
-            observer);
-    LOGGER.info("New attempt: {} for table: {} is done with result status: {}", attemptJobId, tableNameWithType,
-        result.getStatus());
+        new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx,
+            _pinotHelixResourceManager.getPropertyStore());
+
+    try {
+      _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
+              observer)
+          .whenComplete((result, throwable) -> {
+            if (throwable != null) {
+              LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, throwable);
+            } else {
+              LOGGER.info("New attempt: {} for table: {} is done with result status: {}", attemptJobId,
+                  tableNameWithType, result.getStatus());
+            }
+          });
+    } catch (RebalanceInProgressException e) {
+      LOGGER.warn("Rebalance job for table: {} is already in progress. Skipping retry.", tableNameWithType, e);
+    }
   }
 
   @VisibleForTesting
@@ -309,7 +313,8 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       }
       // The job is considered failed, but it's possible it is still running, then we might end up with more than one
       // rebalance jobs running in parallel for a table. The rebalance algorithm is idempotent, so this should be fine
-      // for the correctness.
+      // for the correctness. Note that we do still abort this job before retrying, because we don't allow more than
+      // one actively running rebalance job (as per ZK) for a table.
       LOGGER.info("Found stuck rebalance job: {} for original job: {}", jobId, originalJobId);
       candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(jobCtx, jobStartTimeMs));
     }

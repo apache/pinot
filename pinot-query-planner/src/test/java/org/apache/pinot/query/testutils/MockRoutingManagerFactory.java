@@ -35,6 +35,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -101,7 +102,8 @@ public class MockRoutingManagerFactory {
     _disabledTables.add(tableNameWithType);
   }
 
-  public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
+  public RoutingManager buildRoutingManager(
+      @Nullable Map<String, TablePartitionReplicatedServersInfo> partitionInfoMap) {
     int numTables = _tableSegmentServersMap.size();
     Map<String, RoutingTable> routingTableMap = Maps.newHashMapWithExpectedSize(numTables);
     Map<String, List<String>> tableSegmentsMap = Maps.newHashMapWithExpectedSize(numTables);
@@ -128,8 +130,29 @@ public class MockRoutingManagerFactory {
       routingTableMap.put(tableNameWithType, new RoutingTable(serverRouteInfoMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
     }
+    Map<String, TablePartitionInfo> tablePartitionInfoMap = null;
+    if (partitionInfoMap != null) {
+      tablePartitionInfoMap = new HashMap<>();
+      for (Map.Entry<String, TablePartitionReplicatedServersInfo> entry : partitionInfoMap.entrySet()) {
+        String tableNameWithType = entry.getKey();
+        TablePartitionReplicatedServersInfo partitionInfo = entry.getValue();
+        // Create TablePartitionInfo from TablePartitionReplicatedServersInfo to mimic the simpler case when:
+        // 1. There are no excluded new segments.
+        // 2. There are no segments with invalid partition id.
+        TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfos = partitionInfo.getPartitionInfoMap();
+        List<List<String>> segmentsByPartition = new ArrayList<>();
+        for (TablePartitionReplicatedServersInfo.PartitionInfo partition : partitionInfos) {
+          segmentsByPartition.add(partition == null ? List.of() : partition._segments);
+        }
+        TablePartitionInfo tablePartitionInfo =
+            new TablePartitionInfo(tableNameWithType, partitionInfo.getPartitionColumn(),
+                partitionInfo.getPartitionFunctionName(), partitionInfo.getNumPartitions(), segmentsByPartition,
+                List.of());
+        tablePartitionInfoMap.put(tableNameWithType, tablePartitionInfo);
+      }
+    }
     return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, _disabledTables, partitionInfoMap,
-        _serverInstances);
+        _serverInstances, tablePartitionInfoMap);
   }
 
   public TableCache buildTableCache() {
@@ -176,18 +199,23 @@ public class MockRoutingManagerFactory {
     private final Map<String, List<String>> _segmentsMap;
     private final Set<String> _hybridTables;
     private final Set<String> _disabledTables;
+    @Nullable
+    private final Map<String, TablePartitionReplicatedServersInfo> _partitionReplicatedServersInfoMap;
+    @Nullable
     private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
 
     public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
         Set<String> hybridTables, Set<String> disabledTables,
-        @Nullable Map<String, TablePartitionInfo> partitionInfoMap, Map<String, ServerInstance> serverInstances) {
+        @Nullable Map<String, TablePartitionReplicatedServersInfo> partitionReplicatedServersInfoMap,
+        Map<String, ServerInstance> serverInstances, @Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
       _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
-      _partitionInfoMap = partitionInfoMap;
+      _partitionReplicatedServersInfoMap = partitionReplicatedServersInfoMap;
       _serverInstances = serverInstances;
       _disabledTables = disabledTables;
+      _partitionInfoMap = partitionInfoMap;
     }
 
     @Override
@@ -232,6 +260,13 @@ public class MockRoutingManagerFactory {
     @Override
     public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
       return _partitionInfoMap != null ? _partitionInfoMap.get(tableNameWithType) : null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
+      return _partitionReplicatedServersInfoMap != null ? _partitionReplicatedServersInfoMap.get(tableNameWithType)
+          : null;
     }
 
     @Override

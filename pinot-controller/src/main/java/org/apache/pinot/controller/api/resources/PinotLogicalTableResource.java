@@ -93,7 +93,8 @@ public class PinotLogicalTableResource {
   @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "List all logical table names", notes = "Lists all logical table names")
   public List<String> listLogicalTableNames(@Context HttpHeaders headers) {
-    return _pinotHelixResourceManager.getAllLogicalTableNames();
+    String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
+    return _pinotHelixResourceManager.getAllLogicalTableNames(databaseName);
   }
 
   @GET

@@ -417,7 +417,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentDownloadURIStr, segmentFile, tableNameWithType, copySegmentToFinalLocation);
 
       ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
+      zkOperator.completeSegmentOperations(tableConfig, segmentMetadata, uploadType, finalSegmentLocationURI,
           segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
           enableParallelPushProtection, allowRefresh, headers);
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
@@ -647,7 +647,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         // complete segment operations for all the segments
         if (++entryCount == segmentsMetadataInfoMap.size()) {
           ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-          zkOperator.completeSegmentsOperations(tableNameWithType, uploadType, enableParallelPushProtection,
+          zkOperator.completeSegmentsOperations(tableConfig, uploadType, enableParallelPushProtection,
               allowRefresh, headers, segmentUploadMetadataList);
         }
       }

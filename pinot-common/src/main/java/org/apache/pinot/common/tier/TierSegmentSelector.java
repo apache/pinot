@@ -18,21 +18,17 @@
  */
 package org.apache.pinot.common.tier;
 
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+
+
 /**
  * Interface for the segment selection strategy of a tier
  */
 public interface TierSegmentSelector {
 
-  /**
-   * The type of the segment selector (e.g. TIME)
-   */
+  /// Returns the type of the segment selector (e.g. TIME).
   String getType();
 
-  /**
-   * Checks if the provided segment is eligible for selection to this tier
-   * @param tableNameWithType Name of the table
-   * @param segmentName Name of the segment
-   * @return true if eligible
-   */
-  boolean selectSegment(String tableNameWithType, String segmentName);
+  /// Returns `true` if the segment is eligible for the tier.
+  boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata);
 }

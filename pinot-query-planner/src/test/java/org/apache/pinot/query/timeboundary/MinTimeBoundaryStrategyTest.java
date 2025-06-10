@@ -84,7 +84,6 @@ public class MinTimeBoundaryStrategyTest {
 
     return new Object[][]{
         {timeBoundaryInfoMap, List.of("table3_OFFLINE"), "table3_OFFLINE"},
-        {timeBoundaryInfoMap, List.of("Invalid_OFFLINE"), "Invalid_OFFLINE"},
         {timeBoundaryInfoMap, List.of("table2_OFFLINE", "table3_OFFLINE"), "table2_OFFLINE"},
         {timeBoundaryInfoMap, List.of("table3_OFFLINE", "table2_OFFLINE", "table4_OFFLINE"), "table2_OFFLINE"},
         {timeBoundaryInfoMap, List.of(), "empty_includedTables_OFFLINE"}
@@ -102,8 +101,8 @@ public class MinTimeBoundaryStrategyTest {
   private void testComputeTimeBoundary(Map<String, TimeBoundaryInfo> timeBoundaryInfoMap, String expectedTableName,
       Map<String, Object> parameters) {
     setupMocks(timeBoundaryInfoMap);
-    TimeBoundaryInfo timeBoundaryInfo = _minTimeBoundaryStrategy.computeTimeBoundary(
-        createLogicalTableConfig(parameters), _mockTableCache, _mockRoutingManager);
+    _minTimeBoundaryStrategy.init(createLogicalTableConfig(parameters), _mockTableCache);
+    TimeBoundaryInfo timeBoundaryInfo = _minTimeBoundaryStrategy.computeTimeBoundary(_mockRoutingManager);
     assertSame(timeBoundaryInfo, timeBoundaryInfoMap.get(expectedTableName));
   }
 

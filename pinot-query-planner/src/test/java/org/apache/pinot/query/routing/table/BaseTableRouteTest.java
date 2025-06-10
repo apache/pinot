@@ -170,7 +170,7 @@ public class BaseTableRouteTest {
     TimeBoundaryStrategyService mockService = mock(TimeBoundaryStrategyService.class);
     when(TimeBoundaryStrategyService.getInstance()).thenReturn(mockService);
     when(mockService.getTimeBoundaryStrategy(any())).thenReturn(_timeBoundaryStrategy);
-    when(_timeBoundaryStrategy.computeTimeBoundary(any(), any(), any())).thenReturn(mock(TimeBoundaryInfo.class));
+    when(_timeBoundaryStrategy.computeTimeBoundary(any())).thenReturn(mock(TimeBoundaryInfo.class));
   }
 
   @AfterClass

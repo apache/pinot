@@ -26,13 +26,13 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
-public class PinotIdealstateChanger extends PinotZKChanger {
+public class PinotIdealStateChanger extends PinotZKChanger {
 
   private final String _tableNameWithType;
   private final boolean _dryRun;
 
-  public PinotIdealstateChanger(String zkAddress, String clusterName, String tableNameWithType, boolean dryRun) {
-    super(zkAddress, clusterName);
+  public PinotIdealStateChanger(String zkAddress, String clusterName, String tableNameWithType, boolean dryRun) {
+    super("PinotIdealStateChanger", zkAddress, clusterName);
     _tableNameWithType = tableNameWithType;
     _dryRun = dryRun;
   }
@@ -60,7 +60,7 @@ public class PinotIdealstateChanger extends PinotZKChanger {
     final String clusterName = "LLCRealtimeClusterIntegrationTest";
     final String tableName = "mytable_REALTIME";
 
-    PinotIdealstateChanger changer = new PinotIdealstateChanger(zkAddress, clusterName, tableName, dryRun);
+    PinotIdealStateChanger changer = new PinotIdealStateChanger(zkAddress, clusterName, tableName, dryRun);
     changer.updateIdealState();
   }
 }
