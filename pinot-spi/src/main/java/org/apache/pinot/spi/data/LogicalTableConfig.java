@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -174,6 +175,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     }
   }
 
+  @JsonIgnore
   public boolean isHybridLogicalTable() {
     return _refOfflineTableName != null && _refRealtimeTableName != null;
   }
