@@ -691,13 +691,15 @@ public class PinotTenantRestletResource {
           "1")
       @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
       @ApiParam(value =
-          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are allowed in this tenant rebalance"
-              + " job. Leave blank to allow all tables from the tenant", example = "")
-      @QueryParam("allowTables") String allowTables,
+          "Comma separated list of tables with type that should be included in this tenant rebalance"
+              + " job. Leaving blank defaults to include all tables from the tenant. Example: table1_REALTIME, table2_REALTIME",
+          example = "")
+      @QueryParam("includeTables") String allowTables,
       @ApiParam(value =
-          "Comma separated list of tables (with OFFLINE or REALTIME suffix) that are blocked in this tenant rebalance"
-              + " job. These table will be removed from allowTables", example = "")
-      @QueryParam("blockTables") String blockTables,
+          "Comma separated list of tables with type that would be excluded in this tenant rebalance"
+              + " job. These tables will be removed from includeTables (that said, if a table appears in both list, it will be excluded). Example: table1_REALTIME, table2_REALTIME",
+          example = "")
+      @QueryParam("excludeTables") String blockTables,
       @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
       @QueryParam("verboseResult") Boolean verboseResult,
       @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
@@ -712,19 +714,21 @@ public class PinotTenantRestletResource {
       config.setVerboseResult(verboseResult);
     }
     if (allowTables != null) {
-      config.setAllowTables(Arrays.stream(StringUtil.split(allowTables, ',', 0)).map(String::strip).collect(
-          Collectors.toSet()));
+      config.setAllowTables(Arrays.stream(StringUtil.split(allowTables, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
     }
     if (blockTables != null) {
-      config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0)).map(String::strip).collect(
-          Collectors.toSet()));
+      config.setBlockTables(Arrays.stream(StringUtil.split(blockTables, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
     }
-    if (!config.getParallelWhitelist().isEmpty() || !config.getParallelBlacklist().isEmpty()) {
-      // If the parallel whitelist or blacklist is set, the old tenant rebalance logic will be used
-      // TODO: Deprecate the support for this in the future
-      LOGGER.warn("Using the old tenant rebalance logic because parallel whitelist or blacklist is set. "
-          + "This will be deprecated in the future.");
-      return ((DefaultTenantRebalancer) _tenantRebalancer).rebalanceWithParallelAndSequential(config);
+    if ((!config.getBlockTables().isEmpty() || !config.getAllowTables().isEmpty()) && (
+        !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty())) {
+      throw new ControllerApplicationException(LOGGER,
+          "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time."
+              + " The latter is a deprecated usage of this API.",
+          Response.Status.BAD_REQUEST);
     }
     return _tenantRebalancer.rebalance(config);
   }

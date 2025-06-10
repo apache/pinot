@@ -89,7 +89,7 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TenantRebalancer tenantRebalancer =
+    DefaultTenantRebalancer tenantRebalancer =
         new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
@@ -158,7 +158,7 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+    DefaultTenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
@@ -285,7 +285,7 @@ public class TenantRebalancerTest extends ControllerTest {
     addDummySchema(tableNameD);
     addDummySchema(tableNameE);
 
-    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+    DefaultTenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
 
     // table A set tenantConfig.tenants.server to tenantName
     // SHOULD be selected as tenant's table

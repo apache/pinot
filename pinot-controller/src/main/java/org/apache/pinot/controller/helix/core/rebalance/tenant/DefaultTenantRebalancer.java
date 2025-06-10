@@ -61,6 +61,17 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
 
   @Override
   public TenantRebalanceResult rebalance(TenantRebalanceConfig config) {
+    if (!config.getParallelWhitelist().isEmpty() || !config.getParallelBlacklist().isEmpty()) {
+      // If the parallel whitelist or blacklist is set, the old tenant rebalance logic will be used
+      // TODO: Deprecate the support for this in the future
+      LOGGER.warn("Using the old tenant rebalance logic because parallel whitelist or blacklist is set, "
+          + "which is a deprecated usage of this API.");
+      return rebalanceWithParallelAndSequential(config);
+    }
+    return rebalanceWithIncludeExcludeTables(config);
+  }
+
+  private TenantRebalanceResult rebalanceWithIncludeExcludeTables(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> dryRunResults = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
     Set<String> allowTables = config.getAllowTables();
@@ -135,7 +146,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResults, config.isVerboseResult());
   }
 
-  public TenantRebalanceResult rebalanceWithParallelAndSequential(TenantRebalanceConfig config) {
+  private TenantRebalanceResult rebalanceWithParallelAndSequential(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
     tables.forEach(table -> {
