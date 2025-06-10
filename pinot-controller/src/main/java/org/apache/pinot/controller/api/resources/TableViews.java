@@ -20,10 +20,13 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -33,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -54,6 +59,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -171,41 +177,54 @@ public class TableViews {
     return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
   }
 
-  public List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
-      Map<String, Map<String, String>> idealStateMap) {
-    List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
-
-    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
-      String segment = entry.getKey();
-      Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
-      Map<String, String> idealViewEntryValue = entry.getValue();
-
-      if (externalViewEntryValue == null) {
-        segmentStatusInfoList.add(
-            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
-      } else if (isErrorSegment(externalViewEntryValue)) {
-        segmentStatusInfoList.add(
-            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
-      } else {
-        boolean isViewsEqual = externalViewEntryValue.equals(idealViewEntryValue);
-        if (isViewsEqual) {
-          if (isOnlineOrConsumingSegment(externalViewEntryValue)) {
-            segmentStatusInfoList.add(
-                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
-          } else if (isOfflineSegment(externalViewEntryValue)) {
-            segmentStatusInfoList.add(
-                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
-          } else {
-            segmentStatusInfoList.add(
-                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
-          }
-        } else {
-          segmentStatusInfoList.add(
-              new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
-        }
-      }
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableNameWithType}/badSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT_STATUS)
+  @ApiOperation(value = "Get bad segment names per partition group for a realtime table.", notes = "Get a sorted list"
+      + " of bad segments per partition group (sort order is in increasing order of segment sequence number)")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Returns a map of partition group IDs to the list of segment names in sorted"
+          + " order of sequence number"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public String getSegmentsStatusDetails(
+      @ApiParam(value = "Name of the table with type.", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " should be a realtime table.",
+          Response.Status.BAD_REQUEST);
     }
-    return segmentStatusInfoList;
+
+    try {
+      TableViews.TableView idealStateView = getTableState(tableNameWithType, TableViews.IDEALSTATE, null);
+      TableViews.TableView externalView = getTableState(tableNameWithType, TableViews.EXTERNALVIEW, null);
+
+      Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
+      Map<String, Map<String, String>> externalViewStateMap = getStateMap(externalView);
+
+      List<SegmentStatusInfo> segmentStatusInfoList = getSegmentStatuses(externalViewStateMap, idealStateMap,
+          CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
+
+      if (segmentStatusInfoList.isEmpty()) {
+        return JsonUtils.objectToPrettyString(new HashMap<>());
+      }
+
+      Map<Integer, SortedSet<LLCSegmentName>> partitionGroupIdToSegments = new HashMap<>();
+      for (SegmentStatusInfo segmentStatusInfo : segmentStatusInfoList) {
+        String segmentName = segmentStatusInfo.getSegmentName();
+        LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+        Preconditions.checkNotNull(llcSegmentName, "Unable to convert segmentName to LLCSegment.");
+        partitionGroupIdToSegments.computeIfAbsent(llcSegmentName.getPartitionGroupId(), k -> new TreeSet<>())
+            .add(llcSegmentName);
+      }
+
+      return JsonUtils.objectToPrettyString(partitionGroupIdToSegments);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   public TableView getSegmentsView(TableViews.TableView tableView, List<String> segmentNames) {
@@ -217,6 +236,49 @@ public class TableViews {
       tableViewResult._realtime = getTableTypeSegmentsView(tableView._realtime, segmentNames);
     }
     return tableViewResult;
+  }
+
+  private List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
+      Map<String, Map<String, String>> idealStateMap, @Nullable String filterStatus) {
+    List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
+      String segment = entry.getKey();
+      Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
+      Map<String, String> idealViewEntryValue = entry.getValue();
+
+      String computedStatus = computeDisplayStatus(externalViewEntryValue, idealViewEntryValue);
+      if ((filterStatus == null) || (computedStatus.equals(filterStatus))) {
+        segmentStatusInfoList.add(new SegmentStatusInfo(segment, computedStatus));
+      }
+    }
+
+    return segmentStatusInfoList;
+  }
+
+  public List<SegmentStatusInfo> getSegmentStatuses(Map<String, Map<String, String>> externalViewMap,
+      Map<String, Map<String, String>> idealStateMap) {
+    return getSegmentStatuses(externalViewMap, idealStateMap, null);
+  }
+
+  private String computeDisplayStatus(Map<String, String> externalView, Map<String, String> idealView) {
+    if (externalView == null) {
+      return CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING;
+    }
+
+    if (isErrorSegment(externalView)) {
+      return CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD;
+    }
+
+    if (externalView.equals(idealView)) {
+      if (isOnlineOrConsumingSegment(externalView) || isOfflineSegment(externalView)) {
+        return CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD;
+      } else {
+        return CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING;
+      }
+    }
+
+    return CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING;
   }
 
   private Map<String, Map<String, String>> getTableTypeSegmentsView(Map<String, Map<String, String>> tableTypeView,
@@ -257,7 +319,7 @@ public class TableViews {
 
   // we use name "view" to closely match underlying names and to not
   // confuse with table state of enable/disable
-  private TableView getTableState(String tableName, String view, TableType tableType) {
+  private TableView getTableState(String tableName, String view, @Nullable TableType tableType) {
     TableView tableView;
     if (view.equalsIgnoreCase(IDEALSTATE)) {
       tableView = getTableIdealState(tableName, tableType);
@@ -274,7 +336,7 @@ public class TableViews {
     return tableView;
   }
 
-  private TableView getTableIdealState(String tableNameOptType, TableType tableType) {
+  private TableView getTableIdealState(String tableNameOptType, @Nullable TableType tableType) {
     TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView._offline = getIdealState(tableNameOptType, TableType.OFFLINE);

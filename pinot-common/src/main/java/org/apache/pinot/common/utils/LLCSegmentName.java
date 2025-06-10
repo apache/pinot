@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -151,5 +152,10 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   @Override
   public String toString() {
     return _segmentName;
+  }
+
+  @JsonValue
+  public String asJson() {
+    return toString(); // This forces JSON serialization to use this method
   }
 }
