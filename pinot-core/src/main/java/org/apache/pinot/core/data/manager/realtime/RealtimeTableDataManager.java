@@ -847,7 +847,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   /**
    * Replaces the CONSUMING segment with the one sealed locally.
    */
+  @Deprecated
   public void replaceConsumingSegment(String segmentName)
+      throws Exception {
+    // Fetch ZK metadata to pass to addSegment so that ZK creation time is set automatically
+    SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
+    replaceConsumingSegment(segmentName, zkMetadata);
+  }
+
+  /**
+   * Replaces the CONSUMING segment with the one sealed locally.
+   * This overloaded method avoids extra ZK call when the caller already has SegmentZKMetadata.
+   */
+  public void replaceConsumingSegment(String segmentName, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
@@ -856,8 +868,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
 
-    // Fetch ZK metadata to pass to addSegment so that ZK creation time is set automatically
-    SegmentZKMetadata zkMetadata = fetchZKMetadataNullable(segmentName);
     addSegment(immutableSegment, zkMetadata);
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
   }
