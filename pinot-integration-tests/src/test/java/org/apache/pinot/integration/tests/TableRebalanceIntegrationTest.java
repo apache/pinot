@@ -26,7 +26,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -37,9 +40,13 @@ import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,9 +61,11 @@ import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -1256,6 +1265,55 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     assertEquals(numServersAdded, summaryResult.getServerInfo().getServersAdded().size());
     assertEquals(numServersRemoved, summaryResult.getServerInfo().getServersRemoved().size());
     assertEquals(numServersUnchanged, summaryResult.getServerInfo().getServersUnchanged().size());
+  }
+
+  @Test
+  public void testDisallowMultipleConcurrentRebalancesOnSameTable() throws Exception {
+    // Manually write an IN_PROGRESS rebalance job to ZK instead of trying to collide multiple actual rebalance
+    // attempts which will be prone to race conditions and cause this test to be flaky. We only reject a rebalance job
+    // if there is an IN_PROGRESS rebalance job for the same table in ZK, so we could actually end up with more than
+    // one active rebalance job if both are started at the exact same time since the progress stats are written to ZK
+    // after some initial pre-checks are done. However, rebalances are idempotent, and we don't actually care too much
+    // about avoiding this edge case race condition as long as in most cases we are able to prevent users from
+    // triggering a rebalance for a table that already has an in-progress rebalance job.
+    String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(getTableName());
+    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
+    // rebalance is not a NO_OP
+    BaseServerStarter serverStarter = startOneServer(NUM_SERVERS);
+    createServerTenant(getServerTenant(), 1, 0);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+
+    Pair<Integer, String> response =
+        postRequestWithStatusCode(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
+    assertEquals(response.getLeft(), Response.Status.CONFLICT.getStatusCode());
+    assertTrue(response.getRight().contains("Rebalance job is already in progress for table"));
+
+    // Update the job status to DONE to allow other tests to run
+    progressStats.setStatus(RebalanceResult.Status.DONE);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Stop the added server
+    serverStarter.stop();
+    TestUtils.waitForCondition(
+        aVoid -> getHelixResourceManager().dropInstance(serverStarter.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
   }
 
   private String getReloadJobIdFromResponse(String response) {
