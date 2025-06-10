@@ -97,11 +97,8 @@ import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
@@ -794,30 +791,7 @@ public class PinotTableRestletResource {
   public ServerRebalanceJobStatusResponse rebalanceStatus(
       @ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
-    Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
-
-    if (controllerJobZKMetadata == null) {
-      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
-          Response.Status.NOT_FOUND);
-    }
-    ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
-    TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
-        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
-        TableRebalanceProgressStats.class);
-    serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
-
-    long timeSinceStartInSecs = 0L;
-    if (RebalanceResult.Status.DONE != tableRebalanceProgressStats.getStatus()) {
-      timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
-    }
-    serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
-
-    String jobCtxInStr = controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
-    if (StringUtils.isNotEmpty(jobCtxInStr)) {
-      TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
-      serverRebalanceJobStatusResponse.setTableRebalanceContext(jobCtx);
-    }
-    return serverRebalanceJobStatusResponse;
+    return _tableRebalanceManager.getRebalanceStatus(jobId);
   }
 
   @GET

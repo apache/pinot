@@ -206,6 +206,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
+  // This executor should be used by all code paths for user initiated rebalances, so that the controller config
+  // CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS is honored.
   protected ExecutorService _rebalancerExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;

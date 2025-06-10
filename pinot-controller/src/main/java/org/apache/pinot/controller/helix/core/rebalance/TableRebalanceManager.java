@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -28,11 +29,14 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import javax.ws.rs.NotFoundException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -149,11 +153,15 @@ public class TableRebalanceManager {
   @VisibleForTesting
   RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
       RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
-    String rebalanceJobInProgress = rebalanceJobInProgress(tableNameWithType);
-    if (rebalanceJobInProgress != null) {
-      String errorMsg = "Rebalance job is already in progress for table: " + tableNameWithType + ", jobId: "
-          + rebalanceJobInProgress + ". Please wait for the job to complete or cancel it before starting a new one.";
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null, null);
+
+    if (!rebalanceConfig.isDryRun()) {
+      String rebalanceJobInProgress = rebalanceJobInProgress(tableNameWithType);
+      if (rebalanceJobInProgress != null) {
+        String errorMsg = "Rebalance job is already in progress for table: " + tableNameWithType + ", jobId: "
+            + rebalanceJobInProgress + ". Please wait for the job to complete or cancel it before starting a new one.";
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
+            null);
+      }
     }
 
     Map<String, Set<String>> tierToSegmentsMap;
@@ -177,7 +185,7 @@ public class TableRebalanceManager {
    */
   public List<String> cancelRebalance(String tableNameWithType) {
     List<String> cancelledJobIds = new ArrayList<>();
-    _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
+    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
         jobMetadata -> {
           String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
           try {
@@ -197,7 +205,45 @@ public class TableRebalanceManager {
             LOGGER.error("Failed to cancel rebalance job: {} for table: {}", jobId, tableNameWithType, e);
           }
         });
+    LOGGER.info("Tried to cancel existing rebalance jobs for table: {} at best effort and done: {}", tableNameWithType,
+        updated);
     return cancelledJobIds;
+  }
+
+  /**
+   * Gets the status of the rebalance job with the given ID.
+   *
+   * @param jobId ID of the rebalance job to get the status for
+   * @return response containing the status of the rebalance job
+   * @throws JsonProcessingException if there is an error processing the rebalance progress stats from ZK
+   * @throws NotFoundException if the rebalance job with the given ID does not exist
+   */
+  public ServerRebalanceJobStatusResponse getRebalanceStatus(String jobId)
+      throws JsonProcessingException {
+    Map<String, String> controllerJobZKMetadata =
+        _resourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+    if (controllerJobZKMetadata == null) {
+      LOGGER.warn("Rebalance job with ID: {} not found", jobId);
+      throw new NotFoundException("Rebalance job with ID: " + jobId + " not found");
+    }
+    ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
+    TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
+        TableRebalanceProgressStats.class);
+    serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
+
+    long timeSinceStartInSecs = 0L;
+    if (RebalanceResult.Status.DONE != tableRebalanceProgressStats.getStatus()) {
+      timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
+    }
+    serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
+
+    String jobCtxInStr = controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
+    if (StringUtils.isNotEmpty(jobCtxInStr)) {
+      TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
+      serverRebalanceJobStatusResponse.setTableRebalanceContext(jobCtx);
+    }
+    return serverRebalanceJobStatusResponse;
   }
 
   @Nullable
