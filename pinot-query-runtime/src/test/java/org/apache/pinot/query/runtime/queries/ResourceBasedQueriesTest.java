@@ -270,7 +270,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // query pinot
     runQuery(sql, expect, false).ifPresent(queryResult -> {
       try {
-        compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder, "", "");
+        compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -282,7 +282,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
     runQuery(sql, expect, false).ifPresent(
-        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder, "", ""));
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
@@ -291,8 +291,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
-        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder, testCaseName,
-            finalSql));
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
@@ -301,8 +300,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
-        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder, testCaseName,
-            finalSql));
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
   private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
