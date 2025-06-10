@@ -1158,9 +1158,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   protected long getAuthoritativeCreationTime(IndexSegment segment) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    if (segmentMetadata.isMutableSegment()) {
-      return segmentMetadata.getIndexCreationTime();
-    }
     if (segmentMetadata instanceof SegmentMetadataImpl) {
       SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
       long zkCreationTime = segmentMetadataImpl.getZkCreationTime();
