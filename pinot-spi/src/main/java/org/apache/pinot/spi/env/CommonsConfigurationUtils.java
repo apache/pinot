@@ -82,6 +82,19 @@ public class CommonsConfigurationUtils {
    * @param path representing the path of file
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @param ioFactoryKind representing to set IOFactory. It can be null.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(@Nullable String path, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
+      throws ConfigurationException {
+    return fromPath(path, setDefaultDelimiter, ioFactoryKind, false);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @param failOnDuplicateKeys fail the loading when seeing duplicate keys.
    * @return a {@link PropertiesConfiguration} instance.
    */
