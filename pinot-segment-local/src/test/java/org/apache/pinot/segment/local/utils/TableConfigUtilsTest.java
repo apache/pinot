@@ -76,7 +76,10 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -1052,9 +1055,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on RAW encoding type");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create FST index on column: myCol1, it can only be applied to dictionary encoded single value "
-              + "string columns");
+      Assert.assertEquals(e.getMessage(), "Cannot create FST index on column: myCol1 without dictionary");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1065,9 +1066,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on multi value column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create FST index on column: myCol2, it can only be applied to dictionary encoded single value "
-              + "string columns");
+      Assert.assertEquals(e.getMessage(), "Cannot create FST index on multi-value column: myCol2");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1078,9 +1077,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on non String column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create FST index on column: intCol, it can only be applied to dictionary encoded single value "
-              + "string columns");
+      Assert.assertEquals(e.getMessage(), "Cannot create FST index on column: intCol of stored type other than STRING");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1093,7 +1090,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail since TEXT index is enabled on non String column");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Cannot create text index on column: intCol, it can only be applied to string columns");
+          "Cannot create TEXT index on column: intCol of stored type other than STRING");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1105,8 +1102,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since field name is not present in schema");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Column: myCol21 defined in field config list must be a valid column defined in the schema");
+      Assert.assertEquals(e.getMessage(), "Failed to find column: myCol21 in schema");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1117,7 +1113,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since dictionary encoding does not support compression codec SNAPPY");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Compression codec: SNAPPY is not applicable to dictionary encoded index");
+      Assert.assertEquals(e.getMessage(),
+          "Compression codec: SNAPPY is not applicable to dictionary encoded column: intCol");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1128,7 +1125,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since raw encoding does not support compression codec MV_ENTRY_DICT");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Compression codec: MV_ENTRY_DICT is not applicable to raw index");
+      Assert.assertEquals(e.getMessage(), "Compression codec: MV_ENTRY_DICT is not applicable to raw column: intCol");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1169,7 +1166,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Dictionary override optimization options (OptimizeDictionary, "
-          + "optimizeDictionaryForMetrics) not supported with forward index for column: myCol2, disabled");
+          + "optimizeDictionaryForMetrics) not supported with forward index disabled for column: myCol2");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1188,19 +1185,21 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol1")).setInvertedIndexColumns(Arrays.asList("myCol2"))
-        .setSortedColumn("myCol2").build();
+        .setNoDictionaryColumns(List.of("myCol2"))
+        .setInvertedIndexColumns(List.of("myCol1"))
+        .setSortedColumn("myCol1")
+        .build();
     try {
       // Enable forward index disabled flag for a column with inverted index and is sorted
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       FieldConfig fieldConfig =
-          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
+          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
               null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      Assert.fail("Should not fail for myCol2 with forward index disabled but is sorted, this is a no-op");
+      Assert.fail("Should not fail for myCol1 with forward index disabled but is sorted, this is a no-op");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1219,7 +1218,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail for MV myCol2 with forward index disabled but has range and inverted index");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Feature not supported for multi-value columns with range index. "
-          + "Cannot disable forward index for column myCol2. Disable range index on this column to use this feature.");
+          + "Cannot disable forward index for column: myCol2. Disable range index on this column to use this feature.");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1238,7 +1237,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail for SV myCol1 with forward index disabled but has range v1 and inverted index");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Feature not supported for single-value columns with range index version "
-          + "< 2. Cannot disable forward index for column myCol1. Either disable range index or create range index "
+          + "< 2. Cannot disable forward index for column: myCol1. Either disable range index or create range index "
           + "with version >= 2 to use this feature.");
     }
 
@@ -1255,8 +1254,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create an Inverted index on column myCol2 specified in the noDictionaryColumns config");
+      Assert.assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
     }
 
     // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
@@ -1270,8 +1268,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create inverted index on column: myCol2, it can only be applied to dictionary encoded columns");
+      Assert.assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1287,9 +1284,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Cannot create FST index on column: myCol2, it can only be applied to dictionary encoded single value "
-              + "string columns");
+      Assert.assertEquals(e.getMessage(), "Cannot create FST index on column: myCol2 without dictionary");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1322,7 +1317,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Cannot disable forward index for column intCol, as the table type is REALTIME.");
+          "Cannot disable forward index for column: intCol, as the table type is REALTIME");
     }
   }
 
@@ -1640,7 +1635,7 @@ public class TableConfigUtilsTest {
     Assert.assertTrue(e.getMessage().contains("Duplicate function column pair"));
 
     starTreeIndexConfig =
-        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), List.of("DISTINCTCOUNTHLL__myCol"),
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("DISTINCTCOUNTHLL__myCol"),
             List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
                 null, null, null, null, null)), 1);
     TableConfig tableConfig2 = new TableConfigBuilder(TableType.OFFLINE)
@@ -1648,11 +1643,11 @@ public class TableConfigUtilsTest {
         .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
         .build();
     e = Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig2, schema));
-    Assert.assertTrue(e.getMessage()
-        .contains("Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified"));
+    Assert.assertEquals(e.getMessage(),
+        "Either 'functionColumnPairs' or 'aggregationConfigs' must be specified, but not both");
 
     starTreeIndexConfig =
-        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), null,
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), null,
             List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
                 null, null, null, null, null),
                 new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
@@ -2568,6 +2563,74 @@ public class TableConfigUtilsTest {
           + "and replicaGroupPartitionConfig are set");
     } catch (IllegalStateException ignored) {
     }
+  }
+
+  @Test
+  public void testValidateImplicitRealtimeTablePartitionSelectorConfigs() {
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    when(instanceAssignmentConfig.getPartitionSelector()).thenReturn(
+        InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig));
+    assertTrue(
+        e.getMessage().contains("IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for REALTIME tables"));
+
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        Mockito.mock(InstanceReplicaGroupPartitionConfig.class);
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(true);
+    when(instanceAssignmentConfig.getReplicaGroupPartitionConfig()).thenReturn(instanceReplicaGroupPartitionConfig);
+    TableConfig tableConfig2 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig2));
+    assertTrue(e.getMessage()
+        .contains(
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used for CONSUMING instance partitions type"));
+
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(false);
+    when(instanceAssignmentConfig.getReplicaGroupPartitionConfig()).thenReturn(instanceReplicaGroupPartitionConfig);
+    TableConfig tableConfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig3));
+    assertTrue(e.getMessage()
+        .contains(
+            "IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR can only be used with replica group based instance "
+                + "assignment"));
+
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(true);
+    when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(1);
+    TableConfig tableConfig4 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig4));
+    assertTrue(e.getMessage()
+        .contains("numPartitions should not be explicitly set when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR"));
+
+    when(instanceReplicaGroupPartitionConfig.isReplicaGroupBased()).thenReturn(true);
+    when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(0);
+    when(instanceReplicaGroupPartitionConfig.getNumInstancesPerPartition()).thenReturn(2);
+    TableConfig tableConfig5 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig5));
+    assertTrue(e.getMessage()
+        .contains("numInstancesPerPartition must be 1 when using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR"));
+
+    when(instanceReplicaGroupPartitionConfig.getNumPartitions()).thenReturn(0);
+    when(instanceReplicaGroupPartitionConfig.getNumInstancesPerPartition()).thenReturn(0);
+    TableConfig tableConfig6 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+    TableConfigUtils.validateInstanceAssignmentConfigs(tableConfig6);
   }
 
   private Map<String, String> getStreamConfigs() {

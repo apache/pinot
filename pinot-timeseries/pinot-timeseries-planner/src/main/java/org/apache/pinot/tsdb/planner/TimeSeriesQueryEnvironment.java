@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.tsdb.planner.physical.TableScanVisitor;
@@ -75,7 +76,8 @@ public class TimeSeriesQueryEnvironment {
         throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
       }
     }
-    TableScanVisitor.INSTANCE.init(_routingManager);
+    // TODO(timeseries): Add support for logical tables in the future.
+    TableScanVisitor.INSTANCE.init(_routingManager, new ImplicitHybridTableRouteProvider(), _tableCache);
   }
 
   public TimeSeriesLogicalPlanResult buildLogicalPlan(RangeTimeSeriesRequest request) {
@@ -87,6 +89,9 @@ public class TimeSeriesQueryEnvironment {
 
   public TimeSeriesDispatchablePlan buildPhysicalPlan(RangeTimeSeriesRequest timeSeriesRequest,
       RequestContext requestContext, TimeSeriesLogicalPlanResult logicalPlan) {
+    // Step-0: Add table type info to the logical plan.
+    logicalPlan = new TimeSeriesLogicalPlanResult(TableScanVisitor.INSTANCE.addTableTypeInfoToPlan(
+      logicalPlan.getPlanNode()), logicalPlan.getTimeBuckets());
     // Step-1: Assign segments to servers for each leaf node.
     TableScanVisitor.Context scanVisitorContext = TableScanVisitor.createContext(requestContext.getRequestId());
     TableScanVisitor.INSTANCE.assignSegmentsToPlan(logicalPlan.getPlanNode(), logicalPlan.getTimeBuckets(),

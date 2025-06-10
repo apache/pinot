@@ -201,10 +201,10 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
               bufferView(buffer, header._variableSizeDataStart + offset, header._variableSizeDataLength));
         case METADATA: {
           Map<Integer, String> exceptions = deserializeExceptions(stream, header);
+          List<DataBuffer> metadata = deserializeMetadata(buffer, header);
           if (!exceptions.isEmpty()) {
-            return MetadataBlock.newError(exceptions);
+            return MetadataBlock.newErrorWithStats(exceptions, metadata);
           } else {
-            List<DataBuffer> metadata = deserializeMetadata(buffer, header);
             return new MetadataBlock(metadata);
           }
         }

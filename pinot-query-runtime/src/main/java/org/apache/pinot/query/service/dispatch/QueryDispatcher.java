@@ -68,7 +68,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -79,10 +78,11 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesBrokerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
@@ -579,20 +579,13 @@ public class QueryDispatcher {
       long timeoutMs,
       Map<String, String> queryOptions,
       MailboxService mailboxService) {
-
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
     PlanFragment planFragment = stagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
-
-    Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
-        "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
-
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
     List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
-
     Preconditions.checkState(workerMetadata.size() == 1,
         "Expecting single worker for reduce stage, got: %s", workerMetadata.size());
 
@@ -603,7 +596,7 @@ public class QueryDispatcher {
             workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
-    DataSchema sourceSchema = receiveNode.getDataSchema();
+    DataSchema sourceSchema = rootNode.getDataSchema();
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
@@ -617,8 +610,9 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(executionContext, receiveNode)) {
-      block = receiveOperator.nextBlock();
+    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+      MultiStageOperator rootOperator = opChain.getRoot();
+      block = rootOperator.nextBlock();
       while (block.isData()) {
         DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
         int numRows = dataBlock.getNumberOfRows();
@@ -637,9 +631,9 @@ public class QueryDispatcher {
             resultRows.add(row);
           }
         }
-        block = receiveOperator.nextBlock();
+        block = rootOperator.nextBlock();
       }
-      queryStats = receiveOperator.calculateStats();
+      queryStats = rootOperator.calculateStats();
     }
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isError()) {

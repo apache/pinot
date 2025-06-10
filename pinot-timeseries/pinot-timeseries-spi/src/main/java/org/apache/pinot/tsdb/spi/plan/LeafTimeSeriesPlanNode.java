@@ -76,6 +76,11 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
         _filterExpression, _valueExpression, newAggInfo, _groupByExpressions, _limit, _queryOptions);
   }
 
+  public LeafTimeSeriesPlanNode withTableName(String newTableName) {
+    return new LeafTimeSeriesPlanNode(_id, _inputs, newTableName, _timeColumn, _timeUnit, _offsetSeconds,
+        _filterExpression, _valueExpression, _aggInfo, _groupByExpressions, _limit, _queryOptions);
+  }
+
   @Override
   public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
     return new LeafTimeSeriesPlanNode(_id, newInputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,

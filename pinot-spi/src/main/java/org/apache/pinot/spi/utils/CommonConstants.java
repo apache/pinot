@@ -632,13 +632,25 @@ public class CommonConstants {
         // records to stream partitions, which can make a segment have multiple partitions. The scale of this is
         // usually low, and this query option allows the MSE Optimizer to infer the partition of a segment based on its
         // name, when that segment has multiple partitions in its columnPartitionMap.
+        @Deprecated
         public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
+        // For realtime tables, this infers the segment partition for all segments. The partition column, function,
+        // and number of partitions still rely on the Table's segmentPartitionConfig. This is useful if you have
+        // scenarios where the stream doesn't guarantee 100% accuracy for stream partition assignment. In such
+        // scenarios, if you don't have upsert compaction enabled, inferInvalidSegmentPartition will suffice. But when
+        // you have compaction enabled, it's possible that after compaction you are only left with invalid partition
+        // records, which can change the partition of a segment from something like [1, 3, 5] to [5], for a segment
+        // that was supposed to be in partition-1.
+        public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
         //   a table config to enable broker pruning (it is disabled by default).
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
+        // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
+        // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
+        public static final String RUN_IN_BROKER = "runInBroker";
       }
 
       public static class QueryOptionValue {
