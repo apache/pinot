@@ -295,6 +295,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             finalSql));
   }
 
+  @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
+  public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      throws Exception {
+    final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
+    runQuery(finalSql, expect, false).ifPresent(
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder, testCaseName,
+            finalSql));
+  }
+
   private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
 
     Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();

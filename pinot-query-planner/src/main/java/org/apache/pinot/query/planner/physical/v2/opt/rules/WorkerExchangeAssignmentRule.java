@@ -36,6 +36,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.Join;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
@@ -47,7 +48,6 @@ import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.mapping.DistMappingGenerator;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
-import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -328,8 +328,8 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     Preconditions.checkState(relDistribution.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
         "Unexpected distribution constraint: %s", relDistribution.getType());
-    Preconditions.checkState(parent instanceof PhysicalJoin, "Expected parent to be join. Found: %s", parent);
-    PhysicalJoin parentJoin = (PhysicalJoin) parent;
+    Preconditions.checkState(parent instanceof Join, "Expected parent to be join. Found: %s", parent);
+    Join parentJoin = (Join) parent;
     // TODO(mse-physical): add support for sub-partitioning and coalescing exchange.
     HashDistributionDesc hashDistToMatch = getLeftInputHashDistributionDesc(parentJoin).orElseThrow();
     if (assumedDistribution.satisfies(relDistribution)) {
@@ -380,9 +380,10 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     return _physicalPlannerContext.getNodeIdGenerator().get();
   }
 
-  private Optional<HashDistributionDesc> getLeftInputHashDistributionDesc(PhysicalJoin join) {
+  private Optional<HashDistributionDesc> getLeftInputHashDistributionDesc(Join join) {
     List<Integer> leftKeys = join.analyzeCondition().leftKeys;
-    return join.getPRelInput(0).getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
+    PRelNode asPRelNode = (PRelNode) join;
+    return asPRelNode.getPRelInput(0).getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
         .filter(desc -> desc.getKeys().equals(leftKeys))
         .findFirst();
   }
