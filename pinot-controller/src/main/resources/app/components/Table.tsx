@@ -72,7 +72,8 @@ type Props = {
     toggleName: string;
     toggleValue: boolean;
   },
-  tooltipData?: string[]
+  tooltipData?: string[],
+  additionalControls?: React.ReactNode
 };
 
 // These sort functions are applied to any columns with these names. Otherwise, we just
@@ -281,7 +282,8 @@ export default function CustomizedTables({
   inAccordionFormat,
   regexReplace,
   accordionToggleObject,
-  tooltipData
+  tooltipData,
+  additionalControls
 }: Props) {
   // Separate the initial and final data into two separated state variables.
   // This way we can filter and sort the data without affecting the original data.
@@ -603,6 +605,7 @@ export default function CustomizedTables({
           searchValue={search}
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
+          additionalControls={additionalControls}
         />
         {renderTableComponent()}
       </>
@@ -619,6 +622,7 @@ export default function CustomizedTables({
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
           accordionToggleObject={accordionToggleObject}
+          additionalControls={additionalControls}
         >
           {renderTableComponent()}
         </SimpleAccordion>

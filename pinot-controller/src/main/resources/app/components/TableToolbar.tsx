@@ -33,6 +33,7 @@ type Props = {
   recordCount?: number;
   showTooltip?: boolean;
   tooltipText?: string;
+  additionalControls?: React.ReactNode;
 };
 
 const useToolbarStyles = makeStyles((theme) => ({
@@ -58,7 +59,8 @@ export default function TableToolbar({
   handleSearch,
   recordCount,
   showTooltip,
-  tooltipText
+  tooltipText,
+  additionalControls
 }: Props) {
   const classes = useToolbarStyles();
 
@@ -72,10 +74,15 @@ export default function TableToolbar({
       >
         {name.toUpperCase()}
       </Typography>
-      {showSearchBox ? <SearchBar
-        value={searchValue}
-        onChange={(e) => handleSearch(e.target.value)}
-      /> : <strong>{(recordCount)}</strong>}
+      {showSearchBox ? (
+        <SearchBar
+          value={searchValue}
+          onChange={(e) => handleSearch(e.target.value)}
+        />
+      ) : (
+        <strong>{recordCount}</strong>
+      )}
+      {additionalControls}
       {showTooltip &&
         <Tooltip title={tooltipText}>
           <HelpOutlineIcon />

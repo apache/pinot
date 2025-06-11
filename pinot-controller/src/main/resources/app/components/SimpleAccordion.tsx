@@ -71,7 +71,8 @@ type Props = {
     toggleName: string;
     toggleValue: boolean;
   },
-  detailsContainerClass?: string
+  detailsContainerClass?: string,
+  additionalControls?: React.ReactNode
 };
 
 export default function SimpleAccordion({
@@ -83,7 +84,8 @@ export default function SimpleAccordion({
   recordCount,
   children,
   accordionToggleObject,
-  detailsContainerClass
+  detailsContainerClass,
+  additionalControls
 }: Props) {
   const classes = useStyles();
 
@@ -120,13 +122,13 @@ export default function SimpleAccordion({
         }
       </AccordionSummary>
       <AccordionDetails className={clsx(classes.details, detailsContainerClass)}>
-        {showSearchBox ?
+        {showSearchBox ? (
           <SearchBar
-            // searchOnRight={true}
             value={searchValue}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          : null}
+        ) : null}
+        {additionalControls}
         {children}
       </AccordionDetails>
     </Accordion>
