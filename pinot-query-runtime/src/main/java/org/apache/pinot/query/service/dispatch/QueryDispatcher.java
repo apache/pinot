@@ -166,7 +166,7 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      return runReducerFromQueryThread(dispatchableSubPlan, queryOptions, _mailboxService);
     } catch (Exception ex) {
       return tryRecover(context.getRequestId(), servers, ex);
     } catch (Throwable e) {
@@ -447,6 +447,8 @@ public class QueryDispatcher {
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID, cid);
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+        Long.toString(QueryThreadContext.getPassiveDeadlineMs()));
     requestMetadata.putAll(queryOptions);
     return requestMetadata;
   }
@@ -572,15 +574,30 @@ public class QueryDispatcher {
     return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
   }
 
+  private static QueryResult runReducerFromQueryThread(
+      DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions,
+      MailboxService mailboxService
+  ) {
+    return runReducer(
+        QueryThreadContext.getRequestId(),
+        subPlan,
+        QueryThreadContext.getActiveDeadlineMs(),
+        QueryThreadContext.getPassiveDeadlineMs(),
+        queryOptions,
+        mailboxService
+    );
+  }
+
   // There is no reduction happening here, results are simply concatenated.
   @VisibleForTesting
   public static QueryResult runReducer(long requestId,
       DispatchableSubPlan subPlan,
-      long timeoutMs,
+      long activeDeadlineMs,
+      long passiveDeadlineMs,
       Map<String, String> queryOptions,
       MailboxService mailboxService) {
     long startTimeMs = System.currentTimeMillis();
-    long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
     PlanFragment planFragment = stagePlan.getPlanFragment();
@@ -592,8 +609,8 @@ public class QueryDispatcher {
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext, true);
+        new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs,
+            queryOptions, stageMetadata, workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();
