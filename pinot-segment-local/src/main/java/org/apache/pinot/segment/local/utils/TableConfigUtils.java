@@ -707,6 +707,14 @@ public final class TableConfigUtils {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
+    // primary key columns are not of multi-value type
+    for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(primaryKeyColumn);
+      if (fieldSpec != null) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("Upsert/Dedup primary key column: %s cannot be of multi-value type", primaryKeyColumn));
+      }
+    }
     // replica group is configured for routing
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
