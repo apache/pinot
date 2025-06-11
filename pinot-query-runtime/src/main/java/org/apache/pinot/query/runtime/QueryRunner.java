@@ -288,8 +288,11 @@ public class QueryRunner {
       Map<String, String> rlsFilters =
           requestMetadata.entrySet().stream().filter(e -> e.getKey().startsWith(CommonConstants.RLS_FILTERS))
               .collect(Collectors.toMap(e -> e.getKey().split("-")[1], Map.Entry::getValue));
+      System.out.println("Request metadata for the request is: " + requestMetadata);
+      System.out.println("RLS filters for the request is: " + rlsFilters);
       opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService, rlsFilters);
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+              rlsFilters);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
