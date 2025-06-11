@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.broker.api;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
@@ -29,8 +25,6 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
-import org.apache.pinot.spi.auth.MultiTableRowColAuthResult;
-import org.apache.pinot.spi.auth.MultiTableRowColAuthResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAuthResult;
 import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
@@ -138,22 +132,5 @@ public interface AccessControl extends FineGrainedAccessControl {
    */
   default TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
     return TableRowColAuthResultImpl.unrestricted();
-  }
-
-  /**
-   * Convenience method to get RLS/CLS filters for a set of tables. By default, we iterate through each table and do
-   * the check using {@link AccessControl#getRowColFilters(RequesterIdentity, String)} and construct the final
-   * response by returning an instance of {@link MultiTableRowColAuthResult}
-   * @param requesterIdentity requester identity
-   * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
-   * @return {@link MultiTableRowColAuthResult} with the result of the access control check.
-   */
-  default MultiTableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, Set<String> tables) {
-    Map<String, Map<String, List<String>>> rlsFilters = new HashMap<>();
-    for (String table : tables) {
-      Optional<Map<String, List<String>>> rlsFiltersMaybe = getRowColFilters(requesterIdentity, table).getRLSFilters();
-      rlsFiltersMaybe.ifPresent(rlsFilterList -> rlsFilters.put(table, rlsFilterList));
-    }
-    return new MultiTableRowColAuthResultImpl(rlsFilters);
   }
 }

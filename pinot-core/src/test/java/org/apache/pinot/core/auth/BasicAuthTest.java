@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.auth;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -29,38 +33,42 @@ public class BasicAuthTest {
   @Test
   public void testBasicAuthPrincipal() {
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("READ"))
+        ImmutableSet.of("READ"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable"));
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
-        Collections.emptySet(), ImmutableSet.of("Read"))
+        Collections.emptySet(), ImmutableSet.of("Read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable1"));
     Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable1"));
     Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
-        Collections.emptySet(), ImmutableSet.of("read"))
+        Collections.emptySet(), ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable2"));
     Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable"),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable"));
     Assert.assertFalse(new BasicAuthPrincipal("name", "token", Collections.emptySet(), ImmutableSet.of("myTable"),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable"));
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable1"),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasTable("myTable"));
 
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("READ"))
+        ImmutableSet.of("READ"), Map.of("myTable", List.of("cityID > 100")))
         .hasPermission("read"));
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("Read"))
+        ImmutableSet.of("Read"), Map.of("myTable", List.of("cityID > 100")))
         .hasPermission("READ"));
     Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasPermission("Read"));
     Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
         .hasPermission("write"));
+
+    Assert.assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100")))
+        .getRLSFilters("myTable"), Optional.of(ImmutableList.of("cityID > 100")));
   }
 }

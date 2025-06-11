@@ -1,11 +1,9 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -20,6 +18,7 @@ public class RlsFiltersRewriter implements QueryRewriter {
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    System.out.println("Query options being written for pinot query: " + pinotQuery.getQueryOptions() + " and the query is " + pinotQuery.toString());
     if (!MapUtils.isEmpty(queryOptions)) {
       String tableName = pinotQuery.getDataSource().getTableName();
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
