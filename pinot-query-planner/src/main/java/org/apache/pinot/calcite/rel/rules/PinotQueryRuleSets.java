@@ -27,7 +27,6 @@ import org.apache.calcite.rel.rules.AggregateRemoveRule;
 import org.apache.calcite.rel.rules.AggregateUnionAggregateRule;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
-import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
@@ -113,8 +112,8 @@ public class PinotQueryRuleSets {
 
       // Consider semijoin optimizations first before push transitive predicate
       // Pinot version doesn't push predicates to the right in case of lookup join
-      // TODO: add description and constant for this
-      PinotJoinPushTransitivePredicatesRule.INSTANCE,
+      PinotJoinPushTransitivePredicatesRule
+          .instanceWithDescription(PlannerRuleNames.PINOT_JOIN_PUSH_TRANSITIVE_PREDICATES),
 
       // convert non-all union into all-union + distinct
       UnionToDistinctRule.Config.DEFAULT
@@ -131,7 +130,8 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.AGGREGATE_UNION_AGGREGATE).toRule(),
 
       // reduce SUM and AVG
-      // TODO: Consider not reduce at all.
+      // TODO: Consider not reduce at all. This can now be controlled by specifying
+      //    `plannerRule_skipAggregateReduceFunctions=true` in query option
       PinotAggregateReduceFunctionsRule
           .instanceWithDescription(PlannerRuleNames.PINOT_AGGREGATE_REDUCE_FUNCTIONS),
 
