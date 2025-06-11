@@ -325,6 +325,29 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
     setConfirmDialog(true);
   };
 
+  const handleResetSegmentClick = () => {
+    setDialogDetails({
+      title: 'Reset Segment',
+      content: 'Are you sure want to reset this segment?',
+      successCb: () => handleResetOp(),
+    });
+    setConfirmDialog(true);
+  };
+
+  const handleResetOp = async () => {
+    const result = await PinotMethodUtils.resetSegmentOp(
+      tableName,
+      segmentName
+    );
+    if (result.status) {
+      dispatch({ type: 'success', message: result.status, show: true });
+      fetchData();
+    } else {
+      dispatch({ type: 'error', message: result.error, show: true });
+    }
+    closeDialog();
+  };
+
   const handleReloadOp = async () => {
     const result = await PinotMethodUtils.reloadSegmentOp(
       tableName,
@@ -375,6 +398,15 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
                 enableTooltip={true}
               >
                 Reload Segment
+              </CustomButton>
+              <CustomButton
+                onClick={() => {
+                  handleResetSegmentClick();
+                }}
+                tooltipTitle="Reset the segment by disabling and enabling it"
+                enableTooltip={true}
+              >
+                Reset Segment
               </CustomButton>
             </div>
           </SimpleAccordion>
