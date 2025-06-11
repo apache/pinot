@@ -121,9 +121,10 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
     if (numQueryThreads > _semaphore.getTotalPermits()) {
       throw new RuntimeException(
           String.format("Can't dispatch query because the estimated number of server threads for this query is too "
-              + "large for the configured value of '"
-              + CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
-              + "'. estimatedThreads=%d configuredLimit=%d", numQueryThreads, _semaphore.getTotalPermits()));
+              + "large for the configured value of '%s' or '%s'. estimatedThreads=%d configuredLimit=%d",
+                  CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
+                  CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
+                  numQueryThreads, _semaphore.getTotalPermits()));
     }
 
     boolean result = _semaphore.tryAcquire(numQueryThreads, timeout, unit);
