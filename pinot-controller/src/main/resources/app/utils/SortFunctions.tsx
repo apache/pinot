@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import {TableSortFunction} from "Models";
+import {TableSortFunction, DISPLAY_SEGMENT_STATUS} from "Models";
 import app_state from "../app_state";
 
 
@@ -46,4 +46,22 @@ export const sortBytes: TableSortFunction = (a: any, b: any, column: string, ind
     } else {
         return valuesToResultNumber(aUnitIndex, bUnitIndex, order);
     }
+}
+
+export const sortSegmentStatus: TableSortFunction = (a: any, b: any, column: string, index: number, order: boolean) => {
+    const statusOrder = {
+        [DISPLAY_SEGMENT_STATUS.BAD]: 0,
+        [DISPLAY_SEGMENT_STATUS.UPDATING]: 1,
+        [DISPLAY_SEGMENT_STATUS.GOOD]: 2
+    } as Record<string, number>;
+    const getStatusValue = (record: any) => {
+        const cell = record[column+app_state.columnNameSeparator+index];
+        if (cell && typeof cell === 'object') {
+            return cell.value ?? '';
+        }
+        return cell ?? '';
+    };
+    const aStatus = statusOrder[getStatusValue(a)] ?? 99;
+    const bStatus = statusOrder[getStatusValue(b)] ?? 99;
+    return valuesToResultNumber(aStatus, bStatus, order);
 }

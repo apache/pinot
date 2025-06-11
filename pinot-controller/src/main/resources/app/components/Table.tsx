@@ -47,7 +47,7 @@ import { Link } from 'react-router-dom';
 import Chip from '@material-ui/core/Chip';
 import { get, has, orderBy } from 'lodash';
 import app_state from '../app_state';
-import { sortBytes, sortNumberOfSegments } from '../utils/SortFunctions'
+import { sortBytes, sortNumberOfSegments, sortSegmentStatus } from '../utils/SortFunctions'
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
@@ -83,6 +83,7 @@ let staticSortFunctions: Map<string, TableSortFunction> = new Map()
 staticSortFunctions.set("Number of Segments", sortNumberOfSegments);
 staticSortFunctions.set("Estimated Size", sortBytes);
 staticSortFunctions.set("Reported Size", sortBytes);
+staticSortFunctions.set("Status", sortSegmentStatus);
 
 const StyledTableRow = withStyles((theme) =>
   createStyles({

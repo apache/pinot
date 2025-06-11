@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip, FormControl, InputLabel, Select } from '@material-ui/core';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
@@ -157,6 +157,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const segmentListColumns = ['Segment Name', 'Status'];
   const loadingSegmentList = Utils.getLoadingTableData(segmentListColumns);
   const [segmentList, setSegmentList] = useState<TableData>(loadingSegmentList);
+  const [fullSegmentList, setFullSegmentList] = useState<TableData>(loadingSegmentList);
+  const [segmentStatusFilter, setSegmentStatusFilter] = useState<string>('ALL');
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -185,6 +187,20 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [isPauseActionInProgress, setIsPauseActionInProgress] = useState(false);
   const [pauseActionType, setPauseActionType] = useState<'pause' | 'resume' | null>(null);
   const pausePollingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!fullSegmentList || !fullSegmentList.records) return;
+    if (segmentStatusFilter === 'ALL') {
+      setSegmentList(fullSegmentList);
+    } else {
+      setSegmentList({
+        columns: fullSegmentList.columns,
+        records: fullSegmentList.records.filter(
+          (r) => r[1].value === segmentStatusFilter
+        ),
+      });
+    }
+  }, [segmentStatusFilter, fullSegmentList]);
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -248,6 +264,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       segmentTableRows.push([
         name,
         {
+          value: status,
           customRenderer: (
             <SegmentStatusRenderer
               segmentName={name}
@@ -258,7 +275,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         },
       ])
     );
-    setSegmentList({columns, records: segmentTableRows});
+    const tableData = {columns, records: segmentTableRows};
+    setFullSegmentList(tableData);
+    setSegmentList(tableData);
   };
 
 
@@ -867,6 +886,22 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 />
               </SimpleAccordion>
               </div>
+            <Box mb={1} display="flex" justifyContent="flex-end">
+              <FormControl variant="outlined" size="small">
+                <InputLabel id="segment-status-filter-label">State</InputLabel>
+                <Select
+                  labelId="segment-status-filter-label"
+                  value={segmentStatusFilter}
+                  onChange={(e) => setSegmentStatusFilter(e.target.value as string)}
+                  label="State"
+                >
+                  <MenuItem value="ALL">All</MenuItem>
+                  <MenuItem value={DISPLAY_SEGMENT_STATUS.GOOD}>Good</MenuItem>
+                  <MenuItem value={DISPLAY_SEGMENT_STATUS.UPDATING}>Updating</MenuItem>
+                  <MenuItem value={DISPLAY_SEGMENT_STATUS.BAD}>Bad</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
               data={segmentList}
