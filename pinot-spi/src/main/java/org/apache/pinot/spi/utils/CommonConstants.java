@@ -677,6 +677,7 @@ public class CommonConstants {
       public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTransposeRule";
       public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTransposeRule";
       public static final String PINOT_JOIN_CONDITION_PUSH = "JoinConditionPushRule";
+      public static final String PINOT_JOIN_PUSH_TRANSITIVE_PREDICATES = "JoinPushTransitivePredicates";
       public static final String PROJECT_REMOVE = "ProjectRemoveRule";
       public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindowRule";
       public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTransposeRule";
@@ -691,7 +692,6 @@ public class CommonConstants {
       public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregateRule";
       public static final String PINOT_AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctionsRule";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilterRule";
-      public static final String FILTER_INTO_JOIN = "FilterIntoJoinRule";
       public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTransposeRule";
       public static final String PROJECT_MERGE = "ProjectMergeRule";
       public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMergeRule";
