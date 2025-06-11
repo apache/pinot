@@ -92,6 +92,9 @@ public class ControllerConf extends PinotConfiguration {
   // Consider tierConfigs when assigning new offline segment
   public static final String CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT = "controller.segment.enableTieredAssignment";
 
+  // Used to determine whether to use group commit idealstate on segment completion
+  public static final String CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED =
+      "controller.segment.completion.group.commit.enabled";
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
   }
@@ -1364,5 +1367,9 @@ public class ControllerConf extends PinotConfiguration {
         .map(String::trim)
         .filter(lang -> !lang.isEmpty())
         .collect(Collectors.toList());
+  }
+
+  public boolean getSegmentCompletionGroupCommitEnabled() {
+    return getProperty(CONTROLLER_SEGMENT_COMPLETION_GROUP_COMMIT_ENABLED, true);
   }
 }

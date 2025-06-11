@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
@@ -33,6 +29,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -41,166 +38,17 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- * IdealStateGroupCommit is a utility class to commit group updates to IdealState.
- * It is designed to be used in a multi-threaded environment where multiple threads
- * may try to update the same IdealState concurrently.
- * The implementation is shamelessly borrowed from (<a href=
- * "https://github.com/apache/helix/blob/helix-1.4.1/helix-core/src/main/java/org/apache/helix/GroupCommit.java"
- * >HelixGroupCommit</a>).
- * This is especially useful for updating large IdealState, which each update may
- * take a long time, e.g. to update one IdealState with 100k segments may take
- * ~4 seconds, then 15 updates will take 1 minute and cause other requests
- * (e.g. Segment upload, realtime segment commit, segment deletion, etc) timeout.
+ * A utility class for committing ideal states in a single commit operation.
  */
-public class IdealStateGroupCommit {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommit.class);
-
-  private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
+public class IdealStateSingleCommit {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateSingleCommit.class);
   private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
+  private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
+  private static final int _minNumCharsInISToTurnOnCompression = -1;
+  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
-  private static int _minNumCharsInISToTurnOnCompression = -1;
-
-  private static class Queue {
-    final AtomicReference<Thread> _running = new AtomicReference<Thread>();
-    final ConcurrentLinkedQueue<Entry> _pending = new ConcurrentLinkedQueue<Entry>();
-  }
-
-  private static class Entry {
-    final String _resourceName;
-    final Function<IdealState, IdealState> _updater;
-    IdealState _updatedIdealState = null;
-    AtomicBoolean _sent = new AtomicBoolean(false);
-    Throwable _exception;
-
-    Entry(String resourceName, Function<IdealState, IdealState> updater) {
-      _resourceName = resourceName;
-      _updater = updater;
-    }
-  }
-
-  private final Queue[] _queues = new Queue[100];
-
-  /**
-   * Set up a group committer and its associated queues
-   */
-  public IdealStateGroupCommit() {
-    // Don't use Arrays.fill();
-    for (int i = 0; i < _queues.length; i++) {
-      _queues[i] = new Queue();
-    }
-  }
-
-  private Queue getQueue(String resourceName) {
-    return _queues[(resourceName.hashCode() & Integer.MAX_VALUE) % _queues.length];
-  }
-
-  public static synchronized void setMinNumCharsInISToTurnOnCompression(int minNumChars) {
-    _minNumCharsInISToTurnOnCompression = minNumChars;
-  }
-
-  /**
-   * Do a group update for idealState associated with a given resource key
-   * @param helixManager helixManager with the ability to pull from the current data\
-   * @param resourceName the resource name to be updated
-   * @param updater the idealState updater to be applied
-   * @return IdealState if the update is successful, exception if the update fails and null if interrupted while
-   * committing change
-   */
-  public IdealState commit(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater,
-      RetryPolicy retryPolicy, boolean noChangeOk) {
-    Queue queue = getQueue(resourceName);
-    Entry entry = new Entry(resourceName, updater);
-
-    queue._pending.add(entry);
-    LOGGER.info("The queue size for resource {} is {}", resourceName, queue._pending.size());
-    while (!entry._sent.get()) {
-      if (queue._running.compareAndSet(null, Thread.currentThread())) {
-        ArrayList<Entry> processed = new ArrayList<>();
-        try {
-          if (queue._pending.peek() == null) {
-            // All pending entries have been processed, the updatedIdealState should be set.
-            return entry._updatedIdealState;
-          }
-          IdealState response = updateIdealState(helixManager, resourceName, idealState -> {
-            IdealState updatedIdealState = idealState;
-            if (!processed.isEmpty()) {
-              queue._pending.addAll(processed);
-              processed.clear();
-            }
-            Iterator<Entry> it = queue._pending.iterator();
-            while (it.hasNext()) {
-              Entry ent = it.next();
-              if (!ent._resourceName.equals(resourceName)) {
-                continue;
-              }
-              processed.add(ent);
-              it.remove();
-              updatedIdealState = ent._updater.apply(updatedIdealState);
-              ent._updatedIdealState = updatedIdealState;
-              ent._exception = null;
-            }
-            return updatedIdealState;
-          }, retryPolicy, noChangeOk);
-          if (response == null) {
-            RuntimeException ex = new RuntimeException("Failed to update IdealState");
-            for (Entry ent : processed) {
-              ent._exception = ex;
-              ent._updatedIdealState = null;
-            }
-            throw ex;
-          }
-        } catch (Throwable e) {
-          // If there is an exception, set the exception for all processed entries
-          for (Entry ent : processed) {
-            ent._exception = e;
-            ent._updatedIdealState = null;
-          }
-          throw e;
-        } finally {
-          queue._running.set(null);
-          for (Entry e : processed) {
-            synchronized (e) {
-              e._sent.set(true);
-              e.notify();
-            }
-          }
-        }
-      } else {
-        synchronized (entry) {
-          try {
-            entry.wait(10);
-          } catch (InterruptedException e) {
-            LOGGER.error("Interrupted while committing change, resourceName: " + resourceName + ", updater: " + updater,
-                e);
-            // Restore interrupt status
-            Thread.currentThread().interrupt();
-            return null;
-          }
-        }
-      }
-    }
-    if (entry._exception != null) {
-      throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName,
-          entry._exception);
-    }
-    return entry._updatedIdealState;
-  }
-
-  private static class IdealStateWrapper {
-    IdealState _idealState;
-  }
-
-  /**
-   * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
-   *
-   * @param helixManager The HelixManager used to interact with the Helix cluster
-   * @param resourceName The resource for which to update the ideal state
-   * @param updater A function that returns an updated ideal state given an input ideal state
-   * @return updated ideal state if successful, null if not
-   */
-  private static IdealState updateIdealState(HelixManager helixManager, String resourceName,
+  public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy policy, boolean noChangeOk) {
     // NOTE: ControllerMetrics could be null because this method might be invoked by Broker.
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
@@ -217,7 +65,8 @@ public class IdealStateGroupCommit {
           // Make a copy of the idealState above to pass it to the updater
           // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
           // list fields
-          IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
+          IdealState idealStateCopy = cloneIdealState(idealState);
+
           IdealState updatedIdealState;
           try {
             updatedIdealState = updater.apply(idealStateCopy);
@@ -295,7 +144,7 @@ public class IdealStateGroupCommit {
               numChars += entry.getValue().length();
             }
             numChars *= is.getNumPartitions();
-            return _minNumCharsInISToTurnOnCompression > 0 && numChars > _minNumCharsInISToTurnOnCompression;
+            return (_minNumCharsInISToTurnOnCompression > 0) && (numChars > _minNumCharsInISToTurnOnCompression);
           }
           return false;
         }
@@ -304,14 +153,22 @@ public class IdealStateGroupCommit {
         controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_RETRY, retries);
         controllerMetrics.addTimedValue(resourceName, ControllerTimer.IDEAL_STATE_UPDATE_TIME_MS,
             System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS, 1L);
       }
       return idealStateWrapper._idealState;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       if (controllerMetrics != null) {
         controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
       }
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }
+  }
+
+  private static class IdealStateWrapper {
+    IdealState _idealState;
+  }
+
+  public static IdealState cloneIdealState(IdealState idealState) {
+    return new IdealState(
+        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
   }
 }

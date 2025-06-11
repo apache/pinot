@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Maps;
@@ -83,6 +84,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.IdealStateSingleCommit;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -1385,7 +1387,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+    Function<IdealState, IdealState> updater = idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -1406,7 +1408,13 @@ public class PinotLLCRealtimeSegmentManager {
           isTablePaused(idealState) || isTopicPaused(idealState, committingSegmentName) ? null : newSegmentName,
           segmentAssignment, instancePartitionsMap);
       return idealState;
-    }, DEFAULT_RETRY_POLICY);
+    };
+    if (_controllerConf.getSegmentCompletionGroupCommitEnabled()) {
+      return HelixHelper.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY);
+    }
+    LOGGER.info("Updating the ideal state for table: {}, committing segment: {}, new consuming segment: {}",
+        realtimeTableName, committingSegmentName, newSegmentName);
+    return IdealStateSingleCommit.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY, false);
   }
 
   public static boolean isTablePaused(IdealState idealState) {
