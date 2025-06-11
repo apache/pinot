@@ -335,17 +335,23 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const handleResetOp = async () => {
-    const result = await PinotMethodUtils.resetSegmentOp(
-      tableName,
-      segmentName
-    );
-    if (result.status) {
-      dispatch({ type: 'success', message: result.status, show: true });
-      fetchData();
-    } else {
-      dispatch({ type: 'error', message: result.error, show: true });
+    try {
+      const result = await PinotMethodUtils.resetSegmentOp(
+        tableName,
+        segmentName
+      );
+      if (result.status) {
+        dispatch({ type: 'success', message: result.status, show: true });
+        fetchData();
+      } else {
+        dispatch({ type: 'error', message: result.error, show: true });
+      }
+    } catch (error) {
+      console.error('Error resetting segment:', error);
+      dispatch({ type: 'error', message: 'Failed to reset segment. Please try again later.', show: true });
+    } finally {
+      closeDialog();
     }
-    closeDialog();
   };
 
   const handleReloadOp = async () => {
