@@ -29,6 +29,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -961,29 +963,28 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testGetNonExistentTableConfig() {
+  public void testGetNonExistentTableConfig()
+      throws IOException {
     // Attempt to get a non-existent table config
     String tableName = "nonExistentTable";
     String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName);
-    String msg = expectThrows(IOException.class, () -> sendGetRequest(url)).getMessage();
-    assertTrue(
-        msg.contains("Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable does not exist\""),
-        msg);
+    Pair<Integer, String> respWithStatusCode = sendGetRequestWithStatusCode(url, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    String msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable does not exist"), msg);
 
     // Attempt to get a non-existent table config with type
     String offlineUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.OFFLINE);
-    msg = expectThrows(IOException.class, () -> sendGetRequest(offlineUrl)).getMessage();
-    assertTrue(
-        msg.contains(
-            "Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable_OFFLINE does not exist\""),
-        msg);
+    respWithStatusCode = sendGetRequestWithStatusCode(offlineUrl, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable_OFFLINE does not exist"), msg);
 
     String realtimeUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.REALTIME);
-    msg = expectThrows(IOException.class, () -> sendGetRequest(realtimeUrl)).getMessage();
-    assertTrue(
-        msg.contains(
-            "Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable_REALTIME does not exist\""),
-        msg);
+    respWithStatusCode = sendGetRequestWithStatusCode(realtimeUrl, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable_REALTIME does not exist"), msg);
   }
 
   /**

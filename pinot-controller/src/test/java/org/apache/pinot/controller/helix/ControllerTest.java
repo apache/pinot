@@ -1014,6 +1014,23 @@ public class ControllerTest {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
+  /**
+   * Sends a GET request to the specified URL and returns the status code along with the stringified response.
+   * @param urlString the URL to send the GET request
+   * @param headers the headers to include in the GET request
+   * @return a Pair containing the status code and the stringified response
+   */
+  public static Pair<Integer, String> sendGetRequestWithStatusCode(String urlString, Map<String, String> headers)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendGetRequest(new URL(urlString).toURI(), headers);
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public static String sendPostRequest(String urlString)
       throws IOException {
     return sendPostRequest(urlString, null);
