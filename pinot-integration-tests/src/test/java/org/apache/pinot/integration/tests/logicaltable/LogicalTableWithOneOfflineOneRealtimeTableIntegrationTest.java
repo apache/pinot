@@ -21,8 +21,6 @@ package org.apache.pinot.integration.tests.logicaltable;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest extends BaseLogicalTableIntegrationTest {
@@ -42,26 +40,5 @@ public class LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest extends B
     // Overlapping data files for the hybrid table
     return distributeFilesToTables(getRealtimeTableNames(),
         _avroFiles.subList(_avroFiles.size() - 4, _avroFiles.size()));
-  }
-
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-            + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED, true);
-  }
-
-  protected void overrideBrokerConf(PinotConfiguration serverConf) {
-    overrideServerConf(serverConf);
   }
 }
