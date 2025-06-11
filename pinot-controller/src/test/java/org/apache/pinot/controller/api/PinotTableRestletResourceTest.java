@@ -960,6 +960,32 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         aThrows.getMessage());
   }
 
+  @Test
+  public void testGetNonExistentTableConfig() {
+    // Attempt to get a non-existent table config
+    String tableName = "nonExistentTable";
+    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName);
+    String msg = expectThrows(IOException.class, () -> sendGetRequest(url)).getMessage();
+    assertTrue(
+        msg.contains("Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable does not exist\""),
+        msg);
+
+    // Attempt to get a non-existent table config with type
+    String offlineUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.OFFLINE);
+    msg = expectThrows(IOException.class, () -> sendGetRequest(offlineUrl)).getMessage();
+    assertTrue(
+        msg.contains(
+            "Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable_OFFLINE does not exist\""),
+        msg);
+
+    String realtimeUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.REALTIME);
+    msg = expectThrows(IOException.class, () -> sendGetRequest(realtimeUrl)).getMessage();
+    assertTrue(
+        msg.contains(
+            "Got error status code: 404 (Not Found) with reason: \"Table nonExistentTable_REALTIME does not exist\""),
+        msg);
+  }
+
   /**
    * Updating existing REALTIME table with invalid replication factor should throw exception.
    */
