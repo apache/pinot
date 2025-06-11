@@ -191,10 +191,6 @@ public class Tracing {
     }
 
     @Override
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-    }
-
-    @Override
     public void sampleUsage() {
     }
 
@@ -331,7 +327,6 @@ public class Tracing {
 
     @Deprecated
     public static void setThreadResourceUsageProvider() {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(null);
     }
 
     // Check for thread interruption, every time after merging 8192 keys

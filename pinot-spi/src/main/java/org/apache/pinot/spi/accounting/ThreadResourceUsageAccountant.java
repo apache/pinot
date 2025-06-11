@@ -71,7 +71,8 @@ public interface ThreadResourceUsageAccountant {
    * set resource usage provider
    */
   @Deprecated
-  void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
+  default void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
+  }
 
   /**
    * call to sample usage

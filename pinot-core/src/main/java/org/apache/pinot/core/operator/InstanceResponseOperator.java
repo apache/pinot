@@ -102,13 +102,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   protected BaseResultsBlock getBaseBlock() {
     long startWallClockTimeNs = System.nanoTime();
-    ThreadResourceSnapshot resourceContext = new ThreadResourceSnapshot();
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
 
     BaseResultsBlock resultsBlock = getCombinedResults();
 
-    resourceContext.close();
-    long mainThreadCpuTimeNs = resourceContext.getCpuTimeNs();
-    long mainThreadMemAllocatedBytes = resourceContext.getAllocatedBytes();
+    resourceSnapshot.close();
+    long mainThreadCpuTimeNs = resourceSnapshot.getCpuTimeNs();
+    long mainThreadMemAllocatedBytes = resourceSnapshot.getAllocatedBytes();
 
     long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
 
