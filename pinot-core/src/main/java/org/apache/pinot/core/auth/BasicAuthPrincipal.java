@@ -38,8 +38,7 @@ public class BasicAuthPrincipal {
   private final Map<String, Map<String, List<String>>> _rlsFilters;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
-      Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters,
-      Map<String, Map<String, List<String>>> visibleCols, Map<String, Map<String, List<String>>> maskedCols) {
+      Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters) {
     _name = name;
     _token = token;
     _tables = tables;
