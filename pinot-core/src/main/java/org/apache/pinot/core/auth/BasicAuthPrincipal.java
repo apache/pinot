@@ -36,8 +36,6 @@ public class BasicAuthPrincipal {
   private final Set<String> _permissions;
   //key: table name, val: list of RLS filters applicable for that table.
   private final Map<String, Map<String, List<String>>> _rlsFilters;
-  private final Map<String, Map<String, List<String>>> _visibleCols;
-  private final Map<String, Map<String, List<String>>> _maskedCols;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
       Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters,
@@ -48,8 +46,6 @@ public class BasicAuthPrincipal {
     _excludeTables = excludeTables;
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
     _rlsFilters = rlsFilters;
-    _visibleCols = visibleCols;
-    _maskedCols = maskedCols;
   }
 
   public String getName() {
@@ -89,14 +85,6 @@ public class BasicAuthPrincipal {
     return Optional.ofNullable(_rlsFilters.get(tableName));
   }
 
-  public Optional<Map<String, List<String>>> getVisibleCols(String tableName) {
-    return Optional.ofNullable(_visibleCols.get(tableName));
-  }
-
-  public Optional<Map<String, List<String>>> getMaskedCols(String tableName) {
-    return Optional.ofNullable(_maskedCols.get(tableName));
-  }
-
   @Override
   public String toString() {
     return "BasicAuthPrincipal{"
@@ -104,9 +92,7 @@ public class BasicAuthPrincipal {
         + ", _token='" + _token + '\''
         + ", _tables=" + _tables
         + ", _permissions=" + _permissions + '\''
-        + ",_rlsFilters=" + _rlsFilters + '\''
-        + ",_visibleCols=" + _visibleCols + '\''
-        + ",_maskedCols=" + _maskedCols
+        + ",_rlsFilters=" + _rlsFilters
         + '}';
   }
 }
