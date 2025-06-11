@@ -136,6 +136,10 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "300000")
   private long _retryInitialDelayInMs = 300000L;
 
+  @JsonProperty("forceCommitBeforeRebalance")
+  @ApiModelProperty(example = "false")
+  private boolean _forceCommitBeforeRebalance = false;
+
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -272,6 +276,14 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
+  public boolean isForceCommitBeforeRebalance() {
+    return _forceCommitBeforeRebalance;
+  }
+
+  public void setForceCommitBeforeRebalance(boolean forceCommitBeforeRebalance) {
+    _forceCommitBeforeRebalance = forceCommitBeforeRebalance;
+  }
+
   public Enablement getMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
@@ -292,7 +304,8 @@ public class RebalanceConfig {
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + ", _forceCommitBeforeRebalance=" + _forceCommitBeforeRebalance + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -314,6 +327,7 @@ public class RebalanceConfig {
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxAttempts = cfg._maxAttempts;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
+    rc._forceCommitBeforeRebalance = cfg._forceCommitBeforeRebalance;
     return rc;
   }
 }
