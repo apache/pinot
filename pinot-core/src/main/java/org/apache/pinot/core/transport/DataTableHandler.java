@@ -65,14 +65,16 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
-    try (ThreadResourceSnapshot resourceContext = new ThreadResourceSnapshot()) {
+    try {
       long deserializationStartTimeMs = System.currentTimeMillis();
+      ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
+      resourceSnapshot.close();
       Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
-          resourceContext.getCpuTimeNs(), resourceContext.getAllocatedBytes());
+          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes());
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);

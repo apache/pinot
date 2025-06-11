@@ -330,11 +330,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
     }
 
-    @Override
-    @Deprecated
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-    }
-
     public CPUMemThreadLevelAccountingObjects.ThreadEntry getThreadEntry() {
       return _threadLocalEntry.get();
     }

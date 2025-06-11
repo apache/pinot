@@ -103,7 +103,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          ThreadResourceSnapshot resourceContext = new ThreadResourceSnapshot();
+          ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
           Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
           // Register the task to the phaser
@@ -114,7 +114,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             Tracing.ThreadAccountantOps.clear();
             return;
           }
-          try (resourceContext) {
+          try (resourceSnapshot) {
             processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
@@ -132,8 +132,8 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();
-            _totalWorkerThreadCpuTimeNs.getAndAdd(resourceContext.getCpuTimeNs());
-            _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceContext.getAllocatedBytes());
+            _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
+            _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceSnapshot.getAllocatedBytes());
             Tracing.ThreadAccountantOps.clear();
           }
         }
