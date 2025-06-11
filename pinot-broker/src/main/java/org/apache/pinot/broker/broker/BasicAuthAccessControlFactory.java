@@ -159,12 +159,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
           "Principal: " + principal.getName() + " does not have access to table: " + table);
 
       Optional<Map<String, List<String>>> rlsFiltersMaybe = principal.getRLSFilters(table);
-      Optional<Map<String, List<String>>> visibleColsMaybe = principal.getVisibleCols(table);
-      Optional<Map<String, List<String>>> maskedColsMaybe = principal.getMaskedCols(table);
-
       rlsFiltersMaybe.ifPresent(tableRowColAuthResult::setRLSFilters);
-      visibleColsMaybe.ifPresent(tableRowColAuthResult::setVisibleCols);
-      maskedColsMaybe.ifPresent(tableRowColAuthResult::setMaskedCols);
 
       return tableRowColAuthResult;
     }

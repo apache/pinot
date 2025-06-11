@@ -15,13 +15,5 @@ public interface TableRowColAuthResult {
    */
   Optional<Map<String, List<String>>> getRLSFilters();
 
-  Optional<Map<String, List<String>>> visibleColumns();
-
-  Optional<Map<String, List<String>>> maskedColumns();
-
   TableRowColAuthResult setRLSFilters(Map<String, List<String>> rlsFilters);
-
-  TableRowColAuthResult setVisibleCols(Map<String, List<String>> visibleCols);
-
-  TableRowColAuthResult setMaskedCols(Map<String, List<String>> maskedCols);
 }
