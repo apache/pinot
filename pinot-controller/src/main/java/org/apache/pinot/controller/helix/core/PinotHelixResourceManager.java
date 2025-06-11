@@ -48,7 +48,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -154,15 +153,8 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
-import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
-import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -245,13 +237,10 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private final RebalancePreChecker _rebalancePreChecker;
-  private TableSizeReader _tableSizeReader;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -274,26 +263,13 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _rebalancePreChecker = rebalancePreChecker;
-    _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
-  }
-
-  public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
-        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
-        controllerConf.getRebalanceDiskUtilizationThreshold());
+        LineageManagerFactory.create(controllerConf));
   }
 
   /**
@@ -445,24 +421,6 @@ public class PinotHelixResourceManager {
    */
   public LineageManager getLineageManager() {
     return _lineageManager;
-  }
-
-  /**
-   * Get the rebalance pre-checker
-   *
-   * @return rebalance pre-checker
-   */
-  public RebalancePreChecker getRebalancePreChecker() {
-    return _rebalancePreChecker;
-  }
-
-  /**
-   * Get the table size reader.
-   *
-   * @return table size reader
-   */
-  public TableSizeReader getTableSizeReader() {
-    return _tableSizeReader;
   }
 
 /**
@@ -1586,6 +1544,12 @@ public class PinotHelixResourceManager {
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
+    if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, schemaName)) {
+      // For logical table schemas, we do not need to reload segments or send schema refresh messages
+      LOGGER.info("Logical table schema: {} updated, no need to reload segments or send schema refresh messages",
+          schemaName);
+      return;
+    }
     try {
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       if (reload) {
@@ -2053,10 +2017,6 @@ public class PinotHelixResourceManager {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
-  public void registerTableSizeReader(TableSizeReader tableSizeReader) {
-    _tableSizeReader = tableSizeReader;
-  }
-
   private void assignInstances(TableConfig tableConfig, boolean override) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -2434,25 +2394,7 @@ public class PinotHelixResourceManager {
    */
   public Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker) {
-    Map<String, Map<String, String>> controllerJobs = new HashMap<>();
-    for (String jobType : jobTypes) {
-      String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-      ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
-      if (jobsZnRecord == null) {
-        continue;
-      }
-      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
-      for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
-        String jobId = jobMetadataEntry.getKey();
-        Map<String, String> jobMetadata = jobMetadataEntry.getValue();
-        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType),
-            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType, jobResourcePath, jobId);
-        if (jobMetadataChecker.test(jobMetadata)) {
-          controllerJobs.put(jobId, jobMetadata);
-        }
-      }
-    }
-    return controllerJobs;
+    return ControllerZkHelixUtils.getAllControllerJobs(jobTypes, jobMetadataChecker, _propertyStore);
   }
 
   /**
@@ -2532,37 +2474,12 @@ public class PinotHelixResourceManager {
    * @param jobId job's UUID
    * @param jobMetadata the job metadata
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
-   * @param prevJobMetadataChecker to check the previous job metadata before adding new one
    * @return boolean representing success / failure of the ZK write step
    */
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobType,
       Predicate<Map<String, String>> prevJobMetadataChecker) {
-    Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
-        "Submission Time in JobMetadata record not set. Cannot expire these records");
-    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-    Stat stat = new Stat();
-    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
-    if (jobsZnRecord != null) {
-      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
-      Map<String, String> prevJobMetadata = jobMetadataMap.get(jobId);
-      if (!prevJobMetadataChecker.test(prevJobMetadata)) {
-        return false;
-      }
-      jobMetadataMap.put(jobId, jobMetadata);
-      if (jobMetadataMap.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
-        jobMetadataMap = jobMetadataMap.entrySet().stream().sorted((v1, v2) -> Long.compare(
-                Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
-                Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
-            .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
-            .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      }
-      jobsZnRecord.setMapFields(jobMetadataMap);
-      return _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
-    } else {
-      jobsZnRecord = new ZNRecord(jobResourcePath);
-      jobsZnRecord.setMapField(jobId, jobMetadata);
-      return _propertyStore.set(jobResourcePath, jobsZnRecord, AccessOption.PERSISTENT);
-    }
+    return ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, jobType,
+        prevJobMetadataChecker);
   }
 
   /**
@@ -3868,47 +3785,10 @@ public class PinotHelixResourceManager {
         "Instance: " + instanceName + (enableInstance ? " enable" : " disable") + " failed, timeout");
   }
 
-  /**
-   * Entry point for table Rebalacing.
-   * @param tableNameWithType
-   * @param rebalanceConfig
-   * @param trackRebalanceProgress whether to track rebalance progress stats
-   * @return RebalanceResult
-   * @throws TableNotFoundException
-   */
-  public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
-      String rebalanceJobId, boolean trackRebalanceProgress)
-      throws TableNotFoundException {
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
-    }
-    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
-    ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
-    if (trackRebalanceProgress) {
-      zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
-    }
-    return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
-        zkBasedTableRebalanceObserver);
-  }
-
-  public RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
-      RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
-    Map<String, Set<String>> tierToSegmentsMap = null;
-    if (rebalanceConfig.isUpdateTargetTier()) {
-      tierToSegmentsMap = updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
-    }
-    TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker,
-            _tableSizeReader);
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
-  }
-
   /// Calculates the target tier for the segments within a table, updates the segment ZK metadata and persists the
   /// update to ZK.
-  @VisibleForTesting
-  Map<String, Set<String>> updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
+  public Map<String, Set<String>> updateTargetTier(String rebalanceJobId, String tableNameWithType,
+      TableConfig tableConfig) {
     List<Tier> sortedTiers =
         CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) ? getSortedTiers(tableConfig) : List.of();
     LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",

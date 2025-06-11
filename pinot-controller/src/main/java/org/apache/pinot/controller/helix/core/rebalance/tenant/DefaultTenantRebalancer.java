@@ -29,20 +29,25 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DefaultTenantRebalancer implements TenantRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTenantRebalancer.class);
-  PinotHelixResourceManager _pinotHelixResourceManager;
-  ExecutorService _executorService;
+  private final TableRebalanceManager _tableRebalanceManager;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ExecutorService _executorService;
 
-  public DefaultTenantRebalancer(PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService) {
+  public DefaultTenantRebalancer(TableRebalanceManager tableRebalanceManager,
+      PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService) {
+    _tableRebalanceManager = tableRebalanceManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
   }
@@ -56,13 +61,13 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
-            _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
-                false));
-      } catch (TableNotFoundException exception) {
+            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false));
+      } catch (TableNotFoundException | RebalanceInProgressException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
       }
     });
+
     if (config.isDryRun()) {
       return new TenantRebalanceResult(null, rebalanceResult, config.isVerboseResult());
     } else {
@@ -198,7 +203,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       TenantRebalanceObserver observer) {
     try {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
-      RebalanceResult result = _pinotHelixResourceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
+      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {

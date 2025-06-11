@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +28,19 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.InstanceIdToSegments;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageWorkerAssignmentRule.TableScanWorkerAssignmentResult;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
@@ -69,7 +76,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   @Test
   public void testAssignTableScanWithUnPartitionedOfflineTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-        OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of(), false);
+        OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of(), false, false);
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
     assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
@@ -80,7 +87,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   @Test
   public void testAssignTableScanWithUnPartitionedRealtimeTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-        REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of(), false);
+        REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of(), false, false);
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
     assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
@@ -91,7 +98,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   @Test
   public void testAssignTableScanWithUnPartitionedHybridTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-        HYBRID_INSTANCE_ID_TO_SEGMENTS, Map.of(), false);
+        HYBRID_INSTANCE_ID_TO_SEGMENTS, Map.of(), false, false);
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
     assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
@@ -103,7 +110,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   @Test
   public void testAssignTableScanPartitionedOfflineTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-        OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo()), false);
+        OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo()), false, false);
     // Basic checks.
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -119,7 +126,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   @Test
   public void testAssignTableScanPartitionedRealtimeTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
-        REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of("REALTIME", createRealtimeTablePartitionInfo()), false);
+        REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of("REALTIME", createRealtimeTablePartitionInfo()), false, false);
     // Basic checks.
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -141,7 +148,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       // Case-1: When inferInvalidPartitionSegment is set to true.
       TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS, Map.of("REALTIME",
-              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), true);
+              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), true, false);
       // Basic checks.
       assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
       assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -158,7 +165,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       // Case-2: When inferInvalidPartitionSegment is set to false.
       TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS, Map.of("REALTIME",
-              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), false);
+              createRealtimeTablePartitionInfo(List.of(INVALID_SEGMENT_PARTITION))), false, false);
       // Basic checks.
       assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
       assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
@@ -173,13 +180,57 @@ public class LeafStageWorkerAssignmentRuleTest {
   public void testAssignTableScanPartitionedHybridTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
         HYBRID_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo(),
-            "REALTIME", createRealtimeTablePartitionInfo()), false);
+            "REALTIME", createRealtimeTablePartitionInfo()), false, false);
     assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
     assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
     assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
     assertEquals(result._pinotDataDistribution.getHashDistributionDesc().size(), 0);
     validateTableScanAssignment(result, HYBRID_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap, "OFFLINE");
     validateTableScanAssignment(result, HYBRID_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
+  }
+
+  @Test
+  public void testBuildTablePartitionInfoWithInferredPartitionsWhenRealtimeSegments() {
+    final LLCSegmentName segment1 = new LLCSegmentName(TABLE_NAME, 3, 35,
+        System.currentTimeMillis() / 1000);
+    final LLCSegmentName segment2 = new LLCSegmentName(TABLE_NAME, 2, 35,
+        System.currentTimeMillis() / 1000);
+    final UploadedRealtimeSegmentName segment3 = new UploadedRealtimeSegmentName(
+        String.format("uploaded__%s__0__20240530T0000Z__suffix", TABLE_NAME));
+    final List<String> segments = List.of(segment1.getSegmentName(), segment2.getSegmentName(),
+        segment3.getSegmentName());
+    final String tableNameWithType = "foobar_REALTIME";
+    final int numPartitions = 4;
+    // Create input table partition info and set all segments to invalid partition. Simulating case when the
+    // segmentPartitionConfig has just been added to a Realtime table.
+    final TablePartitionInfo inputTablePartitionInfo = new TablePartitionInfo(tableNameWithType, PARTITION_COLUMN,
+        PARTITION_FUNCTION, numPartitions, List.of(), segments /* invalid partition segments */);
+    // Setup other test inputs.
+    Map<String, List<String>> instanceIdToSegmentsMap = new HashMap<>();
+    instanceIdToSegmentsMap.put("instance-0", segments);
+    TablePartitionInfo tpi = LeafStageWorkerAssignmentRule.buildTablePartitionInfoWithInferredPartitions(
+        TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), instanceIdToSegmentsMap, inputTablePartitionInfo);
+    assertNotNull(tpi);
+    assertEquals(tpi.getNumPartitions(), numPartitions);
+    assertEquals(tpi.getSegmentsWithInvalidPartition(), List.of());
+    assertEquals(tpi.getSegmentsByPartition().get(0), List.of(segment3.getSegmentName()));
+    assertEquals(tpi.getSegmentsByPartition().get(1), List.of());
+    assertEquals(tpi.getSegmentsByPartition().get(2), List.of(segment2.getSegmentName()));
+    assertEquals(tpi.getSegmentsByPartition().get(3), List.of(segment1.getSegmentName()));
+  }
+
+  @Test
+  public void testBuildTablePartitionInfoWithInferredPartitionsWhenInvalidRealtimeSegmentName() {
+    final List<String> segments = List.of("foobar_101_35__20250509T1Z");
+    final String tableNameWithType = "foobar_REALTIME";
+    final int numPartitions = 4;
+    final TablePartitionInfo inputTablePartitionInfo = new TablePartitionInfo(tableNameWithType, PARTITION_COLUMN,
+        PARTITION_FUNCTION, numPartitions, List.of(), segments /* invalid partition segments */);
+    // Setup other test inputs.
+    Map<String, List<String>> instanceIdToSegmentsMap = new HashMap<>();
+    instanceIdToSegmentsMap.put("instance-0", segments);
+    assertNull(LeafStageWorkerAssignmentRule.buildTablePartitionInfoWithInferredPartitions(
+        TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), instanceIdToSegmentsMap, inputTablePartitionInfo));
   }
 
   @Test
@@ -239,6 +290,24 @@ public class LeafStageWorkerAssignmentRuleTest {
         List.of("s0", "s1", "s2")));
     assertEquals(List.of("s0", "s1", "s2"), LeafStageWorkerAssignmentRule.sampleSegmentsForLogging(
         List.of("s0", "s1", "s2", "s3", "s4")));
+  }
+
+  @Test
+  public void testExtractLeafStageRoot() {
+    // Create parents mock RelNodes. The first node is not part of the leaf stage, while the last two nodes are.
+    PRelNode pRelNode1 = mock(PRelNode.class);
+    PRelNode pRelNode2 = mock(PRelNode.class);
+    PRelNode pRelNode3 = mock(PRelNode.class);
+    doReturn(false).when(pRelNode1).isLeafStage();
+    doReturn(true).when(pRelNode2).isLeafStage();
+    doReturn(true).when(pRelNode3).isLeafStage();
+    // Add nodes in order (top to bottom of tree).
+    Deque<PRelNode> parents = new ArrayDeque<>();
+    parents.addLast(pRelNode1);
+    parents.addLast(pRelNode2);
+    parents.addLast(pRelNode3);
+    PRelNode leafStageRoot = LeafStageWorkerAssignmentRule.extractCurrentLeafStageParent(parents);
+    assertEquals(leafStageRoot, pRelNode2);
   }
 
   private static void validateTableScanAssignment(TableScanWorkerAssignmentResult assignmentResult,

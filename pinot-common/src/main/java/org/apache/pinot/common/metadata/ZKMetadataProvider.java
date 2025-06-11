@@ -52,6 +52,7 @@ import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TableConfigDecoratorRegistry;
@@ -73,7 +74,6 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_PAUSELESS_DEBUG_METADATA_PREFIX = "/PAUSELESS_DEBUG_METADATA";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
-  private static final String PROPERTYSTORE_LOGICAL_PREFIX = "/LOGICAL/TABLE";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
@@ -312,7 +312,7 @@ public class ZKMetadataProvider {
   }
 
   public static String constructPropertyStorePathForLogical(String tableName) {
-    return StringUtil.join("/", PROPERTYSTORE_LOGICAL_PREFIX, tableName);
+    return StringUtil.join("/", ZkPaths.LOGICAL_TABLE_PARENT_PATH, tableName);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
@@ -850,7 +850,7 @@ public class ZKMetadataProvider {
 
   public static List<LogicalTableConfig> getAllLogicalTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
-        propertyStore.getChildren(PROPERTYSTORE_LOGICAL_PREFIX, null, AccessOption.PERSISTENT, 0, 0);
+        propertyStore.getChildren(ZkPaths.LOGICAL_TABLE_PARENT_PATH, null, AccessOption.PERSISTENT, 0, 0);
     if (znRecords != null) {
       return znRecords.stream().map(znRecord -> {
         try {

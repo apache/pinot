@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -25,6 +26,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -35,9 +40,13 @@ import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,22 +55,22 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
@@ -86,6 +95,78 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
     return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
         + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
+  }
+
+  @Test
+  public void testImplicitRealtimeTableInstanceAssignment() throws Exception {
+    // Instance assignment not configured for the table initially, so INSTANCE_PARTITIONS should not exist.
+    assertThrows("404", IOException.class,
+        () -> sendGetRequest(getControllerBaseApiUrl() + "/tables/" + getTableName() + "/instancePartitions"));
+
+    // Update table config with instance assignment config, use IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR to
+    // create partitions in the replica group based on the number of stream partitions.
+    TableConfig realtimeTableConfig = getTableConfigBuilder(TableType.REALTIME).build();
+    realtimeTableConfig.setInstanceAssignmentConfigMap(
+        Map.of(InstancePartitionsType.CONSUMING.name(), new InstanceAssignmentConfig(
+            new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(getServerTenant()), false, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 0, 1, 0, 0, 0, true, null),
+            InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true))
+    );
+    updateTableConfig(realtimeTableConfig);
+
+    // Rebalance the table to reassign instances and create the INSTANCE_PARTITIONS.
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinAvailableReplicas(-1);
+    rebalanceConfig.setIncludeConsuming(true);
+    sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+
+    // We're using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR based instance assignment for this table.
+    // This test verifies that INSTANCE_PARTITIONS is written to ZK after instance assignment in the rebalance and has
+    // the expected number of partitions.
+
+    TestUtils.waitForCondition(
+        aVoid -> {
+          try {
+            sendGetRequest(getControllerBaseApiUrl() + "/tables/" + getTableName() + "/instancePartitions");
+          } catch (Exception e) {
+            return false;
+          }
+          return true;
+        }, 10_000, "Expected INSTANCE_PARTITIONS to be created for table after instance assignment in rebalance"
+    );
+
+    JsonNode instancePartitions = JsonUtils.stringToJsonNode(
+        sendGetRequest(getControllerBaseApiUrl() + "/tables/" + getTableName() + "/instancePartitions"));
+
+    assertNotNull(instancePartitions);
+    assertEquals(instancePartitions.size(), 1);
+
+    JsonNode partitionToInstancesMap =
+        instancePartitions.get(InstancePartitionsType.CONSUMING.name()).get("partitionToInstancesMap");
+
+    assertEquals(partitionToInstancesMap.size(), getNumKafkaPartitions()); // single replica group
+    for (int i = 0; i < getNumKafkaPartitions(); i++) {
+      assertNotNull(partitionToInstancesMap.get(i + "_0")); // partition i, replica group 0
+    }
+
+    // Reset the table config and rebalance
+    updateTableConfig(getTableConfigBuilder(TableType.REALTIME).build());
+    sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+
+    TestUtils.waitForCondition(
+        aVoid -> {
+          try {
+            sendGetRequest(getControllerBaseApiUrl() + "/tables/" + getTableName() + "/instancePartitions");
+          } catch (Exception e) {
+            return e.getCause() instanceof HttpErrorStatusException
+                && ((HttpErrorStatusException) e.getCause()).getStatusCode() == 404;
+          }
+          return false;
+        }, 10_000,
+        "Expected INSTANCE_PARTITIONS to be deleted for table after removing instance assignment configs and "
+            + "rebalancing"
+    );
   }
 
   @Test
@@ -1184,6 +1265,55 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     assertEquals(numServersAdded, summaryResult.getServerInfo().getServersAdded().size());
     assertEquals(numServersRemoved, summaryResult.getServerInfo().getServersRemoved().size());
     assertEquals(numServersUnchanged, summaryResult.getServerInfo().getServersUnchanged().size());
+  }
+
+  @Test
+  public void testDisallowMultipleConcurrentRebalancesOnSameTable() throws Exception {
+    // Manually write an IN_PROGRESS rebalance job to ZK instead of trying to collide multiple actual rebalance
+    // attempts which will be prone to race conditions and cause this test to be flaky. We only reject a rebalance job
+    // if there is an IN_PROGRESS rebalance job for the same table in ZK, so we could actually end up with more than
+    // one active rebalance job if both are started at the exact same time since the progress stats are written to ZK
+    // after some initial pre-checks are done. However, rebalances are idempotent, and we don't actually care too much
+    // about avoiding this edge case race condition as long as in most cases we are able to prevent users from
+    // triggering a rebalance for a table that already has an in-progress rebalance job.
+    String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(getTableName());
+    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
+    // rebalance is not a NO_OP
+    BaseServerStarter serverStarter = startOneServer(NUM_SERVERS);
+    createServerTenant(getServerTenant(), 1, 0);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+
+    Pair<Integer, String> response =
+        postRequestWithStatusCode(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
+    assertEquals(response.getLeft(), Response.Status.CONFLICT.getStatusCode());
+    assertTrue(response.getRight().contains("Rebalance job is already in progress for table"));
+
+    // Update the job status to DONE to allow other tests to run
+    progressStats.setStatus(RebalanceResult.Status.DONE);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Stop the added server
+    serverStarter.stop();
+    TestUtils.waitForCondition(
+        aVoid -> getHelixResourceManager().dropInstance(serverStarter.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
   }
 
   private String getReloadJobIdFromResponse(String response) {

@@ -19,10 +19,13 @@
 package org.apache.pinot.tsdb.planner.physical;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -31,6 +34,8 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -40,12 +45,16 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 public class TableScanVisitor {
   public static final TableScanVisitor INSTANCE = new TableScanVisitor();
   private RoutingManager _routingManager;
+  private TableRouteProvider _tableRouteProvider;
+  private TableCache _tableCache;
 
   private TableScanVisitor() {
   }
 
-  public void init(RoutingManager routingManager) {
+  public void init(RoutingManager routingManager, TableRouteProvider tableRouteProvider, TableCache tableCache) {
     _routingManager = routingManager;
+    _tableRouteProvider = tableRouteProvider;
+    _tableCache = tableCache;
   }
 
   public void assignSegmentsToPlan(BaseTimeSeriesPlanNode planNode, TimeBuckets timeBuckets, Context context) {
@@ -66,6 +75,51 @@ public class TableScanVisitor {
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
     }
+  }
+
+  /**
+   * Adds table type information (offline/realtime) to the plan node.
+   * If the plan node is a leaf node, it retrieves the table route info and updates the table name with type.
+   * If the plan node has child nodes, it recursively processes each child node.
+   *
+   * @param planNode The {@link BaseTimeSeriesPlanNode} to process.
+   * @return The updated {@link BaseTimeSeriesPlanNode} with table type information.
+   */
+  public BaseTimeSeriesPlanNode addTableTypeInfoToPlan(BaseTimeSeriesPlanNode planNode) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
+      TableRouteInfo routeInfo = _tableRouteProvider.getTableRouteInfo(sfpNode.getTableName(), _tableCache,
+        _routingManager);
+      String tableNameWithType = getTableNameWithType(routeInfo);
+      Preconditions.checkNotNull(tableNameWithType, "Table not found for table name: " + sfpNode.getTableName());
+      return sfpNode.withTableName(tableNameWithType);
+    }
+
+    List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
+      newInputs.add(addTableTypeInfoToPlan(childNode));
+    }
+    return planNode.withInputs(newInputs);
+  }
+
+
+  /**
+   * Returns the table name with type (offline/realtime) if the table exists, otherwise returns null.
+   *
+   * @param routeInfo The {@link TableRouteInfo} for the table.
+   * @return The table name with type, or null if the table does not exist.
+   */
+  @Nullable
+  private String getTableNameWithType(TableRouteInfo routeInfo) {
+    Preconditions.checkState(!routeInfo.isHybrid(),
+      "Hybrid tables are not supported yet for timeseries queries");
+    if (routeInfo.isOffline()) {
+      return routeInfo.getOfflineTableName();
+    }
+    if (routeInfo.isRealtime()) {
+      return routeInfo.getRealtimeTableName();
+    }
+    return null;
   }
 
   public static Context createContext(Long requestId) {

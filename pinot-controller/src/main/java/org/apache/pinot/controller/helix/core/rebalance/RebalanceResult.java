@@ -114,4 +114,12 @@ public class RebalanceResult {
     // UNKNOWN_ERROR if the job hits on an unexpected exception.
     NO_OP, DONE, FAILED, IN_PROGRESS, ABORTED, CANCELLED, UNKNOWN_ERROR
   }
+
+  @Override
+  public String toString() {
+    return "RebalanceResult{" + "_jobId='" + _jobId + '\'' + ", _status=" + _status + ", _description='" + _description
+        + '\'' + ", _instanceAssignment=" + _instanceAssignment + ", _tierInstanceAssignment="
+        + _tierInstanceAssignment + ", _segmentAssignment=" + _segmentAssignment + ", _preChecksResult="
+        + _preChecksResult + ", _rebalanceSummaryResult=" + _rebalanceSummaryResult + '}';
+  }
 }
