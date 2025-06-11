@@ -328,7 +328,7 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleResetSegmentClick = () => {
     setDialogDetails({
       title: 'Reset Segment',
-      content: 'Are you sure want to reset this segment?',
+      content: 'Are you sure you want to reset this segment?',
       successCb: () => handleResetOp(),
     });
     setConfirmDialog(true);
