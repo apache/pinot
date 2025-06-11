@@ -15,8 +15,7 @@ public class TableRowColAuthResultImpl implements TableRowColAuthResult {
 
   }
 
-  public TableRowColAuthResultImpl(Map<String, List<String>> maskedCols, Map<String, List<String>> visibleCols,
-      Map<String, List<String>> rlsFilters) {
+  public TableRowColAuthResultImpl(Map<String, List<String>> rlsFilters) {
     _rlsFilters = rlsFilters;
   }
 
