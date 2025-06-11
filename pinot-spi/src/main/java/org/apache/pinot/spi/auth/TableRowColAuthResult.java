@@ -1,7 +1,6 @@
 package org.apache.pinot.spi.auth;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 
@@ -13,7 +12,7 @@ public interface TableRowColAuthResult {
    * Returns the RLS filters associated with a particular table. RLS filters are defined as a list.
    * @return optional of the RLS filters. Empty optional is there are no RLS filters defined on this table
    */
-  Optional<Map<String, List<String>>> getRLSFilters();
+  Optional<List<String>> getRLSFilters();
 
-  TableRowColAuthResult setRLSFilters(Map<String, List<String>> rlsFilters);
+  TableRowColAuthResult setRLSFilters(List<String> rlsFilters);
 }

@@ -35,10 +35,10 @@ public class BasicAuthPrincipal {
   private final Set<String> _excludeTables;
   private final Set<String> _permissions;
   //key: table name, val: list of RLS filters applicable for that table.
-  private final Map<String, Map<String, List<String>>> _rlsFilters;
+  private final Map<String, List<String>> _rlsFilters;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
-      Set<String> permissions, Map<String, Map<String, List<String>>> rlsFilters) {
+      Set<String> permissions, Map<String, List<String>> rlsFilters) {
     _name = name;
     _token = token;
     _tables = tables;
@@ -80,7 +80,7 @@ public class BasicAuthPrincipal {
    * @return An {@link java.util.Optional} containing the RLS filter string if configured for this principal and table,
    * otherwise {@link java.util.Optional#empty()}.
    */
-  public Optional<Map<String, List<String>>> getRLSFilters(String tableName) {
+  public Optional<List<String>> getRLSFilters(String tableName) {
     return Optional.ofNullable(_rlsFilters.get(tableName));
   }
 

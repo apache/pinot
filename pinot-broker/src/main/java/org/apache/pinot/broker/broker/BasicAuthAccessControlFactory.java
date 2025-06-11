@@ -158,7 +158,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Preconditions.checkArgument(principal.hasTable(table),
           "Principal: " + principal.getName() + " does not have access to table: " + table);
 
-      Optional<Map<String, List<String>>> rlsFiltersMaybe = principal.getRLSFilters(table);
+      Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
       rlsFiltersMaybe.ifPresent(tableRowColAuthResult::setRLSFilters);
 
       return tableRowColAuthResult;

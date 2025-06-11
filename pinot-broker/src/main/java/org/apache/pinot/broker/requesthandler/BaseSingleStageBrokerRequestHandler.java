@@ -929,24 +929,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Map<String, String> queryOptions =
         pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
 
-    Optional<Map<String, List<String>>> rlsFiltersMaybe = rlsFilters.getRLSFilters();
-    if (rlsFiltersMaybe.isPresent()) {
-      Map<String, List<String>> rowFilters = rlsFiltersMaybe.get();
-      StringBuilder sb = new StringBuilder();
-      for (String policyId : rowFilters.keySet()) {
-        List<String> filters = rowFilters.get(policyId);
-        for (int i = 0; i < filters.size(); i++) {
-          sb.append(filters.get(i));
-          if (i < filters.size() - 1) {
-            sb.append(" AND ");
-          }
-        }
-      }
-      queryOptions.put(tableName, sb.toString());
+    rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
+      String combinedFilters = String.join(" AND ", rowFilters);
+      queryOptions.put(tableName, combinedFilters);
       pinotQuery.setQueryOptions(queryOptions);
-
       CalciteSqlParser.queryRewrite(pinotQuery);
-    }
+    });
 
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);

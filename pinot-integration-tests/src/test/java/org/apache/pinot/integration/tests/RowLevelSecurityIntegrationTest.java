@@ -31,7 +31,6 @@ import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
 import org.slf4j.Logger;
@@ -49,6 +48,7 @@ import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.get
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
   private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ";
   public static final Map<String, String> AUTH_HEADER_USER_2 = Map.of("Authorization", AUTH_TOKEN_USER_2);
+  private static final String DEFAULT_TABLE_NAME_2= "mytable2";
 
   protected List<File> _avroFiles;
   private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTest.class);
@@ -62,9 +62,9 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
     properties.put("controller.admin.access.control.principals.user.password", "secret");
     properties.put("controller.admin.access.control.principals.user2.password", "notSoSecret");
-    properties.put("controller.admin.access.control.principals.user.tables", DEFAULT_TABLE_NAME);
+    properties.put("controller.admin.access.control.principals.user.tables", "mytable, mytable2");
     properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    properties.put("controller.admin.access.control.principals.user2.tables", "mytable");
+    properties.put("controller.admin.access.control.principals.user2.tables", "mytable, mytable2");
     properties.put("controller.admin.access.control.principals.user2.permissions", "read");
   }
 
@@ -76,12 +76,14 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     brokerConf.setProperty("pinot.broker.access.control.principals.admin.password", "verysecret");
     brokerConf.setProperty("pinot.broker.access.control.principals.user.password", "secret");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.password", "notSoSecret");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user.tables", DEFAULT_TABLE_NAME);
+    brokerConf.setProperty("pinot.broker.access.control.principals.user.tables", "mytable, mytable2");
     brokerConf.setProperty("pinot.broker.access.control.principals.user.permissions", "read");
     brokerConf.setProperty("pinot.broker.access.control.principals.user.mytable.rls", "AirlineID='19805'");
-    brokerConf.setProperty("pinot.broker.access.control.principals.user2.tables", "mytable");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user2.tables", "mytable, mytable2");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.permissions", "read");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable.rls",
+        "AirlineID='19805', DestStateName='California'");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable2.rls",
         "AirlineID='19805', DestStateName='California'");
   }
 
@@ -128,6 +130,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     // Set up a table for testing different principals.
     setupTable(DEFAULT_TABLE_NAME);
+    setupTable(DEFAULT_TABLE_NAME_2);
 
     waitForAllDocsLoaded(600_000L);
   }
@@ -178,7 +181,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Test
-  public void testRowFiltersForMultiStateQuery()
+  public void testRowFiltersForSingleTableWithMultiStateQuery()
       throws Exception {
     setUseMultiStageQueryEngine(true);
     String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
@@ -209,6 +212,40 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     Assert.assertTrue(
         compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
   }
+
+  @Test
+  public void testRowFiltersForTwoTablesWithMultiStateQuery()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable2)";
+    String queryWithFiltersForUser1 = "select count(*), avg(ActualElapsedTime) "
+        + "from mytable "
+        + "WHERE ActualElapsedTime > ("
+        + "    select avg(ActualElapsedTime) as avg_profit "
+        + "    from mytable2 "
+        + "    where AirlineID = '19805' "
+        + "  ) "
+        + "  and AirlineID = '19805'";
+
+    String queryWithFiltersForUser2 = "select count(*), avg(ActualElapsedTime) "
+        + "from mytable "
+        + "WHERE ActualElapsedTime > ("
+        + "    select avg(ActualElapsedTime) as avg_profit "
+        + "    from mytable2 "
+        + "    where AirlineID = '19805' "
+        + "      and DestStateName = 'California'"
+        + "  ) "
+        + "  and AirlineID = '19805'"
+        + "  and DestStateName = 'California'";
+
+    // compare admin response with that of user
+    Assert.assertTrue(
+        compareRows(queryBroker(queryWithFiltersForUser1, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER)));
+    Assert.assertTrue(
+        compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
+  }
+
 
   private JsonNode queryBroker(String query, Map<String, String> headers)
       throws Exception {
