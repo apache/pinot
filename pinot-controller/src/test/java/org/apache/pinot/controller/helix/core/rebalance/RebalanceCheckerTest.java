@@ -51,10 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class RebalanceCheckerTest {
@@ -216,6 +213,28 @@ public class RebalanceCheckerTest {
     jobs.remove("job3");
     jobTime = RebalanceChecker.getLatestJob(jobs);
     assertNull(jobTime);
+  }
+
+  @Test
+  public void testStuckInProgressJobs()
+      throws Exception {
+    String tableName = "table01";
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+
+    assertFalse(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
+
+    RebalanceConfig jobCfg = new RebalanceConfig();
+    jobCfg.setHeartbeatTimeoutInMs(10_000);
+    TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    // Even though allowRetries is false, we still abort stuck jobs (heartbeat timeout exceeded).
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, false);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() - 20_000));
+    allJobMetadata.put("job1", jobMetadata);
+
+    assertTrue(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
   }
 
   @Test
