@@ -717,8 +717,10 @@ public final class TableConfigUtils {
     // primary key columns are not of multi-value type
     for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(primaryKeyColumn);
-      Preconditions.checkState(fieldSpec.isSingleValueField(),
-          String.format("Upsert/Dedup primary key column: %s cannot be of multi-value type", primaryKeyColumn));
+      if (fieldSpec != null) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("Upsert/Dedup primary key column: %s cannot be of multi-value type", primaryKeyColumn));
+      }
     }
     // replica group is configured for routing
     Preconditions.checkState(

@@ -147,9 +147,9 @@ public class SchemaUtils {
             .equals(FieldSpec.DataType.DOUBLE)) {
           validateDefaultIsNotNaN(fieldSpec);
         }
-        if (!fieldSpec.isSingleValueField()) {
-          validateMultiValueCompatibility(fieldSpec);
-        }
+      }
+      if (!fieldSpec.isSingleValueField()) {
+        validateMultiValueCompatibility(fieldSpec);
       }
     }
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
