@@ -164,9 +164,13 @@ public class ServerInstance {
     if (serverConf.isEnableGrpcServer()) {
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
+      String instanceName = _helixManager.getInstanceName();
+      TlsConfig actualTslConfig = serverConf.isGrpcTlsServerEnabled()
+          ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX)
+          : null;
+      _grpcQueryServer = new GrpcQueryServer(instanceName, grpcPort,
+          GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
+          actualTslConfig, _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }

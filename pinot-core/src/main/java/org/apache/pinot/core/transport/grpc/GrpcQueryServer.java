@@ -76,6 +76,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private static final int DEFAULT_GRPC_QUERY_WORKER_THREAD =
       Math.max(2, Math.min(8, ResourceManager.DEFAULT_QUERY_WORKER_THREADS));
 
+  private final String _instanceId;
   private final QueryExecutor _queryExecutor;
   private final ServerMetrics _serverMetrics;
   private final Server _server;
@@ -107,8 +108,15 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     }
   }
 
-  public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig, QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, AccessControl accessControl) {
+  @Deprecated
+  public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig,
+      QueryExecutor queryExecutor, ServerMetrics serverMetrics, AccessControl accessControl) {
+    this("unknown-server", port, config, tlsConfig, queryExecutor, serverMetrics, accessControl);
+  }
+
+  public GrpcQueryServer(String instanceId, int port, GrpcConfig config, TlsConfig tlsConfig,
+        QueryExecutor queryExecutor, ServerMetrics serverMetrics, AccessControl accessControl) {
+    _instanceId = instanceId;
     _executorService = QueryThreadContext.contextAwareExecutorService(
         Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet()
             ? config.getQueryWorkerThreads()
@@ -220,7 +228,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       return;
     }
 
-    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(_instanceId)) {
       QueryThreadContext.setQueryEngine("sse-grpc");
       // Deserialize the request
       ServerQueryRequest queryRequest;

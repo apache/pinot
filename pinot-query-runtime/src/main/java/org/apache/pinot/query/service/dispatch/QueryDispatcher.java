@@ -637,18 +637,28 @@ public class QueryDispatcher {
     }
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isError()) {
-      Map<QueryErrorCode, String> queryExceptions = ((ErrorMseBlock) block).getErrorMessages();
+      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+      Map<QueryErrorCode, String> queryExceptions = errorBlock.getErrorMessages();
 
       String errorMessage;
       Map.Entry<QueryErrorCode, String> error;
+      String from;
+      if (errorBlock.getStageId() >= 0) {
+        from = "from stage " + errorBlock.getStageId();
+        if (errorBlock.getServerId() != null) {
+          from += " on server " + errorBlock.getServerId();
+        }
+      } else {
+        from = "from servers";
+      }
       if (queryExceptions.size() == 1) {
         error = queryExceptions.entrySet().iterator().next();
-        errorMessage = "Received 1 error from servers: " + error.getValue();
+        errorMessage = "Received 1 error " + from + ": " + error.getValue();
       } else {
         error = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
-        errorMessage = "Received " + queryExceptions.size() + " errors from servers. "
+        errorMessage = "Received " + queryExceptions.size() + " errors " + from + ". "
                 + "The one with highest priority is: " + error.getValue();
       }
       QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);
