@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixAdmin;
@@ -58,18 +57,19 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   private HelixConfigScope _helixConfigScope;
   private int _numBrokers;
   private int _numServers;
+  private AdjustableSemaphore _semaphore;
   /**
    * If _maxServerQueryThreads is <= 0, it means that the cluster is not configured to limit the number of multi-stage
    * queries that can be executed concurrently. In this case, we should not block the query.
    */
   private int _maxServerQueryThreads;
-  private AdjustableSemaphore _semaphore;
+  private final int _maxServerQueryThreadsFromServerConfig;
   private final AtomicInteger _currentQueryServerThreads = new AtomicInteger();
 
-  private final PinotConfiguration _pinotConfiguration;
-
-  public MultiStageQueryThrottler(PinotConfiguration pinotConfiguration) {
-    _pinotConfiguration = pinotConfiguration;
+  public MultiStageQueryThrottler(PinotConfiguration brokerConf) {
+    _maxServerQueryThreadsFromServerConfig = brokerConf.getProperty(
+            CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
+            CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
   }
 
   @Override
@@ -78,7 +78,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     _helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
         _helixManager.getClusterName()).build();
-    _maxServerQueryThreads = calculateMaxServerQueryThreads(_pinotConfiguration);
+    _maxServerQueryThreads = calculateMaxServerQueryThreads();
 
     List<String> clusterInstances = _helixAdmin.getInstancesInCluster(_helixManager.getClusterName());
     _numBrokers = Math.max(1, (int) clusterInstances.stream()
@@ -171,7 +171,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
         }
       }
     } else {
-      int maxServerQueryThreads = calculateMaxServerQueryThreads(_pinotConfiguration);
+      int maxServerQueryThreads = calculateMaxServerQueryThreads();
 
       if (_maxServerQueryThreads == maxServerQueryThreads) {
         return;
@@ -206,22 +206,13 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   }
 
   @VisibleForTesting
-  int calculateMaxServerQueryThreads(PinotConfiguration config) {
-    Map<String, String> clusterConfigMap = _helixAdmin.getConfig(
-        _helixConfigScope,
-        Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
-    int maxServerQueryThreadsFromClusterConfig = Integer.parseInt(
-        clusterConfigMap.getOrDefault(
-            CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
-            CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
-    int maxServerQueryThreadsFromBrokerConfig = config.getProperty(
-            CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
-            CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
-
-    if (maxServerQueryThreadsFromClusterConfig <= 0 && maxServerQueryThreadsFromBrokerConfig <= 0) {
-      return 0;
+  int calculateMaxServerQueryThreads() {
+    if (_maxServerQueryThreadsFromServerConfig > 0) {
+      return _maxServerQueryThreadsFromServerConfig;
     }
-    return Math.min(maxServerQueryThreadsFromClusterConfig,
-            maxServerQueryThreadsFromBrokerConfig);
+    return Integer.parseInt(_helixAdmin.getConfig(_helixConfigScope,
+            Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS))
+            .getOrDefault(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
+                    CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
   }
 }

@@ -79,7 +79,7 @@ public class HardLimitExecutorTest {
     PinotConfiguration config2 = new PinotConfiguration(configMap2);
     assertEquals(30, HardLimitExecutor.getMultiStageExecutorHardLimit(config2));
 
-    // Both configs are set, server is lower
+    // Both configs are set. Server is lower. Server config prioritized.
     Map<String, Object> configMap3 = new HashMap<>();
     configMap3.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "10");
     configMap3.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR, "5");
@@ -87,17 +87,17 @@ public class HardLimitExecutorTest {
     PinotConfiguration config3 = new PinotConfiguration(configMap3);
     assertEquals(30, HardLimitExecutor.getMultiStageExecutorHardLimit(config3));
 
-    // Both configs are set, cluster is lower
+    // Both configs are set. Cluster is lower. Server config prioritized.
     Map<String, Object> configMap4 = new HashMap<>();
     configMap4.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "10");
     configMap4.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR, "2");
     configMap4.put(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS, "30");
     PinotConfiguration config4 = new PinotConfiguration(configMap4);
-    assertEquals(20, HardLimitExecutor.getMultiStageExecutorHardLimit(config4));
+    assertEquals(30, HardLimitExecutor.getMultiStageExecutorHardLimit(config4));
 
     // No configs set, should return non-positive
     Map<String, Object> configMap5 = new HashMap<>();
     PinotConfiguration config5 = new PinotConfiguration(configMap5);
-    assertEquals(-1, HardLimitExecutor.getMultiStageExecutorHardLimit(config5));
+    assertEquals(0, HardLimitExecutor.getMultiStageExecutorHardLimit(config5));
   }
 }

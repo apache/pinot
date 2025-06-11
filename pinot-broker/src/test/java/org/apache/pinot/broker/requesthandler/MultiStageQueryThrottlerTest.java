@@ -314,13 +314,13 @@ public class MultiStageQueryThrottlerTest {
     // Neither config is set, both use defaults
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
+    ).thenReturn(Map.of());
 
     PinotConfiguration emptyConfig = new PinotConfiguration(); // No MSE_MAX_SERVER_QUERY_THREADS set
     _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(0, _multiStageQueryThrottler.calculateMaxServerQueryThreads(emptyConfig));
+    Assert.assertEquals(-1, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
 
     // Only cluster config is set
     when(_helixAdmin.getConfig(any(),
@@ -330,7 +330,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(10, _multiStageQueryThrottler.calculateMaxServerQueryThreads(emptyConfig));
+    Assert.assertEquals(10, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
 
     // Only broker config is set
     when(_helixAdmin.getConfig(any(),
@@ -344,9 +344,9 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(20, _multiStageQueryThrottler.calculateMaxServerQueryThreads(brokerConfig));
+    Assert.assertEquals(20, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
 
-    // Both configs are set, cluster config is lower
+    // Both configs are set. Cluster config is lower. Broker config prioritized.
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "15"));
@@ -358,9 +358,9 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig2);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(15, _multiStageQueryThrottler.calculateMaxServerQueryThreads(brokerConfig2));
+    Assert.assertEquals(25, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
 
-    // Both configs are set, broker config is lower
+    // Both configs are set. Broker config is lower. Broker config prioritized.
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "30"));
@@ -372,7 +372,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig3);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(5, _multiStageQueryThrottler.calculateMaxServerQueryThreads(brokerConfig3));
+    Assert.assertEquals(5, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
   }
 
   @Test
