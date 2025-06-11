@@ -124,7 +124,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       ExecutorService executorService = Executors.newFixedThreadPool(10);
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
-      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+      TableRebalancer tableRebalancer =
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -683,7 +684,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       ExecutorService executorService = Executors.newFixedThreadPool(10);
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
-      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+          _tableSizeReader, null);
       // Set up the table with 1 replication factor and strict replica group enabled
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
           .setNumReplicas(1)
@@ -811,7 +813,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           (numReplicas * numPartitions * (numSegmentsPerPartition + 1)) / numServers);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null, null);
     // Rebalance should return NO_OP status since there has been no change
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -963,7 +965,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 1);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     // Set up the table with 1 replication factor and strict replica group enabled
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(1)
@@ -1021,7 +1023,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -1116,11 +1119,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setNumReplicas(2)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .build();
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setNumReplicas(2)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
@@ -1520,7 +1525,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, executorService, 1);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
 
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
@@ -2060,11 +2066,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
-    TableRebalancer tableRebalancerOriginal = new TableRebalancer(_helixManager, null, null, null, _tableSizeReader);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setNumReplicas(numReplica)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .build();
+    TableRebalancer tableRebalancerOriginal =
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setNumReplicas(numReplica)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
@@ -2169,11 +2177,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
     }
 
-    TableRebalancer tableRebalancerOriginal = new TableRebalancer(_helixManager, null, null, null, _tableSizeReader);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setNumReplicas(numReplica)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .build();
+    TableRebalancer tableRebalancerOriginal =
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setNumReplicas(numReplica)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);

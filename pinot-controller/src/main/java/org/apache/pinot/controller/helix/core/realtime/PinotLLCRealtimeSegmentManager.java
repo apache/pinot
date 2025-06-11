@@ -2178,7 +2178,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+  public void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
       ForceCommitBatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
