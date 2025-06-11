@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.spi.accounting;
 
-public class ThreadResourceContext implements AutoCloseable {
-  private final long _startCpuTime;
-  private final long _startAllocatedBytes;
+public class ThreadResourceSnapshot implements AutoCloseable {
+  private long _startCpuTime;
+  private long _startAllocatedBytes;
 
   private long _endCpuTime;
   private long _endAllocatedBytes;
@@ -29,16 +29,22 @@ public class ThreadResourceContext implements AutoCloseable {
   /**
    * Creates a new tracker and takes initial snapshots.
    */
-  public ThreadResourceContext() {
+  public ThreadResourceSnapshot() {
+    reset();
+  }
+
+  public void reset() {
     _startCpuTime = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
     _startAllocatedBytes = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
+    _endCpuTime = _startCpuTime;
+    _endAllocatedBytes = _startAllocatedBytes;
   }
 
   /**
    * Gets the CPU time used so far in nanoseconds.
    * Takes a current snapshot if not yet closed.
    */
-  public long getCpuTimeNanos() {
+  public long getCpuTimeNs() {
     updateCurrentSnapshot();
     return _endCpuTime - _startCpuTime;
   }
@@ -83,7 +89,7 @@ public class ThreadResourceContext implements AutoCloseable {
 
   @Override
   public String toString() {
-    return "ThreadResourceContext{" + "cpuTime=" + (_endCpuTime - _startCpuTime) + ", allocatedBytes="
+    return "ThreadResourceSnapshot{" + "cpuTime=" + (_endCpuTime - _startCpuTime) + ", allocatedBytes="
         + (_endAllocatedBytes - _startAllocatedBytes) + ", closed=" + _closed + '}';
   }
 }

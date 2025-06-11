@@ -34,7 +34,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.spi.accounting.ThreadResourceContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -416,7 +416,7 @@ public class DataTableImplV4 implements DataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadResourceContext resourceContext = new ThreadResourceContext();
+    ThreadResourceSnapshot resourceContext = new ThreadResourceSnapshot();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -428,7 +428,7 @@ public class DataTableImplV4 implements DataTable {
     // backward compatibility.
     if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
-          String.valueOf(resourceContext.getCpuTimeNanos()));
+          String.valueOf(resourceContext.getCpuTimeNs()));
     }
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
       getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),

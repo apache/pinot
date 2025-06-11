@@ -290,8 +290,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
       if (_isThreadCPUSamplingEnabled) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS =
-            ThreadResourceUsageProvider.getCurrentThreadCpuTime() - _threadLocalEntry.get()._startTimeNs;
+        _threadLocalEntry.get().updateCpuSnapshot();
       }
     }
 
@@ -302,16 +301,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
       if (_isThreadMemorySamplingEnabled) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes =
-            ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() - _threadLocalEntry.get()._startBytesAllocated;
+        _threadLocalEntry.get().updateMemorySnapshot();
       }
     }
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
       _threadLocalEntry.get()._errorStatus.set(null);
-      _threadLocalEntry.get()._startTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
-      _threadLocalEntry.get()._startBytesAllocated = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
       if (queryId != null) {
         _threadLocalEntry.get()
             .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
@@ -322,8 +318,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {
       _threadLocalEntry.get()._errorStatus.set(null);
-      _threadLocalEntry.get()._startTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
-      _threadLocalEntry.get()._startBytesAllocated = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
       if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
             parentContext.getAnchorThread());

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -44,8 +45,7 @@ public class CPUMemThreadLevelAccountingObjects {
     volatile long _currentThreadMemoryAllocationSampleBytes = 0;
 
     // reference point for start time/bytes
-    long _startTimeNs;
-    long _startBytesAllocated;
+    private final ThreadResourceSnapshot _threadResourceSnapshot = new ThreadResourceSnapshot();
 
     // previous query_id, task_id of the thread, this field should only be accessed by the accountant
     TaskEntry _previousThreadTaskStatus = null;
@@ -117,6 +117,15 @@ public class CPUMemThreadLevelAccountingObjects {
     public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nonnull Thread anchorThread) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread));
+      _threadResourceSnapshot.reset();
+    }
+
+    public void updateCpuSnapshot() {
+      _currentThreadCPUTimeSampleMS = _threadResourceSnapshot.getCpuTimeNs() / 1_000_000; // convert to ms
+    }
+
+    public void updateMemorySnapshot() {
+      _currentThreadMemoryAllocationSampleBytes = _threadResourceSnapshot.getAllocatedBytes();
     }
   }
 

@@ -30,7 +30,7 @@ import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.spi.accounting.ThreadResourceContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -102,12 +102,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   protected BaseResultsBlock getBaseBlock() {
     long startWallClockTimeNs = System.nanoTime();
-    ThreadResourceContext resourceContext = new ThreadResourceContext();
+    ThreadResourceSnapshot resourceContext = new ThreadResourceSnapshot();
 
     BaseResultsBlock resultsBlock = getCombinedResults();
 
     resourceContext.close();
-    long mainThreadCpuTimeNs = resourceContext.getCpuTimeNanos();
+    long mainThreadCpuTimeNs = resourceContext.getCpuTimeNs();
     long mainThreadMemAllocatedBytes = resourceContext.getAllocatedBytes();
 
     long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
