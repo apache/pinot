@@ -288,6 +288,18 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
   }
 
+  @Test
+  public void testConstantExpressionQuery()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    JsonNode result = postQuery("SELECT 1");
+    assertEquals(result.get("numServersQueried").intValue(), 1);
+
+    result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable WHERE false GROUP BY 1 ORDER BY 2 DESC");
+    assertEquals(result.get("numServersQueried").intValue(), 1);
+  }
+
   // Disabled because segments might not be server partitioned with multiple servers
   @Test(enabled = false)
   @Override
