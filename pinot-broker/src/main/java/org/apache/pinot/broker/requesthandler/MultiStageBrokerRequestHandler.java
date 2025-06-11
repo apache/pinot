@@ -254,7 +254,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throws QueryException, WebApplicationException {
     _queryLogger.log(requestId, query);
 
-    long queryTimeoutMs = getTimeout(sqlNodeAndOptions.getOptions());
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    long queryTimeoutMs = getTimeout(options);
+    QueryThreadContext.setActiveDeadlineMs(System.currentTimeMillis() + queryTimeoutMs);
+    QueryThreadContext.setPassiveDeadlineMs(System.currentTimeMillis() + queryTimeoutMs + getPassiveTimeout(options));
+
     Timer queryTimer = new Timer(queryTimeoutMs, TimeUnit.MILLISECONDS);
 
     try (QueryEnvironment.CompiledQuery compiledQuery =
@@ -339,6 +343,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private long getTimeout(Map<String, String> queryOptions) {
     Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
     return timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
+  }
+
+  private long getPassiveTimeout(Map<String, String> queryOptions) {
+    Long passiveTimeoutMsFromQueryOption = QueryOptionsUtils.getPassiveTimeoutMs(queryOptions);
+    return passiveTimeoutMsFromQueryOption != null ? passiveTimeoutMsFromQueryOption : _brokerPassiveTimeoutMs;
   }
 
 

@@ -344,7 +344,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers) {
-      super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      super(context.getId(), context.getPassiveDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }

@@ -280,7 +280,9 @@ public class ServerPlanRequestUtils {
       pinotQuery.setQueryOptions(queryOptions);
     }
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
+        Long.toString(executionContext.getActiveDeadlineMs() - System.currentTimeMillis()));
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+        Long.toString(executionContext.getPassiveDeadlineMs() - executionContext.getActiveDeadlineMs()));
   }
 
   /**

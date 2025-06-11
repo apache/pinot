@@ -113,6 +113,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String passiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, passiveTimeoutMsString, 0);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);

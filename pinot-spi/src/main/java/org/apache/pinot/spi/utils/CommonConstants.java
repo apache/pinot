@@ -325,6 +325,8 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
+    public static final String CONFIG_OF_BROKER_PASSIVE_TIMEOUT_MS = "pinot.broker.passiveTimeoutMs";
+    public static final long DEFAULT_BROKER_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
@@ -477,6 +479,7 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
