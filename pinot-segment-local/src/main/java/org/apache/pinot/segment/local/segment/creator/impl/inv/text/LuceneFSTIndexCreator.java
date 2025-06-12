@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.text;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -55,13 +58,28 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
       throws IOException {
+    this(indexDir, columnName, sortedEntries, new FSTBuilder());
+  }
+
+  @VisibleForTesting
+  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries, FSTBuilder fstBuilder)
+      throws IOException {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
-    _fstBuilder = new FSTBuilder();
+    _fstBuilder = fstBuilder;
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
-        _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
+        try {
+          _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
+        } catch (IOException ex) {
+          // Caught exception while trying to add, update metric and skip the document
+          ServerMetrics serverMetrics = ServerMetrics.get();
+          // TODO: Get the tableNameWithType and IndexType for the metric name
+          if (serverMetrics != null) {
+            ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+          }
+        }
       }
     }
   }
@@ -76,10 +94,15 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public void add(String document) {
     try {
       _fstBuilder.addEntry(document, _dictId);
-      _dictId++;
     } catch (IOException ex) {
-      throw new RuntimeException("Unable to load the schema file", ex);
+      // Caught exception while trying to add, update metric and skip the document
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      // TODO: Get the tableNameWithType and IndexType for the metric name
+      if (serverMetrics != null) {
+        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+      }
     }
+    _dictId++;
   }
 
   @Override
