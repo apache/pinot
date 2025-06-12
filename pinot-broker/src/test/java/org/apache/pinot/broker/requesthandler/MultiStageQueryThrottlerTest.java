@@ -320,7 +320,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(-1, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), -1);
 
     // Only cluster config is set
     when(_helixAdmin.getConfig(any(),
@@ -330,7 +330,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(10, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 10);
 
     // Only broker config is set
     when(_helixAdmin.getConfig(any(),
@@ -344,7 +344,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(20, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 20);
 
     // Both configs are set. Cluster config is lower. Broker config prioritized.
     when(_helixAdmin.getConfig(any(),
@@ -358,7 +358,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig2);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(25, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 25);
 
     // Both configs are set. Broker config is lower. Broker config prioritized.
     when(_helixAdmin.getConfig(any(),
@@ -372,7 +372,7 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig3);
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertEquals(5, _multiStageQueryThrottler.calculateMaxServerQueryThreads());
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 5);
   }
 
   @Test
