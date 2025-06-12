@@ -114,7 +114,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             Tracing.ThreadAccountantOps.clear();
             return;
           }
-          try (resourceSnapshot) {
+          try {
             processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
@@ -132,10 +132,12 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();
-            _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
-            _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceSnapshot.getAllocatedBytes());
             Tracing.ThreadAccountantOps.clear();
           }
+
+          resourceSnapshot.takeSnapshot();
+          _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
+          _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceSnapshot.getAllocatedBytes());
         }
       });
     }
