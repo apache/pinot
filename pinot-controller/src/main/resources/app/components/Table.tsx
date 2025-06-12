@@ -51,6 +51,8 @@ import { sortBytes, sortNumberOfSegments } from '../utils/SortFunctions'
 import Utils from '../utils/Utils';
 import TableToolbar from './TableToolbar';
 import SimpleAccordion from './SimpleAccordion';
+import clsx from 'clsx';
+import { getStatusChipClass } from './StatusFilter';
 
 type Props = {
   title?: string,
@@ -106,7 +108,7 @@ const StyledTableCell = withStyles((theme) =>
 const StyledChip = withStyles((theme) =>
   createStyles({
     root: {
-      height: '28px',
+      height: '24px',
       '& span': {
         paddingLeft: '8px',
         paddingRight: '8px',
@@ -166,21 +168,33 @@ const useStyles = makeStyles((theme) => ({
   spacer: {
     flex: '0 1 auto',
   },
+  chip: {
+    height: 24,
+    '& span': {
+      paddingLeft: 8,
+      paddingRight: 8,
+      fontWeight: 600,
+    },
+  },
   cellStatusGood: {
     color: '#4CAF50',
-    border: '1px solid #4CAF50',
+    border: '1px solid rgba(76,175,80,0.3)',
+    backgroundColor: 'rgba(76,175,80,0.1)',
   },
   cellStatusBad: {
     color: '#f44336',
-    border: '1px solid #f44336',
+    border: '1px solid rgba(244,67,54,0.3)',
+    backgroundColor: 'rgba(244,67,54,0.1)',
   },
   cellStatusConsuming: {
     color: '#ff9800',
-    border: '1px solid #ff9800',
+    border: '1px solid rgba(255,152,0,0.3)',
+    backgroundColor: 'rgba(255,152,0,0.1)',
   },
   cellStatusError: {
     color: '#a11',
-    border: '1px solid #a11',
+    border: '1px solid rgba(170,17,17,0.3)',
+    backgroundColor: 'rgba(170,17,17,0.1)',
   },
   clickable: {
     cursor: 'pointer',
@@ -366,50 +380,14 @@ export default function CustomizedTables({
   }, [search, timeoutId, filterSearchResults]);
 
   const styleCell = (str: string) => {
-    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
-      return (
-        <StyledChip
-          label={str}
-          className={classes.cellStatusGood}
-          variant="outlined"
-        />
-      );
-    }
-    if (str.toLocaleLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
-      return (
-        <StyledChip
-          label={str}
-          className={classes.cellStatusBad}
-          variant="outlined"
-        />
-      );
-    }
-    if (str.toLowerCase() === 'consuming' || str.toLocaleLowerCase() === "partial" || str.toLocaleLowerCase() === "updating" ) {
-      return (
-        <StyledChip
-          label={str}
-          className={classes.cellStatusConsuming}
-          variant="outlined"
-        />
-      );
-    }
-    if (str.toLowerCase() === 'error') {
-      return (
-        <StyledChip
-          label={str}
-          className={classes.cellStatusError}
-          variant="outlined"
-        />
-      );
-    }
-    if (str?.toLowerCase()?.search('partial-') !== -1) {
-      return (
-        <StyledChip
-          label={str?.replace('Partial-','')}
-          className={classes.cellStatusConsuming}
-          variant="outlined"
-        />
-      );
+    if (str.toLowerCase() === 'good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true' ||
+        str.toLowerCase() === 'bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false' ||
+        str.toLowerCase() === 'consuming' || str.toLowerCase() === 'partial' || str.toLowerCase() === 'updating' || str.toLowerCase() === 'error' ||
+        str.toLowerCase().startsWith('partial-')) {
+      const normalized = str.toLowerCase().startsWith('partial-') ? 'partial' : str.toLowerCase();
+      const chipClass = getStatusChipClass(normalized, classes);
+      const label = str.toLowerCase().startsWith('partial-') ? str.replace('Partial-', '') : str;
+      return <StyledChip label={label} className={clsx(classes.chip, chipClass)} variant="outlined" />;
     }
     if (str.search('\n') !== -1) {
       return (<pre>{str.toString()}</pre>);

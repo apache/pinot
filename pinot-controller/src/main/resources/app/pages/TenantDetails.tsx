@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Box, Button, Checkbox, FormControl, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip, InputLabel, Select } from '@material-ui/core';
+import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
@@ -50,6 +50,7 @@ import {
   RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
 import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
+import StatusFilter from '../components/StatusFilter';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -169,21 +170,17 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   }, [segmentList, segmentStatusFilter]);
 
   const segmentStatusFilterElement = (
-    <FormControl variant="outlined" size="small" style={{ marginLeft: 16, minWidth: 170 }}>
-      <InputLabel id="segment-status-filter-label">Status</InputLabel>
-      <Select
-        labelId="segment-status-filter-label"
-        value={segmentStatusFilter}
-        onChange={(e) => setSegmentStatusFilter(e.target.value as any)}
-        label="Status"
-      >
-        <MenuItem value="ALL">All</MenuItem>
-        <MenuItem value="BAD_OR_UPDATING">Bad or Updating</MenuItem>
-        <MenuItem value={DISPLAY_SEGMENT_STATUS.BAD}>Bad</MenuItem>
-        <MenuItem value={DISPLAY_SEGMENT_STATUS.UPDATING}>Updating</MenuItem>
-        <MenuItem value={DISPLAY_SEGMENT_STATUS.GOOD}>Good</MenuItem>
-      </Select>
-    </FormControl>
+    <StatusFilter
+      value={segmentStatusFilter}
+      onChange={setSegmentStatusFilter}
+      options={[
+        { label: 'All', value: 'ALL' },
+        { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+        { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+        { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+        { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+      ]}
+    />
   );
 
   const [tableSchema, setTableSchema] = useState<TableData>({
