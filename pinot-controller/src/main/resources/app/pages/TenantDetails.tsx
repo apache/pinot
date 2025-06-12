@@ -904,7 +904,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               addLinks
               showSearchBox={true}
               inAccordionFormat={true}
-              additionalControls={segmentStatusFilterElement}
+              additionalControls={
+                <StatusFilter
+                  value={segmentStatusFilter}
+                  onChange={setSegmentStatusFilter}
+                  options={[
+                    { label: 'All', value: 'ALL' },
+                    { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+                    { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+                    { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+                    { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+                  ]}
+                />
+              }
             />
           </Grid>
           <Grid item xs={6}>

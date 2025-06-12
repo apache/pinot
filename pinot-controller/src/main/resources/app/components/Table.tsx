@@ -385,9 +385,8 @@ export default function CustomizedTables({
         str.toLowerCase() === 'consuming' || str.toLowerCase() === 'partial' || str.toLowerCase() === 'updating' || str.toLowerCase() === 'error' ||
         str.toLowerCase().startsWith('partial-')) {
       const normalized = str.toLowerCase().startsWith('partial-') ? 'partial' : str.toLowerCase();
-      const chipClass = getStatusChipClass(normalized, classes);
       const label = str.toLowerCase().startsWith('partial-') ? str.replace('Partial-', '') : str;
-      return <StyledChip label={label} className={clsx(classes.chip, chipClass)} variant="outlined" />;
+      return <StyledChip label={label} className={clsx(classes.chip)} variant="outlined" />;
     }
     if (str.search('\n') !== -1) {
       return (<pre>{str.toString()}</pre>);

@@ -25,7 +25,7 @@ import AccordionDetails from '@material-ui/core/AccordionDetails';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import SearchBar from './SearchBar';
-import { FormControlLabel, Switch, Tooltip } from '@material-ui/core';
+import { FormControlLabel, Switch, Tooltip, Box } from '@material-ui/core';
 import clsx from 'clsx';
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -34,7 +34,7 @@ const useStyles = makeStyles((theme: Theme) =>
       backgroundColor: 'rgba(66, 133, 244, 0.1)',
       borderBottom: '1px #BDCCD9 solid',
       minHeight: '0 !important',
-      '& .MuiAccordionSummary-content.Mui-expanded':{
+      '& .MuiAccordionSummary-content.Mui-expanded': {
         margin: 0,
         alignItems: 'center',
       }
@@ -54,6 +54,26 @@ const useStyles = makeStyles((theme: Theme) =>
       marginRight: 0,
       marginLeft: 'auto',
       zoom: 0.85
+    },
+    controlsContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing(1),
+      padding: '8px 16px',
+      borderBottom: '1px solid #BDCCD9',
+      backgroundColor: '#f8f9fa',
+      flexWrap: 'wrap',
+    },
+    searchBarContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing(1),
+    },
+    additionalControlsContainer: {
+      marginLeft: 'auto',
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing(1),
     }
   }),
 );
@@ -89,6 +109,9 @@ export default function SimpleAccordion({
 }: Props) {
   const classes = useStyles();
 
+  const hasControls = showSearchBox || additionalControls;
+  const needsControlsContainer = additionalControls; // Only create container when there are additional controls
+
   return (
     <Accordion
       defaultExpanded={true}
@@ -112,7 +135,7 @@ export default function SimpleAccordion({
             control={
               <Switch
                 checked={accordionToggleObject.toggleValue}
-                onChange={accordionToggleObject.toggleChangeHandler} 
+                onChange={accordionToggleObject.toggleChangeHandler}
                 name={accordionToggleObject.toggleName}
                 color="primary"
               />
@@ -122,14 +145,31 @@ export default function SimpleAccordion({
         }
       </AccordionSummary>
       <AccordionDetails className={clsx(classes.details, detailsContainerClass)}>
-        {showSearchBox ? (
-          <SearchBar
-            value={searchValue}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        ) : null}
-        {additionalControls && (
-          <div style={{ marginTop: 8 }}>{additionalControls}</div>
+        {needsControlsContainer ? (
+          // New layout: search + additional controls in container
+          <div className={classes.controlsContainer}>
+            {showSearchBox && (
+              <div className={classes.searchBarContainer}>
+                <SearchBar
+                  value={searchValue}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            )}
+            {additionalControls && (
+              <div className={classes.additionalControlsContainer}>
+                {additionalControls}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Original layout: just search bar if present
+          showSearchBox && (
+            <SearchBar
+              value={searchValue}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          )
         )}
         {children}
       </AccordionDetails>

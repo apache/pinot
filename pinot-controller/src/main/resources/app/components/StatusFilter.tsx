@@ -1,113 +1,212 @@
 import React from 'react';
-import { FormControl, InputLabel, Select, MenuItem, Chip, makeStyles, createStyles } from '@material-ui/core';
-import PropTypes from 'prop-types';
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  makeStyles,
+  Chip
+} from '@material-ui/core';
+import { DISPLAY_SEGMENT_STATUS } from 'Models';
 
-const useStyles = makeStyles(() =>
-  createStyles({
-    formControl: {
-      marginLeft: 16,
-      minWidth: 170,
+const useStyles = makeStyles((theme) => ({
+  formControl: {
+    minWidth: 140,
+    height: 32, // Match search bar height
+  },
+  select: {
+    height: 32,
+    fontSize: '0.875rem',
+    backgroundColor: '#fff',
+    '& .MuiSelect-select': {
+      paddingTop: 6,
+      paddingBottom: 6,
+      paddingLeft: 12,
+      paddingRight: 32,
+      display: 'flex',
+      alignItems: 'center',
+      height: 'auto',
+      minHeight: 'unset',
     },
-    chip: {
-      height: 24,
-      fontWeight: 600,
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 4,
+      '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#4285f4',
+      },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#4285f4',
+        borderWidth: 1,
+      },
     },
-    good: {
-      color: '#4CAF50',
-      border: '1px solid rgba(76,175,80,0.3)',
-      backgroundColor: 'rgba(76,175,80,0.1)',
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: '#BDCCD9',
     },
-    bad: {
-      color: '#f44336',
-      border: '1px solid rgba(244,67,54,0.3)',
-      backgroundColor: 'rgba(244,67,54,0.1)',
+  },
+  inputLabel: {
+    fontSize: '0.75rem',
+    color: '#666',
+    transform: 'translate(12px, 9px) scale(1)',
+    '&.MuiInputLabel-shrink': {
+      transform: 'translate(12px, -6px) scale(0.75)',
+      color: '#4285f4',
     },
-    consuming: {
-      color: '#ff9800',
-      border: '1px solid rgba(255,152,0,0.3)',
-      backgroundColor: 'rgba(255,152,0,0.1)',
+    '&.Mui-focused': {
+      color: '#4285f4',
     },
-    error: {
-      color: '#a11',
-      border: '1px solid rgba(170,17,17,0.3)',
-      backgroundColor: 'rgba(170,17,17,0.1)',
+  },
+  menuItem: {
+    padding: '6px 12px',
+    fontSize: '0.875rem',
+    minHeight: 'auto',
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.08)',
     },
-    menuItem: {
+    '&.Mui-selected': {
+      backgroundColor: 'rgba(66, 133, 244, 0.12)',
       '&:hover': {
-        backgroundColor: 'rgba(66,133,244,0.08)',
-      },
-      '&.Mui-selected': {
-        backgroundColor: 'rgba(66,133,244,0.12)',
+        backgroundColor: 'rgba(66, 133, 244, 0.16)',
       },
     },
-  })
-);
+  },
+  statusChip: {
+    height: 18,
+    fontSize: '0.7rem',
+    fontWeight: 600,
+    marginLeft: 6,
+    '& .MuiChip-label': {
+      paddingLeft: 6,
+      paddingRight: 6,
+    }
+  },
+  // Status styles
+  cellStatusGood: {
+    color: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    border: '1px solid #4CAF50',
+  },
+  cellStatusBad: {
+    color: '#f44336',
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    border: '1px solid #f44336',
+  },
+  cellStatusConsuming: {
+    color: '#ff9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    border: '1px solid #ff9800',
+  },
+  cellStatusError: {
+    color: '#a11',
+    backgroundColor: 'rgba(170, 17, 17, 0.1)',
+    border: '1px solid #a11',
+  },
+  menuPaper: {
+    marginTop: 2,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
+    border: '1px solid #BDCCD9',
+    maxHeight: 200,
+  }
+}));
 
-export const getStatusChipClass = (status: string, classes: Record<string, string>): string => {
-  const s = status.toLowerCase();
-  if (['good', 'online', 'alive', 'true'].includes(s)) return classes.good;
-  if (['bad', 'offline', 'dead', 'false'].includes(s)) return classes.bad;
-  if (s === 'error') return classes.error;
-  return classes.consuming;
+type StatusFilterOption = {
+  label: string;
+  value: 'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING';
 };
 
-interface Option { label: string; value: string; }
-interface StatusFilterProps {
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  label?: string;
-}
+type StatusFilterProps = {
+  value: 'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING';
+  onChange: (value: 'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING') => void;
+  options: StatusFilterOption[];
+};
 
-const StatusFilter = ({ value, onChange, options, label = 'Status' }: StatusFilterProps) => {
+export const getStatusChipClass = (status: string, classes?: any) => {
+  const normalizedStatus = status.toLowerCase();
+  switch (normalizedStatus) {
+    case DISPLAY_SEGMENT_STATUS.GOOD.toLowerCase():
+      return classes.cellStatusGood;
+    case DISPLAY_SEGMENT_STATUS.BAD.toLowerCase():
+      return classes.cellStatusBad;
+    case DISPLAY_SEGMENT_STATUS.UPDATING.toLowerCase():
+      return classes.cellStatusConsuming;
+    case 'error':
+      return classes.cellStatusError;
+    case 'bad_or_updating':
+      return classes.cellStatusBad;
+    default:
+      return '';
+  }
+};
+
+const StatusFilter: React.FC<StatusFilterProps> = ({ value, onChange, options }) => {
   const classes = useStyles();
 
-  const handleChange = (e: React.ChangeEvent<{ value: unknown }>) => {
-    onChange(e.target.value as string);
-  };
+  const renderValue = (selected: string) => {
+    const selectedOption = options.find(option => option.value === selected);
+    const label = selectedOption ? selectedOption.label : 'All';
 
-  const renderValue = (selected: unknown) => {
-    const option = options.find((o) => o.value === selected) || { label: selected as string, value: selected as string };
-    const chipClass = getStatusChipClass(option.value, classes);
-    return <Chip label={option.label} className={`${classes.chip} ${chipClass}`} variant="outlined" />;
+    if (selected === 'ALL') {
+      return label;
+    }
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <Chip
+          size="small"
+          label={label}
+          variant="outlined"
+          className={`${classes.statusChip} ${getStatusChipClass(selected, classes)}`}
+        />
+      </div>
+    );
   };
 
   return (
-    <FormControl variant="outlined" size="small" className={classes.formControl}>
-      <InputLabel id="status-filter-label">{label}</InputLabel>
+    <FormControl variant="outlined" className={classes.formControl} size="small">
+      <InputLabel className={classes.inputLabel}>Filter</InputLabel>
       <Select
-        labelId="status-filter-label"
         value={value}
-        onChange={handleChange}
-        label={label}
+        onChange={(e) => onChange(e.target.value as 'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING')}
+        label="Filter"
+        className={classes.select}
         renderValue={renderValue}
         MenuProps={{
-          anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-          transformOrigin: { vertical: 'top', horizontal: 'left' },
+          PaperProps: {
+            className: classes.menuPaper,
+          },
+          anchorOrigin: {
+            vertical: 'bottom',
+            horizontal: 'left',
+          },
+          transformOrigin: {
+            vertical: 'top',
+            horizontal: 'left',
+          },
           getContentAnchorEl: null,
-          PaperProps: { style: { maxHeight: 300, marginTop: 4 } },
         }}
       >
-        {options.map((opt) => (
-          <MenuItem key={opt.value} value={opt.value} className={classes.menuItem}>
-            {opt.label}
+        {options.map((option) => (
+          <MenuItem
+            key={option.value}
+            value={option.value}
+            className={classes.menuItem}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+              justifyContent: 'space-between'
+            }}>
+              <Chip
+                size="small"
+                label={option.label}
+                variant="outlined"
+                className={`${classes.statusChip} ${getStatusChipClass(option.value, classes)}`}
+              />
+            </div>
           </MenuItem>
         ))}
       </Select>
     </FormControl>
   );
-};
-
-StatusFilter.propTypes = {
-  value: PropTypes.string.isRequired,
-  onChange: PropTypes.func.isRequired,
-  options: PropTypes.arrayOf(
-    PropTypes.shape({
-      label: PropTypes.string.isRequired,
-      value: PropTypes.string.isRequired,
-    })
-  ).isRequired,
-  label: PropTypes.string,
 };
 
 export default StatusFilter;
