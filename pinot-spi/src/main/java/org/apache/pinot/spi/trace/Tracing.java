@@ -326,6 +326,10 @@ public class Tracing {
       sample();
     }
 
+    @Deprecated
+    public static void updateQueryUsageConcurrently(String queryId) {
+    }
+
     public static void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
       Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId, cpuTimeNs, allocatedBytes);
     }
