@@ -2,12 +2,12 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -27,7 +27,7 @@ public class RlsFiltersRewriter implements QueryRewriter {
       Expression existingFilterExpression = pinotQuery.getFilterExpression();
       if (existingFilterExpression != null) {
         Expression combinedFilterExpression =
-            RequestUtils.getFunctionExpression(SqlKind.AND.toString(), List.of(expression, existingFilterExpression));
+            RequestUtils.getFunctionExpression(FilterKind.AND.name(), List.of(expression, existingFilterExpression));
         pinotQuery.setFilterExpression(combinedFilterExpression);
       } else {
         pinotQuery.setFilterExpression(expression);

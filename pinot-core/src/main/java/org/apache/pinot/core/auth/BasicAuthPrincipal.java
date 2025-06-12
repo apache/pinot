@@ -89,7 +89,7 @@ public class BasicAuthPrincipal {
     return "BasicAuthPrincipal{"
         + "_name='" + _name + '\''
         + ", _token='" + _token + '\''
-        + ", _tables=" + _tables
+        + ", _tables=" + _tables + '\''
         + ", _permissions=" + _permissions + '\''
         + ",_rlsFilters=" + _rlsFilters
         + '}';
