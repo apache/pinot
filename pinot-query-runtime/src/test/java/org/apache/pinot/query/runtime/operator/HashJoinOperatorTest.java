@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
 public class HashJoinOperatorTest {
@@ -604,6 +605,166 @@ public class HashJoinOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2, null}); // Left null preserved (no match)
     assertEquals(resultRows.get(1), new Object[]{4, "CC"}); // Left unmatched preserved
+  }
+
+  @Test
+  public void shouldHandleCompositeKeyWithNullValues() {
+    // Test composite key join (multi-column) with null values
+    // This should expose the bug in isNullKey method where it checks for Object[] instead of Key
+
+    DataSchema compositeSchema = new DataSchema(
+            new String[]{"int_col", "string_col", "double_col"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    _leftInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Normal row
+            .addRow(2, null, 2.0)      // Null in second key component
+            .addRow(3, "Cc", null)     // Null in third key component
+            .addRow(4, "Dd", 4.0)      // Normal row
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Match for first left row
+            .addRow(2, null, 2.0)      // Should NOT match left null (SQL standard)
+            .addRow(3, "Cc", null)     // Should NOT match left null (SQL standard)
+            .addRow(5, "Ee", 5.0)      // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "double_col1", "int_col2", "string_col2", "double_col2"},
+            new ColumnDataType[]{
+                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
+                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
+            });
+
+    // Composite key join on columns 1 and 2 (string_col and double_col)
+    HashJoinOperator operator = getOperator(compositeSchema, resultSchema, JoinRelType.LEFT,
+            List.of(1, 2), List.of(1, 2), List.of(), PlanNode.NodeHint.EMPTY);
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Expected behavior per SQL standard:
+    // - Row 1: (1, "Aa", 1.0) should match (1, "Aa", 1.0)
+    // - Row 2: (2, null, 2.0) should NOT match (2, null, 2.0) -> left preserved with nulls
+    // - Row 3: (3, "Cc", null) should NOT match (3, "Cc", null) -> left preserved with nulls
+    // - Row 4: (4, "Dd", 4.0) has no match -> left preserved with nulls
+
+    assertEquals(resultRows.size(), 4);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1.0, 1, "Aa", 1.0});      // Match
+    assertEquals(resultRows.get(1), new Object[]{2, null, 2.0, null, null, null});  // Left null preserved
+    assertEquals(resultRows.get(2), new Object[]{3, "Cc", null, null, null, null}); // Left null preserved
+    assertEquals(resultRows.get(3), new Object[]{4, "Dd", 4.0, null, null, null});  // Left unmatched preserved
+  }
+
+  @Test
+  public void shouldHandleCompositeKeyInnerJoinWithNulls() {
+    // Test that composite keys with nulls are properly excluded from INNER join
+
+    DataSchema compositeSchema = new DataSchema(
+            new String[]{"int_col", "string_col", "double_col"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    _leftInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Should match
+            .addRow(2, null, 2.0)      // Should be excluded (null key)
+            .addRow(3, "Cc", 3.0)      // No match in right
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Match
+            .addRow(2, null, 2.0)      // Should be excluded (null key)
+            .addRow(4, "Dd", 4.0)      // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "double_col1", "int_col2", "string_col2", "double_col2"},
+            new ColumnDataType[]{
+                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
+                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
+            });
+
+    // Composite key join on columns 1 and 2 (string_col and double_col)
+    HashJoinOperator operator = getOperator(compositeSchema, resultSchema, JoinRelType.INNER,
+            List.of(1,2), List.of(1,2), List.of(), PlanNode.NodeHint.EMPTY);
+
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Only the non-null key match should be returned
+    assertEquals(resultRows.size(), 1);
+    assertArrayEquals(resultRows.get(0), new Object[]{1, "Aa", 1.0, 1, "Aa", 1.0});
+  }
+
+  @Test
+  public void shouldHandleCompositeKeySemiJoinWithNulls() {
+    // Test that SEMI join properly handles composite keys with nulls
+
+    DataSchema compositeSchema = new DataSchema(
+            new String[]{"int_col", "string_col", "double_col"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    _leftInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Should match
+            .addRow(2, null, 2.0)      // Should be excluded (null key)
+            .addRow(3, "Cc", 3.0)      // No match in right
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Match
+            .addRow(2, null, 2.0)      // Should be excluded (null key)
+            .addRow(4, "Dd", 4.0)      // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "double_col1"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    // Composite key join on columns 1 and 2 (string_col and double_col)
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.SEMI,
+            List.of(1, 2), List.of(1, 2), List.of());
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Only left rows with non-null keys that have matches should be returned
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1.0});
+  }
+
+  @Test
+  public void shouldHandleCompositeKeyAntiJoinWithNulls() {
+    // Test that ANTI join properly handles composite keys with nulls
+    // Per SQL standard, rows with null keys should be included in ANTI join result
+
+    DataSchema compositeSchema = new DataSchema(
+            new String[]{"int_col", "string_col", "double_col"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    _leftInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Has match in right
+            .addRow(2, null, 2.0)      // Null key - should be included
+            .addRow(3, "Cc", 3.0)      // No match in right
+            .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(compositeSchema)
+            .addRow(1, "Aa", 1.0)      // Match for left row 1
+            .addRow(2, null, 2.0)      // Null key - should not match left null
+            .addRow(4, "Dd", 4.0)      // No match in left
+            .buildWithEos();
+
+    DataSchema resultSchema = new DataSchema(
+            new String[]{"int_col1", "string_col1", "double_col1"},
+            new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE});
+
+    // Composite key join on columns 1 and 2 (string_col and double_col)
+    HashJoinOperator operator = getOperator(resultSchema, JoinRelType.ANTI,
+            List.of(1, 2), List.of(1, 2), List.of());
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Left rows with null keys and unmatched non-null keys should be returned
+    assertEquals(resultRows.size(), 2);
+    assertTrue(containsRow(resultRows, new Object[]{2, null, 2.0}));  // Null key preserved
+    assertTrue(containsRow(resultRows, new Object[]{3, "Cc", 3.0}));  // Unmatched preserved
   }
 
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
