@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.json;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -92,6 +95,29 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   public void add(String jsonString)
       throws IOException {
     addFlattenedRecords(JsonUtils.flatten(jsonString, _jsonIndexConfig));
+  }
+
+  @Override
+  public void add(Object value)
+      throws IOException {
+    String valueToAdd;
+    try {
+      valueToAdd = JsonUtils.objectToString(value);
+    } catch (JsonProcessingException e) {
+      if (_jsonIndexConfig.getSkipInvalidJson()) {
+        // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
+        ServerMetrics serverMetrics = ServerMetrics.get();
+        // TODO: Get the tableNameWithType and IndexType for the metric name
+        if (serverMetrics != null) {
+          ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+        }
+        addFlattenedRecords(JsonUtils.SKIPPED_FLATTENED_RECORD);
+        return;
+      } else {
+        throw e;
+      }
+    }
+    add(valueToAdd);
   }
 
   /**
