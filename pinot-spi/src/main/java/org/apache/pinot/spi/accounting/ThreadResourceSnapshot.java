@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.spi.accounting;
 
+/**
+ * ThreadResourceSnapshot is a utility class that helps to track the CPU time and memory allocated.
+ * {@link ThreadResourceUsageProvider} provides cumulative CPU time and memory allocated for the current thread.
+ * This class uses that provider to snapshot start & end values for a task executed by that thread.
+ * It also implements {@link AutoCloseable} to allow usage in try-with-resources blocks,
+ */
 public class ThreadResourceSnapshot implements AutoCloseable {
   private long _startCpuTime;
   private long _startAllocatedBytes;
