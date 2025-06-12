@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -99,10 +98,10 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     // validate if partitionID is same for all small segments. Get partition id value for new segment.
     int partitionID = getCommonPartitionIDForSegments(segmentMetadataList);
 
-    // get the max creation time of the small segments. This will be the index creation time for the new segment.
-    Optional<Long> maxCreationTimeOfMergingSegments =
-        segmentMetadataList.stream().map(SegmentMetadataImpl::getIndexCreationTime).reduce(Long::max);
-    if (maxCreationTimeOfMergingSegments.isEmpty()) {
+    // get the max creation time from the task configuration passed by the generator
+    long maxCreationTimeOfMergingSegments =
+        Long.parseLong(configs.get(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY));
+    if (maxCreationTimeOfMergingSegments <= 0) {
       String message = "No valid creation time found for the new merged segment. This might be due to "
           + "missing creation time for merging segments";
       LOGGER.error(message);
@@ -138,7 +137,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
 
     // create new UploadedRealtimeSegment
-    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments.get());
+    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments);
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
         new UploadedRealtimeSegmentNameGenerator(TableNameBuilder.extractRawTableName(tableNameWithType), partitionID,
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));
