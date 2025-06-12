@@ -297,9 +297,8 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea42</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <maven.version>3.9.10</maven.version>
-    <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
-    <plexus-utils.version>3.6.0</plexus-utils.version>
+    <maven.version>3.9.9</maven.version>
+    <plexus-utils.version>4.0.2</plexus-utils.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -2079,13 +2078,9 @@
       </dependency>
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
-        <artifactId>plexus-component-annotations</artifactId>
-        <version>${plexus-component-annotations.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-utils</artifactId>
         <version>${plexus-utils.version}</version>
+        <scope>compile</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
