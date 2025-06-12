@@ -198,6 +198,12 @@ public class Tracing {
     }
 
     @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId) {
+      // No-op for default accountant
+    }
+
+    @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
       // No-op for default accountant
     }
