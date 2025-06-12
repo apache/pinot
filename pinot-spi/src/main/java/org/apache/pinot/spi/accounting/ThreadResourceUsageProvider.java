@@ -54,6 +54,16 @@ public class ThreadResourceUsageProvider {
   private ThreadResourceUsageProvider() {
   }
 
+  @Deprecated
+  public long getThreadTimeNs() {
+    return 0;
+  }
+
+  @Deprecated
+  public long getThreadAllocatedBytes() {
+    return 0;
+  }
+
   public static long getCurrentThreadCpuTime() {
     return _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() : 0;
   }
