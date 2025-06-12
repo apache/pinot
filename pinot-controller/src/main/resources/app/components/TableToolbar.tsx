@@ -33,7 +33,6 @@ type Props = {
   recordCount?: number;
   showTooltip?: boolean;
   tooltipText?: string;
-  additionalControls?: React.ReactNode;
 };
 
 const useToolbarStyles = makeStyles((theme) => ({
@@ -59,8 +58,7 @@ export default function TableToolbar({
   handleSearch,
   recordCount,
   showTooltip,
-  tooltipText,
-  additionalControls
+  tooltipText
 }: Props) {
   const classes = useToolbarStyles();
 
@@ -82,7 +80,6 @@ export default function TableToolbar({
       ) : (
         <strong>{recordCount}</strong>
       )}
-      {additionalControls}
       {showTooltip &&
         <Tooltip title={tooltipText}>
           <HelpOutlineIcon />

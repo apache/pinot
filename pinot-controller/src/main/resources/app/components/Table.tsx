@@ -605,8 +605,10 @@ export default function CustomizedTables({
           searchValue={search}
           handleSearch={(val: string) => setSearch(val)}
           recordCount={recordsCount}
-          additionalControls={additionalControls}
         />
+        {additionalControls && (
+          <div style={{ marginTop: 8 }}>{additionalControls}</div>
+        )}
         {renderTableComponent()}
       </>
     );

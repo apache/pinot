@@ -128,7 +128,9 @@ export default function SimpleAccordion({
             onChange={(e) => handleSearch(e.target.value)}
           />
         ) : null}
-        {additionalControls}
+        {additionalControls && (
+          <div style={{ marginTop: 8 }}>{additionalControls}</div>
+        )}
         {children}
       </AccordionDetails>
     </Accordion>
