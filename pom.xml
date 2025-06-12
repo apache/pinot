@@ -60,6 +60,7 @@
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
+    <module>pinot-udf-test</module>
   </modules>
 
   <licenses>
@@ -576,6 +577,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-timeseries-m3ql</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-udf-test</artifactId>
         <version>${project.version}</version>
       </dependency>
 

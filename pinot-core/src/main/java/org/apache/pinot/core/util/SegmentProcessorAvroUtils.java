@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -65,6 +66,10 @@ public final class SegmentProcessorAvroUtils {
         if (value instanceof byte[]) {
           value = ByteBuffer.wrap((byte[]) value);
         }
+        if (value instanceof BigDecimal) {
+          // Convert BigDecimal to String for Avro compatibility
+          value = value.toString();
+        }
         reusableRecord.put(field, value);
       }
     }
@@ -86,22 +91,27 @@ public final class SegmentProcessorAvroUtils {
       if (fieldSpec.isSingleValueField()) {
         switch (storedType) {
           case INT:
-            fieldAssembler = fieldAssembler.name(name).type().intType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().intType().noDefault();
             break;
           case LONG:
-            fieldAssembler = fieldAssembler.name(name).type().longType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().longType().noDefault();
             break;
           case FLOAT:
-            fieldAssembler = fieldAssembler.name(name).type().floatType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().floatType().noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = fieldAssembler.name(name).type().doubleType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().doubleType().noDefault();
             break;
           case STRING:
-            fieldAssembler = fieldAssembler.name(name).type().stringType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().stringType().noDefault();
             break;
           case BYTES:
-            fieldAssembler = fieldAssembler.name(name).type().bytesType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().bytesType().noDefault();
+            break;
+          case BIG_DECIMAL:
+            fieldAssembler = fieldAssembler.name(name).type().nullable().stringBuilder()
+                .endString()
+                .noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
@@ -109,19 +119,26 @@ public final class SegmentProcessorAvroUtils {
       } else {
         switch (storedType) {
           case INT:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().intType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items().intType().noDefault();
             break;
           case LONG:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().longType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items().longType().noDefault();
             break;
           case FLOAT:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().floatType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items().floatType().noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().doubleType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items().doubleType().noDefault();
             break;
           case STRING:
-            fieldAssembler = fieldAssembler.name(name).type().array().items().stringType().noDefault();
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items().stringType().noDefault();
+            break;
+          case BIG_DECIMAL:
+            fieldAssembler = fieldAssembler.name(name).type().nullable().array().items()
+                .stringBuilder()
+                .prop("logicalType", "pinot. " + fieldSpec.getFieldType())
+                .endString()
+                .noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);

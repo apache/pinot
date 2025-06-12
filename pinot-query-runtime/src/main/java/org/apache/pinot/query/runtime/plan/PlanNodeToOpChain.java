@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
+import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
@@ -58,6 +59,7 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -201,7 +203,11 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitProject(ProjectNode node, OpChainExecutionContext context) {
       PlanNode input = node.getInputs().get(0);
-      return new TransformOperator(context, visit(input, context), input.getDataSchema(), node);
+      try {
+        return new TransformOperator(context, visit(input, context), input.getDataSchema(), node);
+      } catch (IllegalArgumentException e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+      }
     }
 
     @Override

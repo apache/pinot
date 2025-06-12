@@ -76,10 +76,12 @@ public class FunctionRegistry {
   // Key is canonical name
   public static final Map<String, PinotScalarFunction> FUNCTION_MAP;
 
-  private static final int VAR_ARG_KEY = -1;
+  public static final int VAR_ARG_KEY = -1;
 
   static {
     long startTimeMs = System.currentTimeMillis();
+
+    // TODO: Register functions for UDFs
 
     // Register ScalarFunction classes
     Map<String, PinotScalarFunction> functionMap = new HashMap<>();
@@ -184,6 +186,10 @@ public class FunctionRegistry {
         numArguments == VAR_ARG_KEY ? "variable" : numArguments);
   }
 
+  public static Set<String> getFunctionNames() {
+    return FUNCTION_MAP.keySet();
+  }
+
   /**
    * Returns {@code true} if the given canonical name is registered, {@code false} otherwise.
    *
@@ -244,7 +250,7 @@ public class FunctionRegistry {
     private final String _name;
     private final Map<Integer, FunctionInfo> _functionInfoMap;
 
-    private ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
+    public ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
       _name = name;
       _functionInfoMap = functionInfoMap;
     }
