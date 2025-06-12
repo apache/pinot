@@ -71,8 +71,8 @@ public class DedupConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to pause dedup table's partition consumption during commit")
   private boolean _allowDedupConsumptionDuringCommit;
 
-  @JsonPropertyDescription("Recovery mode which is used to decide how to recover segment having zero replicas in "
-      + "pause-less ingestion")
+  @JsonPropertyDescription("Recovery mode which is used to decide how to recover segment having no completed "
+      + "(immutable) replica on any server in pause-less ingestion")
   @Nullable
   private DisasterRecoveryMode _disasterRecoveryMode;
 

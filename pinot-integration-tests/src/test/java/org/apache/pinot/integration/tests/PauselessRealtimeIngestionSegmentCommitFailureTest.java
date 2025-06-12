@@ -238,11 +238,11 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     return segmentZKMetadataMap;
   }
 
-  public String getNonPauselessTableName() {
+  protected String getNonPauselessTableName() {
     return DEFAULT_TABLE_NAME_2;
   }
 
-  public String getPauselessTableName() {
+  protected String getPauselessTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
