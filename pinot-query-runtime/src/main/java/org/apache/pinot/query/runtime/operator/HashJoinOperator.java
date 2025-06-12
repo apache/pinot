@@ -38,6 +38,7 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.core.data.table.Key;
 
 
 /**
@@ -65,7 +66,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   private List<Object[]> _nullKeyRightRows;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
-                          MultiStageOperator rightInput, JoinNode node) {
+      MultiStageOperator rightInput, JoinNode node) {
     super(context, leftInput, leftSchema, rightInput, node);
     List<Integer> leftKeys = node.getLeftKeys();
     Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
@@ -74,7 +75,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     _rightTable = createLookupTable(leftKeys, leftSchema);
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
     // Initialize _nullKeyRightRows for both RIGHT and FULL JOINs
-    _nullKeyRightRows = (_joinType == JoinRelType.RIGHT || _joinType == JoinRelType.FULL) ? new ArrayList<>() : null;
+    _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
   }
 
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {
@@ -124,17 +125,20 @@ public class HashJoinOperator extends BaseJoinOperator {
     if (key == null) {
       return true;
     }
-    // For composite keys (Object[]), check if any component is null
-    if (key instanceof Object[]) {
-      Object[] keyArray = (Object[]) key;
-      for (Object component : keyArray) {
-        if (component == null) {
+    if (key instanceof Key) {
+      Object[] components = ((Key) key).getValues();
+      for (Object comp : components) {
+        if (comp == null) {
           return true;
         }
       }
+      return false;
     }
+    // For single keys (non-composite), key == null is already checked above
     return false;
   }
+
+
 
   @Override
   protected void finishBuildingRightTable() {
@@ -169,7 +173,10 @@ public class HashJoinOperator extends BaseJoinOperator {
 
   private boolean handleNullKey(Object key, Object[] leftRow, List<Object[]> rows) {
     if (isNullKey(key)) {
-      handleUnmatchedLeftRow(leftRow, rows);
+      // For INNER joins, don't add anything when key is null
+      if (_joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL) {
+        handleUnmatchedLeftRow(leftRow, rows);
+      }
       return true;
     }
     return false;
@@ -269,11 +276,6 @@ public class HashJoinOperator extends BaseJoinOperator {
 
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
-      // SEMI-JOIN only checks existence of the key
-      // Skip rows with null join keys for SEMI-JOIN
-      if (isNullKey(key)) {
-        continue;
-      }
       if (_rightTable.containsKey(key)) {
         rows.add(leftRow);
       }
@@ -289,12 +291,6 @@ public class HashJoinOperator extends BaseJoinOperator {
 
     for (Object[] leftRow : leftRows) {
       Object key = _leftKeySelector.getKey(leftRow);
-      // ANTI-JOIN only checks non-existence of the key
-      // For ANTI-JOIN, rows with null keys should be included (null != anything)
-      if (isNullKey(key)) {
-        rows.add(leftRow);
-        continue;
-      }
       if (!_rightTable.containsKey(key)) {
         rows.add(leftRow);
       }
