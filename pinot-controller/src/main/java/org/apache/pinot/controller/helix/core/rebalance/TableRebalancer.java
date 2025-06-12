@@ -95,9 +95,6 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.AttemptFailureException;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -390,14 +387,14 @@ public class TableRebalancer {
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
       if (forceCommitBeforeRebalance) {
-          Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
-          if (!consumingSegmentsToMoveNext.isEmpty()) {
-            currentIdealState =
-                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
-            currentAssignment = currentIdealState.getRecord().getMapFields();
-            targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
-                tierToInstancePartitionsMap, rebalanceConfig);
-          }
+        Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
+        if (!consumingSegmentsToMoveNext.isEmpty()) {
+          currentIdealState =
+              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
+          currentAssignment = currentIdealState.getRecord().getMapFields();
+          targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+              tierToInstancePartitionsMap, rebalanceConfig);
+        }
       }
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
