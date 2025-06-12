@@ -22,15 +22,13 @@ package org.apache.pinot.spi.accounting;
  * ThreadResourceSnapshot is a utility class that helps to track the CPU time and memory allocated.
  * {@link ThreadResourceUsageProvider} provides cumulative CPU time and memory allocated for the current thread.
  * This class uses that provider to snapshot start & end values for a task executed by that thread.
- * It also implements {@link AutoCloseable} to allow usage in try-with-resources blocks,
  */
-public class ThreadResourceSnapshot implements AutoCloseable {
+public class ThreadResourceSnapshot {
   private long _startCpuTime;
   private long _startAllocatedBytes;
 
   private long _endCpuTime;
   private long _endAllocatedBytes;
-  private boolean _closed = false;
 
   /**
    * Creates a new tracker and takes initial snapshots.
@@ -51,7 +49,6 @@ public class ThreadResourceSnapshot implements AutoCloseable {
    * Takes a current snapshot if not yet closed.
    */
   public long getCpuTimeNs() {
-    updateCurrentSnapshot();
     return _endCpuTime - _startCpuTime;
   }
 
@@ -60,42 +57,20 @@ public class ThreadResourceSnapshot implements AutoCloseable {
    * Takes a current snapshot if not yet closed.
    */
   public long getAllocatedBytes() {
-    updateCurrentSnapshot();
     return _endAllocatedBytes - _startAllocatedBytes;
   }
 
   /**
    * Updates the current snapshot if not already closed.
    */
-  private void updateCurrentSnapshot() {
-    if (!_closed) {
-      _endCpuTime = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
-      _endAllocatedBytes = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
-    }
-  }
-
-  /**
-   * Takes final snapshots and marks the tracker as closed.
-   * This is automatically called when used in try-with-resources.
-   */
-  @Override
-  public void close() {
-    if (!_closed) {
-      updateCurrentSnapshot();
-      _closed = true;
-    }
-  }
-
-  /**
-   * Returns true if this tracker has been closed.
-   */
-  public boolean isClosed() {
-    return _closed;
+  public void takeSnapshot() {
+    _endCpuTime = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
+    _endAllocatedBytes = ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes();
   }
 
   @Override
   public String toString() {
     return "ThreadResourceSnapshot{" + "cpuTime=" + (_endCpuTime - _startCpuTime) + ", allocatedBytes="
-        + (_endAllocatedBytes - _startAllocatedBytes) + ", closed=" + _closed + '}';
+        + (_endAllocatedBytes - _startAllocatedBytes) + '}';
   }
 }

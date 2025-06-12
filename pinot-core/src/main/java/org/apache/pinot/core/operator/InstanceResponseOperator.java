@@ -106,7 +106,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
     BaseResultsBlock resultsBlock = getCombinedResults();
 
-    resourceSnapshot.close();
+    resourceSnapshot.takeSnapshot();
     long mainThreadCpuTimeNs = resourceSnapshot.getCpuTimeNs();
     long mainThreadMemAllocatedBytes = resourceSnapshot.getAllocatedBytes();
 
