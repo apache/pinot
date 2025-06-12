@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 
@@ -38,7 +39,6 @@ import static org.testng.Assert.assertNotNull;
 public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     extends PauselessRealtimeIngestionSegmentCommitFailureTest {
 
-  private static final String PRIMARY_KEY_COLUMN = "id";
   private static final int NUM_PARTITIONS = 2;
 
   @Override
@@ -60,6 +60,11 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
   protected long getCountStarResult() {
     // Two distinct records are expected with pk values of 0, 1.
     return 2;
+  }
+
+  @Override
+  protected String getPartitionColumn() {
+    return "id";
   }
 
   @Override
@@ -103,7 +108,7 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
 
     // add non-pauseless table
     TableConfig tableConfig2 = createDedupTableConfig(avroFiles.get(0));
-    tableConfig2.setTableName(getNonPauselessTableName());
+    tableConfig2.setTableName(TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName()));
     tableConfig2.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig2);
@@ -115,7 +120,7 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
 
     // add pauseless table
     TableConfig tableConfig = createDedupTableConfig(avroFiles.get(0));
-    tableConfig.setTableName(getPauselessTableName());
+    tableConfig.setTableName(TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName()));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     assertNotNull(tableConfig.getIngestionConfig());
@@ -133,11 +138,8 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
         "Segments still not in error state");
   }
 
-  /**
-   * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
-   */
   protected TableConfig createDedupTableConfig(File sampleAvroFile) {
-    TableConfig tableConfig = super.createDedupTableConfig(sampleAvroFile, PRIMARY_KEY_COLUMN, NUM_PARTITIONS);
+    TableConfig tableConfig = super.createDedupTableConfig(sampleAvroFile, getPartitionColumn(), NUM_PARTITIONS);
     assertNotNull(tableConfig.getDedupConfig());
     tableConfig.getDedupConfig().setDisasterRecoveryMode(DisasterRecoveryMode.BEST_EFFORT);
     if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {

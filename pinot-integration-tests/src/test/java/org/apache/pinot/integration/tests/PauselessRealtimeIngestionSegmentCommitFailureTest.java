@@ -185,8 +185,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     // Finally compare metadata across your two tables
     compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(realtimeTableName),
         _helixResourceManager.getSegmentsZKMetadata(TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME_2)));
-
-    Thread.sleep(10000);
   }
 
   /**

@@ -1473,7 +1473,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 _segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
                 if (!buildSegmentAndReplace()) {
-                  _segmentLogger.info("Failed to build the segment: {} and replace. Downloading to replace", _segmentNameStr);
+                  _segmentLogger.info("Failed to build the segment: {} and replace. Downloading to replace",
+                      _segmentNameStr);
                   downloadSegmentAndReplace(segmentZKMetadata);
                 }
               } else {
@@ -1493,7 +1494,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
                   if (!buildSegmentAndReplace()) {
-                    _segmentLogger.info("Failed to build the segment: {} after catchup. Downloading to replace", _segmentNameStr);
+                    _segmentLogger.info("Failed to build the segment: {} after catchup. Downloading to replace",
+                        _segmentNameStr);
                     downloadSegmentAndReplace(segmentZKMetadata);
                   }
                 } else {
