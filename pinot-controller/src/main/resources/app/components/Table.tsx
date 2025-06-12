@@ -607,7 +607,15 @@ export default function CustomizedTables({
           recordCount={recordsCount}
         />
         {additionalControls && (
-          <div style={{ marginTop: 8 }}>{additionalControls}</div>
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: '1px solid #BDCCD9',
+            }}
+          >
+            {additionalControls}
+          </div>
         )}
         {renderTableComponent()}
       </>
