@@ -62,6 +62,7 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       addFailureToCommits = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, addFailureToCommits);
+        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, addFailureToCommits,
+        partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 }
