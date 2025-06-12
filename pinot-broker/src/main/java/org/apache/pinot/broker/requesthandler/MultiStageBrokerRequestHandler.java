@@ -350,8 +350,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
               String combinedFilters = String.join(" AND ", rowFilters);
               String key = String.format("%s-%s", CommonConstants.RLS_FILTERS, tableName);
               compiledQuery.getOptions().put(key, combinedFilters);
-              System.out.println(
-                  "CombinedFilters for the user: " + requesterIdentity.toString() + " are: " + combinedFilters);
             });
       }
     }
