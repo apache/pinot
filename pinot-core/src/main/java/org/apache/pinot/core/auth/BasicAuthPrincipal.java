@@ -38,6 +38,11 @@ public class BasicAuthPrincipal {
   private final Map<String, List<String>> _rlsFilters;
 
   public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
+      Set<String> permissions) {
+    this(name, token, tables, excludeTables, permissions, null);
+  }
+
+  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
       Set<String> permissions, Map<String, List<String>> rlsFilters) {
     _name = name;
     _token = token;
