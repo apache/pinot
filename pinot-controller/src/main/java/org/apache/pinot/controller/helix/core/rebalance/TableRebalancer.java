@@ -389,7 +389,16 @@ public class TableRebalancer {
 
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
-
+      if (forceCommitBeforeRebalance) {
+          Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
+          if (!consumingSegmentsToMoveNext.isEmpty()) {
+            currentIdealState =
+                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
+            currentAssignment = currentIdealState.getRecord().getMapFields();
+            targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+                tierToInstancePartitionsMap, rebalanceConfig);
+          }
+      }
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
       idealStateRecord.setMapFields(targetAssignment);
@@ -517,7 +526,7 @@ public class TableRebalancer {
       }
 
       Map<String, Map<String, String>> nextAssignment;
-      if (rebalanceConfig.isForceCommitBeforeRebalance()) {
+      if (forceCommitBeforeRebalance) {
         nextAssignment =
             getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                 lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
@@ -1961,7 +1970,8 @@ public class TableRebalancer {
     }
   }
 
-  private Set<String> getMovingConsumingSegments(Map<String, Map<String, String>> currentAssignment,
+  @VisibleForTesting
+  static Set<String> getMovingConsumingSegments(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment) {
     Set<String> movingConsumingSegments = new HashSet<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
@@ -1981,23 +1991,28 @@ public class TableRebalancer {
 
   private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType,
       @Nullable Set<String> segmentsToCommit, Logger tableRebalanceLogger) {
-    ForceCommitBatchConfig forceCommitBatchConfig =
-        ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
-    segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
-        segmentsToCommit == null ? null : StringUtil.join(",", segmentsToCommit.toArray(String[]::new)),
-        forceCommitBatchConfig);
-    try {
-      // Wait until all committed segments have their status set to DONE.
-      // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
-      // guarantee there will be available peers for the new instance to download (e.g. the only available replica
-      // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
-      // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
-      // happens only after the committing segment status is set to DONE.
-      _pinotLLCRealtimeSegmentManager.waitUntilPrevBatchIsComplete(tableNameWithType, segmentsToCommit,
+    if (_pinotLLCRealtimeSegmentManager != null) {
+      ForceCommitBatchConfig forceCommitBatchConfig =
+          ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
+      segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
+          segmentsToCommit == null ? null : StringUtil.join(",", segmentsToCommit.toArray(String[]::new)),
           forceCommitBatchConfig);
-    } catch (Exception e) {
-      tableRebalanceLogger.warn("Failed to wait for previous batch to complete", e);
+      try {
+        // Wait until all committed segments have their status set to DONE.
+        // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
+        // guarantee there will be available peers for the new instance to download (e.g. the only available replica
+        // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
+        // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
+        // happens only after the committing segment status is set to DONE.
+        _pinotLLCRealtimeSegmentManager.waitUntilPrevBatchIsComplete(tableNameWithType, segmentsToCommit,
+            forceCommitBatchConfig);
+      } catch (Exception e) {
+        tableRebalanceLogger.warn("Failed to wait for previous batch to complete", e);
+      }
+    } else {
+      tableRebalanceLogger.warn(
+          "PinotLLCRealtimeSegmentManager is not initialized, cannot force commit consuming segments");
     }
-    return _pinotLLCRealtimeSegmentManager.getIdealState(tableNameWithType);
+    return _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
   }
 }

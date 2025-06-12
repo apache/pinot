@@ -674,7 +674,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier,
       @ApiParam(value = "Do force commit on consuming segments before they are rebalanced") @DefaultValue("false")
-      @QueryParam("forceCommitConsumingSegments") boolean forceCommitConsumingSegments,
+      @QueryParam("forceCommitBeforeRebalance") boolean forceCommitBeforeRebalance,
       @Context HttpHeaders headers
       //@formatter:on
   ) {
@@ -692,7 +692,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
-    rebalanceConfig.setForceCommitBeforeRebalance(forceCommitConsumingSegments);
+    rebalanceConfig.setForceCommitBeforeRebalance(forceCommitBeforeRebalance);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);
