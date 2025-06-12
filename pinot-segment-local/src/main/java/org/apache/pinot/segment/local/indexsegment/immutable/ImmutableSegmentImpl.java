@@ -32,14 +32,15 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.segment.local.utils.IndexSegmentUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -239,12 +240,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public DataSource getDataSource(String column, Schema schema) {
     DataSource dataSource = getDataSourceNullable(column);
-    if (dataSource == null) {
-      dataSource = IndexSegmentUtils.getVirtualDataSource(schema, _segmentMetadata.getSchema(), column,
-          _segmentMetadata.getTotalDocs());
-      _dataSources.put(column, dataSource);
+    if (dataSource != null) {
+      return dataSource;
     }
-    return dataSource;
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
+        schema.getSchemaName());
+    return IndexSegmentUtils.createVirtualDataSource(
+        new VirtualColumnContext(fieldSpec, _segmentMetadata.getTotalDocs()));
   }
 
   @Override

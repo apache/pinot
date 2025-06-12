@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVF
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -41,7 +42,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 /**
  * Provide the default null value.
  */
-public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProvider {
+public class DefaultNullValueVirtualColumnProvider implements VirtualColumnProvider {
 
   @Override
   public ForwardIndexReader<?> buildForwardIndex(VirtualColumnContext context) {
@@ -86,8 +87,12 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
 
   @Override
   public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
-    ColumnMetadataImpl.Builder builder = getColumnMetadataBuilder(context).setCardinality(1).setHasDictionary(true);
-    if (context.getFieldSpec().isSingleValueField()) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    ColumnMetadataImpl.Builder builder = new ColumnMetadataImpl.Builder().setFieldSpec(fieldSpec)
+        .setTotalDocs(context.getTotalDocCount())
+        .setCardinality(1)
+        .setHasDictionary(true);
+    if (fieldSpec.isSingleValueField()) {
       builder.setSorted(true);
     } else {
       // When there is no value for a multi-value column, the maxNumberOfMultiValues and cardinality should be
@@ -96,7 +101,6 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
       builder.setMaxNumberOfMultiValues(1);
     }
 
-    FieldSpec fieldSpec = context.getFieldSpec();
     Object defaultNullValue = fieldSpec.getDefaultNullValue();
     switch (fieldSpec.getDataType().getStoredType()) {
       case INT:

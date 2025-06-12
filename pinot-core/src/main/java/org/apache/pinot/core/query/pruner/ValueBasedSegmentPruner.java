@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 /**
  * The {@code ValueBasedSegmentPruner} prunes segments based on values inside the filter and segment metadata and data.
  */
-@SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
+@SuppressWarnings({"rawtypes", "unchecked"})
 abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   public static final String IN_PREDICATE_THRESHOLD = "inpredicate.threshold";
   protected int _inPredicateThreshold;
@@ -72,6 +72,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   private boolean isApplicableToFilter(FilterContext filter) {
     switch (filter.getType()) {
       case AND:
+        assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
           if (isApplicableToFilter(child)) {
             return true;
@@ -79,6 +80,7 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         }
         return false;
       case OR:
+        assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
           if (!isApplicableToFilter(child)) {
             return false;
@@ -98,17 +100,17 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   abstract boolean isApplicableToPredicate(Predicate predicate);
 
   @Override
-  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext queryContext) {
+  public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
     if (segments.isEmpty()) {
       return segments;
     }
-    FilterContext filter = Objects.requireNonNull(queryContext.getFilter());
+    FilterContext filter = Objects.requireNonNull(query.getFilter());
     ValueCache cachedValues = new ValueCache();
     Map<String, DataSource> dataSourceCache = new HashMap<>();
     List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
     for (IndexSegment segment : segments) {
       dataSourceCache.clear();
-      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, queryContext)) {
+      if (!pruneSegment(segment, filter, dataSourceCache, cachedValues, query)) {
         selectedSegments.add(segment);
       }
     }
@@ -116,18 +118,20 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
   }
 
   protected boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
-      ValueCache cachedValues, QueryContext queryContext) {
+      ValueCache cachedValues, QueryContext query) {
     switch (filter.getType()) {
       case AND:
+        assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (pruneSegment(segment, child, dataSourceCache, cachedValues, queryContext)) {
+          if (pruneSegment(segment, child, dataSourceCache, cachedValues, query)) {
             return true;
           }
         }
         return false;
       case OR:
+        assert filter.getChildren() != null;
         for (FilterContext child : filter.getChildren()) {
-          if (!pruneSegment(segment, child, dataSourceCache, cachedValues, queryContext)) {
+          if (!pruneSegment(segment, child, dataSourceCache, cachedValues, query)) {
             return false;
           }
         }
@@ -137,18 +141,19 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
         return false;
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
+        assert predicate != null;
         // Only prune columns
         if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
           return false;
         }
-        return pruneSegmentWithPredicate(segment, predicate, dataSourceCache, cachedValues, queryContext);
+        return pruneSegmentWithPredicate(segment, predicate, dataSourceCache, cachedValues, query);
       default:
         throw new IllegalStateException();
     }
   }
 
   abstract boolean pruneSegmentWithPredicate(IndexSegment segment, Predicate predicate,
-      Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext queryContext);
+      Map<String, DataSource> dataSourceCache, ValueCache cachedValues, QueryContext query);
 
   protected static Comparable convertValue(String stringValue, DataType dataType) {
     try {

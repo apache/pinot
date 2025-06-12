@@ -109,8 +109,8 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
    *   <li>3. Keep the segments that has value overlap with the selected ones; remove the others</li>
    * </ul>
    */
-  private List<IndexSegment> pruneSelectionOrderBy(List<IndexSegment> segments, QueryContext queryContext) {
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+  private List<IndexSegment> pruneSelectionOrderBy(List<IndexSegment> segments, QueryContext query) {
+    List<OrderByExpressionContext> orderByExpressions = query.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
     assert numOrderByExpressions > 0;
@@ -126,8 +126,8 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     List<MinMaxValue> minMaxValues = new ArrayList<>(numSegments);
     for (int i = 0; i < numSegments; i++) {
       IndexSegment segment = segments.get(i);
-      DataSourceMetadata dataSourceMetadata = segment.getDataSource(firstOrderByColumn,
-          queryContext.getSchema()).getDataSourceMetadata();
+      DataSourceMetadata dataSourceMetadata =
+          segment.getDataSource(firstOrderByColumn, query.getSchema()).getDataSourceMetadata();
       Comparable minValue = dataSourceMetadata.getMinValue();
       Comparable maxValue = dataSourceMetadata.getMaxValue();
       // Always keep the segment if it does not have column min/max value in the metadata
@@ -141,7 +141,7 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
       return segments;
     }
 
-    int remainingDocs = queryContext.getLimit() + queryContext.getOffset();
+    int remainingDocs = query.getLimit() + query.getOffset();
     if (firstOrderByExpression.isAsc()) {
       // For ascending order, sort on column max value in ascending order
       try {

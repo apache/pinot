@@ -43,14 +43,6 @@ public class VirtualColumnProviderFactory {
     }
   }
 
-  public static VirtualColumnProvider buildProvider(String virtualColumnProvider) {
-    try {
-      return PluginManager.get().createInstance(virtualColumnProvider);
-    } catch (Exception e) {
-      throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
-    }
-  }
-
   public static void addBuiltInVirtualColumnsToSegmentSchema(Schema schema, String segmentName) {
     if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true,

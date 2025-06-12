@@ -29,7 +29,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
@@ -86,29 +85,6 @@ public class SegmentPrunerServiceTest {
 
     Assert.assertEquals(actual, Collections.emptyList());
     Assert.assertEquals(stats.getInvalidSegments(), 0);
-  }
-
-  @Test
-  public void segmentsWithoutColumnAreInvalid() {
-    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
-    IndexSegment indexSegment = mockIndexSegment(10, "col1", "col2");
-
-    SegmentPrunerStatistics stats = new SegmentPrunerStatistics();
-
-    List<IndexSegment> indexes = new ArrayList<>();
-    indexes.add(indexSegment);
-
-    String query = "select not_present from t1";
-
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    Schema schema = mock(Schema.class);
-    when(schema.getColumnNames()).thenReturn(new java.util.TreeSet<>(Arrays.asList("col1", "col2")));
-    queryContext.setSchema(schema);
-
-    List<IndexSegment> actual = service.prune(indexes, queryContext, stats);
-
-    Assert.assertEquals(actual, Collections.emptyList());
-    Assert.assertEquals(1, stats.getInvalidSegments());
   }
 
   private IndexSegment mockIndexSegment(int totalDocs, String... columns) {
