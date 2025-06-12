@@ -432,7 +432,7 @@ public final class RelToPlanNodeConverter {
     List<RexExpression> projects = rel.getProjects() == null ?
         null : RexExpressionUtils.fromRexNodes(rel.getProjects());
     @Nullable
-    List<RelFieldCollation> collations = rel.getCollation().getFieldCollations();
+    List<RelFieldCollation> collations = rel.getCollation() == null ? null : rel.getCollation().getFieldCollations();
     // fetch and offset are -1 if fields in rel are null
     int fetch = RexExpressionUtils.getValueAsInt(rel.getFetch());
     int offset = RexExpressionUtils.getValueAsInt(rel.getOffset());
