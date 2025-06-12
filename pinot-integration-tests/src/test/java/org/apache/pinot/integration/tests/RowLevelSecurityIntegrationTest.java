@@ -84,7 +84,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable.rls",
         "AirlineID='19805', DestStateName='California'");
     brokerConf.setProperty("pinot.broker.access.control.principals.user2.mytable2.rls",
-        "AirlineID='19805', DestStateName='California'");
+        "AirlineID='20409', DestStateName='Florida'");
   }
 
   @Override
@@ -217,27 +217,25 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   public void testRowFiltersForTwoTablesWithMultiStateQuery()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
-        + "(select avg(ActualElapsedTime) as avg_profit from mytable2)";
+    String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > 0.1 * ABS("
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable2))";
     String queryWithFiltersForUser1 = "select count(*), avg(ActualElapsedTime) "
         + "from mytable "
-        + "WHERE ActualElapsedTime > ("
+        + "WHERE ActualElapsedTime > 0.1 * ABS(("
         + "    select avg(ActualElapsedTime) as avg_profit "
         + "    from mytable2 "
-        + "    where AirlineID = '19805' "
-        + "  ) "
+        + "  )) "
         + "  and AirlineID = '19805'";
-
-    String queryWithFiltersForUser2 = "select count(*), avg(ActualElapsedTime) "
-        + "from mytable "
-        + "WHERE ActualElapsedTime > ("
-        + "    select avg(ActualElapsedTime) as avg_profit "
-        + "    from mytable2 "
-        + "    where AirlineID = '19805' "
-        + "      and DestStateName = 'California'"
-        + "  ) "
-        + "  and AirlineID = '19805'"
-        + "  and DestStateName = 'California'";
+    String queryWithFiltersForUser2 ="SELECT COUNT(*), AVG(ActualElapsedTime)"
+        + "    FROM mytable "
+        + "    WHERE ActualElapsedTime > 0.1 * ABS(("
+        + "            SELECT AVG(ActualElapsedTime) AS avg_profit"
+        + "        FROM mytable2"
+        + "        WHERE AirlineID = '20409'"
+        + "        AND DestStateName = 'Florida'"
+        + "    ))"
+        + "    AND DestStateName = 'California'"
+        + "    AND AirlineID='19805'";
 
     // compare admin response with that of user
     Assert.assertTrue(
