@@ -63,13 +63,13 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
    * queries that can be executed concurrently. In this case, we should not block the query.
    */
   private int _maxServerQueryThreads;
-  private final int _maxServerQueryThreadsFromServerConfig;
+  private final int _maxServerQueryThreadsFromBrokerConfig;
   private final AtomicInteger _currentQueryServerThreads = new AtomicInteger();
 
   public MultiStageQueryThrottler(PinotConfiguration brokerConf) {
-    _maxServerQueryThreadsFromServerConfig = brokerConf.getProperty(
-            CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
-            CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
+    _maxServerQueryThreadsFromBrokerConfig = brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
+        CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
   }
 
   @Override
@@ -90,7 +90,8 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
 
     if (_maxServerQueryThreads > 0) {
       int semaphoreLimit = Math.max(1, _maxServerQueryThreads * _numServers / _numBrokers);
-      LOGGER.info("Setting max server query threads to {} for _maxServerQueryThreads={}, {} brokers, and {} servers",
+      LOGGER.info("Setting estimated server query threads limit: {} for maxServerQueryThreads: {}, "
+          + "numBrokers: {}, and numServers: {}",
           semaphoreLimit, _maxServerQueryThreads, _numBrokers, _numServers);
       _semaphore = new AdjustableSemaphore(semaphoreLimit, true);
     }
@@ -164,10 +165,11 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
         _numBrokers = numBrokers;
         _numServers = numServers;
         if (_maxServerQueryThreads > 0) {
-          int newPermits = Math.max(1, _maxServerQueryThreads * _numServers / _numBrokers);
-          LOGGER.info("Setting max server query threads to {} for {} brokers and {} servers",
-              newPermits, _numBrokers, _numServers);
-          _semaphore.setPermits(newPermits);
+          int semaphoreLimit = Math.max(1, _maxServerQueryThreads * _numServers / _numBrokers);
+          LOGGER.info("Setting estimated server query threads limit: {} for maxServerQueryThreads: {}, "
+                  + "numBrokers: {}, and numServers: {}",
+              semaphoreLimit, _maxServerQueryThreads, _numBrokers, _numServers);
+          _semaphore.setPermits(semaphoreLimit);
         }
       }
     } else {
@@ -187,10 +189,11 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       }
 
       if (maxServerQueryThreads > 0) {
-        int newPermits = Math.max(1, maxServerQueryThreads * _numServers / _numBrokers);
-        LOGGER.info("Setting max server query threads to {} for {} brokers and {} servers",
-            newPermits, _numBrokers, _numServers);
-        _semaphore.setPermits(newPermits);
+        int semaphoreLimit = Math.max(1, maxServerQueryThreads * _numServers / _numBrokers);
+        LOGGER.info("Setting estimated server query threads limit: {} for maxServerQueryThreads: {}, "
+                + "numBrokers: {}, and numServers: {}",
+            semaphoreLimit, _maxServerQueryThreads, _numBrokers, _numServers);
+        _semaphore.setPermits(semaphoreLimit);
       }
       _maxServerQueryThreads = maxServerQueryThreads;
     }
@@ -207,12 +210,12 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
 
   @VisibleForTesting
   int calculateMaxServerQueryThreads() {
-    if (_maxServerQueryThreadsFromServerConfig > 0) {
-      return _maxServerQueryThreadsFromServerConfig;
+    if (_maxServerQueryThreadsFromBrokerConfig > 0) {
+      return _maxServerQueryThreadsFromBrokerConfig;
     }
     return Integer.parseInt(_helixAdmin.getConfig(_helixConfigScope,
-            Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS))
-            .getOrDefault(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
-                    CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
+        Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS))
+        .getOrDefault(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
+            CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
   }
 }
