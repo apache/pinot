@@ -116,21 +116,21 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
   @Test
   public void testForceCommitBeforeRebalance()
       throws Exception {
-    final String TENANT_A = "tenantA";
-    final String TENANT_B = "tenantB";
+    final String tenantA = "tenantA";
+    final String tenantB = "tenantB";
 
     TableConfig tableConfig = getRealtimeTableConfig();
 
     BaseServerStarter serverStarter0 = startOneServer(0);
     BaseServerStarter serverStarter1 = startOneServer(1);
-    createServerTenant(TENANT_A, 0, 2);
+    createServerTenant(tenantA, 0, 2);
 
     BaseServerStarter serverStarter2 = startOneServer(2);
-    BaseServerStarter serverStarter3 = startOneServer( 3);
-    createServerTenant(TENANT_B, 0, 2);
+    BaseServerStarter serverStarter3 = startOneServer(3);
+    createServerTenant(tenantB, 0, 2);
 
-    // Prepare the table to replicate segments across two servers on TENANT_A
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_A, null));
+    // Prepare the table to replicate segments across two servers on tenantA
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     tableConfig.getValidationConfig().setReplication("2");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
     updateTableConfig(tableConfig);
@@ -152,8 +152,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
 
     waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
 
-    // test: move segments from TENANT_A to TENANT_B
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_B, null));
+    // test: move segments from tenantA to tenantB
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
     rebalanceConfig.setForceCommitBeforeRebalance(true);
@@ -181,9 +181,9 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
         originalConsumingSegmentsToMove.size());
 
-    // test: move segment from TENANT_B to TENANT_A with downtime
+    // test: move segment from tenantB to tenantA with downtime
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_A, null));
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
     rebalanceConfig.setForceCommitBeforeRebalance(true);
@@ -224,28 +224,30 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     serverStarter3.stop();
   }
 
-  @Test void testForceCommitBeforeRebalanceStrictReplicaGroup() throws Exception {
-    final String TENANT_A = "tenantA_strictRG";
-    final String TENANT_B = "tenantB_strictRG";
+  @Test
+  void testForceCommitBeforeRebalanceStrictReplicaGroup()
+      throws Exception {
+    final String tenantA = "tenantA_strictRG";
+    final String tenantB = "tenantB_strictRG";
 
     BaseServerStarter serverStarter0 = startOneServer(0);
-    BaseServerStarter serverStarter1 = startOneServer( 1);
-    createServerTenant(TENANT_A, 0, 2);
+    BaseServerStarter serverStarter1 = startOneServer(1);
+    createServerTenant(tenantA, 0, 2);
 
     BaseServerStarter serverStarter2 = startOneServer(2);
-    BaseServerStarter serverStarter3 = startOneServer( 3);
-    createServerTenant(TENANT_B, 0, 2);
+    BaseServerStarter serverStarter3 = startOneServer(3);
+    createServerTenant(tenantB, 0, 2);
 
-    // Prepare the table to replicate segments across two servers on TENANT_A
+    // Prepare the table to replicate segments across two servers on tenantA
     TableConfig tableConfig = getRealtimeTableConfig();
-    tableConfig.setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-        false));
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_A, null));
+    tableConfig.setRoutingConfig(
+        new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+            false));
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     tableConfig.getValidationConfig().setReplication("2");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
     updateTableConfig(tableConfig);
-
 
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(false);
@@ -265,8 +267,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
 
     waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
 
-    // test: move segments from TENANT_A to TENANT_B
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_B, null));
+    // test: move segments from tenantA to tenantB
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
     rebalanceConfig.setForceCommitBeforeRebalance(true);
@@ -294,9 +296,9 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
         originalConsumingSegmentsToMove.size());
 
-    // test: move segment from TENANT_B to TENANT_A with batch size
+    // test: move segment from tenantB to tenantA with batch size
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_A, null));
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
     rebalanceConfig.setForceCommitBeforeRebalance(true);
@@ -325,10 +327,10 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
         originalConsumingSegmentsToMove.size());
 
-    // test: move segment from TENANT_A to TENANT_B with includeConsuming = false, consuming segment should not be
+    // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
     // committed
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), TENANT_B, null));
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
     rebalanceConfig.setForceCommitBeforeRebalance(true);
@@ -369,8 +371,6 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     serverStarter3.stop();
   }
 
-
-
   private void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -407,4 +407,3 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
   }
 }
-
