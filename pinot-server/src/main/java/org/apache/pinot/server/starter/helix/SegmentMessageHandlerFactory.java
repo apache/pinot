@@ -33,6 +33,7 @@ import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -74,6 +75,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
+      case TableConfigSchemaRefreshMessage.REFRESH_TABLE_CONFIG_AND_SCHEMA:
+        return new TableSchemaRefreshMessageHandler(new TableConfigSchemaRefreshMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -236,6 +239,33 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
       if (tableDataManager instanceof RealtimeTableDataManager) {
         ((RealtimeTableDataManager) tableDataManager).removeIngestionMetrics(_segmentName);
+      }
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
+      return helixTaskResult;
+    }
+  }
+
+  private class TableSchemaRefreshMessageHandler extends DefaultMessageHandler {
+    TableSchemaRefreshMessageHandler(TableConfigSchemaRefreshMessage message, ServerMetrics metrics,
+                                     NotificationContext context) {
+      super(message, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _logger.info("Handling table schema refresh message for table: {}", _tableNameWithType);
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager != null) {
+          // Update the table config and schema by fetching from ZK
+          tableDataManager.fetchIndexLoadingConfig();
+        } else {
+          _logger.warn("No data manager found for table: {}", _tableNameWithType);
+        }
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES, 1);
+        Utils.rethrowException(e);
       }
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);

@@ -36,6 +36,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -469,6 +470,32 @@ public class SortOperatorTest {
     assertEquals(resultRows.get(0), new Object[]{null, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 1});
     assertEquals(resultRows.get(2), new Object[]{1, null});
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
+  }
+
+  @Test
+  public void shouldPreservePrecision() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{LONG});
+    // Insert 3 consecutive large numbers that are represented by the same double value if converted to double due to
+    // precision loss.
+    long largeValue = 1L << 60;
+    //noinspection ConstantValue
+    assert (double) largeValue == (double) (largeValue + 1) && (double) largeValue == (double) (largeValue + 2);
+    when(_input.nextBlock())
+        .thenReturn(block(schema, new Object[]{largeValue + 2}, new Object[]{largeValue}, new Object[]{largeValue + 1}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0));
+    SortOperator operator = getOperator(schema, collations);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{largeValue});
+    assertEquals(resultRows.get(1), new Object[]{largeValue + 1});
+    assertEquals(resultRows.get(2), new Object[]{largeValue + 2});
     assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 

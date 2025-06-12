@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -46,7 +48,8 @@ public class DataBlockTest {
     Exception originalException = new UnsupportedOperationException("Expected test exception.");
     String expected = "Expected test error";
 
-    DataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
+    String ex = DataBlockUtils.extractErrorMsg(originalException);
+    DataBlock dataBlock = MetadataBlock.newError(-1, -1, null, Map.of(QueryErrorCode.UNKNOWN.getId(), ex));
     dataBlock.addException(QueryErrorCode.QUERY_EXECUTION, expected);
     Assert.assertEquals(dataBlock.getNumberOfRows(), 0);
 

@@ -63,6 +63,7 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -527,7 +528,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     InstanceSelector instanceSelector =
         InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
             adaptiveServerSelector, _pinotConfig);
-    instanceSelector.init(_routableServers, idealState, externalView, preSelectedOnlineSegments);
+    instanceSelector.init(_routableServers, _enabledServerInstanceMap, idealState, externalView,
+        preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -831,6 +833,17 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
     SegmentPartitionMetadataManager partitionMetadataManager = routingEntry.getPartitionMetadataManager();
     return partitionMetadataManager != null ? partitionMetadataManager.getTablePartitionInfo() : null;
+  }
+
+  @Nullable
+  @Override
+  public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    if (routingEntry == null) {
+      return null;
+    }
+    SegmentPartitionMetadataManager partitionMetadataManager = routingEntry.getPartitionMetadataManager();
+    return partitionMetadataManager != null ? partitionMetadataManager.getTablePartitionReplicatedServersInfo() : null;
   }
 
   @Nullable

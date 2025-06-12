@@ -113,7 +113,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     BaseResultsBlock finalBlock = new MetadataResultsBlock();
     int numServerThreads = Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     CombineOperatorUtils.setExecutionStatistics(finalBlock, _operators, _totalWorkerThreadCpuTimeNs.get(),
-        numServerThreads);
+        numServerThreads, _totalWorkerThreadMemAllocatedBytes.get());
     return finalBlock;
   }
 

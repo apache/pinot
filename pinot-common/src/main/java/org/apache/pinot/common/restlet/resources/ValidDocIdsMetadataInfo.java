@@ -31,12 +31,14 @@ public class ValidDocIdsMetadataInfo {
   private final String _segmentCrc;
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
+  private final long _segmentCreationTimeMillis;
 
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
-      @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes) {
+      @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
+      @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -44,6 +46,7 @@ public class ValidDocIdsMetadataInfo {
     _segmentCrc = segmentCrc;
     _validDocIdsType = validDocIdsType;
     _segmentSizeInBytes = segmentSizeInBytes;
+    _segmentCreationTimeMillis = segmentCreationTimeMillis;
   }
 
   public String getSegmentName() {
@@ -72,5 +75,9 @@ public class ValidDocIdsMetadataInfo {
 
   public long getSegmentSizeInBytes() {
     return _segmentSizeInBytes;
+  }
+
+  public long getSegmentCreationTimeMillis() {
+    return _segmentCreationTimeMillis;
   }
 }

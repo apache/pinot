@@ -221,9 +221,11 @@ public class UpsertCompactionTaskGeneratorTest {
       throws IOException {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
     String json = "{\"testTable__0\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
-        + "\"segmentName\": \"testTable__0\", \"totalDocs\": 100, \"segmentCrc\": \"1000\"}], "
+        + "\"segmentName\": \"testTable__0\", \"totalDocs\": 100, \"segmentCrc\": \"1000\", "
+        + "\"segmentCreationTimeMillis\": 1234567890}], "
         + "\"testTable__1\": [{\"totalValidDocs\": 0, "
-        + "\"totalInvalidDocs\": 10, \"segmentName\": \"testTable__1\", \"totalDocs\": 10, \"segmentCrc\": \"2000\"}]}";
+        + "\"totalInvalidDocs\": 10, \"segmentName\": \"testTable__1\", \"totalDocs\": 10, \"segmentCrc\": \"2000\", "
+        + "\"segmentCreationTimeMillis\": 9876543210}]}";
 
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfo =
         JsonUtils.stringToObject(json, new TypeReference<>() {
@@ -279,9 +281,10 @@ public class UpsertCompactionTaskGeneratorTest {
     // Test the case where the completedSegment from api has different crc than segment from zk metadata.
     json = "{\"" + _completedSegment.getSegmentName() + "\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
         + "\"segmentName\": \"" + _completedSegment.getSegmentName() + "\", \"totalDocs\": 100, \"segmentCrc\": "
-        + "\"1234567890\"}], \"" + _completedSegment2.getSegmentName() + "\": [{\"totalValidDocs\": 0, "
-        + "\"totalInvalidDocs\": 10, \"segmentName\": \"" + _completedSegment2.getSegmentName() + "\", "
-        + "\"segmentCrc\": \"" + _completedSegment2.getCrc() + "\", \"totalDocs\": 10}]}";
+        + "\"1234567890\", \"segmentCreationTimeMillis\": 1111111111}], \"" + _completedSegment2.getSegmentName()
+        + "\": [{\"totalValidDocs\": 0, " + "\"totalInvalidDocs\": 10, \"segmentName\": \""
+        + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\": \"" + _completedSegment2.getCrc()
+        + "\", \"totalDocs\": 10, \"segmentCreationTimeMillis\": 2222222222}]}";
     validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<>() {
     });
     segmentSelectionResult =
@@ -293,16 +296,16 @@ public class UpsertCompactionTaskGeneratorTest {
 
     // completedSegment2 is still supposed to be deleted
     Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
-    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0),
-        _completedSegment2.getSegmentName());
+    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
 
     // check if both the candidates for compaction are coming in sorted descending order
     json = "{\"" + _completedSegment.getSegmentName() + "\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
         + "\"segmentName\": \"" + _completedSegment.getSegmentName() + "\", \"totalDocs\": 100, \"segmentCrc\": \""
-        + _completedSegment.getCrc() + "\"}], \"" + _completedSegment2.getSegmentName() + "\": "
+        + _completedSegment.getCrc() + "\", \"segmentCreationTimeMillis\": 1234567890}], \""
+        + _completedSegment2.getSegmentName() + "\": "
         + "[{\"totalValidDocs\": 10, \"totalInvalidDocs\": 40, \"segmentName\": \""
         + _completedSegment2.getSegmentName() + "\", \"segmentCrc\": \"" + _completedSegment2.getCrc() + "\", "
-        + "\"totalDocs\": 50}]}";
+        + "\"totalDocs\": 50, \"segmentCreationTimeMillis\": 9876543210}]}";
     validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<>() {
     });
     compactionConfigs = getCompactionConfigs("30", "0");
@@ -315,6 +318,10 @@ public class UpsertCompactionTaskGeneratorTest {
         _completedSegment.getSegmentName());
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(1).getSegmentName(),
         _completedSegment2.getSegmentName());
+
+    // Check segmentCreationTimeMillis is deserialized correctly
+    assertEquals(validDocIdsMetadataInfo.get("testTable__0").get(0).getSegmentCreationTimeMillis(), 1234567890L);
+    assertEquals(validDocIdsMetadataInfo.get("testTable__1").get(0).getSegmentCreationTimeMillis(), 9876543210L);
   }
 
   @Test
@@ -324,27 +331,27 @@ public class UpsertCompactionTaskGeneratorTest {
             "1");
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setSnapshot(Enablement.ENABLE);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig)
+            .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+            .build();
 
     _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), upsertCompactionTaskConfig);
 
     // test with invalidRecordsThresholdPercents as 0
     Map<String, String> upsertCompactionTaskConfig1 = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
-    TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig1)))
-        .build();
+    TableConfig zeroPercentTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig)
+            .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig1)))
+            .build();
     _taskGenerator.validateTaskConfigs(zeroPercentTableConfig, new Schema(), upsertCompactionTaskConfig1);
 
     // test with invalid invalidRecordsThresholdPercents as -1 and 110
     Map<String, String> upsertCompactionTaskConfig2 = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
-    TableConfig negativePercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig2)))
-        .build();
+    TableConfig negativePercentTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig)
+            .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig2)))
+            .build();
     Assert.assertThrows(IllegalStateException.class,
         () -> _taskGenerator.validateTaskConfigs(negativePercentTableConfig, new Schema(),
             upsertCompactionTaskConfig2));

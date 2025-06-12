@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -140,7 +139,6 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     _helixResourceManager.addTable(tableConfig);
 
     String segmentName = "testSegment";
-    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, new SegmentZKMetadata(segmentName));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), "downloadUrl");
 

@@ -148,6 +148,9 @@ public class SchemaUtils {
           validateDefaultIsNotNaN(fieldSpec);
         }
       }
+      if (!fieldSpec.isSingleValueField()) {
+        validateMultiValueCompatibility(fieldSpec);
+      }
     }
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
@@ -164,6 +167,16 @@ public class SchemaUtils {
     Preconditions.checkState(!fieldSpec.getDefaultNullValueString().equals("NaN"),
             "NaN as null default value is not managed yet for %s",
             fieldSpec.getName());
+  }
+
+  /**
+   * Validations for MV type columns
+   */
+  private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
+        "JSON columns cannot be of multi-value type");
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.BIG_DECIMAL),
+        "BIG_DECIMAL columns cannot be of multi-value type");
   }
 
   /**

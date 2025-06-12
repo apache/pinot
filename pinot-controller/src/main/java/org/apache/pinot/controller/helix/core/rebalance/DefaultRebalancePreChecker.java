@@ -33,6 +33,7 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableMetadataReader;
@@ -57,6 +58,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
   public static final String REBALANCE_CONFIG_OPTIONS = "rebalanceConfigOptions";
   public static final String REPLICA_GROUPS_INFO = "replicaGroupsInfo";
+
+  public static final int SEGMENT_ADD_THRESHOLD = 200;
+  public static final int RECOMMENDED_BATCH_SIZE = 200;
 
   private static double _diskUtilizationThreshold;
 
@@ -100,7 +104,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
             preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
-        preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment()));
+        preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
+        preCheckContext.getRebalanceSummaryResult()));
 
     preCheckResult.put(REPLICA_GROUPS_INFO, checkReplicaGroups(tableConfig, rebalanceConfig));
 
@@ -334,7 +339,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   }
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
-      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
+      Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+      RebalanceSummaryResult rebalanceSummaryResult) {
     List<String> warnings = new ArrayList<>();
     boolean pass = true;
     if (rebalanceConfig.isBestEfforts()) {
@@ -343,14 +349,37 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
     List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
-    if (rebalanceConfig.isDowntime()) {
-      int numReplicas = Integer.MAX_VALUE;
+    int numReplicas = Integer.MAX_VALUE;
+    if (rebalanceConfig.isDowntime() || PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       for (String segment : segmentsToMove) {
         numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
       }
+    }
+
+    if (rebalanceConfig.isDowntime()) {
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
         warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
+      }
+    }
+
+    // It was revealed a risk of data loss for pauseless tables during rebalance, when downtime=true or
+    // minAvailableReplicas=0 -- If a segment is being moved and has not yet uploaded to deep store, premature
+    // deletion could cause irrecoverable data loss. This pre-check added as a workaround to warn the potential risk.
+    // TODO: Get to the root cause of the issue and revisit this pre-check.
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      int minAvailableReplica = rebalanceConfig.getMinAvailableReplicas();
+      if (minAvailableReplica < 0) {
+        minAvailableReplica = numReplicas + minAvailableReplica;
+      }
+      if (numReplicas == 1) {
+        pass = false;
+        warnings.add(
+            "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
+                + "during rebalance");
+      } else if (rebalanceConfig.isDowntime() || minAvailableReplica <= 0) {
+        pass = false;
+        warnings.add("Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
       }
     }
 
@@ -366,6 +395,19 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && !rebalanceConfig.isUpdateTargetTier()) {
       pass = false;
       warnings.add("updateTargetTier should be enabled when tier configs are present");
+    }
+
+    // --- Batch size per server recommendation check using summary ---
+    int maxSegmentsToAddOnServer = rebalanceSummaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer();
+    int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
+    if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
+      if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
+          || batchSizePerServer > RECOMMENDED_BATCH_SIZE) {
+        pass = false;
+        warnings.add("Number of segments to add to a single server (" + maxSegmentsToAddOnServer + ") is high (>"
+            + SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to " + RECOMMENDED_BATCH_SIZE
+            + " or lower to avoid excessive load on servers.");
+      }
     }
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")

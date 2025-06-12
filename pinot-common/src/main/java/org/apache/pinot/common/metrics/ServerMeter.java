@@ -131,11 +131,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
+  THREAD_MEM_ALLOCATED_BYTES("bytes", false),
+  RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
+  TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
 
   GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
 
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+  TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
   // Multi-stage
   /**
@@ -196,7 +201,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_FAILED("predownloadFailed", true),
 
   // reingestion metrics
-  SEGMENT_REINGESTION_FAILURE("segments", false);
+  SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  /**
+   * Approximate heap bytes used by the mutable JSON index at the time of index close.
+   */
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
 
   private final String _meterName;
   private final String _unit;
