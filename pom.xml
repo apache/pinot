@@ -2682,8 +2682,8 @@
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
             <inc>SCRIPT_STYLE</inc>
             <sql>SCRIPT_STYLE</sql>
-            <conf>DOUBLESLASH_STYLE</conf>
-            <cfg>DOUBLESLASH_STYLE</cfg>
+            <conf>CONF_STYLE</conf>
+            <cfg>CONF_STYLE</cfg>
             <proto>DOUBLESLASH_STYLE</proto>
             <rst>RST_STYLE</rst>
             <readme>RST_STYLE</readme>
@@ -2729,6 +2729,7 @@
             <exclude>**/*.json</exclude>
             <exclude>**/*.schema</exclude>
             <exclude>**/*.sql</exclude>
+            <exclude>**/*.conf</exclude>
 
             <!-- JDBC Drivers -->
             <exclude>**/java.sql.*</exclude>
