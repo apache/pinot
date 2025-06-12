@@ -162,7 +162,7 @@ jobs:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}-forceclean
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Build Project
