@@ -3476,7 +3476,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: AggregateProjectMergeRule -> Time:*\n"
-        + "Rule: Project -> Time:*\n"
+        + "Rule: EvaluateProjectLiteralRule -> Time:*\n"
         + "Rule: AggregateRemoveRule -> Time:*\n"
         + "Rule: SortRemoveRule -> Time:*\n");
 
@@ -3502,12 +3502,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
             + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
+    // TODO: investigate why changing description will result in changing of order here
+    //    Might be because the set is HashMap, the order is determined by the hash of the key,
+    //    which is the description
     assertEquals(response2Json.get("rows").get(0).get(2).asText(),
         "Rule Execution Times\n"
-            + "Rule: Project -> Time: *\n"
             + "Rule: FilterProjectTransposeRule -> Time: *\n"
-            + "Rule: Filter -> Time: *\n"
-            + "Rule: ProjectFilterTransposeRule -> Time: *\n");
+            + "Rule: EvaluateProjectLiteralRule -> Time: *\n"
+            + "Rule: ProjectFilterTransposeRule -> Time: *\n"
+            + "Rule: EvaluateFilterLiteralRule -> Time: *\n");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
