@@ -136,9 +136,9 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "300000")
   private long _retryInitialDelayInMs = 300000L;
 
-  @JsonProperty("forceCommitBeforeRebalance")
+  @JsonProperty("forceCommitBeforeMoved")
   @ApiModelProperty(example = "false")
-  private boolean _forceCommitBeforeRebalance = false;
+  private boolean _forceCommitBeforeMoved = false;
 
   public boolean isDryRun() {
     return _dryRun;
@@ -276,12 +276,12 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
-  public boolean isForceCommitBeforeRebalance() {
-    return _forceCommitBeforeRebalance;
+  public boolean isForceCommitBeforeMoved() {
+    return _forceCommitBeforeMoved;
   }
 
-  public void setForceCommitBeforeRebalance(boolean forceCommitBeforeRebalance) {
-    _forceCommitBeforeRebalance = forceCommitBeforeRebalance;
+  public void setForceCommitBeforeMoved(boolean forceCommitBeforeMoved) {
+    _forceCommitBeforeMoved = forceCommitBeforeMoved;
   }
 
   public Enablement getMinimizeDataMovement() {
@@ -305,7 +305,7 @@ public class RebalanceConfig {
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
         + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
-        + ", _forceCommitBeforeRebalance=" + _forceCommitBeforeRebalance + '}';
+        + ", _forceCommitBeforeMoved=" + _forceCommitBeforeMoved + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -327,7 +327,7 @@ public class RebalanceConfig {
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxAttempts = cfg._maxAttempts;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
-    rc._forceCommitBeforeRebalance = cfg._forceCommitBeforeRebalance;
+    rc._forceCommitBeforeMoved = cfg._forceCommitBeforeMoved;
     return rc;
   }
 }

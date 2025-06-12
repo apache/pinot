@@ -105,7 +105,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         + "&heartbeatTimeoutInMs=" + rebalanceConfig.getHeartbeatTimeoutInMs()
         + "&maxAttempts=" + rebalanceConfig.getMaxAttempts()
         + "&retryInitialDelayInMs=" + rebalanceConfig.getRetryInitialDelayInMs()
-        + "&forceCommitBeforeRebalance=" + rebalanceConfig.isForceCommitBeforeRebalance();
+        + "&forceCommitBeforeMoved=" + rebalanceConfig.isForceCommitBeforeMoved();
   }
 
   private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
@@ -114,7 +114,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
   }
 
   @Test
-  public void testForceCommitBeforeRebalance()
+  public void testForceCommitBeforeMoved()
       throws Exception {
     final String tenantA = "tenantA";
     final String tenantB = "tenantB";
@@ -156,7 +156,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeRebalance(true);
+    rebalanceConfig.setForceCommitBeforeMoved(true);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
@@ -186,7 +186,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeRebalance(true);
+    rebalanceConfig.setForceCommitBeforeMoved(true);
     rebalanceConfig.setIncludeConsuming(false);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -210,7 +210,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.getValidationConfig().setReplication("1");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
     updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommitBeforeRebalance(false);
+    rebalanceConfig.setForceCommitBeforeMoved(false);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(true);
@@ -225,7 +225,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
   }
 
   @Test
-  void testForceCommitBeforeRebalanceStrictReplicaGroup()
+  void testForceCommitBeforeMovedStrictReplicaGroup()
       throws Exception {
     final String tenantA = "tenantA_strictRG";
     final String tenantB = "tenantB_strictRG";
@@ -271,7 +271,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeRebalance(true);
+    rebalanceConfig.setForceCommitBeforeMoved(true);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
@@ -301,7 +301,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeRebalance(true);
+    rebalanceConfig.setForceCommitBeforeMoved(true);
     rebalanceConfig.setBatchSizePerServer(1);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -333,7 +333,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeRebalance(true);
+    rebalanceConfig.setForceCommitBeforeMoved(true);
     rebalanceConfig.setIncludeConsuming(false);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -357,7 +357,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfig.getValidationConfig().setReplication("1");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
     updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommitBeforeRebalance(false);
+    rebalanceConfig.setForceCommitBeforeMoved(false);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(true);

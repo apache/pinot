@@ -237,18 +237,18 @@ public class TableRebalancer {
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean forceCommitBeforeRebalance =
-        tableConfig.getTableType() == TableType.REALTIME && rebalanceConfig.isForceCommitBeforeRebalance();
+    boolean forceCommitBeforeMoved =
+        tableConfig.getTableType() == TableType.REALTIME && rebalanceConfig.isForceCommitBeforeMoved();
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
             + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
             + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}, "
-            + "forceCommitBeforeRebalance: {}",
+            + "forceCommitBeforeMoved: {}",
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
-        rebalanceConfig.isForceCommitBeforeRebalance());
+        rebalanceConfig.isForceCommitBeforeMoved());
 
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
@@ -393,7 +393,7 @@ public class TableRebalancer {
 
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
-      if (forceCommitBeforeRebalance) {
+      if (forceCommitBeforeMoved) {
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
         if (!consumingSegmentsToMoveNext.isEmpty()) {
           currentIdealState =
@@ -530,7 +530,7 @@ public class TableRebalancer {
       }
 
       Map<String, Map<String, String>> nextAssignment;
-      if (forceCommitBeforeRebalance) {
+      if (forceCommitBeforeMoved) {
         nextAssignment =
             getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                 lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
