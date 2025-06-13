@@ -859,6 +859,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .get("columnIndexSizeMap").get(column);
   }
 
+  /**
+   * Get all segment names for a given tableName and tableType.
+   */
+  protected List<String> getSegmentNames(String tableName, @Nullable String tableType)
+      throws Exception {
+    return getControllerRequestClient().listSegments(tableName, tableType, true);
+  }
+
   protected List<ValidDocIdsMetadataInfo> getValidDocIdsMetadata(String tableNameWithType,
       ValidDocIdsType validDocIdsType)
       throws Exception {
