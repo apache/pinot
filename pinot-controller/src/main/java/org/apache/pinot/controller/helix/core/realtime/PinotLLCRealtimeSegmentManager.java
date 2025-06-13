@@ -1409,30 +1409,25 @@ public class PinotLLCRealtimeSegmentManager {
             + "sending message to instances: {} to remove ingestion metrics", committedSegment, oldInstances,
         newConsumingSegment, newInstances, realtimeTableName, instancesNoLongerServe);
 
-    sendRemoveIngestionMetricsMessageToServers(realtimeTableName, committedSegment, instancesNoLongerServe);
-  }
-
-  public void sendRemoveIngestionMetricsMessageToServers(String realtimeTableName, String segmentName,
-      Set<String> instanceNames) {
     ClusterMessagingService messagingService = _helixManager.getMessagingService();
-    List<String> instancesSent = new ArrayList<>(instanceNames.size());
-    for (String instance : instanceNames) {
+    List<String> instancesSent = new ArrayList<>(instancesNoLongerServe.size());
+    for (String instance : instancesNoLongerServe) {
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setInstanceName(instance);
       recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
       recipientCriteria.setResource(realtimeTableName);
-      recipientCriteria.setPartition(segmentName);
+      recipientCriteria.setPartition(committedSegment);
       recipientCriteria.setSessionSpecific(true);
       IngestionMetricsRemoveMessage message = new IngestionMetricsRemoveMessage();
       if (messagingService.send(recipientCriteria, message, null, -1) > 0) {
         instancesSent.add(instance);
       } else {
         LOGGER.warn("Failed to send ingestion metrics remove message for table: {} segment: {} to instance: {}",
-            realtimeTableName, segmentName, instance);
+            realtimeTableName, committedSegment, instance);
       }
     }
     LOGGER.info("Sent ingestion metrics remove message for table: {} segment: {} to instances: {}", realtimeTableName,
-        segmentName, instancesSent);
+        committedSegment, instancesSent);
   }
 
   /*
