@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -67,7 +68,6 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -78,7 +78,6 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -733,36 +732,9 @@ public class TableRebalancer {
     Set<String> serversUnchanged = new HashSet<>();
     Set<String> serversGettingNewSegments = new HashSet<>();
     Map<String, RebalanceSummaryResult.TagInfo> tagsInfoMap = new HashMap<>();
-    String serverTenantName = tableConfig.getTenantConfig().getServer();
-    if (serverTenantName != null) {
-      String serverTenantTag =
-          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
-      tagsInfoMap.put(serverTenantTag,
-          new RebalanceSummaryResult.TagInfo(serverTenantTag));
-    }
-    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
-    if (tagOverrideConfig != null) {
-      String completedTag = tagOverrideConfig.getRealtimeCompleted();
-      String consumingTag = tagOverrideConfig.getRealtimeConsuming();
-      if (completedTag != null) {
-        tagsInfoMap.put(completedTag, new RebalanceSummaryResult.TagInfo(completedTag));
-      }
-      if (consumingTag != null) {
-        tagsInfoMap.put(consumingTag, new RebalanceSummaryResult.TagInfo(consumingTag));
-      }
-    }
-    if (tableConfig.getInstanceAssignmentConfigMap() != null) {
-      // for simplicity, including all segment types present in instanceAssignmentConfigMap
-      tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
-        String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
-        tagsInfoMap.put(tag, new RebalanceSummaryResult.TagInfo(tag));
-      });
-    }
-    if (tableConfig.getTierConfigsList() != null) {
-      tableConfig.getTierConfigsList().forEach(tierConfig -> {
-        String tierTag = tierConfig.getServerTag();
-        tagsInfoMap.put(tierTag, new RebalanceSummaryResult.TagInfo(tierTag));
-      });
+    Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
+    for (String tag : relevantTags) {
+      tagsInfoMap.put(tag, new RebalanceSummaryResult.TagInfo(tag));
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
@@ -803,12 +775,11 @@ public class TableRebalancer {
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
           instanceToTagsMap.getOrDefault(server, null)));
-      List<String> serverTags = getServerTag(server);
-      Set<String> relevantTags = new HashSet<>(serverTags);
-      relevantTags.retainAll(tagsInfoMap.keySet());
+      Set<String> serverTags = new HashSet<>(getServerTag(server));
+      Set<String> relevantTagsForServer = Sets.intersection(serverTags, relevantTags);
       // The segments remain unchanged or need to download will be accounted to every tag associated with this
       // server instance
-      if (relevantTags.isEmpty()) {
+      if (relevantTagsForServer.isEmpty()) {
         // this could happen when server's tags changed but reassignInstance=false in the rebalance config
         tableRebalanceLogger.warn("Server: {} was assigned but does not have any relevant tags", server);
 
@@ -819,7 +790,7 @@ public class TableRebalancer {
         tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
         tagsInfo.increaseNumServerParticipants(1);
       } else {
-        for (String tag : relevantTags) {
+        for (String tag : relevantTagsForServer) {
           RebalanceSummaryResult.TagInfo tagsInfo = tagsInfoMap.get(tag);
           tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
           tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
