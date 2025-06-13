@@ -513,8 +513,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (CollectionUtils.isEmpty(partitionIds)) {
       return _ingestionDelayTracker.stopTrackingIngestionDelayForAllPartitions();
     }
-    for (Integer partitionGroupId: partitionIds) {
-      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
+    for (Integer partitionId: partitionIds) {
+      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionId);
     }
     return partitionIds;
   }
