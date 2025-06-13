@@ -41,7 +41,6 @@ import it.unimi.dsi.fastutil.booleans.BooleanList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -85,6 +84,13 @@ import org.slf4j.LoggerFactory;
  * (4) A reload is issued on an existing segment after text index is enabled on a newly
  * added column. In this case, the default column handler would have taken care of adding
  * forward index for the new column. Read the forward index to create text index.
+ *
+ * NOTE:
+ * Class is based on TextIndexHandler but operates on to multi-column text index.
+ * This class extends BaseIndexHandler only to reuse some functionality (temporary forward indices handling)
+ * but should not be used in the same way as other single-column indexes.
+ * As the name implies, multi-column text index is not bound to a single column and can't be built with column-major
+ * approach.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultiColumnTextIndexHandler extends BaseIndexHandler {
@@ -105,32 +111,57 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
-    MultiColumnTextMetadata multiColumnTextMetadata = segmentMetadata.getMultiColumnTextMetadata();
-    if (multiColumnTextMetadata == null) {
-      // If the segment does not have multi-column text index metadata, we need to create it.
-      LOGGER.info("Segment: {} does not have multi-column text index metadata, need to create it", segmentName);
-      return true;
-    }
-    // If the segment has multi-column text index metadata, check if it needs to be updated.
-    List<String> existingColumns = multiColumnTextMetadata.getColumns();
-    List<String> newColumns = _textIndexConfig.getColumns();
-    if (existingColumns.equals(newColumns)) {
-      // If the existing columns are the same as the new columns, no need to update.
-      LOGGER.info("Segment: {} already has multi-column text index for columns: {}, no need to update",
-          segmentName, existingColumns);
-      return false;
-    }
-    for (String column : newColumns) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata != null) {
-        // Fail fast upon unsupported operations.
-        if (columnMetadata.getDataType() != DataType.STRING) {
-          throw new UnsupportedOperationException(
-              "Text index is currently only supported on STRING columns: " + column);
+    MultiColumnTextMetadata oldConfig = segmentMetadata.getMultiColumnTextMetadata();
+
+    boolean needUpdate = shouldModifyMultiColTextIndex(_textIndexConfig, oldConfig);
+    if (needUpdate) {
+      List<String> newColumns = _textIndexConfig.getColumns();
+      for (String column : newColumns) {
+        ColumnMetadata columnMeta = segmentMetadata.getColumnMetadataFor(column);
+        if (columnMeta != null) {
+          validate(columnMeta.getDataType(), column);
         }
       }
+
+      LOGGER.info("Segment: {} does require (re)building multi column text index on columns: {}", segmentName,
+          _textIndexConfig.getColumns());
+
+      return true;
+    } else {
+      LOGGER.info("Segment: {} does not required (re)building multi column text index", segmentName);
+      return false;
     }
-    return true;
+  }
+
+  private static void validate(DataType columnMeta, String column) {
+    if (columnMeta != DataType.STRING) {
+      throw new UnsupportedOperationException(
+          "Text index is currently only supported on STRING columns: " + column);
+    }
+  }
+
+  public static boolean shouldModifyMultiColTextIndex(MultiColumnTextIndexConfig newConfig,
+      MultiColumnTextMetadata oldConfig) {
+    if (newConfig == null) {
+      return oldConfig != null;
+    } else {
+      if (oldConfig == null) {
+        return true;
+      }
+
+      if (!oldConfig.getColumns().equals(newConfig.getColumns())) {
+        return true;
+      }
+
+      Map<String, String> newProperties = newConfig.getProperties();
+      if (!MultiColumnTextMetadata.equalsSharedProps(oldConfig.getSharedProperties(), newProperties)) {
+        return true;
+      }
+
+      return !MultiColumnTextMetadata.equalsColumnProps(
+          newConfig.getPerColumnProperties(),
+          oldConfig.getPerColumnProperties());
+    }
   }
 
   @Override
@@ -143,14 +174,14 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
     for (String column : _textIndexConfig.getColumns()) {
       ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      validate(metadata.getFieldSpec().getDataType(), column);
       columnsSV.add(metadata.isSingleValue());
     }
 
-    //TODO: check actual arguments
     try (MultiColumnLuceneTextIndexCreator creator =
         new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
             null, null, _textIndexConfig)) {
-      createMultiColumnTextIndices(segmentWriter, creator);
+      createMultiColumnTextIndex(segmentWriter, creator);
       creator.seal();
 
       // Write the metadata for multi-column text index
@@ -161,90 +192,116 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private void createMultiColumnTextIndices(SegmentDirectory.Writer segmentWriter,
+  private void createMultiColumnTextIndex(SegmentDirectory.Writer segmentWriter,
       MultiColumnLuceneTextIndexCreator textIndexCreator)
       throws IOException {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
     int numDocs = segmentMetadata.getTotalDocs();
 
-    List<String> textIndexConfigColumns = _textIndexConfig.getColumns();
-    List<ColumnMetadata> columnMetadataList = new ArrayList<>();
-    List<ForwardIndexReader> forwardIndexReaderList = new ArrayList<>();
-    List<ForwardIndexReaderContext> forwardIndexReaderContextList = new ArrayList<>();
-    for (String columnName : textIndexConfigColumns) {
-      // Create a temporary forward index if it is disabled and does not exist
-      ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
-      columnMetadataList.add(columnMetadata);
-      ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
-      forwardIndexReaderList.add(forwardIndexReader);
-      forwardIndexReaderContextList.add(forwardIndexReader.createContext());
-      boolean hasDictionary = columnMetadata.hasDictionary();
-      LOGGER.info("Adding column: {} to multi-column text index in segment: {}, hasDictionary: {}", columnName,
-          segmentName, hasDictionary);
-    }
+    List<String> indexedColumns = _textIndexConfig.getColumns();
+    List<ForwardIndexReader> fwdReaders = new ArrayList<>(indexedColumns.size());
+    List<ForwardIndexReaderContext> fwdReaderContexts = new ArrayList<>(indexedColumns.size());
+    List<Dictionary> dictionaries = new ArrayList<>(indexedColumns.size());
+    List<String[]> valueBuffers = new ArrayList<>(indexedColumns.size());
+    List<int[]> dictIdBuffers = new ArrayList<>(indexedColumns.size());
+    int[] lengths = new int[indexedColumns.size()];
+    boolean[] hasDictionary = new boolean[indexedColumns.size()];
+    boolean[] isSingleValue = new boolean[indexedColumns.size()];
 
-    for (int docId = 0; docId < numDocs; docId++) {
-      List<Object> documentValues = new ArrayList<>();
-      for (int i = 0; i < textIndexConfigColumns.size(); i++) {
-        ForwardIndexReader forwardIndexReader = forwardIndexReaderList.get(i);
-        ForwardIndexReaderContext readerContext = forwardIndexReaderContextList.get(i);
+    for (int i = 0, n = indexedColumns.size(); i < n; i++) {
+      String columnName = indexedColumns.get(i);
+      ColumnMetadata metadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
+      ForwardIndexReader fwdReader = ForwardIndexType.read(segmentWriter, metadata);
+      fwdReaders.add(fwdReader);
+      fwdReaderContexts.add(fwdReader.createContext());
 
-        ColumnMetadata columnMetadata = columnMetadataList.get(i);
-        boolean hasDictionary = columnMetadata.hasDictionary();
-        if (columnMetadata.isSingleValue()) {
-          if (!hasDictionary) {
-            // text index on raw column, just read the raw forward index
-            documentValues.add(forwardIndexReader.getString(docId, readerContext));
-          } else {
-            // text index on dictionary encoded SV column
-            // read forward index to get dictId
-            // read the raw value from dictionary using dictId
-            try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-              int dictId = forwardIndexReader.getDictId(docId, readerContext);
-              documentValues.add(dictionary.getStringValue(dictId));
-            }
-          }
+      hasDictionary[i] = metadata.hasDictionary();
+      isSingleValue[i] = metadata.isSingleValue();
+
+      if (metadata.hasDictionary()) {
+        dictionaries.add(DictionaryIndexType.read(segmentWriter, metadata));
+      } else {
+        dictionaries.add(null);
+      }
+
+      if (metadata.isSingleValue()) {
+        valueBuffers.add(null);
+        dictIdBuffers.add(null);
+      } else {
+        valueBuffers.add(new String[metadata.getMaxNumberOfMultiValues()]);
+        if (metadata.hasDictionary()) {
+          dictIdBuffers.add(new int[metadata.getMaxNumberOfMultiValues()]);
         } else {
-          if (!hasDictionary) {
-            // text index on raw column, just read the raw forward index
-            // read forward index to get multi-value
-            // read the raw value from forward index using docId
-            // add all values to documentValues
-
-            String[] valueBuffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
-            int length = forwardIndexReader.getStringMV(docId, valueBuffer, readerContext);
-            documentValues.add(Arrays.copyOf(valueBuffer, length));
-          } else {
-            // text index on dictionary encoded MV column
-            // read forward index to get dictId
-            // read the raw value from dictionary using dictId
-            try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-              int maxNumEntries = columnMetadata.getMaxNumberOfMultiValues();
-              int[] dictIdBuffer = new int[maxNumEntries];
-              int length = forwardIndexReader.getDictIdMV(docId, dictIdBuffer, readerContext);
-              String[] valueBuffer = new String[length];
-              for (int j = 0; j < length; j++) {
-                valueBuffer[j] = dictionary.getStringValue(dictIdBuffer[j]);
-              }
-              documentValues.add(valueBuffer);
-            }
-          }
+          dictIdBuffers.add(null);
         }
       }
-      textIndexCreator.add(documentValues);
+
+      LOGGER.info("Including column: {} in multi-column text index in segment: {}, hasDictionary: {}", columnName,
+          segmentName, hasDictionary[i]);
     }
 
-    for (int i = 0; i < _textIndexConfig.getColumns().size(); i++) {
-      try {
-        ForwardIndexReader forwardIndexReader = forwardIndexReaderList.get(i);
-        ForwardIndexReaderContext readerContext = forwardIndexReaderContextList.get(i);
-        forwardIndexReader.close();
-        if (readerContext != null) {
-          readerContext.close();
+    try {
+      for (int docId = 0; docId < numDocs; docId++) {
+        List<Object> values = new ArrayList<>();
+        for (int i = 0; i < indexedColumns.size(); i++) {
+          ForwardIndexReader forwardReader = fwdReaders.get(i);
+          ForwardIndexReaderContext readerContext = fwdReaderContexts.get(i);
+
+          if (isSingleValue[i]) {
+            if (!hasDictionary[i]) {
+              // text index on raw column, just read the raw forward index
+              values.add(forwardReader.getString(docId, readerContext));
+            } else {
+              // text index on dictionary encoded SV column
+              // read forward index to get dictId
+              // read the raw value from dictionary using dictId
+              int dictId = forwardReader.getDictId(docId, readerContext);
+              values.add(dictionaries.get(i).getStringValue(dictId));
+            }
+          } else {
+            if (!hasDictionary[i]) {
+              // text index on raw column, just read the raw forward index
+              // read forward index to get multi-value
+              // read the raw value from forward index using docId
+              String[] valueBuffer = valueBuffers.get(i);
+              int length = forwardReader.getStringMV(docId, valueBuffer, readerContext);
+              lengths[i] = length;
+              values.add(valueBuffer);
+            } else {
+              // text index on dictionary encoded MV column
+              // read forward index to get dictId
+              // read the raw value from dictionary using dictId
+              int[] dictIdBuffer = dictIdBuffers.get(i);
+              int length = forwardReader.getDictIdMV(docId, dictIdBuffer, readerContext);
+              lengths[i] = length;
+              String[] valueBuffer = valueBuffers.get(i);
+              for (int j = 0; j < length; j++) {
+                valueBuffer[j] = dictionaries.get(i).getStringValue(dictIdBuffer[j]);
+              }
+              values.add(valueBuffer);
+            }
+          }
         }
-      } catch (Exception e) {
-        LOGGER.error("Failed to close forward index reader for column: {}", _textIndexConfig.getColumns().get(i), e);
+        textIndexCreator.add(values, lengths);
+      }
+
+      LOGGER.info("Finished adding multi-column text index to segment: {}", segmentName);
+    } finally {
+      for (int i = 0; i < fwdReaders.size(); i++) {
+        try {
+          ForwardIndexReader fwdReader = fwdReaders.get(i);
+          ForwardIndexReaderContext readerContext = fwdReaderContexts.get(i);
+          fwdReader.close();
+          if (readerContext != null) {
+            readerContext.close();
+          }
+          if (dictionaries.get(i) != null) {
+            dictionaries.get(i).close();
+          }
+        } catch (Exception e) {
+          LOGGER.error("Failed to close forward index reader for column: {}", _textIndexConfig.getColumns().get(i), e);
+        }
       }
     }
   }

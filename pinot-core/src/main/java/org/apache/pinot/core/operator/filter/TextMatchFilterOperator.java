@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -61,7 +62,12 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return new BitmapDocIdSet(_textIndexReader.getDocIds(_column, _predicate.getValue()), _numDocs);
+    if (_textIndexReader.isMultiColumn()) {
+      return new BitmapDocIdSet(
+          ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue()), _numDocs);
+    } else {
+      return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs);
+    }
   }
 
   @Override
@@ -71,7 +77,11 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    return _textIndexReader.getDocIds(_column, _predicate.getValue()).getCardinality();
+    if (_textIndexReader.isMultiColumn()) {
+      return ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue()).getCardinality();
+    } else {
+      return _textIndexReader.getDocIds(_predicate.getValue()).getCardinality();
+    }
   }
 
   @Override
@@ -81,7 +91,9 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap = _textIndexReader.getDocIds(_column, _predicate.getValue());
+    ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn() ?
+        ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue())
+        : _textIndexReader.getDocIds(_predicate.getValue());
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
   }
@@ -96,9 +108,10 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     StringBuilder sb = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:text_index");
     sb.append(",operator:").append(_predicate.getType());
     if (_column != null) {
-      sb.append(",column:").append(_column);
+      // column is already included in predicate
+      sb.append(",multiColumnIndex:true");
     }
-    sb.append(",predicate:").append(_predicate.toString());
+    sb.append(",predicate:").append(_predicate);
     return sb.append(')').toString();
   }
 
@@ -112,7 +125,9 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     super.explainAttributes(builder);
     builder.putString("indexLookUp", "text_index");
     builder.putString("operator", _predicate.getType().name());
-    builder.putString("column", _column);
+    if (_column != null) {
+      builder.putString("multiColumnIndex", "true");
+    }
     builder.putString("predicate", _predicate.toString());
   }
 

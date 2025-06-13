@@ -143,59 +143,43 @@ public class TextIndexUtils {
    */
   public static Analyzer getAnalyzer(TextIndexConfig config)
       throws ReflectiveOperationException {
-    String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
-    List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
-    List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
+    String analyzerClassName = config.getLuceneAnalyzerClass();
+    List<String> analyzerClassArgs = config.getLuceneAnalyzerClassArgs();
+    List<String> analyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
 
-    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
-        || ((luceneAnalyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
-        || luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName()))
-        && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
+    if (null == analyzerClassName || analyzerClassName.isEmpty()
+        || ((analyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
+        || analyzerClassName.equals(StandardAnalyzer.class.getName()))
+        && analyzerClassArgs.isEmpty() && analyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
       return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
           config.getStopWordsInclude(), config.getStopWordsExclude(), config.isCaseSensitive());
     }
 
-    // Custom analyzer + custom configs via reflection
-    if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgTypes.size()) {
-      throw new ReflectiveOperationException("Mismatch of the number of analyzer arguments and arguments types.");
-    }
-
-    // Generate args type list
-    List<Class<?>> argClasses = new ArrayList<>();
-    for (String argType : luceneAnalyzerClassArgTypes) {
-      argClasses.add(parseSupportedTypes(argType));
-    }
-
-    // Best effort coercion to the analyzer argument type
-    // Note only a subset of class types is supported, unsupported ones can be added in the future
-    List<Object> argValues = new ArrayList<>();
-    for (int i = 0; i < luceneAnalyzerClassArgs.size(); i++) {
-      argValues.add(parseSupportedTypeValues(luceneAnalyzerClassArgs.get(i), argClasses.get(i)));
-    }
-
-    // Initialize the custom analyzer class with custom analyzer args
-    Class<?> luceneAnalyzerClass = Class.forName(luceneAnalyzerClassName);
-    if (!Analyzer.class.isAssignableFrom(luceneAnalyzerClass)) {
-      String exceptionMessage = "Custom analyzer must be a child of " + Analyzer.class.getCanonicalName();
-      LOGGER.error(exceptionMessage);
-      throw new ReflectiveOperationException(exceptionMessage);
-    }
-
-    // Return a new instance of custom lucene analyzer class
-    return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
-        .newInstance(argValues.toArray(new Object[0]));
+    return getCustomAnalyzer(analyzerClassArgs, analyzerClassArgTypes, analyzerClassName);
   }
 
+  /**
+   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
+   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+   *
+   * @param config Pinot TextIndexConfig to fetch the configuration from
+   * @param override column-specific configuration that overrides the shared configuration
+   * @return Lucene Analyzer class instance
+   * @throws ReflectiveOperationException if instantiation via reflection fails
+   */
   public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
       throws ReflectiveOperationException {
-    String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
-    List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
-    List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
+    String luceneAnalyzerClassName = firstNotNull(override.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClass());
+    List<String> luceneAnalyzerClassArgs =
+        firstNotNull(override.getLuceneAnalyzerClassArgs(), config.getLuceneAnalyzerClassArgs());
+    List<String> luceneAnalyzerClassArgTypes =
+        firstNotNull(override.getLuceneAnalyzerClassArgTypes(), config.getLuceneAnalyzerClassArgTypes());
 
     if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
-        || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
+        || ((luceneAnalyzerClassName.equals(CaseAwareStandardAnalyzer.class.getName())
+        || luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName()))
         && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
@@ -206,6 +190,13 @@ public class TextIndexUtils {
           stopWordsInclude, stopWordsExclude, isCaseSensitive);
     }
 
+    return getCustomAnalyzer(luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneAnalyzerClassName);
+  }
+
+  private static Analyzer getCustomAnalyzer(List<String> luceneAnalyzerClassArgs,
+      List<String> luceneAnalyzerClassArgTypes,
+      String luceneAnalyzerClassName)
+      throws ReflectiveOperationException {
     // Custom analyzer + custom configs via reflection
     if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgTypes.size()) {
       throw new ReflectiveOperationException("Mismatch of the number of analyzer arguments and arguments types.");

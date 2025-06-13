@@ -58,7 +58,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }
     TextIndexReader indexReader = dataSource.getTextIndex();
-    // TODO: find path to index segment
+    // TODO: handle multi-column index (if defined)
     if (indexReader == null) {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }
@@ -80,7 +80,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
 
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
+    initZeroFillingIntValuesSV(length);
 
     int[] docIds = valueBlock.getDocIds();
     MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate);

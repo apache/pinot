@@ -43,7 +43,7 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
-import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -58,9 +58,8 @@ import org.slf4j.LoggerFactory;
  * as and when they are indexed by the consuming segment.
  *
  * A version of RealtimeLuceneTextIndex adapted to work with multiple columns.
- * TODO: refactor
  */
-public class MultiColumnRealtimeLuceneTextIndex implements MutableTextIndex {
+public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnRealtimeLuceneTextIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.getInstance();
@@ -136,26 +135,13 @@ public class MultiColumnRealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  //@Override
   public void add(List<Object> values) {
     _indexCreator.add(values);
   }
 
   @Override
-  public void add(String document) {
-    throw new UnsupportedOperationException(
-        "Multi-column text index requires adding values for all columns at the same time!");
-  }
-
-  @Override
-  public void add(String[] documents) {
-    throw new UnsupportedOperationException(
-        "Multi-column text index requires adding values for all columns at the same time!");
-  }
-
-  @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Multi-column text index requires column name to query!");
   }
 
   @Override
@@ -278,7 +264,6 @@ public class MultiColumnRealtimeLuceneTextIndex implements MutableTextIndex {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
-  @Override
   public void commit() {
     if (!_reuseMutableIndex) {
       return;

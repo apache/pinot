@@ -107,12 +107,11 @@ public class RealtimeSegmentConverter {
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
+      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
 
       if (!_enableColumnMajor) {
         driver.build();
       } else {
-        //TODO: does it work with multi columns ? Can we copy text index as is instead ?
         driver.buildByColumn(_realtimeSegmentImpl);
       }
     }

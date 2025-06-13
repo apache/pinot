@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -176,6 +175,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
     }
 
+    //TODO: can we use one of the previous writers ?
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create/modify/remove multi-col text index if required.
       if (processMultiColTextIndex(indexDir, _indexLoadingConfig.getFieldIndexConfigByColName(),
@@ -279,38 +279,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   private boolean needProcessMultiColumnTextIndex() {
     MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
     MultiColumnTextMetadata oldConfig = _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata();
-    return shouldModifyMultiColTextIndex(newConfig, oldConfig);
-  }
-
-  private static boolean shouldModifyMultiColTextIndex(MultiColumnTextIndexConfig newConfig,
-      MultiColumnTextMetadata oldConfig) {
-    if (newConfig == null) {
-      return oldConfig != null;
-    } else {
-      if (oldConfig == null) {
-        return true;
-      }
-
-      if (!oldConfig.getColumns().equals(newConfig.getColumns())) {
-        return true;
-      }
-
-      Map<String, String> newProperties = newConfig.getProperties();
-      if (newProperties == null) {
-        // If new properties are null, we assume it is empty
-        newProperties = Collections.emptyMap();
-      }
-      if (!Objects.equals(oldConfig.getProperties(), newProperties)) {
-        return true;
-      }
-
-      Map<String, Map<String, String>> newPerColumnProperties = newConfig.getPerColumnProperties();
-      if (newPerColumnProperties == null) {
-        // If new per-column properties are null, we assume it is empty
-        newPerColumnProperties = Collections.emptyMap();
-      }
-      return !MultiColumnTextMetadata.equals(newPerColumnProperties, oldConfig.getPerColumnProperties());
-    }
+    return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig);
   }
 
   private boolean processMultiColTextIndex(File indexDir, Map<String, FieldIndexConfigs> configsByCol,
@@ -328,7 +297,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (newConfig == null) {
         remove = true;
       } else {
-        if (shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
+        if (MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
           LOGGER.info("Change detected in multi-column text index for segment: {}", segmentName);
         } else {
           create = false;
@@ -350,12 +319,13 @@ public class SegmentPreProcessor implements AutoCloseable {
       } else if (create) {
         if (oldConfig != null) {
           // Drop existing multi-column text index before creating a new one
-          // TODO: if props are the same, we might only need to add and/or remove columns (compute diff!)
+          // TODO: check if it's possible to only add/remove select columns
           removeMultiColumnTextIndex(indexDir);
         }
-        MultiColumnTextIndexHandler multiColumnTextIndexHandler =
+        MultiColumnTextIndexHandler handler =
             new MultiColumnTextIndexHandler(_segmentDirectory, configsByCol, newConfig, tableConfig);
-        multiColumnTextIndexHandler.updateIndices(segmentWriter);
+        handler.updateIndices(segmentWriter);
+        handler.postUpdateIndicesCleanup(segmentWriter);
       }
     } finally {
       if (segmentOperationsThrottler != null) {

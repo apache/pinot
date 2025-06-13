@@ -24,14 +24,11 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -67,8 +64,8 @@ import org.slf4j.LoggerFactory;
  * This class is used to create Lucene-based multi-column text index.
  * Used for both offline from {@link SegmentColumnarIndexCreator}
  * and realtime from {@link RealtimeLuceneTextIndex}
- *
- * TODO: refactor
+ * While this is an index creator, it consumes values for multiple columns in a single call,
+ * which doesn't fit IndexCreator.
  */
 public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends AbstractTextIndexCreator*/ {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexCreator.class);
@@ -83,15 +80,6 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
   private Directory _indexDirectory;
   private IndexWriter _indexWriter;
   private int _nextDocId = 0;
-
-  public static HashSet<String> getDefaultEnglishStopWordsSet() {
-    return new HashSet<>(
-        Arrays.asList("a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it",
-            "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "than", "there", "these", "they",
-            "this", "to", "was", "will", "with", "those"));
-  }
-
-  public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(getDefaultEnglishStopWordsSet(), true);
 
   /**
    * Called by {@link SegmentColumnarIndexCreator}
@@ -167,6 +155,9 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
 
       // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to true
       // and (2) happens during realtime segment conversion
+      // TODO: it'd be better to extract to separate implementation because when flag is true, it's basically a no-op
+      // TODO: it's inefficient because implementation (SegmentIndexCreationDriver) still needs to iterate over rows,
+      // TODO: only to check flag and do nothing. It'd be better to skip iteration altogether.
       _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion;
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column [{}]", segmentIndexDir, columns);
@@ -295,13 +286,15 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
     }
   }
 
-  // documents -> list of values for all text columns (either String or String[])
+  /**
+   * Adds given SV or MV documents to multi-column text index.
+   * @param documents list of values for all text columns (either String or String[])
+   */
   public void add(List<Object> documents) {
     if (_reuseMutableIndex) {
       return; // no-op
     }
 
-    // text index on SV column
     Document docToIndex = new Document();
     for (int i = 0, n = _textColumns.size(); i < n; i++) {
       if (_textColumnsSV.getBoolean(i)) {
@@ -311,6 +304,42 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
         String[] values = (String[]) documents.get(i);
         for (String value : values) {
           docToIndex.add(new TextField(column, value, Field.Store.NO));
+        }
+      }
+    }
+
+    docToIndex.add(new StoredField(LUCENE_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
+    try {
+      _indexWriter.addDocument(docToIndex);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while adding a new document to the Lucene index for columns: " + _textColumns, e);
+    }
+  }
+
+  /**
+   * Adds given SV or MV documents to multi-column text index.
+   * Same as add(List<Object> documents) but allows passing length for multivalued columns (and reuse arrays).
+   * @param documents documents list of values for all text columns (either String or String[])
+   * @param lengths number of items passed in i-th multivalued column
+   */
+  public void add(List<Object> documents, int[] lengths) {
+    if (_reuseMutableIndex) {
+      return; // no-op
+    }
+
+    assert documents.size() == lengths.length;
+
+    Document docToIndex = new Document();
+    for (int col = 0, n = _textColumns.size(); col < n; col++) {
+      if (_textColumnsSV.getBoolean(col)) {
+        docToIndex.add(new TextField(_textColumns.get(col), (String) documents.get(col), Field.Store.NO));
+      } else {
+        String column = _textColumns.get(col);
+        String[] values = (String[]) documents.get(col);
+
+        for (int val = 0, len = lengths[col]; val < len; val++) {
+          docToIndex.add(new TextField(column, values[val], Field.Store.NO));
         }
       }
     }

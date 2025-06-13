@@ -58,10 +58,12 @@ public class MultiColumnTextIndexConfig extends BaseJsonConfig {
     return _columns;
   }
 
+  @Nullable
   public Map<String, String> getProperties() {
     return _properties;
   }
 
+  @Nullable
   public Map<String, Map<String, String>> getPerColumnProperties() {
     return _perColumnProperties;
   }

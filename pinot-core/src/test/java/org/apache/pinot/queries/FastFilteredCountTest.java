@@ -53,7 +53,7 @@ import static org.testng.Assert.assertTrue;
 
 public class FastFilteredCountTest extends BaseQueriesTest {
 
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FastFilteredCountTest");
+  protected final File _indexDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -100,7 +100,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(_indexDir);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
@@ -116,7 +116,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setOutDir(_indexDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
@@ -127,7 +127,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(_indexDir, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = List.of(immutableSegment, immutableSegment);
   }
@@ -150,7 +150,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   @AfterClass
   public void tearDown()
       throws IOException {
-    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.deleteDirectory(_indexDir);
   }
 
   @DataProvider

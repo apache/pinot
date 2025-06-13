@@ -18,26 +18,22 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import org.apache.pinot.segment.spi.index.IndexReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public interface TextIndexReader extends IndexReader {
-  /**
-   * Returns the matching dictionary ids for the given search query (optional).
-   */
-  ImmutableRoaringBitmap getDictIds(String searchQuery);
+/*
+ * TextIndexReader which allows querying a specific column within the index.
+ */
+public interface MultiColumnTextIndexReader extends TextIndexReader {
 
   /**
-   * Returns the matching document ids for the given search query.
+   * Returns the matching document ids for the given search query against given column.
    */
-  MutableRoaringBitmap getDocIds(String searchQuery);
+  default MutableRoaringBitmap getDocIds(String column, String searchQuery) {
+    return getDocIds(searchQuery);
+  }
 
-  /**
-   * Marker method that allows to differentiate between single-column and multi-column text index reader .
-   */
   default boolean isMultiColumn() {
-    return false;
+    return true;
   }
 }

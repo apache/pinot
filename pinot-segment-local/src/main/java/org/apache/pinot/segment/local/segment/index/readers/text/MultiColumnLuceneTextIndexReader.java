@@ -52,9 +52,10 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.segment.spi.utils.CsvParser;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -69,7 +70,7 @@ import org.slf4j.LoggerFactory;
  *
  * This class is a version of LuceneTestIndexReader adapted to handling multiple columns.
  */
-public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
+public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexReader.class);
   public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
 
@@ -94,10 +95,20 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
     private final List<String> _stopWordsInclude;
     private final List<String> _stopWordsExclude;
     private final Boolean _isCaseSensitive;
+    private final String _luceneAnalyzerClass;
+    private final List<String> _luceneAnalyzerClassArgs;
+    private final List<String> _luceneAnalyzerClassArgTypes;
 
-    public ColumnConfig(String queryParserClass, Constructor<QueryParserBase> queryParserClassConstructor,
-        Boolean useANDForMultiTermQueries, Boolean enablePrefixSuffixMatchingInPhraseQueries,
-        List<String> stopWordsInclude, List<String> stopWordsExclude, Boolean isCaseSensitive) {
+    public ColumnConfig(String queryParserClass,
+        Constructor<QueryParserBase> queryParserClassConstructor,
+        Boolean useANDForMultiTermQueries,
+        Boolean enablePrefixSuffixMatchingInPhraseQueries,
+        List<String> stopWordsInclude,
+        List<String> stopWordsExclude,
+        Boolean isCaseSensitive,
+        String luceneAnalyzerClass,
+        List<String> luceneAnalyzerClassArgs,
+        List<String> luceneAnalyzerClassArgTypes) {
       _queryParserClass = queryParserClass;
       _queryParserClassConstructor = queryParserClassConstructor;
       _useANDForMultiTermQueries = useANDForMultiTermQueries;
@@ -105,10 +116,18 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
       _stopWordsInclude = stopWordsInclude;
       _stopWordsExclude = stopWordsExclude;
       _isCaseSensitive = isCaseSensitive;
+      _luceneAnalyzerClass = luceneAnalyzerClass;
+      _luceneAnalyzerClassArgs = luceneAnalyzerClassArgs;
+      _luceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes;
     }
 
-    public boolean usesCustomAnalyzer() {
-      return _stopWordsExclude != null || _stopWordsInclude != null;
+    public boolean requiresCustomAnalyzer() {
+      return _stopWordsExclude != null
+          || _stopWordsInclude != null
+          || _isCaseSensitive != null
+          || _luceneAnalyzerClass != null
+          || _luceneAnalyzerClassArgs != null
+          || _luceneAnalyzerClassArgTypes != null;
     }
 
     public String getQueryParserClass() {
@@ -137,6 +156,18 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
 
     public Boolean isCaseSensitive() {
       return _isCaseSensitive;
+    }
+
+    public String getLuceneAnalyzerClass() {
+      return _luceneAnalyzerClass;
+    }
+
+    public List<String> getLuceneAnalyzerClassArgs() {
+      return _luceneAnalyzerClassArgs;
+    }
+
+    public List<String> getLuceneAnalyzerClassArgTypes() {
+      return _luceneAnalyzerClassArgTypes;
     }
   }
 
@@ -195,7 +226,8 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
     HashMap<String, Analyzer> perColumnAnalyzers = null;
     for (Map.Entry<String, ColumnConfig> entry : colConfigs.entrySet()) {
       ColumnConfig colConfig = entry.getValue();
-      if (colConfig.usesCustomAnalyzer()) {
+
+      if (colConfig.requiresCustomAnalyzer()) {
         Analyzer colAnalyzer = TextIndexUtils.getAnalyzer(config, colConfig);
 
         if (perColumnAnalyzers == null) {
@@ -213,6 +245,12 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
     }
   }
 
+  /**
+   * Parse given per column configurations.
+   * @param perColumnConfig
+   * @return map of columns names to per-column lucene configuration
+   * @throws ReflectiveOperationException
+   */
   public static Map<String, ColumnConfig> buildColumnConfigs(Map<String, Map<String, String>> perColumnConfig)
       throws ReflectiveOperationException {
     Map<String, ColumnConfig> perColumnConfigs;
@@ -232,11 +270,20 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
         Boolean enablePhrase = getBoolean(columnProps, FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES);
         List<String> includeKey = extractWords(columnProps, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
         List<String> excludeKey = extractWords(columnProps, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
-        Boolean isCaseSensitive = getBoolean(columnProps, FieldConfig.TEXT_INDEX_IS_CASE_SENSITIVE_KEY);
+        Boolean isCaseSensitive = getBoolean(columnProps, FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY);
+        String luceneAnalyzerClass = columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
+        List<String> luceneAnalyzerClassArgs =
+            columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS) != null
+                ? CsvParser.parse(columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS), true, false)
+                : null;
+        List<String> luceneAnalyzerClassArgTypes =
+            columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES) != null
+                ? CsvParser.parse(columnProps.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES), false, true)
+                : null;
 
         ColumnConfig columnConfig =
             new ColumnConfig(parserClass, parserConstructor, useAnd, enablePhrase, includeKey, excludeKey,
-                isCaseSensitive);
+                isCaseSensitive, luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes);
         perColumnConfigs.put(column, columnConfig);
       }
     }
@@ -262,7 +309,7 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
 
   public MultiColumnLuceneTextIndexReader(SegmentMetadata metadata) {
     this(metadata.getMultiColumnTextMetadata().getColumns(), metadata.getIndexDir(), metadata.getTotalDocs(),
-        metadata.getMultiColumnTextMetadata().getProperties(),
+        metadata.getMultiColumnTextMetadata().getSharedProperties(),
         metadata.getMultiColumnTextMetadata().getPerColumnProperties());
   }
 
@@ -292,9 +339,12 @@ public class MultiColumnLuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    throw new UnsupportedOperationException("");
+    // It should be possible to query without passing column if tokens are prefixed with column name,
+    // e.g. col1:some_token col2:other_token
+    throw new UnsupportedOperationException("Multi-column text index requires column name to query!");
   }
 
+  @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     throw new UnsupportedOperationException("Multi-column text index requires column name to query!");
   }
