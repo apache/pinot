@@ -1206,8 +1206,7 @@ public class TablesResource {
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public String removeIngestionMetrics(
-      @ApiParam(value = "Table name", required = true) @PathParam("tableName")
-      String tableName,
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       @Nullable @ApiParam(value = "List of partition Ids (optional)") @QueryParam("partitionId")
       Set<Integer> partitionIds,
       @Context HttpHeaders headers) {
@@ -1222,8 +1221,7 @@ public class TablesResource {
     try {
       if (tableDataManager instanceof RealtimeTableDataManager) {
         RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
-        Set<Integer> removedPartitionIds =
-            realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionIds);
+        Set<Integer> removedPartitionIds = realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionIds);
         return "Successfully removed ingestion metrics for partitions: " + removedPartitionIds + " in table: "
             + tableNameWithType;
       } else {

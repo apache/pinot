@@ -212,10 +212,8 @@ public class PinotTableInstances {
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public SuccessResponse removeIngestionMetrics(
-      @ApiParam(value = "Table name", required = true) @PathParam("tableName")
-      String tableName,
-      @ApiParam(value = "Instance id of the server", required = true) @PathParam("instanceId")
-      String instanceId,
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Instance id of the server", required = true) @PathParam("instanceId") String instanceId,
       @Nullable @ApiParam(value = "List of Partition Ids (optional)") @QueryParam("partitionId")
       Set<Integer> partitionIds,
       @Context HttpHeaders headers) {
