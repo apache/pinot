@@ -27,6 +27,8 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,6 +40,7 @@ public enum ControllerJobType {
   TABLE_REBALANCE,
   TENANT_REBALANCE;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerJobType.class);
   private static final EnumMap<ControllerJobType, Integer> ZK_NUM_JOBS_LIMIT = new EnumMap<>(ControllerJobType.class);
 
   /**
@@ -75,6 +78,8 @@ public enum ControllerJobType {
           // old job will be marked as ABORTED.
           return stats.getStatus() != RebalanceResult.Status.IN_PROGRESS;
         } catch (Exception e) {
+          LOGGER.warn("Failed to parse table rebalance progress stats for job with ID: {}, assuming it can be deleted",
+              jobMetadataEntry.getLeft(), e);
           // If the stats are corrupted for some reason, let's assume that the rebalance job is no longer in progress
           // and the job metadata entry can be cleaned up.
           return true;
@@ -87,6 +92,8 @@ public enum ControllerJobType {
           // TODO: Add handling for stuck tenant rebalance jobs.
           return stats.getCompletionStatusMsg() != null;
         } catch (Exception e) {
+          LOGGER.warn("Failed to parse tenant rebalance progress stats for job with ID: {}, assuming it can be deleted",
+              jobMetadataEntry.getLeft(), e);
           // If the stats are corrupted for some reason, let's assume that the tenant rebalance job is no longer in
           // progress and the job metadata entry can be cleaned up.
           return true;
