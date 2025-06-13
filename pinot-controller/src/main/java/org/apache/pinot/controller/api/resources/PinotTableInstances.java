@@ -206,7 +206,7 @@ public class PinotTableInstances {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action =
       Actions.Table.DELETE_INGESTION_METRICS)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Remove Realtime ingestion metrics emitted per partitionGroupID from serverInstance",
+  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionGroupID from serverInstance",
       notes = "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully removed ingestion-metrics."),
