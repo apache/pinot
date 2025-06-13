@@ -397,9 +397,9 @@ public interface BrokerResponse {
 
   /**
    * Set the pools queried in the request
-   * @param replicaGroups
+   * @param pools
    */
-  void setPools(Set<Integer> replicaGroups);
+  void setPools(Set<Integer> pools);
 
   /**
    * Get the pools queried in the request

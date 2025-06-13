@@ -329,7 +329,7 @@ public class QueryLogger {
             .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
       }
     },
-    REPLICA_GROUPS("replicaGroups") {
+    POOLS("pools") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
           builder.append(params._response.getPools());
