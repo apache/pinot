@@ -195,6 +195,7 @@ public class QueryRunner {
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(config);
     if (hardLimit > 0) {
+      LOGGER.info("Setting multi-stage executor hardLimit: {}", hardLimit);
       _executorService = new HardLimitExecutor(hardLimit, _executorService);
     }
 
