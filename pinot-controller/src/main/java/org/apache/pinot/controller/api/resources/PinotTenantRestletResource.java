@@ -684,10 +684,11 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}/rebalance")
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   @ApiResponses(value = {
-    @ApiResponse(code = 200, message = "Success", response = TenantRebalanceResult.class),
-    @ApiResponse(code = 400, message = "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time."),
-    @ApiResponse(code = 500, message = "Internal server error during rebalance")
-})
+      @ApiResponse(code = 200, message = "Success", response = TenantRebalanceResult.class),
+      @ApiResponse(code = 400, message = "Bad usage by specifying both include/excludeTables and "
+          + "parallelWhitelist/Blacklist at the same time."),
+      @ApiResponse(code = 500, message = "Internal server error during rebalance")
+  })
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName,
