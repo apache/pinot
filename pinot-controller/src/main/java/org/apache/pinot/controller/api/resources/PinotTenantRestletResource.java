@@ -700,13 +700,13 @@ public class PinotTenantRestletResource {
               + " job. Leaving blank defaults to include all tables from the tenant. Example: table1_REALTIME, "
               + "table2_REALTIME",
           example = "")
-      @QueryParam("includeTables") String allowTables,
+      @QueryParam("includeTables") String includeTables,
       @ApiParam(value =
           "Comma separated list of tables with type that would be excluded in this tenant rebalance"
               + " job. These tables will be removed from includeTables (that said, if a table appears in both list, "
               + "it will be excluded). Example: table1_REALTIME, table2_REALTIME",
           example = "")
-      @QueryParam("excludeTables") String blockTables,
+      @QueryParam("excludeTables") String excludeTables,
       @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
       @QueryParam("verboseResult") Boolean verboseResult,
       @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
@@ -720,13 +720,13 @@ public class PinotTenantRestletResource {
     if (verboseResult != null) {
       config.setVerboseResult(verboseResult);
     }
-    if (allowTables != null) {
-      config.setIncludeTables(Arrays.stream(StringUtil.split(allowTables, ',', 0))
+    if (includeTables != null) {
+      config.setIncludeTables(Arrays.stream(StringUtil.split(includeTables, ',', 0))
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
-    if (blockTables != null) {
-      config.setExcludeTables(Arrays.stream(StringUtil.split(blockTables, ',', 0))
+    if (excludeTables != null) {
+      config.setExcludeTables(Arrays.stream(StringUtil.split(excludeTables, ',', 0))
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
