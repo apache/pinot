@@ -1199,8 +1199,8 @@ public class TablesResource {
   @Path("/tables/{tableName}/ingestionMetrics")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
-      + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will "
-      + "be removed.")
+      + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will be "
+      + "removed.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
       @ApiResponse(code = 500, message = "Internal Server Error")

@@ -205,8 +205,8 @@ public class PinotTableInstances {
   @Produces(MediaType.APPLICATION_JSON)
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_INGESTION_METRICS)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionId from serverInstance",
-      notes = "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
+  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionId from serverInstance", notes =
+      "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully removed ingestion metrics."),
       @ApiResponse(code = 500, message = "Internal Server Error")
