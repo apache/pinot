@@ -64,8 +64,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     if (!config.getParallelWhitelist().isEmpty() || !config.getParallelBlacklist().isEmpty()) {
       // If the parallel whitelist or blacklist is set, the old tenant rebalance logic will be used
       // TODO: Deprecate the support for this in the future
-      LOGGER.warn("Using the old tenant rebalance logic because parallel whitelist or blacklist is set, "
-          + "which is a deprecated usage of this API.");
+      LOGGER.info("Using the old tenant rebalance logic because parallel whitelist or blacklist is set.");
       return rebalanceWithParallelAndSequential(config);
     }
     return rebalanceWithIncludeExcludeTables(config);
@@ -147,7 +146,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   // This method implements the old logic for tenant rebalance using parallel whitelist/blacklist.
-  // Usage of this method is now deprecated and will be removed in the future.
+  // Usage of this method would likely be deprecated and not supported in the future.
   private TenantRebalanceResult rebalanceWithParallelAndSequential(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
     Set<String> tables = getTenantTables(config.getTenantName());
@@ -156,7 +155,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
-            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
+            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false,
                 false));
       } catch (TableNotFoundException | RebalanceInProgressException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
@@ -299,6 +298,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     try {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
       RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true, true);
+      // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally breaks the degree of parallelism
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {

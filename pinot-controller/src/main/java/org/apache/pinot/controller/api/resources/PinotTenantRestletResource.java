@@ -683,6 +683,11 @@ public class PinotTenantRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.REBALANCE_TENANT_TABLES)
   @Path("/tenants/{tenantName}/rebalance")
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
+  @ApiResponses(value = {
+    @ApiResponse(code = 200, message = "Success", response = TenantRebalanceResult.class),
+    @ApiResponse(code = 400, message = "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time."),
+    @ApiResponse(code = 500, message = "Internal server error during rebalance")
+})
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName,
@@ -724,11 +729,13 @@ public class PinotTenantRestletResource {
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
-    if ((!config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty()) && (
-        !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty())) {
+    boolean isParallelListSet = !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty();
+
+    boolean isIncludeExcludeListSet = !config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty();
+
+    if (isParallelListSet && isIncludeExcludeListSet) {
       throw new ControllerApplicationException(LOGGER,
-          "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time."
-              + " The latter is a deprecated usage of this API.",
+          "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time.",
           Response.Status.BAD_REQUEST);
     }
     return _tenantRebalancer.rebalance(config);

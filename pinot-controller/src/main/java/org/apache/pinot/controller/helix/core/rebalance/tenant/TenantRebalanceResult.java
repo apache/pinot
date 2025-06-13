@@ -34,8 +34,7 @@ public class TenantRebalanceResult {
   public TenantRebalanceResult(
       @JsonProperty("jobId") String jobId,
       @JsonProperty("rebalanceTableResults") Map<String, RebalanceResult> rebalanceTableResults) {
-    _jobId = jobId;
-    _rebalanceTableResults = rebalanceTableResults;
+    this(jobId, rebalanceTableResults, true);
   }
 
   public TenantRebalanceResult(String jobId, Map<String, RebalanceResult> rebalanceTableResults, boolean verbose) {

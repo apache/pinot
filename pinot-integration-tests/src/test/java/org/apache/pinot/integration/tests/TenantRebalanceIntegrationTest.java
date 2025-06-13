@@ -39,9 +39,9 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
   }
 
   @Test
-  public void testDeprecatedParallelWhitelistBlacklistCompatibility()
+  public void testParallelWhitelistBlacklistCompatibility()
       throws Exception {
-    // Prepare a TenantRebalanceConfig with parallelWhitelist and parallelBlacklist (deprecated usage)
+    // Prepare a TenantRebalanceConfig with parallelWhitelist and parallelBlacklist (old usage)
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(getServerTenant());
     config.setDryRun(true);
