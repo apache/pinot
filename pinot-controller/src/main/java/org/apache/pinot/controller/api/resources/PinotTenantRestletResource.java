@@ -734,6 +734,9 @@ public class PinotTenantRestletResource {
 
     boolean isIncludeExcludeListSet = !config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty();
 
+    // Setting both parallel and include/exclude lists is not allowed. The rebalancer use the old logic if
+    // parallel white/blacklist is set, otherwise use the new logic (see DefaultTenantRebalancer). Setting both is a
+    // bad use.
     if (isParallelListSet && isIncludeExcludeListSet) {
       throw new ControllerApplicationException(LOGGER,
           "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time.",
