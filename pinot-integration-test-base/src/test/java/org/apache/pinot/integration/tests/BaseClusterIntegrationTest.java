@@ -798,4 +798,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
         .get("columnIndexSizeMap").get(column);
   }
+
+  /**
+   * Get all segment names for a given tableName and tableType.
+   */
+  protected List<String> getSegmentNames(String tableName, @Nullable String tableType)
+      throws Exception {
+    return getControllerRequestClient().listSegments(tableName, tableType, true);
+  }
 }
