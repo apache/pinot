@@ -247,7 +247,7 @@ public class TableRebalancer {
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
-        rebalanceConfig.isForceCommitBeforeMoved());
+        forceCommitBeforeMoved);
 
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
@@ -528,9 +528,16 @@ public class TableRebalancer {
             getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
                 lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
+
         if (!consumingSegmentsToMoveNext.isEmpty()) {
+          _tableRebalanceObserver.onTrigger(
+              TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
+              null);
           idealState =
               forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
+          _tableRebalanceObserver.onTrigger(
+              TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
+              new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
         }
       }
 
