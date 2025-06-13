@@ -36,11 +36,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -369,7 +369,8 @@ public class RebalanceCheckerTest {
     PinotHelixResourceManager pinotHelixManager = new PinotHelixResourceManager(cfg);
     HelixManager helixZkManager = mock(HelixManager.class);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-    String zkPath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE);
+    String zkPath =
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE.name());
     ZNRecord jobsZnRecord = new ZNRecord("jobs");
     when(propertyStore.get(eq(zkPath), any(), eq(AccessOption.PERSISTENT))).thenReturn(jobsZnRecord);
     when(helixZkManager.getClusterManagmentTool()).thenReturn(mock(HelixAdmin.class));
