@@ -209,7 +209,7 @@ public class PinotTableInstances {
   @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionGroupID from serverInstance",
       notes = "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully removed ingestion-metrics."),
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics."),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public SuccessResponse removeIngestionMetrics(
