@@ -64,7 +64,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server2", 2),
         createCandidate("server3", 3)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
+    when(_context.getOrderedPreferredPools()).thenReturn(Collections.emptyList());
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
@@ -83,7 +83,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server2", 2),
         createCandidate("server3", 1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
@@ -103,7 +103,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", 3)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server1");
 
     // Execute
@@ -122,7 +122,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server4", -1),
         createCandidate("server5", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server4");
 
     // Execute
@@ -149,7 +149,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
+    when(_context.getOrderedPreferredPools()).thenReturn(Collections.emptyList());
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
         Pair.of("server1", 0.1),
         Pair.of("server2", 0.2),
@@ -173,7 +173,7 @@ public class PriorityPoolInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
         Pair.of("server1", 0.1),
         Pair.of("server2", 0.2),
