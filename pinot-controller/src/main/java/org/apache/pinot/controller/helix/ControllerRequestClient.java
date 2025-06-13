@@ -198,6 +198,17 @@ public class ControllerRequestClient {
     }
   }
 
+  public void deleteLogicalTable(String logicalTableName)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName)),
+              _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public TableConfig getTableConfig(String tableName, TableType tableType)
       throws IOException {
     try {

@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
@@ -86,27 +85,9 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     return null;
   }
 
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
-  }
-
   @Override
   protected List<String> getNoDictionaryColumns() {
     return List.of(TEXT_COLUMN_NULL_NAME, TEXT_COLUMN_NAME, TEXT_COLUMN_NAME_CASE_SENSITIVE);
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
   }
 
   @Override

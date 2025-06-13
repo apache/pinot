@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,7 +42,17 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
   private ColumnConfigDeserializer<C> _deserializer;
   private IndexReaderFactory<IR> _readerFactory;
 
-  protected abstract ColumnConfigDeserializer<C> createDeserializer();
+  protected ColumnConfigDeserializer<C> createDeserializer() {
+    ColumnConfigDeserializer<C> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<C> fromLegacyConfigs = createDeserializerForLegacyConfigs();
+    return fromLegacyConfigs != null ? fromIndexes.withExclusiveAlternative(fromLegacyConfigs) : fromIndexes;
+  }
+
+  @Nullable
+  protected ColumnConfigDeserializer<C> createDeserializerForLegacyConfigs() {
+    return null;
+  }
 
   protected abstract IndexReaderFactory<IR> createReaderFactory();
 

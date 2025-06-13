@@ -253,10 +253,10 @@ public class ServerPlanRequestUtils {
     instanceRequest.setBrokerId("unknown");
     instanceRequest.setEnableTrace(executionContext.isTraceEnabled());
     /*
-      * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
-      * If segmentList is null, it means that the query is for a logical table and we need to set TableSegmentInfoList
-      *
-      * Either one of segmentList or tableRouteInfoList has to be set, but not both.
+     * If segmentList is not null, it means that the query is for a single table and we can directly set the segments.
+     * If segmentList is null, it means that the query is for a logical table and we need to set TableSegmentInfoList
+     *
+     * Either one of segmentList or tableRouteInfoList has to be set, but not both.
      */
     if (segmentList != null) {
       instanceRequest.setSearchSegments(segmentList);
@@ -422,7 +422,8 @@ public class ServerPlanRequestUtils {
     String logicalTableName = stageMetadata.getTableName();
     LogicalTableContext logicalTableContext = instanceDataManager.getLogicalTableContext(logicalTableName);
     Preconditions.checkNotNull(logicalTableContext,
-        "LogicalTableManager not found for logical table name: " + logicalTableName);
+        String.format("LogicalTableContext not found for logical table name: %s, query context id: %s",
+            logicalTableName, QueryThreadContext.getCid()));
 
     Map<String, List<String>> logicalTableSegmentsMap =
         executionContext.getWorkerMetadata().getLogicalTableSegmentsMap();
@@ -430,7 +431,7 @@ public class ServerPlanRequestUtils {
     List<TableSegmentsInfo> realtimeTableRouteInfoList = new ArrayList<>();
 
     Preconditions.checkNotNull(logicalTableSegmentsMap);
-    for (Map.Entry<String, List<String>> entry: logicalTableSegmentsMap.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : logicalTableSegmentsMap.entrySet()) {
       String physicalTableName = entry.getKey();
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();

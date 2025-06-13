@@ -268,6 +268,7 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
     // Preprocess throttle config specifically for StarTree index rebuild
     public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.startree.preprocess.parallelism";
@@ -290,6 +291,8 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // Download throttle config
     public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
         "pinot.server.max.segment.download.parallelism";
     // Setting to Integer.MAX_VALUE to effectively disable throttling by default
@@ -329,6 +332,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING =
+        "pinot.broker.query.log.logBeforeProcessing";
+    public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
@@ -660,6 +666,9 @@ public class CommonConstants {
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
         //   a table config to enable broker pruning (it is disabled by default).
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
+        // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
+        // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
+        public static final String RUN_IN_BROKER = "runInBroker";
       }
 
       public static class QueryOptionValue {
@@ -1728,5 +1737,15 @@ public class CommonConstants {
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+  }
+
+  /**
+   * ZK paths used by Pinot.
+   */
+  public static class ZkPaths {
+    public static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
+    public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
+    public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+    public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
   }
 }

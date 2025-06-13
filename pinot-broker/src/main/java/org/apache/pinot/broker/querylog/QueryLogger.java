@@ -50,6 +50,7 @@ public class QueryLogger {
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
   private final boolean _enableIpLogging;
+  private final boolean _logBeforeProcessing;
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
@@ -59,23 +60,26 @@ public class QueryLogger {
             Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND)),
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH),
         config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
-            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING), LOGGER, RateLimiter.create(1)
+            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING,
+            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING), LOGGER, RateLimiter.create(1)
         // log once a second for dropped log count
     );
   }
 
   @VisibleForTesting
-  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, Logger logger,
-      RateLimiter droppedLogRateLimiter) {
+  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
+      Logger logger, RateLimiter droppedLogRateLimiter) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
     _logger = logger;
     _droppedLogRateLimiter = droppedLogRateLimiter;
+    _logBeforeProcessing = logBeforeProcessing;
   }
 
   public void log(long requestId, String query) {
-    if (!checkRateLimiter(null)) {
+    if (!_logBeforeProcessing || !checkRateLimiter(null)) {
       return;
     }
 

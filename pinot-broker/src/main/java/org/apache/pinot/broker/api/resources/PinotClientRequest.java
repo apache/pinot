@@ -41,6 +41,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -59,6 +60,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -124,6 +126,10 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  @Inject
+  @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @ManagedAsync
@@ -411,7 +417,7 @@ public class PinotClientRequest {
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open(_instanceId)) {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient) {
         long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
