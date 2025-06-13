@@ -334,8 +334,13 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
 
     query = "SELECT count(*) FROM unknown";
     response = postQueryToController(query);
-    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
-        .containsMessage("TableDoesNotExistError");
+    if (useMultiStageQueryEngine) {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+          .containsMessage("TableDoesNotExistError");
+    } else {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING)
+          .containsMessage("BrokerResourceMissingError");
+    }
   }
 
   @Test
