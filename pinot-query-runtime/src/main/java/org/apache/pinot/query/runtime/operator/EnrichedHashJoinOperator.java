@@ -26,6 +26,7 @@ import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 
 
 public class EnrichedHashJoinOperator extends HashJoinOperator {
@@ -49,7 +50,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   public EnrichedHashJoinOperator(OpChainExecutionContext context,
       MultiStageOperator leftInput, DataSchema leftSchema, MultiStageOperator rightInput,
       EnrichedJoinNode node) {
-    super(context, leftInput, leftSchema, rightInput, node);
+    super(context, leftInput, leftSchema, rightInput, node, node.getJoinResultSchema());
 
     _joinResultSchema = node.getJoinResultSchema();
     _projectResultSchema = node.getProjectResultSchema();
@@ -125,11 +126,14 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     if (_priorityQueue == null) {
       // limit only, terminate if enough rows
       if (_rowsSeen++ == _numRowsToKeep) {
+        earlyTerminate();
+        logger().debug("EnrichedHashJoinOperator: seen enough rows with no sort, early terminating");
         return;
       }
       rows.add(row);
     } else {
       // sort is actually needed
+      logger().debug("EnrichedHashJoinOperator: insert row {}", row);
       SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
     }
   }
@@ -140,7 +144,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       return rows;
     }
     int resultSize = _priorityQueue.size() - _offset;
-    Preconditions.checkState(resultSize > 0,
+    Preconditions.checkState(resultSize >= 0,
         "EnrichedHashJoinOperator sort-limit result size < 0");
     rows = new ArrayList<Object[]>(Arrays.asList(new Object[resultSize][]));
     // TODO: check this really skipped offset?
@@ -148,6 +152,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       Object[] row = _priorityQueue.poll();
       rows.set(i, row);
     }
+    logger().debug("EnrichedJoinOperator: emitting final result {}, early terminating", rows);
+    earlyTerminate();
     return rows;
   }
 
@@ -393,7 +399,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
     @Override
     public Object get(int i) {
-      return i < _leftSize ? _leftRow[i] : _rightRow[i - _leftSize];
+      return i < _leftSize ? (_leftRow == null ? null : _leftRow[i]) : (_rightRow == null ? null : _rightRow[i - _leftSize]);
     }
 
     @Override

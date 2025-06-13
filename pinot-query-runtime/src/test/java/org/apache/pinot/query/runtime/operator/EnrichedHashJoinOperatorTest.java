@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -84,7 +84,7 @@ public class EnrichedHashJoinOperatorTest {
         new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, RexExpression.Literal.TRUE, null, null, 0, 0);
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 3);
@@ -109,7 +109,7 @@ public class EnrichedHashJoinOperatorTest {
         new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, RexExpression.Literal.FALSE, null, null, 0, 0);
     assertTrue(operator.nextBlock().isSuccess());
   }
@@ -134,7 +134,7 @@ public class EnrichedHashJoinOperatorTest {
         new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
             List.of(new RexExpression.InputRef(1), new RexExpression.Literal(DataSchema.ColumnDataType.STRING, "B")));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, null, 0, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -231,7 +231,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, 0, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -260,7 +260,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, 2, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -288,7 +288,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, 2, 1);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -323,7 +323,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, projects, collations, 2, 1);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -358,7 +358,7 @@ public class EnrichedHashJoinOperatorTest {
     // project
     List<RexExpression> projects = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(2));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, projects, null, -1, -1);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -391,7 +391,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, 2, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -429,7 +429,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit, note that the RelFieldCollation's fieldIndex should be acc. to the projected row
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, projects, collations, 2, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -466,7 +466,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit, note that the RelFieldCollation's fieldIndex should be acc. to the projected row
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, projects, collations, 0, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -502,7 +502,7 @@ public class EnrichedHashJoinOperatorTest {
     // sort limit test
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, 2, 0);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -539,7 +539,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(3, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, -1, -1);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -548,6 +548,45 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.get(1), new Object[]{2, "BB", 3, "BB"});
     assertEquals(resultRows.get(2), new Object[]{2, "BB", 2, "BB"});
     assertEquals(resultRows.get(3), new Object[]{4, "Bd", null, null});
+  }
+
+  @Test
+  public void shouldHandleLeftOuterJoinWithSortOnNonPreserveSideNullsFirst() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(4, "Bd")
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "BB")
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(2, "Bc")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+
+    // filter
+    RexExpression.FunctionCall startsWith =
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(DataSchema.ColumnDataType.STRING, "B")));
+
+    // sort limit test
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(3, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.FIRST),
+        new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.FIRST));
+
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of(),
+        PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, -1, -1);
+
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 4);
+    assertEquals(resultRows.get(0), new Object[]{4, "Bd", null, null});
+    assertEquals(resultRows.get(1), new Object[]{3, "Bc", 2, "Bc"});
+    assertEquals(resultRows.get(2), new Object[]{2, "BB", 3, "BB"});
+    assertEquals(resultRows.get(3), new Object[]{2, "BB", 2, "BB"});
   }
 
   @Test
@@ -569,7 +608,7 @@ public class EnrichedHashJoinOperatorTest {
         new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, null, -1, -1);
     List<Object[]> resultRows = new ArrayList<>();
     MseBlock resultBlock = operator.nextBlock();
@@ -608,7 +647,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, -1, -1);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -650,7 +689,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, startsWith, null, collations, -1, -1);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -687,7 +726,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.FULL, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.FULL, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, -1, -1);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -726,7 +765,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, -1, -1);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -764,7 +803,7 @@ public class EnrichedHashJoinOperatorTest {
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
         new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST));
 
-    HashJoinOperator operator = getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of(),
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of(),
         PlanNode.NodeHint.EMPTY, null, null, null, collations, -1, -1);
 
     List<Object[]> resultRows = new ArrayList<>();
@@ -779,8 +818,95 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.get(2), new Object[]{1, "Aa"});
   }
 
+  @Test
+  public void shouldHandleProjectJoinWithNonEquiConditions() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(4, "Be")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "BB")
+        .addRow(4, "Bd")
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(2, "Bc")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+
+    // project
+    List<RexExpression> projects = List.of(new RexExpression.InputRef(0));
+
+    // NonEquiCondition
+    List<RexExpression> nonEquiConditions = List.of(new RexExpression.FunctionCall(DataSchema.ColumnDataType.INT, SqlKind.GREATER_THAN.name(), List.of(
+        new RexExpression.InputRef(0), new RexExpression.InputRef(2)
+    )));
+
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), nonEquiConditions,
+        PlanNode.NodeHint.EMPTY, null, null, projects, null, -1, -1);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{3});
+  }
+
+  @Test
+  public void shouldHandleProjectFilterJoinWithNonEquiConditions() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(4, "Be")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "BB")
+        .addRow(4, "Bd")
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(2, "Bc")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+
+    // NonEquiCondition
+    List<RexExpression> nonEquiConditions = List.of(new RexExpression.FunctionCall(DataSchema.ColumnDataType.INT, SqlKind.GREATER_THAN_OR_EQUAL.name(), List.of(
+        new RexExpression.InputRef(0), new RexExpression.InputRef(2)
+    )));
+
+    // filter is before project
+    RexExpression.FunctionCall startsWith =
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(DataSchema.ColumnDataType.STRING, "Bc")));
+
+    // project
+    List<RexExpression> projects = List.of(new RexExpression.InputRef(0));
+
+    HashJoinOperator operator = getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), nonEquiConditions,
+        PlanNode.NodeHint.EMPTY, null, startsWith, projects, null, -1, -1);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{3});
+  }
+
   // utils ----
-  private EnrichedHashJoinOperator getOperatorNoProject(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
+  private EnrichedHashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions, PlanNode.NodeHint nodeHint,
       RexExpression matchCondition, RexExpression filterCondition, List<RexExpression> projects, List<RelFieldCollation> collations,
       int fetch, int offset
@@ -802,7 +928,7 @@ public class EnrichedHashJoinOperatorTest {
 
   private HashJoinOperator getBasicOperator(DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
-    return getOperatorNoProject(DEFAULT_CHILD_SCHEMA, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
+    return getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
         PlanNode.NodeHint.EMPTY, null, null, null, null, 0, 0);
   }
 

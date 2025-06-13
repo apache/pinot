@@ -79,6 +79,18 @@ public class HashJoinOperator extends BaseJoinOperator {
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
   }
 
+  /** constructor that takes the schema for NonEquiEvaluator as an argument */
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    super(context, leftInput, leftSchema, rightInput, node, nonEquiEvaluationSchema);
+    List<Integer> leftKeys = node.getLeftKeys();
+    Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
+    _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
+    _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
+    _rightTable = createLookupTable(leftKeys, leftSchema);
+    _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
+  }
+
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {
     if (joinKeys.size() > 1) {
       return new ObjectLookupTable();

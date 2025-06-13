@@ -108,6 +108,27 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
   }
 
+  /** constructor that takes the schema for NonEquiEvaluator as an argument */
+  public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    super(context);
+    _leftInput = leftInput;
+    _rightInput = rightInput;
+    _joinType = node.getJoinType();
+    _leftColumnSize = leftSchema.size();
+    _resultSchema = node.getDataSchema();
+    _resultColumnSize = _resultSchema.size();
+    List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
+    _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    for (RexExpression nonEquiCondition : nonEquiConditions) {
+      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema));
+    }
+    Map<String, String> metadata = context.getOpChainMetadata();
+    PlanNode.NodeHint nodeHint = node.getNodeHint();
+    _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
+    _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
+  }
+
   protected static int getMaxRowsInJoin(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);

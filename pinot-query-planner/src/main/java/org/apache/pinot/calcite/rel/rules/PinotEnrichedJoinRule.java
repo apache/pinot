@@ -28,6 +28,7 @@ import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -141,11 +142,11 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
       Config.FILTER_JOIN.toRule();
 
   public static final List<RelOptRule> PINOT_ENRICHED_JOIN_RULES = List.of(
-      SORT_PROJECT_FILTER_JOIN,
-      SORT_PROJECT_JOIN,
-      SORT_FILTER_JOIN,
+//      SORT_PROJECT_FILTER_JOIN,
+//      SORT_PROJECT_JOIN,
+//      SORT_FILTER_JOIN,
       PROJECT_FILTER_JOIN,
-      SORT_JOIN,
+//      SORT_JOIN,
       PROJECT_JOIN,
       FILTER_JOIN
   );
@@ -274,6 +275,11 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
 
       default:
         throw new IllegalStateException("unknown patternType for PinotEnrichedJoinRule");
+    }
+
+    // Disable non-equijoin for now
+    if (join.analyzeCondition().leftKeys.isEmpty()) {
+      return;
     }
 
     PinotLogicalEnrichedJoin pinotLogicalEnrichedJoin = new PinotLogicalEnrichedJoin(
