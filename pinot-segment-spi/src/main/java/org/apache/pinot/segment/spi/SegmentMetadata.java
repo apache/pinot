@@ -28,6 +28,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
@@ -94,6 +95,9 @@ public interface SegmentMetadata {
 
   @Nullable
   List<StarTreeV2Metadata> getStarTreeV2MetadataList();
+
+  @Nullable
+  MultiColumnTextMetadata getMultiColumnTextMetadata();
 
   Map<String, String> getCustomMap();
 

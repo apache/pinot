@@ -104,6 +104,8 @@ public class IndexingConfig extends BaseJsonConfig {
 
   private JsonNode _tierOverwrites;
 
+  private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
+
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -401,6 +403,15 @@ public class IndexingConfig extends BaseJsonConfig {
     _segmentNameGeneratorType = segmentNameGeneratorType;
   }
 
+  @Nullable
+  public MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
+    return _multiColumnTextIndexConfig;
+  }
+
+  public void setMultiColumnTextIndexConfig(MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
+    _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+  }
+
   /**
    * Returns all columns referenced in the indexing config. This is useful to construct FieldIndexConfigs in
    * IndexLoadingConfig when schema is not provided. Only including the columns referenced by indexes supported in
@@ -441,6 +452,9 @@ public class IndexingConfig extends BaseJsonConfig {
     }
     if (_varLengthDictionaryColumns != null) {
       allColumns.addAll(_varLengthDictionaryColumns);
+    }
+    if (_multiColumnTextIndexConfig != null) {
+      allColumns.addAll(_multiColumnTextIndexConfig.getColumns());
     }
     return allColumns;
   }

@@ -35,6 +35,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -45,6 +47,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -53,10 +56,15 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   private static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME_LUCENE = "testSegmentLucene";
   private static final String SEGMENT_NAME_NATIVE = "testSegmentNative";
+
   private static final String QUOTES_COL_LUCENE = "QUOTES_LUCENE";
+  private static final String QUOTES_COL_LUCENE_MC = "QUOTES_LUCENE_MC"; //multi-col index
   private static final String QUOTES_COL_NATIVE = "QUOTES_NATIVE";
+
   private static final String QUOTES_COL_LUCENE_MV = "QUOTES_LUCENE_MV";
+  private static final String QUOTES_COL_LUCENE_MC_MV = "QUOTES_LUCENE_MC_MV"; //multi-col index
   private static final String QUOTES_COL_NATIVE_MV = "QUOTES_NATIVE_MV";
+
   private static final Integer NUM_ROWS = 1024;
 
   private IndexSegment _indexSegment;
@@ -140,8 +148,10 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       GenericRow row = new GenericRow();
       row.putValue(QUOTES_COL_LUCENE, doc);
       row.putValue(QUOTES_COL_NATIVE, doc);
+      row.putValue(QUOTES_COL_LUCENE_MC, doc);
       row.putValue(QUOTES_COL_LUCENE_MV, mvDoc);
       row.putValue(QUOTES_COL_NATIVE_MV, mvDoc);
+      row.putValue(QUOTES_COL_LUCENE_MC_MV, mvDoc);
       rows.add(row);
     }
 
@@ -152,16 +162,27 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
-        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
+        new FieldConfig(QUOTES_COL_LUCENE, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig(QUOTES_COL_LUCENE_MV, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig.Builder(QUOTES_COL_LUCENE_MC).withEncodingType(EncodingType.DICTIONARY).build(),
+        new FieldConfig.Builder(QUOTES_COL_LUCENE_MC_MV).withEncodingType(EncodingType.DICTIONARY).build()
+    );
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_LUCENE, QUOTES_COL_LUCENE_MV))
-        .setFieldConfigList(fieldConfigs).build();
+        .setFieldConfigList(fieldConfigs)
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(QUOTES_COL_LUCENE_MC, QUOTES_COL_LUCENE_MC_MV)))
+        .build();
+
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUOTES_COL_LUCENE, FieldSpec.DataType.STRING)
-        .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING).build();
+        .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(QUOTES_COL_LUCENE_MC, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(QUOTES_COL_LUCENE_MC_MV, FieldSpec.DataType.STRING)
+        .build();
+
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -178,18 +199,22 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       throws Exception {
     List<GenericRow> rows = createTestData(NUM_ROWS);
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(QUOTES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+        new FieldConfig(QUOTES_COL_NATIVE, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
             Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)),
-        new FieldConfig(QUOTES_COL_NATIVE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+        new FieldConfig(QUOTES_COL_NATIVE_MV, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
             Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV))
         .setFieldConfigList(fieldConfigs).build();
     tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUOTES_COL_NATIVE, FieldSpec.DataType.STRING)
-        .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING).build();
+        .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING)
+        .build();
+
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
@@ -205,15 +230,27 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   private ImmutableSegment loadLuceneSegment()
       throws Exception {
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
-        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        new FieldConfig(QUOTES_COL_LUCENE, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig(QUOTES_COL_LUCENE_MV, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig.Builder(QUOTES_COL_LUCENE_MC).withEncodingType(EncodingType.DICTIONARY).build(),
+        new FieldConfig.Builder(QUOTES_COL_LUCENE_MC_MV).withEncodingType(EncodingType.DICTIONARY).build()
+    );
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_LUCENE, QUOTES_COL_LUCENE_MV))
-        .setFieldConfigList(fieldConfigs).build();
+        .setFieldConfigList(fieldConfigs)
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(QUOTES_COL_LUCENE_MC, QUOTES_COL_LUCENE_MC_MV)))
+        .build();
+
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUOTES_COL_LUCENE, FieldSpec.DataType.STRING)
-        .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING).build();
+        .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(QUOTES_COL_LUCENE_MC, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(QUOTES_COL_LUCENE_MC_MV, FieldSpec.DataType.STRING)
+        .build();
+
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_LUCENE), indexLoadingConfig);
   }
@@ -221,9 +258,9 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   private ImmutableSegment loadNativeIndexSegment()
       throws Exception {
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(QUOTES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+        new FieldConfig(QUOTES_COL_NATIVE, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
             Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)),
-        new FieldConfig(QUOTES_COL_NATIVE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+        new FieldConfig(QUOTES_COL_NATIVE_MV, EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
             Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV)).setFieldConfigList(fieldConfigs)
@@ -240,20 +277,20 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     _indexSegments = List.of(_nativeIndexSegment);
     Operator<SelectionResultsBlock> operator = getOperator(nativeQuery);
     SelectionResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getRows();
-    Assert.assertNotNull(resultset);
+    List<Object[]> nativeResult = (List<Object[]>) operatorResult.getRows();
+    Assert.assertNotNull(nativeResult);
 
     _indexSegment = _luceneSegment;
     _indexSegments = List.of(_luceneSegment);
     operator = getOperator(luceneQuery);
     operatorResult = operator.nextBlock();
-    List<Object[]> resultset2 = (List<Object[]>) operatorResult.getRows();
-    Assert.assertNotNull(resultset2);
+    List<Object[]> luceneResult = (List<Object[]>) operatorResult.getRows();
+    Assert.assertNotNull(luceneResult);
 
-    Assert.assertEquals(resultset.size(), resultset2.size());
-    for (int i = 0; i < resultset.size(); i++) {
-      Object[] actualRow = resultset.get(i);
-      Object[] expectedRow = resultset2.get(i);
+    Assert.assertEquals(nativeResult.size(), luceneResult.size());
+    for (int i = 0; i < nativeResult.size(); i++) {
+      Object[] actualRow = nativeResult.get(i);
+      Object[] expectedRow = luceneResult.get(i);
       Assert.assertEquals(actualRow.length, expectedRow.length);
       for (int j = 0; j < actualRow.length; j++) {
         Object actualColValue = actualRow[j];
@@ -262,51 +299,69 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       }
     }
   }
-  @Test
-  public void testQueries() {
+
+  @DataProvider(name = "isMultiColIndex")
+  public static Boolean[] isMultiColIndex() {
+    return new Boolean[]{false, true};
+  }
+
+  @Test(dataProvider = "isMultiColIndex")
+  public void testQueries(boolean isMultiColIndex) {
+    String columns = isMultiColIndex ? QUOTES_COL_LUCENE_MC + "," + QUOTES_COL_LUCENE_MC_MV
+        : QUOTES_COL_LUCENE + "," + QUOTES_COL_LUCENE_MV;
+    String matchColumn = isMultiColIndex ? QUOTES_COL_LUCENE_MC : QUOTES_COL_LUCENE;
 
     String nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE, 'vico.*') LIMIT 50000";
-    String luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE, 'vico*') LIMIT 50000";
+    String luceneQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vico*') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE, 'convi.*ced') LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE, 'convi*ced') LIMIT 50000";
+    luceneQuery = "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'convi*ced') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE, 'vicomte') AND "
         + "TEXT_CONTAINS(QUOTES_NATIVE, 'hos.*') LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE, 'vicomte AND hos*') LIMIT 50000";
+    luceneQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vicomte AND hos*') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE, 'sac.*') OR "
         + "TEXT_CONTAINS(QUOTES_NATIVE, 'herself') LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE, 'sac* OR herself') LIMIT 50000";
+    luceneQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'sac* OR herself') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
     nativeQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE, 'vicomte') LIMIT 50000";
-    luceneQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE, 'vicomte') LIMIT 50000";
+    luceneQuery = "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vicomte') LIMIT 50000";
     testSelectionResults(nativeQuery, luceneQuery);
 
+    matchColumn = isMultiColIndex ? QUOTES_COL_LUCENE_MC_MV : QUOTES_COL_LUCENE_MV;
+
     String nativeMVQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE_MV, 'vico.*') LIMIT 50000";
-    String luceneMVQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE_MV, 'vico*') LIMIT 50000";
+    String luceneMVQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vico*') LIMIT 50000";
     testSelectionResults(nativeMVQuery, luceneMVQuery);
 
     nativeMVQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE_MV, 'convi.*ced') LIMIT 50000";
-    luceneMVQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE_MV, 'convi*ced') LIMIT 50000";
+    luceneMVQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'convi*ced') LIMIT 50000";
     testSelectionResults(nativeMVQuery, luceneMVQuery);
 
     nativeMVQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE_MV, 'vicomte') AND "
         + "TEXT_CONTAINS(QUOTES_NATIVE_MV, 'hos.*') LIMIT 50000";
-    luceneMVQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE_MV, 'vicomte AND hos*') LIMIT 50000";
+    luceneMVQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vicomte AND hos*') LIMIT 50000";
     testSelectionResults(nativeMVQuery, luceneMVQuery);
 
     nativeMVQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE_MV, 'sac.*') OR "
         + "TEXT_CONTAINS(QUOTES_NATIVE_MV, 'herself') LIMIT 50000";
-    luceneMVQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE_MV, 'sac* OR herself') LIMIT 50000";
+    luceneMVQuery =
+        "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'sac* OR herself') LIMIT 50000";
     testSelectionResults(nativeMVQuery, luceneMVQuery);
 
     nativeMVQuery = "SELECT * FROM MyTable WHERE TEXT_CONTAINS(QUOTES_NATIVE_MV, 'vicomte') LIMIT 50000";
-    luceneMVQuery = "SELECT * FROM MyTable WHERE TEXT_MATCH(QUOTES_LUCENE_MV, 'vicomte') LIMIT 50000";
+    luceneMVQuery = "SELECT " + columns + " FROM MyTable WHERE TEXT_MATCH(" + matchColumn + ", 'vicomte') LIMIT 50000";
     testSelectionResults(nativeMVQuery, luceneMVQuery);
   }
 }
