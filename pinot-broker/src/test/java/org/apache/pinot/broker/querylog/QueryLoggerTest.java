@@ -87,7 +87,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -125,7 +125,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -141,7 +141,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -155,7 +155,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(true, true, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -169,7 +169,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 1, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -183,7 +183,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 1456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -217,7 +217,7 @@ public class QueryLoggerTest {
     }).thenReturn(true);
 
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     ExecutorService executorService = Executors.newFixedThreadPool(4);
 

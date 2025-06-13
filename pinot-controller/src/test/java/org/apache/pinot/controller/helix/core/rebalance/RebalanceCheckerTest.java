@@ -51,10 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class RebalanceCheckerTest {
@@ -87,7 +84,7 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
@@ -104,7 +101,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
     jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
@@ -116,7 +113,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
@@ -152,11 +149,37 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.DONE);
     stats.setStartTimeMs(5000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job5", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job5", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job5", stats, jobCtx);
     allJobMetadata.put("job5", jobMetadata);
     jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
     assertEquals(jobs.size(), 0);
+
+    // Add job6 that doesn't support retries as per its rebalance context (used by system initiated rebalances in
+    // practice).
+    jobCfg = new RebalanceConfig();
+    jobCfg.setMaxAttempts(4);
+    stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.FAILED);
+    stats.setStartTimeMs(5000);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job6", jobCfg, false);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job6", stats, jobCtx);
+    allJobMetadata.put("job6", jobMetadata);
+    jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
+    assertEquals(jobs.size(), 0);
+
+    // Ensure that a job serialized using an older version of TableRebalanceContext without the allowRetries field is
+    // retriable by default.
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT,
+        "{\"jobId\":\"job6\",\"attemptId\":1,\"config\":{\"maxAttempts\":4,\"dryRun\":false,\"preChecks\":false,"
+            + "\"bootstrap\":false,\"downtime\":false,\"lowDiskMode\":false,\"bestEfforts\":false,"
+            + "\"reassignInstances\":false,\"includeConsuming\":false,\"batchSizePerServer\":-1,"
+            + "\"updateTargetTier\":false,\"externalViewCheckIntervalInMs\":1000,\"minAvailableReplicas\":1,"
+            + "\"heartbeatIntervalInMs\":300000,\"heartbeatTimeoutInMs\":3600000,\"retryInitialDelayInMs\":300000,"
+            + "\"minimizeDataMovement\":\"ENABLE\",\"externalViewStabilizationTimeoutInMs\":3600000},"
+            + "\"originalJobId\":\"job6\"}, tableName=table01}");
+    jobs = RebalanceChecker.getCandidateJobs(tableName, Map.of("job6", jobMetadata));
+    assertEquals(jobs.size(), 1);
   }
 
   @Test
@@ -193,6 +216,28 @@ public class RebalanceCheckerTest {
   }
 
   @Test
+  public void testStuckInProgressJobs()
+      throws Exception {
+    String tableName = "table01";
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+
+    assertFalse(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
+
+    RebalanceConfig jobCfg = new RebalanceConfig();
+    jobCfg.setHeartbeatTimeoutInMs(10_000);
+    TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    // Even though allowRetries is false, we still abort stuck jobs (heartbeat timeout exceeded).
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, false);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() - 20_000));
+    allJobMetadata.put("job1", jobMetadata);
+
+    assertTrue(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
+  }
+
+  @Test
   public void testRetryRebalance()
       throws Exception {
     String tableName = "table01";
@@ -208,7 +253,7 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
@@ -225,7 +270,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
     jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
@@ -237,7 +282,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
@@ -284,7 +329,7 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(nowMs);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
 
