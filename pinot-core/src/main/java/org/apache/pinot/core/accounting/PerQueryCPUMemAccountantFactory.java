@@ -287,6 +287,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId) {
+    }
 
     /**
      * The thread would need to do {@code setThreadResourceUsageProvider} first upon it is scheduled.
