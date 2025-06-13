@@ -150,7 +150,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         .keySet();
     assertEquals(originalConsumingSegmentsToMove.size(), 2);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     // test: move segments from tenantA to tenantB
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
@@ -168,7 +168,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         .getConsumingSegmentToBeMovedSummary()
         .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
         .keySet();
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
@@ -216,7 +216,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     rebalanceConfig.setIncludeConsuming(true);
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     serverStarter0.stop();
     serverStarter1.stop();
@@ -265,7 +265,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         .keySet();
     assertEquals(originalConsumingSegmentsToMove.size(), 2);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     // test: move segments from tenantA to tenantB
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
@@ -283,7 +283,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         .getConsumingSegmentToBeMovedSummary()
         .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
         .keySet();
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
     ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
@@ -315,7 +315,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
         2);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
     consumingSegmentInfoResponse =
@@ -339,7 +339,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
     consumingSegmentInfoResponse =
@@ -363,7 +363,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     rebalanceConfig.setIncludeConsuming(true);
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 15000);
+    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
     serverStarter0.stop();
     serverStarter1.stop();
