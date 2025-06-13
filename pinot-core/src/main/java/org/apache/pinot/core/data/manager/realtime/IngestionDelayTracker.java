@@ -23,6 +23,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -212,6 +213,7 @@ public class IngestionDelayTracker {
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
+        LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
       }
       return null;
     });
@@ -317,6 +319,20 @@ public class IngestionDelayTracker {
    */
   public void stopTrackingPartitionIngestionDelay(int partitionId) {
     removePartitionId(partitionId);
+  }
+
+  /**
+   * Handles all partition removal event. This must be invoked when we stop serving partitions for this table in the
+   * current server.
+   *
+   * @return Set of partitionIds for which ingestion metrics were removed.
+   */
+  public Set<Integer> stopTrackingIngestionDelayForAllPartitions() {
+    Set<Integer> removedPartitionIds = new HashSet<>(_ingestionInfoMap.keySet());
+    for (Integer partitionId : _ingestionInfoMap.keySet()) {
+      removePartitionId(partitionId);
+    }
+    return removedPartitionIds;
   }
 
   /**
