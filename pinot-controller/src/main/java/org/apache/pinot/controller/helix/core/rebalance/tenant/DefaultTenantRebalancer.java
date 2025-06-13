@@ -298,7 +298,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     try {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
       RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true, true);
-      // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally breaks the degree of parallelism
+      // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally
+      //  breaks the degree of parallelism
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {
