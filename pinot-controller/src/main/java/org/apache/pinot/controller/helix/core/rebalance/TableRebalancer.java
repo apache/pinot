@@ -522,87 +522,102 @@ public class TableRebalancer {
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
 
-      Map<String, Map<String, String>> nextAssignment;
-      if (forceCommitBeforeMoved) {
-        nextAssignment =
-            getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-                lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
-        Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
-
-        if (!consumingSegmentsToMoveNext.isEmpty()) {
-          _tableRebalanceObserver.onTrigger(
-              TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
-              null);
-          idealState =
-              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
-          _tableRebalanceObserver.onTrigger(
-              TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
-              new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
-        }
-      }
-
       // Re-calculate the target assignment if IdealState changed while waiting for ExternalView to converge
       ZNRecord idealStateRecord = idealState.getRecord();
-      if (idealStateRecord.getVersion() != expectedVersion) {
-        tableRebalanceLogger.info(
-            "IdealState version changed while waiting for ExternalView to converge, re-calculating the target "
-                + "assignment");
-        Map<String, Map<String, String>> oldAssignment = currentAssignment;
-        currentAssignment = idealStateRecord.getMapFields();
-        expectedVersion = idealStateRecord.getVersion();
+      Map<String, Map<String, String>> nextAssignment;
+      boolean needsRecalculation;
+      boolean shouldForceCommit = forceCommitBeforeMoved;
 
-        // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply the
-        // same target instance state map for these segments to the new ideal state as the target assignment
-        boolean segmentsToMoveChanged = false;
-        if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
-          // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment for
-          // new added segments is based on the existing assignment
-          segmentsToMoveChanged = true;
-        } else {
-          for (String segment : segmentsToMove) {
-            Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
-            Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
-            // TODO: Consider allowing segment state change from CONSUMING to ONLINE
-            if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
-              tableRebalanceLogger.info(
-                  "Segment state changed in IdealState from: {} to: {} for segment: {}, re-calculating the target "
-                      + "assignment based on the new IdealState",
-                  oldInstanceStateMap, currentInstanceStateMap, segment);
-              segmentsToMoveChanged = true;
-              break;
+      do {
+        needsRecalculation = false;
+
+        // Step 1: Handle version mismatch and recalculate if needed
+        if (idealStateRecord.getVersion() != expectedVersion) {
+          tableRebalanceLogger.info(
+              "IdealState version changed while waiting for ExternalView to converge, re-calculating the target "
+                  + "assignment");
+          Map<String, Map<String, String>> oldAssignment = currentAssignment;
+          currentAssignment = idealStateRecord.getMapFields();
+          expectedVersion = idealStateRecord.getVersion();
+
+          // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply
+          // the same target instance state map for these segments to the new ideal state as the target assignment
+          boolean segmentsToMoveChanged = false;
+          if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
+            // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment
+            // for new added segments is based on the existing assignment
+            segmentsToMoveChanged = true;
+          } else {
+            for (String segment : segmentsToMove) {
+              Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
+              Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
+              // TODO: Consider allowing segment state change from CONSUMING to ONLINE
+              if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
+                tableRebalanceLogger.info(
+                    "Segment state changed in IdealState from: {} to: {} for segment: {}, re-calculating the target "
+                        + "assignment based on the new IdealState",
+                    oldInstanceStateMap, currentInstanceStateMap, segment);
+                segmentsToMoveChanged = true;
+                break;
+              }
+            }
+          }
+          if (segmentsToMoveChanged) {
+            try {
+              // Re-calculate the instance partitions in case the instance configs changed during the rebalance
+              instancePartitionsMap =
+                  getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
+                      tableRebalanceLogger).getLeft();
+              tierToInstancePartitionsMap =
+                  getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
+                      minimizeDataMovement, tableRebalanceLogger).getLeft();
+              targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+                  tierToInstancePartitionsMap, rebalanceConfig);
+            } catch (Exception e) {
+              onReturnFailure("Caught exception while re-calculating the target assignment, aborting the rebalance", e,
+                  tableRebalanceLogger);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                  "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
+                  tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+            }
+          } else {
+            tableRebalanceLogger.info(
+                "No state change found for segments to be moved, re-calculating the target assignment based on the "
+                    + "previous target assignment");
+            Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
+            // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
+            targetAssignment = new TreeMap<>(currentAssignment);
+            for (String segment : segmentsToMove) {
+              targetAssignment.put(segment, oldTargetAssignment.get(segment));
             }
           }
         }
-        if (segmentsToMoveChanged) {
-          try {
-            // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-            instancePartitionsMap =
-                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
-                    tableRebalanceLogger).getLeft();
-            tierToInstancePartitionsMap =
-                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
-                    minimizeDataMovement, tableRebalanceLogger).getLeft();
-            targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
-                tierToInstancePartitionsMap, rebalanceConfig);
-          } catch (Exception e) {
-            onReturnFailure("Caught exception while re-calculating the target assignment, aborting the rebalance", e,
-                tableRebalanceLogger);
-            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-                "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
-                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+
+        // Step 2: Handle force commit if flag is set, then recalculate if force commit occurred
+        if (shouldForceCommit) {
+          nextAssignment =
+              getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+                  lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
+          Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
+
+          if (!consumingSegmentsToMoveNext.isEmpty()) {
+            tableRebalanceLogger.info("Force committing {} consuming segments before moving them",
+                consumingSegmentsToMoveNext.size());
+            needsRecalculation = true;
+            _tableRebalanceObserver.onTrigger(
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
+                null);
+            idealState =
+                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
+                    tableRebalanceLogger);
+            idealStateRecord = idealState.getRecord();
+            _tableRebalanceObserver.onTrigger(
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
+                new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
           }
-        } else {
-          tableRebalanceLogger.info(
-              "No state change found for segments to be moved, re-calculating the target assignment based on the "
-                  + "previous target assignment");
-          Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
-          // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
-          targetAssignment = new TreeMap<>(currentAssignment);
-          for (String segment : segmentsToMove) {
-            targetAssignment.put(segment, oldTargetAssignment.get(segment));
-          }
+          shouldForceCommit = false; // Only attempt force commit once
         }
-      }
+      } while (needsRecalculation);
 
       if (currentAssignment.equals(targetAssignment)) {
         String msg =
@@ -628,6 +643,7 @@ public class TableRebalancer {
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
+
       nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
               lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
