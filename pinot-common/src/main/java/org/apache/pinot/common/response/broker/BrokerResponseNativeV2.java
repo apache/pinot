@@ -395,8 +395,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public void setPools(@NotNull Set<Integer> replicaGroups) {
-    _pools = replicaGroups;
+  public void setPools(@NotNull Set<Integer> pools) {
+    _pools = pools;
   }
 
   @Override

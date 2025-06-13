@@ -48,13 +48,13 @@ public class ServerSelectionContext {
   /**
    * Creates a new server selection context with the given query options.
    * The ordered preferred pools are extracted from the query options using
-   * {@link QueryOptionsUtils#getOrderedPreferredReplicas(Map)}.
+   * {@link QueryOptionsUtils#getOrderedPreferredPools(Map)}.
    *
    * @param queryOptions map of query options that may contain server selection preferences
    */
   public ServerSelectionContext(Map<String, String> queryOptions) {
     _queryOptions = queryOptions == null ? Collections.emptyMap() : queryOptions;
-    _orderedPreferredPools = QueryOptionsUtils.getOrderedPreferredReplicas(_queryOptions);
+    _orderedPreferredPools = QueryOptionsUtils.getOrderedPreferredPools(_queryOptions);
   }
 
   public Map<String, String> getQueryOptions() {
