@@ -43,10 +43,7 @@ public class SegmentMultiColTextIndexPreprocessThrottler extends BaseSegmentOper
   public SegmentMultiColTextIndexPreprocessThrottler(int maxMultiColTextIndexPreprocessConcurrency,
       int maxMultiColTextIndexPreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
     super(maxMultiColTextIndexPreprocessConcurrency, maxMultiColTextIndexPreprocessConcurrencyBeforeServingQueries,
-        isServingQueries,
-        ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD,
-        ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT,
-        LOGGER);
+        isServingQueries, LOGGER);
   }
 
   @Override
@@ -64,5 +61,15 @@ public class SegmentMultiColTextIndexPreprocessThrottler extends BaseSegmentOper
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentMultiColTextIndexPreprocessThrottler configs with latest clusterConfigs");
+  }
+
+  @Override
+  public void updateThresholdMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD, value);
+  }
+
+  @Override
+  public void updateCountMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT, value);
   }
 }

@@ -653,17 +653,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
           createSegmentStarTreePreprocessThrottler();
       SegmentDownloadThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
 
-      int maxMultiColTextIndexPreprocessConcurrency = Integer.parseInt(
-          _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
-              Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM));
-      int maxMultiColTextIndexPreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
-          _serverConf.getProperty(
-              Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
-              Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
-      // Relax throttling until the server is ready to serve queries
-      SegmentMultiColTextIndexPreprocessThrottler segmentMultiColTextIndexPreprocessThrottler =
-          new SegmentMultiColTextIndexPreprocessThrottler(maxMultiColTextIndexPreprocessConcurrency,
-              maxMultiColTextIndexPreprocessConcurrencyBeforeServingQueries, false);
+      SegmentMultiColTextIndexPreprocessThrottler
+          segmentMultiColTextIndexPreprocessThrottler = createMultiColumnIndexPreprocessThrottler();
 
       _segmentOperationsThrottler =
           new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
@@ -820,6 +811,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
       serverMetrics.addTimedValue(
           ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     }
+  }
+
+  private SegmentMultiColTextIndexPreprocessThrottler createMultiColumnIndexPreprocessThrottler() {
+    int maxConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM));
+    int maxBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(
+            Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    return new SegmentMultiColTextIndexPreprocessThrottler(maxConcurrency, maxBeforeServingQueries, false);
   }
 
   protected SegmentAllIndexPreprocessThrottler createSegmentAllIndexPreprocessThrottler() {
