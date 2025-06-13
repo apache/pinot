@@ -184,7 +184,65 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
-    visitJoin(node, context);
+    // We can reach here for dynamic broadcast SEMI join and lookup join.
+    List<PlanNode> inputs = node.getInputs();
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+
+    if (right instanceof MailboxReceiveNode
+        && ((MailboxReceiveNode) right).getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
+      // For dynamic broadcast SEMI join, right child should be a PIPELINE_BREAKER exchange. Visit the left child and
+      // attach the dynamic filter to the query.
+      if (visit(left, context)) {
+        // semi join to dynamic filter logic
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
+        List<MseBlock> blocks = pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<Object[]> resultDataContainer = new ArrayList<>();
+        DataSchema dataSchema = right.getDataSchema();
+        for (MseBlock block : blocks) {
+          if (block.isData()) {
+            resultDataContainer.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+          }
+        }
+        // TODO: we should keep query stats here as well
+        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+            resultDataContainer, dataSchema);
+
+        // filter logic here
+        PinotQuery pinotQuery = context.getPinotQuery();
+        if (node.getFilterCondition() != null) {
+          if (pinotQuery.getFilterExpression() == null) {
+            Expression expression = CalciteRexExpressionParser.toExpression(node.getFilterCondition(),
+                pinotQuery.getSelectList());
+            applyTimestampIndex(expression, pinotQuery);
+            pinotQuery.setFilterExpression(expression);
+          } else {
+            // if filter is already applied then it cannot have another one on leaf.
+            context.setLeafStageBoundaryNode(node.getInputs().get(0));
+          }
+        }
+
+        // project logic here
+        if (node.getProjects() != null) {
+          List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(),
+              pinotQuery.getSelectList());
+          for (Expression expression : selectList) {
+            applyTimestampIndex(expression, pinotQuery);
+          }
+          pinotQuery.setSelectList(selectList);
+        }
+
+      }
+    } else {
+      // For lookup join, visit the right child and set it as the leaf boundary.
+      Preconditions.checkState(node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP,
+          "Leaf stage should not visit regular JoinNode");
+      if (visit(right, context)) {
+        context.setLeafStageBoundaryNode(right);
+      }
+    }
+
     return null;
   }
 
