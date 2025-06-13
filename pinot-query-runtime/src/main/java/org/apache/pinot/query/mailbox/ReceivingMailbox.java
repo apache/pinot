@@ -61,7 +61,7 @@ public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReceivingMailbox.class);
-  // This was previously a static fina; attribute, but now that includes server and stage, we cannot use constants
+  // This was previously a static final attribute, but now that includes server and stage, we cannot use constants
   private volatile MseBlockWithStats _cancelledErrorBlock;
 
   private final String _id;
