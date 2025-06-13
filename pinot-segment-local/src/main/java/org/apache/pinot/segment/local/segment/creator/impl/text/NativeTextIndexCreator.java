@@ -32,6 +32,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
@@ -92,14 +94,32 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
 
   @Override
   public void add(String document) {
-    addHelper(document);
+    try {
+      addHelper(document);
+    } catch (RuntimeException e) {
+      // Caught exception while trying to add, update metric and skip the document
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      // TODO: Get the tableNameWithType and IndexType for the metric name
+      if (serverMetrics != null) {
+        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+      }
+    }
     _nextDocId++;
   }
 
   @Override
   public void add(String[] documents, int length) {
-    for (int i = 0; i < length; i++) {
-      addHelper(documents[i]);
+    try {
+      for (int i = 0; i < length; i++) {
+        addHelper(documents[i]);
+      }
+    } catch (RuntimeException e) {
+      // Caught exception while trying to add, update metric and skip the document
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      // TODO: Get the tableNameWithType and IndexType for the metric name
+      if (serverMetrics != null) {
+        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+      }
     }
     _nextDocId++;
   }
