@@ -234,11 +234,11 @@ public class PinotTableInstances {
       BiMap<String, String> dataInstanceAdminEndpoints =
           _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceName));
       serverEndpoint = dataInstanceAdminEndpoints.get(instanceName);
-    } catch (InvalidConfigException e) {
+      Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceName);
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to get server endpoint for instance: " + instanceName,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceName);
     StringBuilder uriBuilder = new StringBuilder(serverEndpoint)
         .append("/tables/")
         .append(tableNameWithType)
