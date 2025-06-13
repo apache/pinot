@@ -91,8 +91,8 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn() ?
-        ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue())
+    ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn()
+        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue())
         : _textIndexReader.getDocIds(_predicate.getValue());
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
