@@ -703,18 +703,19 @@ public class PinotTableRestletResource {
       if (dryRun || preChecks || downtime) {
         // For dry-run, preChecks or rebalance with downtime, it's fine to run the rebalance synchronously since it
         // should be a really short operation.
-        return _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
+        return _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false, false);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
-            _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
+            _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false, false);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
           CompletableFuture<RebalanceResult> rebalanceResultFuture =
-              _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
+              _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, rebalanceConfig, rebalanceJobId, true,
+                  true);
           rebalanceResultFuture.whenComplete((rebalanceResult, throwable) -> {
             if (throwable != null) {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);

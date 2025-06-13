@@ -821,7 +821,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    when(segmentMetadata.getIndexCreationTime()).thenReturn(System.currentTimeMillis());
+    long creationTimeMs = System.currentTimeMillis();
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
+    when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return segment;
   }
@@ -846,6 +848,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
+    when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return segment;
   }

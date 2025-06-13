@@ -108,7 +108,6 @@ public final class TableConfigUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
-  private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
@@ -428,6 +427,7 @@ public final class TableConfigUtils {
               "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
           Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
               "The destination column '" + columnName + "' of the aggregation function must be a metric column");
+          DataType dataType = fieldSpec.getDataType();
 
           if (!aggregationColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
@@ -460,7 +460,6 @@ public final class TableConfigUtils {
               Preconditions.checkState(StringUtils.isNumeric(literal),
                   "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
             }
-            DataType dataType = fieldSpec.getDataType();
             Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
                 aggregationConfig);
           } else if (functionType == DISTINCTCOUNTHLLPLUS) {
@@ -482,11 +481,8 @@ public final class TableConfigUtils {
               Preconditions.checkState(StringUtils.isNumeric(literal),
                   "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
             }
-            if (fieldSpec != null) {
-              DataType dataType = fieldSpec.getDataType();
-              Preconditions.checkState(dataType == DataType.BYTES,
-                  "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
-            }
+            Preconditions.checkState(dataType == DataType.BYTES,
+                "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
           } else if (functionType == SUMPRECISION) {
             Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
                 "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
@@ -496,11 +492,8 @@ public final class TableConfigUtils {
             String literal = secondArgument.getLiteral().getStringValue();
             Preconditions.checkState(StringUtils.isNumeric(literal),
                 "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
-            if (fieldSpec != null) {
-              DataType dataType = fieldSpec.getDataType();
-              Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
-                  "Result type for DISTINCT_COUNT_HLL must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
-            }
+            Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+                "Result type for SUM_PRECISION must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
           } else {
             Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
                 aggregationConfig);
@@ -714,6 +707,14 @@ public final class TableConfigUtils {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
+    // primary key columns are not of multi-value type
+    for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(primaryKeyColumn);
+      if (fieldSpec != null) {
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("Upsert/Dedup primary key column: %s cannot be of multi-value type", primaryKeyColumn));
+      }
+    }
     // replica group is configured for routing
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
