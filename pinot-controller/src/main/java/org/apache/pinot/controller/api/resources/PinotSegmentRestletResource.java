@@ -1256,6 +1256,7 @@ public class PinotSegmentRestletResource {
 
     return new SuccessResponse("Successfully deleted segments for table: " + tableNameWithType);
   }
+
   /**
    * Identifies segments that need to be deleted based on partition and sequence ID information.
    *
