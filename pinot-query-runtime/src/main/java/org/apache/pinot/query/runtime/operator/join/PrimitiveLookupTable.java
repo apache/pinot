@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.join;
 
-import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;

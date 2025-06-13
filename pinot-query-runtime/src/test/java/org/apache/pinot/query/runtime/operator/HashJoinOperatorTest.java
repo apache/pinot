@@ -685,11 +685,9 @@ public class HashJoinOperatorTest {
 
     // Composite key join on columns 1 and 2 (string_col and double_col)
     HashJoinOperator operator = getOperator(compositeSchema, resultSchema, JoinRelType.INNER,
-            List.of(1,2), List.of(1,2), List.of(), PlanNode.NodeHint.EMPTY);
-
+            List.of(1, 2), List.of(1, 2), List.of(), PlanNode.NodeHint.EMPTY);
 
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
-
     // Only the non-null key match should be returned
     assertEquals(resultRows.size(), 1);
     assertArrayEquals(resultRows.get(0), new Object[]{1, "Aa", 1.0, 1, "Aa", 1.0});
