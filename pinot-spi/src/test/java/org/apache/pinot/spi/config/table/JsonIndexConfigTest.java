@@ -40,7 +40,7 @@ public class JsonIndexConfigTest {
     assertNull(config.getIncludePaths(), "Unexpected includePaths");
     assertNull(config.getExcludePaths(), "Unexpected excludePaths");
     assertNull(config.getExcludeFields(), "Unexpected excludeFields");
-
+    assertTrue(config.getSkipInvalidJson(), "Unexpected skipInvalidJson");
     assertFalse(config.toJsonString().contains("maxBytesSize"), "Unexpected key in serialized config");
   }
 
