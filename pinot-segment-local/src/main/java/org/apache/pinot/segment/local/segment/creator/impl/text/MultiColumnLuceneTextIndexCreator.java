@@ -301,9 +301,17 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
         docToIndex.add(new TextField(_textColumns.get(i), (String) documents.get(i), Field.Store.NO));
       } else {
         String column = _textColumns.get(i);
-        String[] values = (String[]) documents.get(i);
-        for (String value : values) {
-          docToIndex.add(new TextField(column, value, Field.Store.NO));
+        // check because in some cases (e.g. default mv column value) we get Object[]
+        if (documents.get(i) instanceof String[]) {
+          String[] values = (String[]) documents.get(i);
+          for (String value : values) {
+            docToIndex.add(new TextField(column, value, Field.Store.NO));
+          }
+        } else {
+          Object[] values = (Object[]) documents.get(i);
+          for (Object value : values) {
+            docToIndex.add(new TextField(column, (String) value, Field.Store.NO));
+          }
         }
       }
     }
@@ -336,10 +344,17 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
         docToIndex.add(new TextField(_textColumns.get(col), (String) documents.get(col), Field.Store.NO));
       } else {
         String column = _textColumns.get(col);
-        String[] values = (String[]) documents.get(col);
-
-        for (int val = 0, len = lengths[col]; val < len; val++) {
-          docToIndex.add(new TextField(column, values[val], Field.Store.NO));
+        // check because in some cases (e.g. default mv column value) we get Object[]
+        if (documents.get(col) instanceof String[]) {
+          String[] values = (String[]) documents.get(col);
+          for (int val = 0, len = lengths[col]; val < len; val++) {
+            docToIndex.add(new TextField(column, values[val], Field.Store.NO));
+          }
+        } else {
+          Object[] values = (Object[]) documents.get(col);
+          for (int val = 0, len = lengths[col]; val < len; val++) {
+            docToIndex.add(new TextField(column, (String) values[val], Field.Store.NO));
+          }
         }
       }
     }

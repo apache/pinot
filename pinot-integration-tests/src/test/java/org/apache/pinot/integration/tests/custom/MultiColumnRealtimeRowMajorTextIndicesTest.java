@@ -39,7 +39,9 @@ public class MultiColumnRealtimeRowMajorTextIndicesTest extends MultiColumnTextI
   }
 
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
-    AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
+    if (sampleAvroFile != null) {
+      AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
+    }
 
     Map<String, String> streamConfigs = getStreamConfigs();
     IngestionConfig ingestionCfg = new IngestionConfig();

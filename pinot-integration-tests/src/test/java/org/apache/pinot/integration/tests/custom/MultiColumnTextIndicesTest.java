@@ -132,7 +132,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   }
 
   protected static @NotNull MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
-    MultiColumnTextIndexConfig config = new MultiColumnTextIndexConfig(TEXT_COLUMNS, null,
+    return new MultiColumnTextIndexConfig(TEXT_COLUMNS, null,
         Map.of(
             TEXT_COL_CASE_SENSITIVE, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"),
             TEXT_COL_CASE_SENSITIVE_MV, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"),
@@ -140,7 +140,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
             DICT_TEXT_COL_CASE_SENSITIVE_MV, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true")
         )
     );
-    return config;
   }
 
   @Override
@@ -152,14 +151,16 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
       throw new RuntimeException(e);
     }
     FieldConfig nativeCol =
-        new FieldConfig.Builder(TEXT_COL_NATIVE).withEncodingType(FieldConfig.EncodingType.RAW)
+        new FieldConfig.Builder(TEXT_COL_NATIVE).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
             .withIndexes(nativeIndex)
             .build();
 
     ForwardIndexConfig fwdCfg = ForwardIndexConfig.getDisabled();
     ObjectNode indexes = JsonUtils.newObjectNode();
-    indexes.set("forward", fwdCfg.toJsonNode());
-    indexes.set("inverted", JsonUtils.newObjectNode());
+    if (!isRealtimeTable()) { // we can't disable forward index for realtime table
+      indexes.set("forward", fwdCfg.toJsonNode());
+      indexes.set("inverted", JsonUtils.newObjectNode());
+    }
 
     return Arrays.asList(
         new FieldConfig.Builder(NULLABLE_TEXT_COL).withEncodingType(FieldConfig.EncodingType.RAW).build(),
@@ -170,7 +171,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         new FieldConfig.Builder(TEXT_COL_CASE_SENSITIVE_MV).withEncodingType(FieldConfig.EncodingType.RAW).build(),
         new FieldConfig.Builder(DICT_TEXT_COL).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
             .withIndexes(indexes)
-            .build(), // column missing forward index can still be indexes if there's dictionary and inverted index
+            .build(), // column missing forward index can still be indexed if there's dictionary and inverted index
         new FieldConfig.Builder(DICT_TEXT_COL_CASE_SENSITIVE).withEncodingType(FieldConfig.EncodingType.DICTIONARY)
             .build(),
         new FieldConfig.Builder(DICT_TEXT_COL_MV).withEncodingType(FieldConfig.EncodingType.DICTIONARY).build(),
@@ -295,14 +296,19 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   @Test
   public void testRebuildIndex()
       throws IOException {
-    TableConfig tableConfig = createOfflineTableConfig();
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
     MultiColumnTextIndexConfig oldConfig = tableConfig.getIndexingConfig()
         .getMultiColumnTextIndexConfig();
     MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(oldConfig.getColumns(),
         Map.of(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "yikes"), oldConfig.getPerColumnProperties());
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(TABLE_NAME);
+
+    if (isRealtimeTable()) {
+      reloadRealtimeTable(getTableName());
+    } else {
+      reloadOfflineTable(getTableName());
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -368,11 +374,16 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
+    // wait until all rows are available in realtime index
+    String query = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java')";
     while (getCurrentCountStarResult() < NUM_RECORDS) {
-      Thread.sleep(100);
+      if (getQueryResult(String.format(query, getTableName(), TEXT_COL_CASE_SENSITIVE)) == 12000) {
+        break;
+      } else {
+        Thread.sleep(100);
+      }
     }
 
-    String query = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java')";
     assertEquals(getQueryResult(String.format(query, getTableName(), TEXT_COL_CASE_SENSITIVE)), 12000);
     assertEquals(getQueryResult(String.format(query, getTableName(), DICT_TEXT_COL_CASE_SENSITIVE)), 12000);
 
@@ -399,7 +410,17 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     // null avro columns are, by default, transformed into 'null' strings.
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE TEXT_MATCH(%s, '%s')";
 
+    // wait until all rows are available in realtime index
+    long start = System.currentTimeMillis();
     int rows = NUM_RECORDS / 2;
+    while ((System.currentTimeMillis() - start) < 60000) {
+      if (getQueryResult(String.format(query, NULLABLE_TEXT_COL, "null")) == rows) {
+        break;
+      } else {
+        Thread.sleep(100);
+      }
+    }
+
     assertEquals(getQueryResult(String.format(query, NULLABLE_TEXT_COL, "null")), rows);
     assertEquals(getQueryResult(String.format(query, NULLABLE_TEXT_COL, "value")), rows);
 
@@ -420,17 +441,15 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         + " WHERE TEXT_MATCH(nullable_skills, 'test')");
     String plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
 
-    Assert.assertTrue(plan, plan.endsWith(
-        "Project(columns=[[nullable_skills]])\n"
-            + "            DocIdSet(maxDocs=[10000])\n"
-            + "              FilterTextIndex(predicate=[text_match(nullable_skills,'test')], "
-            + "indexLookUp=[text_index], multiColumnIndex=[true], operator=[TEXT_MATCH])\n"));
+    String suffix = "              FilterTextIndex(predicate=[text_match(nullable_skills,'test')], "
+        + "indexLookUp=[text_index], multiColumnIndex=[true], operator=[TEXT_MATCH])\n";
+    Assert.assertTrue(plan + " doesn't end with: " + suffix, plan.endsWith(suffix));
   }
 
   @Test(priority = 1)
   public void testRemoveColumnFromIndex()
       throws Exception {
-    TableConfig tableConfig = createOfflineTableConfig();
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
     MultiColumnTextIndexConfig oldConfig = tableConfig.getIndexingConfig()
         .getMultiColumnTextIndexConfig();
 
@@ -441,7 +460,11 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         oldConfig.getProperties(), oldConfig.getPerColumnProperties());
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(TABLE_NAME);
+    if (isRealtimeTable()) {
+      reloadRealtimeTable(getTableName());
+    } else {
+      reloadOfflineTable(getTableName());
+    }
 
     boolean columnDisabled = false;
 
@@ -471,10 +494,14 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   public void testRemoveIndex()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    TableConfig tableConfig = createOfflineTableConfig();
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(null);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(TABLE_NAME);
+    if (isRealtimeTable()) {
+      reloadRealtimeTable(getTableName());
+    } else {
+      reloadOfflineTable(getTableName());
+    }
 
     boolean[] columnDisabled = new boolean[TEXT_COLUMNS.size()];
     long start = System.currentTimeMillis();
