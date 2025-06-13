@@ -60,6 +60,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
@@ -423,16 +424,16 @@ public class TablesResource {
   public String getSegmentsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segment names to include", allowMultiple = true) @QueryParam("segmentsToInclude")
-      @DefaultValue("") List<String> segmentsToInclude,
+      @ApiParam(value = "Segments to include", allowMultiple = true) @QueryParam("segments")
+      @DefaultValue("") List<String> segments,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
       List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     // decode columns and segments
     List<String> decodedSegments = new ArrayList<>();
-    if (segmentsToInclude != null && !segmentsToInclude.isEmpty()) {
-      for (String segment : segmentsToInclude) {
+    if (CollectionUtils.isNotEmpty(segments)) {
+      for (String segment : segments) {
         if (!segment.isEmpty()) {
           decodedSegments.add(URIUtils.decode(segment));
         }
