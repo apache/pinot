@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -137,8 +139,7 @@ public class TableMetadataReader {
   }
 
   /**
-   *   Common helper used by both the new (table-level) and legacy
-   *   (segment-level) endpoints.
+   *   Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
    */
   private JsonNode fetchAndAggregateMetadata(List<String> urls,
       BiMap<String, String> endpoints,
@@ -146,28 +147,27 @@ public class TableMetadataReader {
       String tableNameWithType,
       int timeoutMs)
       throws InvalidConfigException, IOException {
-
-    CompletionServiceHelper cs =
-        new CompletionServiceHelper(_executor, _connectionManager, endpoints);
+    CompletionServiceHelper cs = new CompletionServiceHelper(_executor, _connectionManager, endpoints);
     CompletionServiceHelper.CompletionServiceResponse resp =
         cs.doMultiGetRequest(urls, tableNameWithType, perSegmentJson, timeoutMs);
-
+    // all requests will fail if new server endpoint is not available
     if (resp._failedResponseCount == urls.size()) {
       throw new InvalidConfigException("All requests to server instances failed.");
     }
 
-    Map<String, JsonNode> aggregated = new HashMap<>();
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode aggregatedNode = mapper.createObjectNode();
     for (String body : resp._httpResponses.values()) {
       JsonNode node = JsonUtils.stringToJsonNode(body);
-
       // legacy returns one JSON per segment; new returns one JSON with many fields
       if (perSegmentJson) {
-        aggregated.put(node.get("segmentName").asText(), node);
+        String segmentName = node.get("segmentName").asText();
+        aggregatedNode.set(segmentName, node);
       } else {
-        node.fields().forEachRemaining(e -> aggregated.put(e.getKey(), e.getValue()));
+        node.fields().forEachRemaining(entry -> aggregatedNode.set(entry.getKey(), entry.getValue()));
       }
     }
-    return JsonUtils.objectToJsonNode(aggregated);
+    return aggregatedNode;
   }
 
   private List<String> buildTableLevelUrls(Map<String, List<String>> serverToSegs,
@@ -176,7 +176,6 @@ public class TableMetadataReader {
       List<String> columns,
       Set<String> segmentsFilter,
       ServerSegmentMetadataReader reader) {
-
     List<String> urls = new ArrayList<>(serverToSegs.size());
     for (String server : serverToSegs.keySet()) {
       urls.add(reader.generateTableMetadataServerURL(
@@ -191,7 +190,6 @@ public class TableMetadataReader {
       List<String> columns,
       Set<String> segmentsFilter,
       ServerSegmentMetadataReader reader) {
-
     List<String> urls = new ArrayList<>();
     for (Map.Entry<String, List<String>> e : serverToSegs.entrySet()) {
       for (String segment : e.getValue()) {
@@ -230,16 +228,6 @@ public class TableMetadataReader {
         tableNameWithType, columns, segmentsToInclude, reader);
     return fetchAndAggregateMetadata(segmentUrls, endpoints.inverse(), /*perSegmentJson=*/true,
         tableNameWithType, timeoutMs);
-  }
-
-  /**
-   * This method retrieves the full segment metadata for a given table.
-   * Currently supports only OFFLINE tables.
-   * @return a map of segmentName to its metadata
-   */
-  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
-      throws InvalidConfigException, IOException {
-    return getSegmentsMetadataInternal(tableNameWithType, columns, null, timeoutMs);
   }
 
   /**

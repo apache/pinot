@@ -19,7 +19,11 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -108,16 +112,36 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   @Test
   public void testSegmentMetadataApi()
       throws Exception {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
-    JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-    Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+    {
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
-    JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
-    String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
-    JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
-    Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
-        segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+    }
+    {
+      List<String> segmentNames = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
+      List<String> segments = new ArrayList<>();
+      for (String segment : segmentNames) {
+        String encodedSegmentName = URLEncoder.encode(segment, StandardCharsets.UTF_8.toString());
+        segments.add(encodedSegmentName);
+      }
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
+          null, segments));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+    }
   }
 
   @Test

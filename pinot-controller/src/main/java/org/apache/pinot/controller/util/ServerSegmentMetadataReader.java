@@ -520,7 +520,7 @@ public class ServerSegmentMetadataReader {
     }
     List<String> params = new ArrayList<>(values.size());
     for (String value : values) {
-      params.add(String.format("segmentsToInclude=%s", value));
+      params.add(String.format("segments=%s", value));
     }
     paramsStr = String.join("&", params);
     return paramsStr;
