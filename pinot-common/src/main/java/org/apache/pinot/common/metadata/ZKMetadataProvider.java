@@ -43,12 +43,14 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -82,6 +84,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
+  private static final String PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX = "/CONFIGS/QUERYWORKLOAD";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
@@ -303,6 +306,14 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForMinionTaskMetadata(String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType);
+  }
+
+  public static String getPropertyStoreWorkloadConfigsPrefix() {
+    return PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX;
+  }
+
+  public static String constructPropertyStorePathForQueryWorkloadConfig(String workloadName) {
+    return StringUtil.join("/", PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX, workloadName);
   }
 
   @Deprecated
@@ -834,6 +845,52 @@ public class ZKMetadataProvider {
         }
       }
       return result;
+    }
+  }
+
+  public static List<QueryWorkloadConfig> getAllQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    List<ZNRecord> znRecords =
+        propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
+            CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+    if (znRecords == null) {
+      return Collections.emptyList();
+    }
+    int numZNRecords = znRecords.size();
+    List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
+    for (ZNRecord znRecord : znRecords) {
+      queryWorkloadConfigs.add(QueryWorkloadConfigUtils.fromZNRecord(znRecord));
+    }
+    return queryWorkloadConfigs;
+  }
+
+  @Nullable
+  public static QueryWorkloadConfig getQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String workloadName) {
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForQueryWorkloadConfig(workloadName),
+        null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    return QueryWorkloadConfigUtils.fromZNRecord(znRecord);
+  }
+
+  public static boolean setQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      QueryWorkloadConfig queryWorkloadConfig) {
+    String path = constructPropertyStorePathForQueryWorkloadConfig(queryWorkloadConfig.getQueryWorkloadName());
+    boolean isNewConfig = !propertyStore.exists(path, AccessOption.PERSISTENT);
+    ZNRecord znRecord = isNewConfig ? new ZNRecord(queryWorkloadConfig.getQueryWorkloadName())
+        : propertyStore.get(path, null, AccessOption.PERSISTENT);
+    // Update the record with new workload configuration
+    QueryWorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
+    // Create or update based on existence
+    return isNewConfig ? propertyStore.create(path, znRecord, AccessOption.PERSISTENT)
+        : propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+  }
+
+  public static void deleteQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName) {
+    String propertyStorePath = constructPropertyStorePathForQueryWorkloadConfig(workloadName);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
   }
 
