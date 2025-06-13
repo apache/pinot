@@ -51,9 +51,6 @@ public class ThreadResourceUsageProvider {
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
   private static boolean _isThreadMemoryMeasurementEnabled = false;
 
-  private ThreadResourceUsageProvider() {
-  }
-
   @Deprecated
   public long getThreadTimeNs() {
     return 0;
