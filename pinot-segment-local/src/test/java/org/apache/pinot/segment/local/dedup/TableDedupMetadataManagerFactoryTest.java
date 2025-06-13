@@ -86,7 +86,7 @@ public class TableDedupMetadataManagerFactoryTest {
       TableDataManager tableDataManager, boolean expected)
       throws IOException {
     try (TableDedupMetadataManager tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(
-        instanceDedupConfig, tableConfig, schema, tableDataManager)) {
+        instanceDedupConfig, tableConfig, schema, tableDataManager, null)) {
       assertEquals(tableDedupMetadataManager.getContext().isPreloadEnabled(), expected);
     }
   }

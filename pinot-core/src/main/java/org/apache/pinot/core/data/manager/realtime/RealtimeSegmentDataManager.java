@@ -1257,7 +1257,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
       return false;
     }
-    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr);
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr, _segmentZKMetadata);
     removeSegmentFile();
     return true;
   }
@@ -1309,7 +1309,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (descriptor == null) {
       return false;
     }
-    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr);
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr, _segmentZKMetadata);
     return true;
   }
 

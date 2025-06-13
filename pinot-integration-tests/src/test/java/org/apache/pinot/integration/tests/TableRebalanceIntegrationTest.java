@@ -26,6 +26,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -34,12 +36,18 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.regex.JavaUtilPattern;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,9 +62,11 @@ import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -86,6 +96,12 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
     return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
         + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    properties.put(ControllerConf.CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK, 2);
   }
 
   @Test
@@ -1256,6 +1272,109 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     assertEquals(numServersAdded, summaryResult.getServerInfo().getServersAdded().size());
     assertEquals(numServersRemoved, summaryResult.getServerInfo().getServersRemoved().size());
     assertEquals(numServersUnchanged, summaryResult.getServerInfo().getServersUnchanged().size());
+  }
+
+  @Test
+  public void testDisallowMultipleConcurrentRebalancesOnSameTable() throws Exception {
+    // Manually write an IN_PROGRESS rebalance job to ZK instead of trying to collide multiple actual rebalance
+    // attempts which will be prone to race conditions and cause this test to be flaky. We only reject a rebalance job
+    // if there is an IN_PROGRESS rebalance job for the same table in ZK, so we could actually end up with more than
+    // one active rebalance job if both are started at the exact same time since the progress stats are written to ZK
+    // after some initial pre-checks are done. However, rebalances are idempotent, and we don't actually care too much
+    // about avoiding this edge case race condition as long as in most cases we are able to prevent users from
+    // triggering a rebalance for a table that already has an in-progress rebalance job.
+    String jobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(getTableName());
+    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name());
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
+    // rebalance is not a NO_OP
+    BaseServerStarter serverStarter = startOneServer(NUM_SERVERS);
+    createServerTenant(getServerTenant(), 1, 0);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+
+    Pair<Integer, String> response =
+        postRequestWithStatusCode(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
+    assertEquals(response.getLeft(), Response.Status.CONFLICT.getStatusCode());
+    assertTrue(response.getRight().contains("Rebalance job is already in progress for table"));
+
+    // Update the job status to DONE to allow other tests to run
+    progressStats.setStatus(RebalanceResult.Status.DONE);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+        prevJobMetadata -> true);
+
+    // Stop the added server
+    serverStarter.stop();
+    TestUtils.waitForCondition(
+        aVoid -> getHelixResourceManager().dropInstance(serverStarter.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
+  }
+
+  @Test
+  public void testRebalanceJobZkMetadataCleanup()
+      throws Exception {
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(getTableName());
+    // Manually write some rebalance job metadata to ZK - an IN_PROGRESS job and two DONE jobs. The ZK job limit for
+    // table rebalances been overridden to 2 in this test, so the first DONE job should be cleaned up when the second
+    // DONE job is added.
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    String inProgressJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, inProgressJobId);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000");
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name());
+    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, inProgressJobId, jobMetadata,
+        ControllerJobType.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(_helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobType.TABLE_REBALANCE));
+
+    // Add a DONE rebalance
+    String doneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, doneJobId);
+    progressStats.setStatus(RebalanceResult.Status.DONE);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "randomTable_REALTIME");
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, String.valueOf(System.currentTimeMillis()));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, doneJobId, jobMetadata,
+        ControllerJobType.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobType.TABLE_REBALANCE));
+
+    // Add another DONE rebalance
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "anotherTable_REALTIME");
+    String anotherDoneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() + 1000));
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, anotherDoneJobId);
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, anotherDoneJobId, jobMetadata,
+        ControllerJobType.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(
+        _helixResourceManager.getControllerJobZKMetadata(anotherDoneJobId, ControllerJobType.TABLE_REBALANCE));
+
+    // Verify that the first DONE job is cleaned up
+    assertNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobType.TABLE_REBALANCE));
+
+    // Verify that the in-progress job is still there even though it has the oldest submission time
+    assertNotNull(_helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobType.TABLE_REBALANCE));
   }
 
   private String getReloadJobIdFromResponse(String response) {

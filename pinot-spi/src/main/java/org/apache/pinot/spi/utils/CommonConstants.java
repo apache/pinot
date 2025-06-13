@@ -72,6 +72,7 @@ public class CommonConstants {
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
+  public static final String QUERY_WORKLOAD = "queryWorkload";
 
   public static final String JFR = "pinot.jfr";
 
@@ -268,6 +269,7 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
     // Preprocess throttle config specifically for StarTree index rebuild
     public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.startree.preprocess.parallelism";
@@ -278,6 +280,8 @@ public class CommonConstants {
     // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
+
+    // Download throttle config
     public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
         "pinot.server.max.segment.download.parallelism";
     // Setting to Integer.MAX_VALUE to effectively disable throttling by default
@@ -317,6 +321,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING =
+        "pinot.broker.query.log.logBeforeProcessing";
+    public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
@@ -433,6 +440,12 @@ public class CommonConstants {
      */
     public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
     public static final boolean DEFAULT_OF_SPOOLS = false;
+
+    /// Whether to only use servers for leaf stages as the workers for the intermediate stages.
+    /// This value can always be overridden by [Request.QueryOptionKey#USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE].
+    public static final String CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE =
+        "pinot.broker.mse.use.leaf.server.for.intermediate.stage";
+    public static final boolean DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -651,6 +664,10 @@ public class CommonConstants {
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
         public static final String RUN_IN_BROKER = "runInBroker";
+
+        /// For MSE queries, when this option is set to true, only use servers for leaf stages as the workers for the
+        /// intermediate stages. This is useful to control the fanout of the query and reduce data shuffling.
+        public static final String USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = "useLeafServerForIntermediateStage";
       }
 
       public static class QueryOptionValue {
@@ -1290,7 +1307,6 @@ public class CommonConstants {
     public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
     public static final String MESSAGE_COUNT = "messageCount";
 
-    public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
     /**
      * Segment reload job ZK props
      */
@@ -1718,5 +1734,15 @@ public class CommonConstants {
     public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
     public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
     public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
+  }
+
+  /**
+   * ZK paths used by Pinot.
+   */
+  public static class ZkPaths {
+    public static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
+    public static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
+    public static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
+    public static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
   }
 }

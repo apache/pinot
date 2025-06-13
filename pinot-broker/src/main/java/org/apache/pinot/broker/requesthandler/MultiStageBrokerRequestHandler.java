@@ -314,6 +314,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
     boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
         CommonConstants.Broker.DEFAULT_OF_SPOOLS);
+    boolean defaultUseLeafServerForIntermediateStage = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE,
+        CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
     boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
@@ -331,6 +334,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .isCaseSensitive(caseSensitive)
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
+        .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .build();

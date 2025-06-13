@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.accounting;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import javax.annotation.Nullable;
 
 
 /**
@@ -42,6 +43,7 @@ public interface ThreadResourceTracker {
    * QueryId of the task the thread is executing.
    * @return a string containing the query id.
    */
+  @Nullable
   String getQueryId();
 
   /**
