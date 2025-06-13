@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -49,6 +50,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -62,7 +64,6 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,52 +201,51 @@ public class PinotTableInstances {
   }
 
   @DELETE
-  @Path("/table/{tableNameWithType}/{instanceName}/ingestionMetrics")
+  @Path("/tables/{tableName}/{instanceId}/ingestionMetrics")
   @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action =
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action =
       Actions.Table.DELETE_INGESTION_METRICS)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionGroupID from serverInstance",
+  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionId from serverInstance",
       notes = "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Successfully removed ingestion metrics."),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public SuccessResponse removeIngestionMetrics(
-      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-      String tableNameWithType,
-      @ApiParam(value = "Instance name of the server", required = true) @PathParam("instanceName")
-      String instanceName,
-      @ApiParam(value = "Comma-separated list of partition group IDs (optional)") @QueryParam("partitionGroupId")
-      Set<Integer> partitionGroupIds,
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName")
+      String tableName,
+      @ApiParam(value = "Instance id of the server", required = true) @PathParam("instanceId")
+      String instanceId,
+      @Nullable @ApiParam(value = "List of Partition Ids (optional)") @QueryParam("partitionId")
+      Set<Integer> partitionIds,
       @Context HttpHeaders headers) {
     try {
-      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " should be a realtime table.",
-          Response.Status.BAD_REQUEST);
-    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.REALTIME, LOGGER)
+            .get(0);
     String serverEndpoint;
     try {
       BiMap<String, String> dataInstanceAdminEndpoints =
-          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceName));
-      serverEndpoint = dataInstanceAdminEndpoints.get(instanceName);
-      Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceName);
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceId));
+      serverEndpoint = dataInstanceAdminEndpoints.get(instanceId);
+      Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceId);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to get server endpoint for instance: " + instanceName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, "Failed to get server endpoint for instance: " + instanceId,
+          Response.Status.BAD_REQUEST);
     }
     StringBuilder uriBuilder = new StringBuilder(serverEndpoint)
         .append("/tables/")
         .append(tableNameWithType)
         .append("/ingestionMetrics");
 
-    if (partitionGroupIds != null && !partitionGroupIds.isEmpty()) {
-      String query = partitionGroupIds.stream()
-          .map(id -> "partitionGroupId=" + id)
+    if (CollectionUtils.isNotEmpty(partitionIds)) {
+      String query = partitionIds.stream()
+          .map(id -> "partitionId=" + id)
           .collect(Collectors.joining("&"));
       uriBuilder.append("?").append(query);
     }

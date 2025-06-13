@@ -327,11 +327,10 @@ public class IngestionDelayTracker {
    *
    * @return Set of partitionIds for which ingestion metrics were removed.
    */
-  public Set<Integer> stopTrackingPartitionIngestionDelay() {
-    Set<Integer> removedPartitionIds = new HashSet<>();
+  public Set<Integer> stopTrackingIngestionDelayForAllPartitions() {
+    Set<Integer> removedPartitionIds = new HashSet<>(_ingestionInfoMap.keySet());
     for (Integer partitionId : _ingestionInfoMap.keySet()) {
       removePartitionId(partitionId);
-      removedPartitionIds.add(partitionId);
     }
     return removedPartitionIds;
   }

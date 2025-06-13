@@ -509,14 +509,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionGroupIds) {
-    if (partitionGroupIds == null || partitionGroupIds.isEmpty()) {
-      return _ingestionDelayTracker.stopTrackingPartitionIngestionDelay();
+  public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
+    if (CollectionUtils.isEmpty(partitionIds)) {
+      return _ingestionDelayTracker.stopTrackingIngestionDelayForAllPartitions();
     }
-    for (Integer partitionGroupId: partitionGroupIds) {
+    for (Integer partitionGroupId: partitionIds) {
       _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
     }
-    return partitionGroupIds;
+    return partitionIds;
   }
 
   private void doAddConsumingSegment(String segmentName)
