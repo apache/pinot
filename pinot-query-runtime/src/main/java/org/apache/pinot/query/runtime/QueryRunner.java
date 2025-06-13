@@ -249,30 +249,25 @@ public class QueryRunner {
     MseWorkerThreadContext.setStageId(stagePlan.getStageMetadata().getStageId());
     MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
 
-    long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
-    long deadlineMs = System.currentTimeMillis() + timeoutMs;
-
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
+        PipelineBreakerExecutor.executePipelineBreakersFromQueryContext(_opChainScheduler, _mailboxService,
+            workerMetadata, stagePlan, opChainMetadata, parentContext, _sendStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
       ErrorMseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, requestId, workerMetadata, stagePlan,
-          deadlineMs);
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
       return;
     }
 
     // run OpChain
-    OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+    OpChainExecutionContext executionContext = OpChainExecutionContext.fromQueryContext(_mailboxService,
+        opChainMetadata, stageMetadata, workerMetadata, pipelineBreakerResult, parentContext,
+        _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
       opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan,
@@ -285,13 +280,13 @@ public class QueryRunner {
       _opChainScheduler.register(opChain);
     } catch (RuntimeException e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
-      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, requestId, workerMetadata, stagePlan,
-          deadlineMs);
+      notifyErrorAfterSubmission(stageMetadata.getStageId(), errorBlock, workerMetadata, stagePlan);
     }
   }
 
-  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock, long requestId,
-      WorkerMetadata workerMetadata, StagePlan stagePlan, long deadlineMs) {
+  private void notifyErrorAfterSubmission(int stageId, ErrorMseBlock errorBlock,
+      WorkerMetadata workerMetadata, StagePlan stagePlan) {
+    long requestId = QueryThreadContext.getRequestId();
     LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
         stageId, errorBlock);
     MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
@@ -304,6 +299,7 @@ public class QueryRunner {
               receiverMailboxInfos);
       routingInfos.addAll(stageRoutingInfos);
     }
+    long deadlineMs = QueryThreadContext.getPassiveDeadlineMs();
     for (RoutingInfo routingInfo : routingInfos) {
       try {
         StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -495,7 +491,7 @@ public class QueryRunner {
       }
     };
     // compile OpChain
-    OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, requestId, deadlineMs,
+    OpChainExecutionContext executionContext = OpChainExecutionContext.fromQueryContext(_mailboxService,
         opChainMetadata, stageMetadata, workerMetadata, null, null, false);
 
     OpChain opChain =
