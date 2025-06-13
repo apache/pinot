@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.entity.EntityBuilder;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -69,6 +70,8 @@ import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -158,6 +161,8 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected TableRebalanceManager _tableRebalanceManager;
+  protected TableSizeReader _tableSizeReader;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -303,6 +308,8 @@ public class ControllerTest {
       _controllerDataDir = _controllerConfig.getDataDir();
       _helixResourceManager = _controllerStarter.getHelixResourceManager();
       _helixManager = _controllerStarter.getHelixControllerManager();
+      _tableRebalanceManager = _controllerStarter.getTableRebalanceManager();
+      _tableSizeReader = _controllerStarter.getTableSizeReader();
       _helixDataAccessor = _helixManager.getHelixDataAccessor();
       ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
       // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
@@ -800,6 +807,11 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    getControllerRequestClient().deleteLogicalTable(logicalTableName);
+  }
+
   public void waitForEVToAppear(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) != null, 60_000L,
         "Failed to create the external view for table: " + tableNameWithType);
@@ -1019,6 +1031,24 @@ public class ControllerTest {
           getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
+   * stringified response.
+   * @param urlString the URL to send the POST request to
+   * @param payload the payload to send in the POST request
+   * @return a Pair containing the status code and the stringified response
+   */
+  public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
       throw new IOException(e);
     }
   }

@@ -16,19 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Set;
-
-
-public class ControllerJobType {
-  private ControllerJobType() {
+public class SegmentBuildFailureException extends Exception {
+  public SegmentBuildFailureException(String errorMessage, Throwable cause) {
+    super(errorMessage, cause);
   }
-  public static final String RELOAD_SEGMENT = "RELOAD_SEGMENT";
-  public static final String FORCE_COMMIT = "FORCE_COMMIT";
-  public static final String TABLE_REBALANCE = "TABLE_REBALANCE";
-  public static final String TENANT_REBALANCE = "TENANT_REBALANCE";
-  public static final Set<String>
-      VALID_CONTROLLER_JOB_TYPE = ImmutableSet.of(RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE);
+
+  public SegmentBuildFailureException(String errorMessage) {
+    super(errorMessage);
+  }
 }

@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -156,11 +157,7 @@ public class TableRebalancer {
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
       @Nullable TableSizeReader tableSizeReader) {
     _helixManager = helixManager;
-    if (tableRebalanceObserver != null) {
-      _tableRebalanceObserver = tableRebalanceObserver;
-    } else {
-      _tableRebalanceObserver = new NoOpTableRebalanceObserver();
-    }
+    _tableRebalanceObserver = Objects.requireNonNullElseGet(tableRebalanceObserver, NoOpTableRebalanceObserver::new);
     _helixDataAccessor = helixManager.getHelixDataAccessor();
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
@@ -339,22 +336,24 @@ public class TableRebalancer {
         fetchTableSizeDetails(tableNameWithType, tableRebalanceLogger);
 
     Map<String, RebalancePreCheckerResult> preChecksResult = null;
+
+    // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
+    // is expected or not based on the summary results
+    RebalanceSummaryResult summaryResult =
+        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, tableSubTypeSizeDetails,
+            tableConfig, tableRebalanceLogger);
+
     if (preChecks) {
       if (_rebalancePreChecker == null) {
         tableRebalanceLogger.warn(
             "Pre-checks are enabled but the pre-checker is not set, skipping pre-checks");
       } else {
         RebalancePreChecker.PreCheckContext preCheckContext =
-            new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType,
-                tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails, rebalanceConfig);
+            new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
+                targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
         preChecksResult = _rebalancePreChecker.check(preCheckContext);
       }
     }
-    // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
-    // is expected or not based on the summary results
-    RebalanceSummaryResult summaryResult =
-        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, tableSubTypeSizeDetails,
-            tableConfig, tableRebalanceLogger);
 
     if (segmentAssignmentUnchanged) {
       tableRebalanceLogger.info("Table is already balanced");

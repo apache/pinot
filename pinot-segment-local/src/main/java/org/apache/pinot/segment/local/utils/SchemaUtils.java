@@ -117,36 +117,39 @@ public class SchemaUtils {
     Set<String> argumentColumns = new HashSet<>();
     Set<String> primaryKeyColumnCandidates = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String column = fieldSpec.getName();
+      Preconditions.checkState(!StringUtils.containsWhitespace(column),
+          "The column name \"%s\" should not contain blank space.", column);
       if (!fieldSpec.isVirtualColumn()) {
-        String column = fieldSpec.getName();
-        Preconditions.checkState(!StringUtils.containsWhitespace(column),
-            "The column name \"%s\" should not contain blank space.", column);
         primaryKeyColumnCandidates.add(column);
-        String transformFunction = fieldSpec.getTransformFunction();
-        if (transformFunction != null) {
-          try {
-            List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
-            Preconditions.checkState(!arguments.contains(column),
-                "The arguments of transform function %s should not contain the destination column %s",
-                transformFunction, column);
-            transformedColumns.add(column);
-            argumentColumns.addAll(arguments);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
-                    + column + "'", e);
-          }
+      }
+      String transformFunction = fieldSpec.getTransformFunction();
+      if (transformFunction != null) {
+        try {
+          List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
+          Preconditions.checkState(!arguments.contains(column),
+              "The arguments of transform function %s should not contain the destination column %s",
+              transformFunction, column);
+          transformedColumns.add(column);
+          argumentColumns.addAll(arguments);
+        } catch (Exception e) {
+          throw new IllegalStateException(
+              "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
+                  + column + "'", e);
         }
-        if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
-          validateTimeFieldSpec((TimeFieldSpec) fieldSpec);
-        }
-        if (fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME) {
-          validateDateTimeFieldSpec((DateTimeFieldSpec) fieldSpec);
-        }
-        if (fieldSpec.getDataType().equals(FieldSpec.DataType.FLOAT) || fieldSpec.getDataType()
-            .equals(FieldSpec.DataType.DOUBLE)) {
-          validateDefaultIsNotNaN(fieldSpec);
-        }
+      }
+      if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
+        validateTimeFieldSpec((TimeFieldSpec) fieldSpec);
+      }
+      if (fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME) {
+        validateDateTimeFieldSpec((DateTimeFieldSpec) fieldSpec);
+      }
+      if (fieldSpec.getDataType().equals(FieldSpec.DataType.FLOAT) || fieldSpec.getDataType()
+          .equals(FieldSpec.DataType.DOUBLE)) {
+        validateDefaultIsNotNaN(fieldSpec);
+      }
+      if (!fieldSpec.isSingleValueField()) {
+        validateMultiValueCompatibility(fieldSpec);
       }
     }
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
@@ -164,6 +167,16 @@ public class SchemaUtils {
     Preconditions.checkState(!fieldSpec.getDefaultNullValueString().equals("NaN"),
             "NaN as null default value is not managed yet for %s",
             fieldSpec.getName());
+  }
+
+  /**
+   * Validations for MV type columns
+   */
+  private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
+        "JSON columns cannot be of multi-value type");
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.BIG_DECIMAL),
+        "BIG_DECIMAL columns cannot be of multi-value type");
   }
 
   /**

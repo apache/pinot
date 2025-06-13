@@ -276,20 +276,49 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Create a {@link PartitionGroupConsumptionStatus} for each latest segment
-    StreamPartitionMsgOffsetFactory offsetFactory =
-        StreamConsumerFactoryProvider.create(streamConfigs.get(0)).createStreamMsgOffsetFactory();
-    for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
-      int partitionGroupId = entry.getKey();
-      LLCSegmentName llcSegmentName = entry.getValue();
-      SegmentZKMetadata segmentZKMetadata =
-          getSegmentZKMetadata(streamConfigs.get(0).getTableNameWithType(), llcSegmentName.getSegmentName());
-      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
-          new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
-              offsetFactory.create(segmentZKMetadata.getStartOffset()),
-              segmentZKMetadata.getEndOffset() == null ? null : offsetFactory.create(segmentZKMetadata.getEndOffset()),
-              segmentZKMetadata.getStatus().toString());
-      partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
+    String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
+    int numStreams = streamConfigs.size();
+    if (numStreams == 1) {
+      // Single stream
+      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
+      // larger than 10000.
+      StreamConfig streamConfig = streamConfigs.get(0);
+      StreamPartitionMsgOffsetFactory offsetFactory =
+          StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
+      for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
+        int partitionGroupId = entry.getKey();
+        LLCSegmentName llcSegmentName = entry.getValue();
+        SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+            new PartitionGroupConsumptionStatus(partitionGroupId, llcSegmentName.getSequenceNumber(),
+                offsetFactory.create(segmentZKMetadata.getStartOffset()),
+                segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
+                    : null, segmentZKMetadata.getStatus().toString());
+        partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
+      }
+    } else {
+      // Multiple streams
+      StreamPartitionMsgOffsetFactory[] offsetFactories = new StreamPartitionMsgOffsetFactory[numStreams];
+      for (Map.Entry<Integer, LLCSegmentName> entry : partitionGroupIdToLatestSegment.entrySet()) {
+        int partitionGroupId = entry.getKey();
+        int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionGroupId);
+        int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(partitionGroupId);
+        LLCSegmentName llcSegmentName = entry.getValue();
+        SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, llcSegmentName.getSegmentName());
+        StreamPartitionMsgOffsetFactory offsetFactory = offsetFactories[index];
+        if (offsetFactory == null) {
+          offsetFactory = StreamConsumerFactoryProvider.create(streamConfigs.get(index)).createStreamMsgOffsetFactory();
+          offsetFactories[index] = offsetFactory;
+        }
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
+            new PartitionGroupConsumptionStatus(partitionGroupId, streamPartitionId, llcSegmentName.getSequenceNumber(),
+                offsetFactory.create(segmentZKMetadata.getStartOffset()),
+                segmentZKMetadata.getEndOffset() != null ? offsetFactory.create(segmentZKMetadata.getEndOffset())
+                    : null, segmentZKMetadata.getStatus().toString());
+        partitionGroupConsumptionStatusList.add(partitionGroupConsumptionStatus);
+      }
     }
+
     return partitionGroupConsumptionStatusList;
   }
 
@@ -995,18 +1024,37 @@ public class PinotLLCRealtimeSegmentManager {
   Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
     Set<Integer> partitionIds = new HashSet<>();
     boolean allPartitionIdsFetched = true;
-    for (int i = 0; i < streamConfigs.size(); i++) {
-      final int index = i;
+    int numStreams = streamConfigs.size();
+    if (numStreams == 1) {
+      // Single stream
+      // NOTE: We skip partition id translation logic to handle cases where custom stream might return partition id
+      // larger than 10000.
+      StreamConfig streamConfig = streamConfigs.get(0);
       try {
-        partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream()
-            .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
-            .collect(Collectors.toSet()));
+        partitionIds = getPartitionIds(streamConfig);
       } catch (UnsupportedOperationException ignored) {
         allPartitionIdsFetched = false;
         // Stream does not support fetching partition ids. There is a log in the fallback code which is sufficient
       } catch (Exception e) {
         allPartitionIdsFetched = false;
-        LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfigs.get(i).getTopicName(), e);
+        LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfig.getTopicName(), e);
+      }
+    } else {
+      // Multiple streams
+      for (int i = 0; i < numStreams; i++) {
+        StreamConfig streamConfig = streamConfigs.get(i);
+        int index = i;
+        try {
+          partitionIds.addAll(getPartitionIds(streamConfig).stream()
+              .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
+              .collect(Collectors.toSet()));
+        } catch (UnsupportedOperationException ignored) {
+          allPartitionIdsFetched = false;
+          // Stream does not support fetching partition ids. There is a log in the fallback code which is sufficient
+        } catch (Exception e) {
+          allPartitionIdsFetched = false;
+          LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfig.getTopicName(), e);
+        }
       }
     }
 
@@ -2386,7 +2434,8 @@ public class PinotLLCRealtimeSegmentManager {
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
    * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig) {
+  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
+      boolean repairErrorSegmentsForPartialUpsertOrDedup) {
     String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
@@ -2468,7 +2517,7 @@ public class PinotLLCRealtimeSegmentManager {
     boolean isPartialUpsertEnabled =
         tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
     boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
-    if ((isPartialUpsertEnabled || isDedupEnabled)) {
+    if ((isPartialUpsertEnabled || isDedupEnabled) && !repairErrorSegmentsForPartialUpsertOrDedup) {
       // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
@@ -2477,6 +2526,11 @@ public class PinotLLCRealtimeSegmentManager {
           realtimeTableName);
       return;
     } else {
+      if ((isPartialUpsertEnabled || isDedupEnabled)) {
+        LOGGER.info(
+            "Repairing error segments in table: {} as repairErrorSegmentForPartialUpsertOrDedup is set to true",
+            realtimeTableName);
+      }
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
     }
