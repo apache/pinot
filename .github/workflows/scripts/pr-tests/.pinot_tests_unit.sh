@@ -37,11 +37,6 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-common' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -pl 'pinot-clients' \
-      -pl 'pinot-server' \
-      -pl 'pinot-controller' \
-      -pl 'pinot-minion' \
-      -pl 'pinot-broker' \
       -P github-actions,codecoverage,no-integration-tests || exit 1
 
   mvn test \
@@ -59,11 +54,6 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
-    -pl '!pinot-clients' \
-    -pl '!pinot-server' \
-    -pl '!pinot-controller' \
-    -pl '!pinot-minion' \
-    -pl '!pinot-broker' \
     -P github-actions,codecoverage,no-integration-tests || exit 1
 fi
 
