@@ -91,9 +91,7 @@ public interface ThreadResourceUsageAccountant {
   void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
 
   @Deprecated
-  default void updateQueryUsageConcurrently(String queryId) {
-    updateQueryUsageConcurrently(queryId, 0, 0);
-  }
+  void updateQueryUsageConcurrently(String queryId);
 
   /**
    * start the periodical task
