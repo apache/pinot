@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -1188,6 +1189,46 @@ public class TablesResource {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
       return tableDataManager.getStaleSegments();
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @DELETE
+  @Path("/tables/{tableNameWithType}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
+      + "the given table. If no partitionGroupId is provided, metrics for all partitions hosted by this server will "
+      + "be removed.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public String removeIngestionMetrics(
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Comma-separated list of partition group IDs (optional)") @QueryParam("partitionGroupId")
+      Set<Integer> partitionGroupIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    try {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+        Set<Integer> removedPartitionGroupIds =
+            realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionGroupIds);
+        return "Successfully removed ingestion metrics for partitions: " + removedPartitionGroupIds + " in table: "
+            + tableNameWithType;
+      } else {
+        throw new WebApplicationException(
+            "TableDataManager is not RealtimeTableDataManager for table: " + tableNameWithType,
+            Response.Status.BAD_REQUEST);
+      }
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

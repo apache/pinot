@@ -20,6 +20,8 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -29,9 +31,15 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.net.URI;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -42,8 +50,14 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -51,6 +65,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,5 +200,67 @@ public class PinotTableInstances {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
+  }
+
+  @DELETE
+  @Path("/table/{tableNameWithType}/{instanceName}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action =
+      Actions.Table.DELETE_INGESTION_METRICS)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Remove Realtime ingestion metrics emitted per partitionGroupID from serverInstance",
+      notes = "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion-metrics."),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public SuccessResponse removeIngestionMetrics(
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Instance name of the server", required = true) @PathParam("instanceName")
+      String instanceName,
+      @ApiParam(value = "Comma-separated list of partition group IDs (optional)") @QueryParam("partitionGroupId")
+      Set<Integer> partitionGroupIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " should be a realtime table.",
+          Response.Status.BAD_REQUEST);
+    }
+    String serverEndpoint;
+    try {
+      BiMap<String, String> dataInstanceAdminEndpoints =
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceName));
+      serverEndpoint = dataInstanceAdminEndpoints.get(instanceName);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to get server endpoint for instance: " + instanceName,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceName);
+    StringBuilder uriBuilder = new StringBuilder(serverEndpoint)
+        .append("/tables/")
+        .append(tableNameWithType)
+        .append("/ingestionMetrics");
+
+    if (partitionGroupIds != null && !partitionGroupIds.isEmpty()) {
+      String query = partitionGroupIds.stream()
+          .map(id -> "partitionGroupId=" + id)
+          .collect(Collectors.joining("&"));
+      uriBuilder.append("?").append(query);
+    }
+
+    String fullUrl = uriBuilder.toString();
+    SimpleHttpResponse simpleHttpResponse;
+    try {
+      simpleHttpResponse =
+          HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendDeleteRequest(URI.create(fullUrl)));
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return new SuccessResponse(simpleHttpResponse.getResponse());
   }
 }
