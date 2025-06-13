@@ -315,12 +315,13 @@ public class PinotQueryResource {
       boolean found = false;
       String actualTableName = _pinotHelixResourceManager.getActualTableName(tableName, database);
       if (_pinotHelixResourceManager.hasRealtimeTable(actualTableName)) {
-        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(actualTableName)).getTenantConfig()
-            .getBroker());
+        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(actualTableName))
+            .getTenantConfig().getBroker());
         found = true;
       }
       if (_pinotHelixResourceManager.hasOfflineTable(actualTableName)) {
-        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(actualTableName)).getTenantConfig().getBroker());
+        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(actualTableName))
+            .getTenantConfig().getBroker());
         found = true;
       }
 
