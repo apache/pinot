@@ -33,28 +33,28 @@ import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate
 
 
 /**
- * A server selector that implements priority-based server selection based on replica groups.
+ * A server selector that implements priority-based server selection based on pools.
  * This selector works in conjunction with an {@link AdaptiveServerSelector} to provide
  * a two-level selection strategy:
  * <ol>
- *   <li>First level: Select servers based on replica group priorities</li>
- *   <li>Second level: Use adaptive selection within the chosen replica group</li>
+ *   <li>First level: Select servers based on pool priorities</li>
+ *   <li>Second level: Use adaptive selection within the chosen pool</li>
  * </ol>
  *
  * <p>The selector maintains the following invariants:</p>
  * <ul>
- *   <li>Servers from preferred replica groups are always selected before non-preferred groups</li>
- *   <li>Within each replica group, servers are selected using adaptive selection criteria</li>
+ *   <li>Servers from preferred pools are always selected before non-preferred groups</li>
+ *   <li>Within each pools, servers are selected using adaptive selection criteria</li>
  *   <li>When no preferred groups are available, falls back to non-preferred groups</li>
  * </ul>
  */
-public class PriorityGroupInstanceSelector {
+public class PriorityPoolInstanceSelector {
 
-  /** The underlying adaptive server selector used for selection within replica groups */
+  /** The underlying adaptive server selector used for selection within pools */
   private final AdaptiveServerSelector _adaptiveServerSelector;
 
   /** Sentinel value used to group all non-preferred servers together */
-  private static final int SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS = Integer.MAX_VALUE;
+  private static final int SENTINEL_POOL_OF_NON_PREFERRED_SERVERS = Integer.MAX_VALUE;
 
   /**
    * Creates a new priority group instance selector with the given adaptive server selector.
@@ -62,16 +62,16 @@ public class PriorityGroupInstanceSelector {
    * @param adaptiveServerSelector the adaptive server selector to use for selection within groups
    * @throws IllegalArgumentException if adaptiveServerSelector is null
    */
-  public PriorityGroupInstanceSelector(AdaptiveServerSelector adaptiveServerSelector) {
+  public PriorityPoolInstanceSelector(AdaptiveServerSelector adaptiveServerSelector) {
     assert adaptiveServerSelector != null;
     _adaptiveServerSelector = adaptiveServerSelector;
   }
 
   /**
-   * Selects a server instance from the given candidates based on replica group preferences.
+   * Selects a server instance from the given candidates based on pool preferences.
    * The selection process follows these steps:
    * <ol>
-   *   <li>Groups all candidates by their replica group</li>
+   *   <li>Groups all candidates by their pool</li>
    *   <li>Iterates through the ordered preferred groups in priority order</li>
    *   <li>For the first group that has available servers, uses adaptiveServerSelector to choose one</li>
    *   <li>If no preferred groups have servers, falls back to selecting from remaining servers</li>
@@ -80,9 +80,9 @@ public class PriorityGroupInstanceSelector {
    * <p>Example 1 - Preferred group has servers:</p>
    * <pre>
    *   Candidates:
-   *     - server1 (replica group 1)
-   *     - server2 (replica group 2)
-   *     - server3 (replica group 1)
+   *     - server1 (pool 1)
+   *     - server2 (pool 2)
+   *     - server3 (pool 1)
    *   Preferred groups: [2, 1]
    *   Result: server2 is selected (from group 2, highest priority)
    * </pre>
@@ -90,9 +90,9 @@ public class PriorityGroupInstanceSelector {
    * <p>Example 2 - Fallback to second preferred group:</p>
    * <pre>
    *   Candidates:
-   *     - server1 (replica group 1)
-   *     - server3 (replica group 1)
-   *     - server4 (replica group 3)
+   *     - server1 (pool 1)
+   *     - server3 (pool 1)
+   *     - server4 (pool 3)
    *   Preferred groups: [2, 1]
    *   Result: adaptiveServerSelector chooses between server1 and server3 (from group 1)
    * </pre>
@@ -100,8 +100,8 @@ public class PriorityGroupInstanceSelector {
    * <p>Example 3 - Fallback to non-preferred group:</p>
    * <pre>
    *   Candidates:
-   *     - server4 (replica group 3)
-   *     - server5 (replica group 3)
+   *     - server4 (pool 3)
+   *     - server5 (pool 3)
    *   Preferred groups: [2, 1]
    *   Result: adaptiveServerSelector chooses between server4 and server5 (from group 3)
    * </pre>
@@ -125,20 +125,20 @@ public class PriorityGroupInstanceSelector {
     }
     Set<Integer> groupSet = new HashSet<>(groups);
     Map<Integer, List<SegmentInstanceCandidate>> groupToServerPos = new HashMap<>();
-    // Group servers by their replica groups. For servers not in preferred groups,
+    // Group servers by their pools. For servers not in preferred groups,
     // use Integer.MAX_VALUE as a sentinel value to ensure they are processed last.
     // This allows us to:
     // 1. Process preferred groups in their specified order
     // 2. Handle all non-preferred servers as a single group with lowest priority
     // 3. Avoid complex conditional logic for handling non-preferred servers
     for (SegmentInstanceCandidate candidate : candidates) {
-      int group = candidate.getReplicaGroup();
-      group = groupSet.contains(group) ? group : SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS;
+      int group = candidate.getPool();
+      group = groupSet.contains(group) ? group : SENTINEL_POOL_OF_NON_PREFERRED_SERVERS;
       groupToServerPos.computeIfAbsent(group, k -> new ArrayList<>()).add(candidate);
     }
     // Add Integer.MAX_VALUE to the end of preferred groups to ensure non-preferred servers
     // are processed after all preferred groups
-    groups.add(SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS);
+    groups.add(SENTINEL_POOL_OF_NON_PREFERRED_SERVERS);
     for (int group : groups) {
       List<SegmentInstanceCandidate> instancesInGroup = groupToServerPos.get(group);
       if (instancesInGroup != null) {
@@ -151,7 +151,7 @@ public class PriorityGroupInstanceSelector {
 
   /**
    * Invoke adaptiveServerSelector to get the original ranking the servers (min first). Reorder the servers based on
-   * the replica group preference. The head of the OrderedPreferredGroups list is the most preferred group.
+   * the pool preference. The head of the OrderedPreferredGroups list is the most preferred group.
    * The servers in the same group are ranked by the original ranking.
    *
    * <p>Example:</p>
@@ -198,14 +198,14 @@ public class PriorityGroupInstanceSelector {
     Set<Integer> preferredGroups = new HashSet<>(groups);
     Map<Integer, List<String>> groupToRankedServers = new HashMap<>();
     for (Pair<String, Double> entry : serverRankListWithScores) {
-      int group = idToCandidate.get(entry.getLeft()).getReplicaGroup();
+      int group = idToCandidate.get(entry.getLeft()).getPool();
       // If the group is not in the preferred groups list, assign it the sentinel group
-      group = preferredGroups.contains(group) ? group : SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS;
+      group = preferredGroups.contains(group) ? group : SENTINEL_POOL_OF_NON_PREFERRED_SERVERS;
       groupToRankedServers.computeIfAbsent(group, k -> new ArrayList<>()).add(entry.getLeft());
     }
 
     // Add the sentinel group to the end of the groups list to ensure its group members are included in the tail
-    groups.add(SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS);
+    groups.add(SENTINEL_POOL_OF_NON_PREFERRED_SERVERS);
 
     // Build the final ranked list by processing groups in order
     List<String> rankedServers = new ArrayList<>();

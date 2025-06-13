@@ -31,16 +31,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
-public class PriorityGroupInstanceSelectorTest {
+public class PriorityPoolInstanceSelectorTest {
 
   private AdaptiveServerSelector _adaptiveServerSelector;
-  private PriorityGroupInstanceSelector _selector;
+  private PriorityPoolInstanceSelector _selector;
   private ServerSelectionContext _context;
 
   @BeforeMethod
   public void setUp() {
     _adaptiveServerSelector = mock(AdaptiveServerSelector.class);
-    _selector = new PriorityGroupInstanceSelector(_adaptiveServerSelector);
+    _selector = new PriorityPoolInstanceSelector(_adaptiveServerSelector);
     _context = mock(ServerSelectionContext.class);
   }
 
@@ -92,7 +92,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server2");
-    assertEquals(result.getReplicaGroup(), 2);
+    assertEquals(result.getPool(), 2);
   }
 
   @Test
@@ -112,7 +112,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server1");
-    assertEquals(result.getReplicaGroup(), 1);
+    assertEquals(result.getPool(), 1);
   }
 
   @Test
@@ -131,7 +131,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server4");
-    assertEquals(result.getReplicaGroup(), -1);
+    assertEquals(result.getPool(), -1);
   }
 
   @Test
@@ -192,7 +192,7 @@ public class PriorityGroupInstanceSelectorTest {
   private SegmentInstanceCandidate createCandidate(String instance, int replicaGroup) {
     SegmentInstanceCandidate candidate = mock(SegmentInstanceCandidate.class);
     when(candidate.getInstance()).thenReturn(instance);
-    when(candidate.getReplicaGroup()).thenReturn(replicaGroup);
+    when(candidate.getPool()).thenReturn(replicaGroup);
     return candidate;
   }
 }

@@ -194,13 +194,17 @@ public class QueryOptionsUtils {
   }
 
   public static List<Integer> getOrderedPreferredReplicas(Map<String, String> queryOptions) {
-    String orderedPreferredReplicas = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    if (orderedPreferredReplicas == null) {
+    String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
+      // backward compatibility
+      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    }
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }
     // cannot use comma as the delimiter of replica group list
     // because query option use comma as the delimiter of different options
-    String[] replicas = orderedPreferredReplicas.split("\\|");
+    String[] replicas = orderedPreferredPools.split("\\|");
     List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
     for (String replica : replicas) {
       preferredReplicas.add(Integer.parseInt(replica.trim()));

@@ -332,7 +332,7 @@ public class QueryLogger {
     REPLICA_GROUPS("replicaGroups") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-          builder.append(params._response.getReplicaGroups());
+          builder.append(params._response.getPools());
       }
     };
 

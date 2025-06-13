@@ -56,7 +56,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "replicaGroups"
+    "pools"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -114,7 +114,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private Map<String, String> _traceInfo = new HashMap<>();
   private Set<String> _tablesQueried = Set.of();
 
-  private Set<Integer> _replicaGroups = Set.of();
+  private Set<Integer> _pools = Set.of();
 
   public BrokerResponseNative() {
   }
@@ -570,13 +570,13 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public void setReplicaGroups(@NotNull Set<Integer> replicaGroups) {
-    _replicaGroups = replicaGroups;
+  public void setPools(@NotNull Set<Integer> pools) {
+    _pools = pools;
   }
 
   @Override
   @NotNull
-  public Set<Integer> getReplicaGroups() {
-    return _replicaGroups;
+  public Set<Integer> getPools() {
+    return _pools;
   }
 }
