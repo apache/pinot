@@ -115,7 +115,7 @@ public class QueryLoggerTest {
         + "queryEngine=singleStage,"
         + "offlineMemAllocatedBytes(total/thread/resSer):0/0/0,"
         + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
-        + "replicaGroups=[],"
+        + "pools=[],"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }

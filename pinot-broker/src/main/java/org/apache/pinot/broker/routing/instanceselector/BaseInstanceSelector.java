@@ -38,7 +38,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
-import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityGroupInstanceSelector;
+import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -54,7 +54,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
 /**
@@ -94,7 +94,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
   // Will be null if and only if adaptiveServerSelector is null
-  final PriorityGroupInstanceSelector _priorityGroupInstanceSelector;
+  final PriorityPoolInstanceSelector _priorityPoolInstanceSelector;
   final Clock _clock;
   final boolean _useFixedReplica;
   final long _newSegmentExpirationTimeInSeconds;
@@ -127,8 +127,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _tableNameHashForFixedReplicaRouting =
         TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
 
-    _priorityGroupInstanceSelector =
-        _adaptiveServerSelector == null ? null : new PriorityGroupInstanceSelector(_adaptiveServerSelector);
+    _priorityPoolInstanceSelector =
+        _adaptiveServerSelector == null ? null : new PriorityPoolInstanceSelector(_adaptiveServerSelector);
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
@@ -271,7 +271,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, false, getGroup(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -288,7 +288,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
               candidates.add(
-                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getGroup(instance)));
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -296,7 +296,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
           for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true, getGroup(instance)));
+            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
@@ -472,16 +472,16 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @VisibleForTesting
-  int getGroup(String instanceID) {
-    int group = FALLBACK_REPLICA_GROUP_ID;
+  int getPool(String instanceID) {
+    int pool = FALLBACK_POOL_ID;
     ServerInstance server = _enabledServerStore.get(instanceID);
     if (server == null) {
       LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
           instanceID, _tableNameWithType);
     } else {
-      group = server.getPool();
+      pool = server.getPool();
     }
-    return group;
+    return pool;
   }
 
   /**
