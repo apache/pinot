@@ -128,7 +128,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer =
-          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -699,7 +699,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       ExecutorService executorService = Executors.newFixedThreadPool(10);
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
-      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+      TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+          _tableSizeReader, null);
       // Set up the table with 1 replication factor and strict replica group enabled
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
@@ -829,7 +830,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           (numReplicas * numPartitions * (numSegmentsPerPartition + 1)) / numServers);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null, null);
     // Rebalance should return NO_OP status since there has been no change
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -981,7 +982,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 1);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     // Set up the table with 1 replication factor and strict replica group enabled
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
@@ -1040,7 +1042,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -1140,7 +1142,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(2)
@@ -1555,7 +1557,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, executorService, 1);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader);
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
 
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
@@ -2112,7 +2114,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader);
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -2232,7 +2234,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader);
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -2336,6 +2338,69 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers * 2; i++) {
       stopAndDropFakeInstance("consumingSegmentSummaryFailure_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
+  }
+
+  @Test
+  public void testGetMovingConsumingSegments() {
+    // Setup: segment assignments with consuming segments moving
+    Map<String, Map<String, String>> currentAssignment = new HashMap<>();
+    Map<String, Map<String, String>> targetAssignment = new HashMap<>();
+
+    // Segment 1: CONSUMING, same instances, should not be considered moving
+    Map<String, String> cur1 = new HashMap<>();
+    cur1.put("server1", "CONSUMING");
+    cur1.put("server2", "CONSUMING");
+    currentAssignment.put("segment1", cur1);
+    Map<String, String> tgt1 = new HashMap<>();
+    tgt1.put("server1", "CONSUMING");
+    tgt1.put("server2", "CONSUMING");
+    targetAssignment.put("segment1", tgt1);
+
+    // Segment 2: CONSUMING, different instances, should be considered moving
+    Map<String, String> cur2 = new HashMap<>();
+    cur2.put("server1", "CONSUMING");
+    cur2.put("server2", "CONSUMING");
+    currentAssignment.put("segment2", cur2);
+    Map<String, String> tgt2 = new HashMap<>();
+    tgt2.put("server3", "CONSUMING");
+    tgt2.put("server4", "CONSUMING");
+    targetAssignment.put("segment2", tgt2);
+
+    // Segment 3: ONLINE, should not be considered
+    Map<String, String> cur3 = new HashMap<>();
+    cur3.put("server1", "ONLINE");
+    currentAssignment.put("segment3", cur3);
+    Map<String, String> tgt3 = new HashMap<>();
+    tgt3.put("server2", "ONLINE");
+    targetAssignment.put("segment3", tgt3);
+
+    // Segment 4: one instance is ONLINE, should not be considered
+    Map<String, String> cur4 = new HashMap<>();
+    cur4.put("server1", "ONLINE");
+    cur4.put("server2", "CONSUMING");
+    currentAssignment.put("segment4", cur4);
+    Map<String, String> tgt4 = new HashMap<>();
+    tgt4.put("server1", "ONLINE");
+    tgt4.put("server2", "CONSUMING");
+    targetAssignment.put("segment4", tgt4);
+
+    // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving
+    Map<String, String> cur5 = new HashMap<>();
+    cur5.put("server1", "OFFLINE");
+    cur5.put("server2", "CONSUMING");
+    currentAssignment.put("segment5", cur5);
+    Map<String, String> tgt5 = new HashMap<>();
+    tgt5.put("server1", "OFFLINE");
+    tgt5.put("server3", "CONSUMING");
+    targetAssignment.put("segment5", tgt5);
+
+    Set<String> moving = TableRebalancer.getMovingConsumingSegments(currentAssignment, targetAssignment);
+    assertEquals(moving.size(), 2);
+    assertTrue(moving.contains("segment2"));
+    assertTrue(moving.contains("segment5"));
+    assertFalse(moving.contains("segment1"));
+    assertFalse(moving.contains("segment3"));
+    assertFalse(moving.contains("segment4"));
   }
 
   @AfterClass

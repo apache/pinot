@@ -73,7 +73,7 @@ public class PinotTableRebalancer extends PinotZKChanger {
     ZkBasedTableRebalanceObserver rebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, jobId,
         TableRebalanceContext.forInitialAttempt(jobId, _rebalanceConfig, true), _propertyStore);
 
-    return new TableRebalancer(_helixManager, rebalanceObserver, null, null, null)
+    return new TableRebalancer(_helixManager, rebalanceObserver, null, null, null, null)
         .rebalance(tableConfig, _rebalanceConfig, jobId);
   }
 }
