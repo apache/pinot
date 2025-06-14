@@ -179,8 +179,8 @@ public class TableViews {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableNameWithType}/badSegments")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_SEGMENT_STATUS)
+  @Path("/tables/{tableName}/badSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
   @ApiOperation(value = "Get bad segment names per partition group for a realtime table.", notes = "Get a sorted list"
       + " of bad segments per partition group (sort order is in increasing order of segment sequence number)")
   @ApiResponses(value = {
@@ -188,16 +188,17 @@ public class TableViews {
           + " order of sequence number"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
-  public String getSegmentsStatusDetails(
-      @ApiParam(value = "Name of the table with type.", required = true) @PathParam("tableNameWithType")
-      String tableNameWithType,
+  public String getBadSegments(
+      @ApiParam(value = "Name of the table.", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " should be a realtime table.",
-          Response.Status.BAD_REQUEST);
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.REALTIME, LOGGER)
+            .get(0);
     try {
       TableViews.TableView idealStateView = getTableState(tableNameWithType, TableViews.IDEALSTATE, null);
       TableViews.TableView externalView = getTableState(tableNameWithType, TableViews.EXTERNALVIEW, null);
