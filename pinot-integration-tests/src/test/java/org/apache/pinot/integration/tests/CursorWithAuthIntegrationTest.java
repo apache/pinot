@@ -87,18 +87,6 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
     return AUTH_HEADER;
   }
 
-//  @Override
-//  protected Connection getPinotConnection() {
-//    if (_pinotConnection == null) {
-//      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
-//      factory.setHeaders(AUTH_HEADER);
-//
-//      _pinotConnection =
-//          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
-//    }
-//    return _pinotConnection;
-//  }
-
   @Override
   protected Map<String, String> getPinotClientTransportHeaders() {
     return AUTH_HEADER;
