@@ -115,10 +115,26 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testPruneEmptyCorrelateJoin() {
-    // queries involving correlated join with dummy
-    // should be optimized to dummy by PruneEmptyRules.CORRELATE_LEFT_INSTANCE
-    // or its right equivalence
+  public void testPruneEmptyCorrelateLeft() {
+    // Test PruneEmptyRules.CORRELATE_LEFT_INSTANCE help unnest
+    // some queries involving correlate and dummy conditions
+    String query = "EXPLAIN PLAN FOR SELECT *\n"
+        + "FROM a WHERE EXISTS (\n"
+        + "  SELECT * FROM b WHERE a.col1 = b.col1\n"
+        + ") AND 1=0;\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testPruneEmptyJoinLeft() {
+    // Test query that produces join with dummy after unnesting
+    // should be optimized to dummy by PruneEmptyRules.PRUNE_EMPTY_JOIN_LEFT
     String query = "EXPLAIN PLAN FOR SELECT *\n"
         + "FROM (\n"
         + "  SELECT * FROM a WHERE 1 = 0\n"
