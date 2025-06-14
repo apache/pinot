@@ -583,13 +583,15 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
 
-    // Test Runtime Exception is thrown when build segment fails.
+    // Test downloadAndReplace is called after buildAndReplace fails.
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager._failSegmentBuildAndReplace = true;
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue);
-      Assert.expectThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     }
   }
 
