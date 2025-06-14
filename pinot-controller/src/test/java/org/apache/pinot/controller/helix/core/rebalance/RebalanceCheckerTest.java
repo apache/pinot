@@ -40,7 +40,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -370,7 +370,7 @@ public class RebalanceCheckerTest {
     HelixManager helixZkManager = mock(HelixManager.class);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
     String zkPath =
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE.name());
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobTypes.TABLE_REBALANCE.name());
     ZNRecord jobsZnRecord = new ZNRecord("jobs");
     when(propertyStore.get(eq(zkPath), any(), eq(AccessOption.PERSISTENT))).thenReturn(jobsZnRecord);
     when(helixZkManager.getClusterManagmentTool()).thenReturn(mock(HelixAdmin.class));
@@ -380,16 +380,16 @@ public class RebalanceCheckerTest {
 
     pinotHelixManager.addControllerJobToZK("job1",
         ImmutableMap.of("jobId", "job1", "submissionTimeMs", "1000", "tableName", "table01"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job2",
         ImmutableMap.of("jobId", "job2", "submissionTimeMs", "2000", "tableName", "table01"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> false);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> false);
     pinotHelixManager.addControllerJobToZK("job3",
         ImmutableMap.of("jobId", "job3", "submissionTimeMs", "3000", "tableName", "table02"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job4",
         ImmutableMap.of("jobId", "job4", "submissionTimeMs", "4000", "tableName", "table02"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     Map<String, Map<String, String>> jmds = jobsZnRecord.getMapFields();
     assertEquals(jmds.size(), 3);
     assertTrue(jmds.containsKey("job1"));
@@ -397,13 +397,13 @@ public class RebalanceCheckerTest {
     assertTrue(jmds.containsKey("job4"));
 
     Set<String> expectedJobs01 = new HashSet<>();
-    pinotHelixManager.updateJobsForTable("table01", ControllerJobType.TABLE_REBALANCE,
+    pinotHelixManager.updateJobsForTable("table01", ControllerJobTypes.TABLE_REBALANCE,
         jmd -> expectedJobs01.add(jmd.get("jobId")));
     assertEquals(expectedJobs01.size(), 1);
     assertTrue(expectedJobs01.contains("job1"));
 
     Set<String> expectedJobs02 = new HashSet<>();
-    pinotHelixManager.updateJobsForTable("table02", ControllerJobType.TABLE_REBALANCE,
+    pinotHelixManager.updateJobsForTable("table02", ControllerJobTypes.TABLE_REBALANCE,
         jmd -> expectedJobs02.add(jmd.get("jobId")));
     assertEquals(expectedJobs02.size(), 2);
     assertTrue(expectedJobs02.contains("job3"));

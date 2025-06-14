@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +37,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -83,7 +82,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   private synchronized int retryRebalanceTables(Set<String> tableNamesWithType) {
     // Get all jobMetadata for all the given tables with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
-        _pinotHelixResourceManager.getAllJobs(EnumSet.of(ControllerJobType.TABLE_REBALANCE),
+        _pinotHelixResourceManager.getAllJobs(Set.of(ControllerJobTypes.TABLE_REBALANCE),
             jobMetadata -> tableNamesWithType.contains(
                 jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)));
     Map<String, Map<String, Map<String, String>>> tableJobMetadataMap = new HashMap<>();
@@ -216,7 +215,8 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   }
 
   private static void abortExistingJobs(String tableNameWithType, PinotHelixResourceManager pinotHelixResourceManager) {
-    boolean updated = pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
+    boolean updated =
+        pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
         jobMetadata -> {
           String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
           try {
