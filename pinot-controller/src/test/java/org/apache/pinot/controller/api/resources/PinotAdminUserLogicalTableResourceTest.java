@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import java.util.Map;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 
 
 public class PinotAdminUserLogicalTableResourceTest extends PinotLogicalTableResourceTest {
@@ -41,11 +40,7 @@ public class PinotAdminUserLogicalTableResourceTest extends PinotLogicalTableRes
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
   }
 }

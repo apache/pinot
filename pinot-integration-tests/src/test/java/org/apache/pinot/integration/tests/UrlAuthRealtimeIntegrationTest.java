@@ -26,12 +26,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.auth.UrlAuthProvider;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -141,24 +137,13 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
   }
 
   @Override
-  protected Connection getPinotConnection() {
-    if (_pinotConnection == null) {
-      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
-      factory.setHeaders(AUTH_HEADER);
-
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
-    }
-    return _pinotConnection;
+  protected Map<String, String> getPinotClientTransportHeaders() {
+    return AUTH_HEADER;
   }
 
   @Test(expectedExceptions = IOException.class)
