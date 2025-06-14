@@ -46,7 +46,6 @@ if [ "$RUN_TEST_SET" == "1" ]; then
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test \
-    -am \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
