@@ -33,6 +33,10 @@ public class ObjectLookupTable extends LookupTable {
 
   @Override
   public void addRow(@Nullable Object key, Object[] row) {
+    if (key == null) {
+      // Ignore null keys for SQL semantics
+      return;
+    }
     _lookupTable.compute(key, (k, v) -> computeNewValue(row, v));
   }
 
@@ -47,12 +51,18 @@ public class ObjectLookupTable extends LookupTable {
 
   @Override
   public boolean containsKey(@Nullable Object key) {
+    if (key == null) {
+      return false;  // Null keys are not contained per SQL semantics
+    }
     return _lookupTable.containsKey(key);
   }
 
   @Nullable
   @Override
   public Object lookup(@Nullable Object key) {
+    if (key == null) {
+      return null;  // Null keys always return null
+    }
     return _lookupTable.get(key);
   }
 
