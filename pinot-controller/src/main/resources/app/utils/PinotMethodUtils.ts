@@ -80,6 +80,7 @@ import {
   getBrokerListOfTenant,
   getServerListOfTenant,
   deleteSegment,
+  resetSegment,
   putTable,
   putSchema,
   deleteTable,
@@ -989,6 +990,12 @@ const reloadStatusOp = (tableName, tableType) => {
   });
 }
 
+const resetSegmentOp = (tableName, segmentName) => {
+  return resetSegment(tableName, segmentName).then((response) => {
+    return response.data;
+  });
+};
+
 const deleteSegmentOp = (tableName, segmentName) => {
   return deleteSegment(tableName, segmentName).then((response)=>{
     return response.data;
@@ -1382,6 +1389,7 @@ export default {
   getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
+  resetSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,
   reloadAllSegmentsOp,

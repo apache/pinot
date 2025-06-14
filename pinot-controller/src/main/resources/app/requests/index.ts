@@ -265,6 +265,9 @@ export const getServerListOfTenant = (name: string): Promise<AxiosResponse<Serve
 export const reloadSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/segments/${tableName}/${instanceName}/reload`, null, {headers});
 
+export const resetSegment = (tableName: string, segmentName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/segments/${tableName}/${segmentName}/reset`, null, {headers});
+
 export const reloadAllSegments = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/segments/${tableName}/reload?type=${tableType}`, null, {headers});
 
