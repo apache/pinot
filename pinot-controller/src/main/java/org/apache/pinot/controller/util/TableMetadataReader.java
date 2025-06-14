@@ -19,8 +19,11 @@
 package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -127,6 +130,7 @@ public class TableMetadataReader {
 
   /**
    * This api takes in list of segments for which we need the metadata.
+   * This calls the server to get the metadata for all segments instead of making a call per segment.
    */
   public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segmentsToInclude,
       int timeoutMs)
@@ -134,43 +138,96 @@ public class TableMetadataReader {
     return getSegmentsMetadataInternal(tableNameWithType, columns, segmentsToInclude, timeoutMs);
   }
 
+  /**
+   *   Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
+   */
+  private JsonNode fetchAndAggregateMetadata(List<String> urls,
+      BiMap<String, String> endpoints,
+      boolean perSegmentJson,
+      String tableNameWithType,
+      int timeoutMs)
+      throws InvalidConfigException, IOException {
+    CompletionServiceHelper cs = new CompletionServiceHelper(_executor, _connectionManager, endpoints);
+    CompletionServiceHelper.CompletionServiceResponse resp =
+        cs.doMultiGetRequest(urls, tableNameWithType, perSegmentJson, timeoutMs);
+    // all requests will fail if new server endpoint is not available
+    if (resp._failedResponseCount == urls.size()) {
+      throw new InvalidConfigException("All requests to server instances failed.");
+    }
+
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode aggregatedNode = mapper.createObjectNode();
+    for (String body : resp._httpResponses.values()) {
+      JsonNode node = JsonUtils.stringToJsonNode(body);
+      // legacy returns one JSON per segment; new returns one JSON with many fields
+      if (perSegmentJson) {
+        String segmentName = node.get("segmentName").asText();
+        aggregatedNode.set(segmentName, node);
+      } else {
+        node.fields().forEachRemaining(entry -> aggregatedNode.set(entry.getKey(), entry.getValue()));
+      }
+    }
+    return aggregatedNode;
+  }
+
+  private List<String> buildTableLevelUrls(Map<String, List<String>> serverToSegs,
+      BiMap<String, String> endpoints,
+      String tableNameWithType,
+      List<String> columns,
+      Set<String> segmentsFilter,
+      ServerSegmentMetadataReader reader) {
+    List<String> urls = new ArrayList<>(serverToSegs.size());
+    for (String server : serverToSegs.keySet()) {
+      urls.add(reader.generateTableMetadataServerURL(
+          tableNameWithType, columns, segmentsFilter, endpoints.get(server)));
+    }
+    return urls;
+  }
+
+  private List<String> buildSegmentLevelUrls(Map<String, List<String>> serverToSegs,
+      BiMap<String, String> endpoints,
+      String tableNameWithType,
+      List<String> columns,
+      Set<String> segmentsFilter,
+      ServerSegmentMetadataReader reader) {
+    List<String> urls = new ArrayList<>();
+    for (Map.Entry<String, List<String>> e : serverToSegs.entrySet()) {
+      for (String segment : e.getValue()) {
+        if (segmentsFilter == null || segmentsFilter.isEmpty()
+            || segmentsFilter.contains(segment)) {
+          urls.add(reader.generateSegmentMetadataServerURL(
+              tableNameWithType, segment, columns, endpoints.get(e.getKey())));
+        }
+      }
+    }
+    return urls;
+  }
+
   private JsonNode getSegmentsMetadataInternal(String tableNameWithType, List<String> columns,
       Set<String> segmentsToInclude, int timeoutMs)
       throws InvalidConfigException, IOException {
-    final Map<String, List<String>> serverToSegmentsMap =
+    Map<String, List<String>> serverToSegs =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     BiMap<String, String> endpoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
-    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegs.keySet());
+    ServerSegmentMetadataReader reader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    // Filter segments that we need
-    for (Map.Entry<String, List<String>> serverToSegment : serverToSegmentsMap.entrySet()) {
-      List<String> segments = serverToSegment.getValue();
-      if (segmentsToInclude != null && !segmentsToInclude.isEmpty()) {
-        segments.retainAll(segmentsToInclude);
-      }
+    // try table level endpoint first
+    try {
+      List<String> tableUrls = buildTableLevelUrls(serverToSegs, endpoints,
+          tableNameWithType, columns, segmentsToInclude, reader);
+      return fetchAndAggregateMetadata(tableUrls, endpoints, /*perSegmentJson=*/false,
+          tableNameWithType, timeoutMs);
+    } catch (InvalidConfigException ignore) {
+      // fall through to legacy
     }
 
-    List<String> segmentsMetadata =
-        serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType, serverToSegmentsMap, endpoints,
-            columns, timeoutMs);
-    Map<String, JsonNode> response = new HashMap<>();
-    for (String segmentMetadata : segmentsMetadata) {
-      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
-      response.put(responseJson.get("segmentName").asText(), responseJson);
-    }
-    return JsonUtils.objectToJsonNode(response);
-  }
-
-  /**
-   * This method retrieves the full segment metadata for a given table.
-   * Currently supports only OFFLINE tables.
-   * @return a map of segmentName to its metadata
-   */
-  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
-      throws InvalidConfigException, IOException {
-    return getSegmentsMetadataInternal(tableNameWithType, columns, null, timeoutMs);
+    // legacy per segment endpoint
+    List<String> segmentUrls = buildSegmentLevelUrls(serverToSegs, endpoints,
+        tableNameWithType, columns, segmentsToInclude, reader);
+    return fetchAndAggregateMetadata(segmentUrls, endpoints.inverse(), /*perSegmentJson=*/true,
+        tableNameWithType, timeoutMs);
   }
 
   /**
