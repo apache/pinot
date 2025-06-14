@@ -44,7 +44,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
 import org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer;
@@ -457,7 +457,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   private void testForceCommitInternal(String realtimeTableName, String jobId, Set<String> consumingSegments,
       long timeoutMs) {
     Map<String, String> jobMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
+        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.FORCE_COMMIT);
     assertNotNull(jobMetadata);
     assertNotNull(jobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST));
 

@@ -21,11 +21,11 @@ package org.apache.pinot.controller.helix.core.util;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,7 +33,7 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -90,7 +90,7 @@ public class ControllerZkHelixUtils {
    * @param propertyStore the ZK property store to read from
    * @return a map of jobId to job metadata for all the jobs that match the given job types and metadata checker
    */
-  public static Map<String, Map<String, String>> getAllControllerJobs(EnumSet<ControllerJobType> jobTypes,
+  public static Map<String, Map<String, String>> getAllControllerJobs(Set<ControllerJobType> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
     for (ControllerJobType jobType : jobTypes) {

@@ -29,7 +29,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -282,7 +282,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     Map<String, String> jobMetadata =
         createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats, _tableRebalanceContext);
     ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, _rebalanceJobId, jobMetadata,
-        ControllerJobType.TABLE_REBALANCE, prevJobMetadata -> {
+        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> {
           // In addition to updating job progress status, the observer also checks if the job status is IN_PROGRESS.
           // If not, then no need to update the job status, and we keep this status to end the job promptly.
           if (prevJobMetadata == null) {
@@ -318,7 +318,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name());
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
     try {
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
           JsonUtils.objectToString(tableRebalanceProgressStats));

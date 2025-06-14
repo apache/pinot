@@ -1307,6 +1307,8 @@ public class CommonConstants {
     public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
     public static final String MESSAGE_COUNT = "messageCount";
 
+    public static final Integer DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
+
     /**
      * Segment reload job ZK props
      */
