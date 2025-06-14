@@ -207,6 +207,18 @@ public class ControllerTest {
   }
 
   /**
+   * Retrieves the headers to be used for the `ControllerRequestClient`.
+   *
+   * <p>This method returns an empty map, indicating that no custom headers
+   * are set by default for the `ControllerRequestClient`.
+   *
+   * @return A map of headers (key-value pairs) to be used for the `ControllerRequestClient`.
+   */
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return Collections.emptyMap();
+  }
+
+  /**
    * ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
    *
    * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
@@ -215,7 +227,8 @@ public class ControllerTest {
    */
   public ControllerRequestClient getControllerRequestClient() {
     if (_controllerRequestClient == null) {
-      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
+        getControllerRequestClientHeaders());
     }
     return _controllerRequestClient;
   }

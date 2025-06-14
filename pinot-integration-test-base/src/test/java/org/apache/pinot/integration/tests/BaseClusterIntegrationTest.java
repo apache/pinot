@@ -507,6 +507,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
+   * Returns the headers to be used for Pinot client transport.
+   */
+  protected Map<String, String> getPinotClientTransportHeaders() {
+    return Map.of();
+  }
+
+  /**
    * Get the Pinot connection.
    *
    * @return Pinot connection
@@ -523,9 +530,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory()
+        .withConnectionProperties(getPinotConnectionProperties());
+      factory.setHeaders(getPinotClientTransportHeaders());
       _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-          new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
-              .buildTransport());
+          factory.buildTransport());
     }
     return _pinotConnection;
   }
