@@ -114,9 +114,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
     );
 
-    // ThreadResourceUsageProvider(ThreadMXBean wrapper) per runner/worker thread
-    private final ThreadLocal<ThreadResourceUsageProvider> _threadResourceUsageProvider;
-
     // track thread cpu time
     private final boolean _isThreadCPUSamplingEnabled;
 
@@ -167,9 +164,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
-
-      // ThreadMXBean wrapper
-      _threadResourceUsageProvider = new ThreadLocal<>();
 
       // task/query tracking
       _inactiveQuery = new HashSet<>();
@@ -277,19 +271,26 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void updateQueryUsageConcurrently(String queryId) {
+    @Deprecated
+    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
+    }
+
+    @Override
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
       if (_isThreadCPUSamplingEnabled) {
-        long cpuUsageNS = getThreadResourceUsageProvider().getThreadTimeNs();
         _concurrentTaskCPUStatsAggregator.compute(queryId,
-            (key, value) -> (value == null) ? cpuUsageNS : (value + cpuUsageNS));
+            (key, value) -> (value == null) ? cpuTimeNs : (value + cpuTimeNs));
       }
       if (_isThreadMemorySamplingEnabled) {
-        long memoryAllocatedBytes = getThreadResourceUsageProvider().getThreadAllocatedBytes();
         _concurrentTaskMemStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? memoryAllocatedBytes : (value + memoryAllocatedBytes));
       }
     }
 
+    @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId) {
+    }
 
     /**
      * The thread would need to do {@code setThreadResourceUsageProvider} first upon it is scheduled.
@@ -297,9 +298,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadCPUSamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = provider.getThreadTimeNs();
+      if (_isThreadCPUSamplingEnabled) {
+        _threadLocalEntry.get().updateCpuSnapshot();
       }
     }
 
@@ -309,19 +309,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadMemorySamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes = provider.getThreadAllocatedBytes();
+      if (_isThreadMemorySamplingEnabled) {
+        _threadLocalEntry.get().updateMemorySnapshot();
       }
-    }
-
-    private ThreadResourceUsageProvider getThreadResourceUsageProvider() {
-      return _threadResourceUsageProvider.get();
-    }
-
-    @Override
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-      _threadResourceUsageProvider.set(threadResourceUsageProvider);
     }
 
     @Override
@@ -362,8 +352,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
       // clear task info + stats
       threadEntry.setToIdle();
-      // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.remove();
     }
 
     @Override

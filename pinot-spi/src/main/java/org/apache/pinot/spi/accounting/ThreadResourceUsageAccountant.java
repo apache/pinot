@@ -70,6 +70,7 @@ public interface ThreadResourceUsageAccountant {
   /**
    * set resource usage provider
    */
+  @Deprecated
   void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
 
   /**
@@ -87,6 +88,9 @@ public interface ThreadResourceUsageAccountant {
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument
    */
+  void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
+
+  @Deprecated
   void updateQueryUsageConcurrently(String queryId);
 
   /**
