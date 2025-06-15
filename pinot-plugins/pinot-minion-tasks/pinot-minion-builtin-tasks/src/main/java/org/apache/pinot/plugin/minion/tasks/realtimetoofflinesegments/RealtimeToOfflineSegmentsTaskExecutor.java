@@ -175,7 +175,12 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     List<File> outputSegmentDirs;
     try {
       _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-      outputSegmentDirs = new SegmentProcessorFramework(recordReaders, segmentProcessorConfig, workingDir).process();
+      SegmentProcessorFramework framework =
+          new SegmentProcessorFramework(recordReaders, segmentProcessorConfig, workingDir);
+      outputSegmentDirs = framework.process();
+      _eventObserver.notifyProgress(_pinotTaskConfig,
+          "transformation stats - incomplete:" + framework.getIncompleteRowsFound()
+              + ", dropped:" + framework.getSkippedRowsFound() + ", sanitized:" + framework.getSanitizedRowsFound());
     } finally {
       for (RecordReader recordReader : recordReaders) {
         recordReader.close();

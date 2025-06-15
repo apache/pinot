@@ -145,9 +145,13 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-    outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
         recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
-        configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)))).process();
+        configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
+    outputSegmentDirs = framework.process();
+    _eventObserver.notifyProgress(_pinotTaskConfig,
+        "transformation stats - incomplete:" + framework.getIncompleteRowsFound() + ", dropped:" + framework
+            .getSkippedRowsFound() + ", sanitized:" + framework.getSanitizedRowsFound());
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
