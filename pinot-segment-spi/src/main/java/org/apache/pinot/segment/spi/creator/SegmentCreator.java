@@ -33,6 +33,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 /**
  * Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
+ * NOTE: this interface is, in practice, meant only for single-column indexes because of the implicit requirement of
+ * handling both indexRow() and indexColumn() methods.
  */
 public interface SegmentCreator extends Closeable, Serializable {
 

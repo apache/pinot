@@ -27,8 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.doThrow;
@@ -37,15 +40,29 @@ import static org.mockito.Mockito.spy;
 
 public class SegmentOperationsThrottlerTest {
 
-  private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  private final ServerMetrics _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
   private final List<String> _thresholdGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
-          ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD.getGaugeName());
+          ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD.getGaugeName(),
+          ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName());
   private final List<String> _countGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT.getGaugeName(),
-          ServerGauge.SEGMENT_DOWNLOAD_COUNT.getGaugeName());
+          ServerGauge.SEGMENT_DOWNLOAD_COUNT.getGaugeName(),
+          ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT.getGaugeName());
+
+  @BeforeClass
+  public void setup() {
+    ServerMetrics.deregister();
+    ServerMetrics.register(_serverMetrics);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    ServerMetrics.deregister();
+    ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+  }
 
   @Test
   public void testBasicAcquireRelease()
@@ -54,6 +71,7 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentAllIndexPreprocessThrottler(4, 8, true));
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(4, 8, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(4, 8, true));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(4, 8, true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -96,6 +114,8 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentAllIndexPreprocessThrottler(totalPermits, totalPermits * 2, true));
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(totalPermits, totalPermits * 2, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(totalPermits, totalPermits * 2, true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(totalPermits, totalPermits * 2, true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -160,6 +180,23 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentDownloadThrottler(0, 4, false));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentDownloadThrottler(1, -4, false));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentDownloadThrottler(1, 0, false));
+
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(-1, 4, true));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(0, 4, true));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(1, -4, true));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(1, 0, true));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(-1, 4, false));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(0, 4, false));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(1, -4, false));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new SegmentMultiColTextIndexPreprocessThrottler(1, 0, false));
   }
 
   @Test
@@ -176,17 +213,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM), Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), true));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM), Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES),
+        true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);
       String countGaugeName = _countGauges.get(i);
 
-      int defaultPermits = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM)
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM)
-              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+      int defaultPermits = getDefaultPermits(operationsThrottler);
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits);
 
@@ -218,6 +255,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -235,11 +275,7 @@ public class SegmentOperationsThrottlerTest {
       // Change the value of cluster config for max segment operation parallelism to be a negative value
       // If config is <= 0, this is an invalid configuration change. Do nothing other than log a warning
       Map<String, String> updatedClusterConfigs = new HashMap<>();
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-              : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, "-1");
+      updatedClusterConfigs.put(getThrottlerParallelismHelixKey(operationsThrottler), "-1");
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
@@ -263,6 +299,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -289,11 +328,7 @@ public class SegmentOperationsThrottlerTest {
 
       // Increase the value of cluster config for max segment preprocess parallelism
       Map<String, String> updatedClusterConfigs = new HashMap<>();
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+      updatedClusterConfigs.put(getThrottlerParallelismHelixKey(operationsThrottler),
           String.valueOf(initialPermits * 2));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
@@ -338,6 +373,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -364,11 +402,7 @@ public class SegmentOperationsThrottlerTest {
 
       // Decrease the value of cluster config for max segment operation parallelism
       Map<String, String> updatedClusterConfigs = new HashMap<>();
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+      updatedClusterConfigs.put(getThrottlerParallelismHelixKey(operationsThrottler),
           String.valueOf(initialPermits / 2));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits / 2);
@@ -402,18 +436,16 @@ public class SegmentOperationsThrottlerTest {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES), false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES),
+        false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);
       String countGaugeName = _countGauges.get(i);
 
-      int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? Integer.parseInt(
-                  CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      int defaultPermitsBeforeQuery = getDefaultPermitsBeforeServingQueries(operationsThrottler);
       // We set isServingQueries to false when the server is not yet ready to server queries. In this scenario ideally
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
@@ -447,18 +479,16 @@ public class SegmentOperationsThrottlerTest {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES), false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES),
+        false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);
       String countGaugeName = _countGauges.get(i);
 
-      int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? Integer.parseInt(
-              CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      int defaultPermitsBeforeQuery = getDefaultPermitsBeforeServingQueries(operationsThrottler);
       // Default is too high: Integer.MAX_VALUE, take a limited number of permits so that the test doesn't take too
       // long to finish
       int numPermitsToTake = 10000;
@@ -518,18 +548,17 @@ public class SegmentOperationsThrottlerTest {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
+        - 5,
+        false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);
       String countGaugeName = _countGauges.get(i);
 
-      int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? Integer.parseInt(
-              CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      int defaultPermitsBeforeQuery = getDefaultPermitsBeforeServingQueries(operationsThrottler);
       // Default is too high: Integer.MAX_VALUE, take a limited number of permits so that the test doesn't take too
       // long to finish
       int numPermitsToTake = 10000;
@@ -556,11 +585,7 @@ public class SegmentOperationsThrottlerTest {
 
       // Double the permits for before serving queries config
       Map<String, String> updatedClusterConfigs = new HashMap<>();
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+      updatedClusterConfigs.put(getThrottlerParallelismBeforeServingQueriesHelixKey(operationsThrottler),
           String.valueOf(defaultPermitsBeforeQuery));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
@@ -620,18 +645,16 @@ public class SegmentOperationsThrottlerTest {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES), false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, Integer.parseInt(
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES),
+        false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
       String thresholdGaugeName = _thresholdGauges.get(i);
       String countGaugeName = _countGauges.get(i);
 
-      int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? Integer.parseInt(
-              CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
-              : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      int defaultPermitsBeforeQuery = getDefaultPermitsBeforeServingQueries(operationsThrottler);
       // Default is too high: Integer.MAX_VALUE, take a limited number of permits so that the test doesn't take too
       // long to finish
       int numPermitsToTake = 10000;
@@ -659,11 +682,7 @@ public class SegmentOperationsThrottlerTest {
       // Half the permits for before serving queries config
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       int newDefaultPermits = defaultPermitsBeforeQuery / 2;
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+      updatedClusterConfigs.put(getThrottlerParallelismBeforeServingQueriesHelixKey(operationsThrottler),
           String.valueOf(newDefaultPermits));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), newDefaultPermits);
@@ -706,6 +725,7 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentAllIndexPreprocessThrottler(1, 2, true));
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(1, 2, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(1, 2, true));
+    segmentOperationsThrottlerList.add(new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
 
     for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
       BaseSegmentOperationsThrottler spy = spy(operationsThrottler);
@@ -730,6 +750,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -765,6 +788,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -780,18 +806,10 @@ public class SegmentOperationsThrottlerTest {
 
       // Create a set of valid keys and pass clusterConfigs as null, the config should reset to the default
       Set<String> keys = new HashSet<>();
-      keys.add(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-              : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+      keys.add(getThrottlerParallelismHelixKey(operationsThrottler));
       operationsThrottler.onChange(keys, null);
 
-      int newTotalPermits = Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-              : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+      int newTotalPermits = getDefaultPermits(operationsThrottler);
       Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
 
       thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
@@ -811,6 +829,9 @@ public class SegmentOperationsThrottlerTest {
         false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         false));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -826,23 +847,11 @@ public class SegmentOperationsThrottlerTest {
 
       // Create a set of valid keys and pass clusterConfigs as null, the config should reset to the default
       Set<String> keys = new HashSet<>();
-      keys.add(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-              : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
-      keys.add(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      keys.add(getThrottlerParallelismHelixKey(operationsThrottler));
+      keys.add(getThrottlerParallelismBeforeServingQueriesHelixKey(operationsThrottler));
       operationsThrottler.onChange(keys, null);
 
-      int newTotalPermits = Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-          ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      int newTotalPermits = getDefaultPermitsBeforeServingQueries(operationsThrottler);
       Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
 
       thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
@@ -862,6 +871,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -903,6 +915,9 @@ public class SegmentOperationsThrottlerTest {
         true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            true));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -919,17 +934,9 @@ public class SegmentOperationsThrottlerTest {
       // Add random and relevant configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put("random.config.key", "random.config.value");
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+      updatedClusterConfigs.put(getThrottlerParallelismHelixKey(operationsThrottler),
           String.valueOf(initialPermits * 2));
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+      updatedClusterConfigs.put(getThrottlerParallelismBeforeServingQueriesHelixKey(operationsThrottler),
           String.valueOf(initialPermits * 4));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       // Since isServingQueries = false, new total should match CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
@@ -952,6 +959,9 @@ public class SegmentOperationsThrottlerTest {
         false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         false));
+    segmentOperationsThrottlerList.add(
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2,
+            false));
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
@@ -968,17 +978,9 @@ public class SegmentOperationsThrottlerTest {
       // Add random and relevant configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put("random.config.key", "random.config.value");
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+      updatedClusterConfigs.put(getThrottlerParallelismHelixKey(operationsThrottler),
           String.valueOf(initialPermits * 2));
-      updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-                  : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+      updatedClusterConfigs.put(getThrottlerParallelismBeforeServingQueriesHelixKey(operationsThrottler),
           String.valueOf(initialPermits * 4));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       // Since isServingQueries = false, new total should match higher threshold of before serving queries
@@ -999,14 +1001,18 @@ public class SegmentOperationsThrottlerTest {
     SegmentStarTreePreprocessThrottler starTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(
         initialPermits, initialPermits * 2, true);
     SegmentDownloadThrottler downloadThrottler = new SegmentDownloadThrottler(initialPermits, initialPermits * 2, true);
+    SegmentMultiColTextIndexPreprocessThrottler multiColTextIndexPreprocessThrottler =
+        new SegmentMultiColTextIndexPreprocessThrottler(initialPermits, initialPermits * 2, true);
     SegmentOperationsThrottler segmentOperationsThrottler = new SegmentOperationsThrottler(allIndexPreprocessThrottler,
-        starTreePreprocessThrottler, downloadThrottler);
+        starTreePreprocessThrottler, downloadThrottler, multiColTextIndexPreprocessThrottler);
 
     Assert.assertEquals(segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
         initialPermits);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits);
+    Assert.assertEquals(segmentOperationsThrottler.getSegmentMultiColTextIndexPreprocessThrottler().totalPermits(),
+        initialPermits);
 
     for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
@@ -1027,12 +1033,16 @@ public class SegmentOperationsThrottlerTest {
         String.valueOf(initialPermits * 2));
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
         String.valueOf(initialPermits * 2));
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
     segmentOperationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
+    Assert.assertEquals(segmentOperationsThrottler.getSegmentMultiColTextIndexPreprocessThrottler().totalPermits(),
+        initialPermits * 2);
 
     for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
@@ -1054,8 +1064,11 @@ public class SegmentOperationsThrottlerTest {
         initialPermits, initialPermits * 2, false);
     SegmentDownloadThrottler downloadThrottler = new SegmentDownloadThrottler(
         initialPermits, initialPermits * 2, false);
+    SegmentMultiColTextIndexPreprocessThrottler multiColTextIndexPreprocessThrottler =
+        new SegmentMultiColTextIndexPreprocessThrottler(
+            initialPermits, initialPermits * 2, false);
     SegmentOperationsThrottler segmentOperationsThrottler = new SegmentOperationsThrottler(allIndexPreprocessThrottler,
-        starTreePreprocessThrottler, downloadThrottler);
+        starTreePreprocessThrottler, downloadThrottler, multiColTextIndexPreprocessThrottler);
 
     Assert.assertEquals(segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
         initialPermits * 2);
@@ -1082,6 +1095,9 @@ public class SegmentOperationsThrottlerTest {
         String.valueOf(initialPermits * 2));
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
         String.valueOf(initialPermits * 2));
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
+
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         String.valueOf(initialPermits * 4));
     updatedClusterConfigs.put(
@@ -1090,12 +1106,18 @@ public class SegmentOperationsThrottlerTest {
     updatedClusterConfigs.put(
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
         String.valueOf(initialPermits * 4));
+    updatedClusterConfigs.put(
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        String.valueOf(initialPermits * 4));
+
     segmentOperationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
         initialPermits * 4);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits * 4);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 4);
+    Assert.assertEquals(segmentOperationsThrottler.getSegmentMultiColTextIndexPreprocessThrottler().totalPermits(),
+        initialPermits * 4);
 
     for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
@@ -1106,5 +1128,63 @@ public class SegmentOperationsThrottlerTest {
       Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
+  }
+
+  private String getThrottlerParallelismHelixKey(BaseSegmentOperationsThrottler operationsThrottler) {
+    if (operationsThrottler instanceof SegmentAllIndexPreprocessThrottler) {
+      return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM;
+    }
+    if (operationsThrottler instanceof SegmentStarTreePreprocessThrottler) {
+      return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM;
+    }
+    if (operationsThrottler instanceof SegmentMultiColTextIndexPreprocessThrottler) {
+      return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM;
+    }
+    return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM;
+  }
+
+  private String getThrottlerParallelismBeforeServingQueriesHelixKey(
+      BaseSegmentOperationsThrottler operationsThrottler) {
+    if (operationsThrottler instanceof SegmentAllIndexPreprocessThrottler) {
+      return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
+    }
+    if (operationsThrottler instanceof SegmentStarTreePreprocessThrottler) {
+      return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
+    }
+    if (operationsThrottler instanceof SegmentMultiColTextIndexPreprocessThrottler) {
+      return CommonConstants.Helix.
+          CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
+    }
+    return CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES;
+  }
+
+  private int getDefaultPermits(
+      BaseSegmentOperationsThrottler operationsThrottler) {
+    if (operationsThrottler instanceof SegmentAllIndexPreprocessThrottler) {
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM);
+    }
+    if (operationsThrottler instanceof SegmentStarTreePreprocessThrottler) {
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM);
+    }
+    if (operationsThrottler instanceof SegmentMultiColTextIndexPreprocessThrottler) {
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM);
+    }
+    return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+  }
+
+  private int getDefaultPermitsBeforeServingQueries(
+      BaseSegmentOperationsThrottler operationsThrottler) {
+    if (operationsThrottler instanceof SegmentAllIndexPreprocessThrottler) {
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    }
+    if (operationsThrottler instanceof SegmentStarTreePreprocessThrottler) {
+      return Integer.parseInt(
+          CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    }
+    if (operationsThrottler instanceof SegmentMultiColTextIndexPreprocessThrottler) {
+      return Integer.parseInt(
+          CommonConstants.Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    }
+    return Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
   }
 }

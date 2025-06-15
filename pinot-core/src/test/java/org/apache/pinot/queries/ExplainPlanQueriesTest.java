@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -107,6 +108,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private final static String COL1_SORTED_INDEX = "sortedIndexCol1";
   private final static String COL1_JSON_INDEX = "jsonIndexCol1";
   private final static String COL1_TEXT_INDEX = "textIndexCol1";
+  private final static String COL1_MC_TEXT_INDEX = "textIndexMcCol1";
   private final static String MV_COL1_RAW = "mvRawCol1";
   private final static String MV_COL1_NO_INDEX = "mvNoIndexCol1";
 
@@ -126,6 +128,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(COL1_SORTED_INDEX, DataType.DOUBLE)
       .addSingleValueDimension(COL1_JSON_INDEX, DataType.JSON)
       .addSingleValueDimension(COL1_TEXT_INDEX, DataType.STRING)
+      .addSingleValueDimension(COL1_MC_TEXT_INDEX, DataType.STRING)
       .addMultiValueDimension(MV_COL1_RAW, DataType.INT)
       .addMultiValueDimension(MV_COL1_NO_INDEX, DataType.INT)
       .build();
@@ -138,7 +141,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       .setJsonIndexColumns(List.of(COL1_JSON_INDEX))
       .setFieldConfigList(List.of(
           new FieldConfig(COL1_TEXT_INDEX, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
-              null, null)))
+              null, null),
+          new FieldConfig(COL1_MC_TEXT_INDEX, FieldConfig.EncodingType.DICTIONARY, List.of(), null, null)
+      ))
+      .setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of(COL1_MC_TEXT_INDEX)))
       .build();
 
   private static final DataSchema DATA_SCHEMA = new DataSchema(
@@ -195,6 +201,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     record.putValue(COL1_JSON_INDEX, jsonIndexCol1);
     record.putValue(COL1_TEXT_INDEX, textIndexCol1);
+    record.putValue(COL1_MC_TEXT_INDEX, textIndexCol1);
 
     record.putValue(MV_COL1_RAW, mvRawCol1);
     record.putValue(MV_COL1_NO_INDEX, mvNoIndexCol1);
@@ -411,12 +418,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, mvNoIndexCol1, "
             + "mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2
+            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1, textIndexMcCol1)", 3, 2
     });
     result1.add(new Object[]{
         "PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, mvNoIndexCol1"
             + ", rangeIndexCol1, rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, "
-            + "rangeIndexCol3, textIndexCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 4, 3
+            + "rangeIndexCol3, textIndexCol1, textIndexMcCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 4, 3
     });
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
@@ -477,12 +484,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, mvNoIndexCol1, "
             + "mvRawCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
-            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1)", 3, 2
+            + "rangeIndexCol3, rawCol1, sortedIndexCol1, textIndexCol1, textIndexMcCol1)", 3, 2
     });
     result1.add(new Object[]{
         "PROJECT(noIndexCol4, rawCol1, sortedIndexCol1, noIndexCol3, mvNoIndexCol1, "
             + "rangeIndexCol1, rangeIndexCol2, invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, "
-            + "rangeIndexCol3, textIndexCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 4, 3
+            + "rangeIndexCol3, textIndexCol1, textIndexMcCol1, mvRawCol1, jsonIndexCol1, invertedIndexCol3)", 4, 3
     });
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
@@ -1193,44 +1200,66 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   @Test
   public void testSelectAggregateUsingFilterOnTextIndexColumn() {
     // All segments match the same plan for these queries
-    String query1 =
-        "EXPLAIN PLAN FOR SELECT noIndexCol1, noIndexCol2, max(noIndexCol2), min(noIndexCol3) FROM testTable WHERE "
-            + "TEXT_MATCH(textIndexCol1, 'foo') GROUP BY noIndexCol1, noIndexCol2";
-    List<Object[]> result1 = new ArrayList<>();
-    result1.add(new Object[]{"BROKER_REDUCE(limit:10)", 1, 0});
-    result1.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
-    result1.add(new Object[]{
-        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
-    });
-    result1.add(new Object[]{
-        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2
-    });
-    result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result1.add(new Object[]{"DOC_ID_SET", 5, 4});
-    result1.add(new Object[]{
-        "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
-    });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check("EXPLAIN PLAN FOR "
+            + "SELECT noIndexCol1, noIndexCol2, max(noIndexCol2), min(noIndexCol3) "
+            + "FROM testTable "
+            + "WHERE TEXT_MATCH(textIndexCol1, 'foo') "
+            + "GROUP BY noIndexCol1, noIndexCol2",
+        new ResultTable(DATA_SCHEMA,
+            toPlan(
+                "BROKER_REDUCE(limit:10)", 1, 0,
+                "COMBINE_GROUP_BY", 2, 1,
+                "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS,
+                "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2,
+                "PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3,
+                "DOC_ID_SET", 5, 4,
+                "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,"
+                    + "'foo'))", 6, 5
+            )));
 
-    String query2 =
-        "EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2) AS mymax, min(noIndexCol3) AS mymin FROM testTable "
-            + "WHERE TEXT_MATCH (textIndexCol1, 'foo') GROUP BY noIndexCol1, noIndexCol2 ORDER BY noIndexCol1, max"
-            + "(noIndexCol2)";
-    List<Object[]> result2 = new ArrayList<>();
-    result2.add(new Object[]{"BROKER_REDUCE(sort:[noIndexCol1 ASC, max(noIndexCol2) ASC],limit:10)", 1, 0});
-    result2.add(new Object[]{"COMBINE_GROUP_BY", 2, 1});
-    result2.add(new Object[]{
-        "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
-    });
-    result2.add(new Object[]{
-        "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2
-    });
-    result2.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3});
-    result2.add(new Object[]{"DOC_ID_SET", 5, 4});
-    result2.add(new Object[]{
-        "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
-    });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check("EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2) AS mymax, min(noIndexCol3) AS mymin "
+            + "FROM testTable "
+            + "WHERE TEXT_MATCH (textIndexCol1, 'foo') "
+            + "GROUP BY noIndexCol1, noIndexCol2 "
+            + "ORDER BY noIndexCol1, max(noIndexCol2)",
+        new ResultTable(DATA_SCHEMA,
+            toPlan(
+                "BROKER_REDUCE(sort:[noIndexCol1 ASC, max(noIndexCol2) ASC],limit:10)", 1, 0,
+                "COMBINE_GROUP_BY", 2, 1,
+                "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS,
+                "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2,
+                "PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3,
+                "DOC_ID_SET", 5, 4,
+                "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,"
+                    + "'foo'))", 6, 5
+            )));
+
+    // plan shows that multi-column text index is used
+    check("EXPLAIN PLAN FOR "
+            + "SELECT noIndexCol1, noIndexCol2, max(noIndexCol2), min(noIndexCol3) "
+            + "FROM testTable "
+            + "WHERE TEXT_MATCH(textIndexMcCol1, 'foo') "
+            + "GROUP BY noIndexCol1, noIndexCol2",
+        new ResultTable(DATA_SCHEMA,
+            toPlan(
+                "BROKER_REDUCE(limit:10)", 1, 0,
+                "COMBINE_GROUP_BY", 2, 1,
+                "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS,
+                "GROUP_BY(groupKeys:noIndexCol1, noIndexCol2, aggregations:max(noIndexCol2), min(noIndexCol3))", 3, 2,
+                "PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 4, 3,
+                "DOC_ID_SET", 5, 4,
+                "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,multiColumnIndex:true,"
+                    + "predicate:text_match(textIndexMcCol1,'foo'))", 6, 5
+            )
+        ));
+  }
+
+  private List<Object[]> toPlan(Object... values) {
+    ArrayList<Object[]> result = new ArrayList<>();
+    for (int i = 0; i < values.length; i += 3) {
+      result.add(new Object[]{values[i], values[i + 1], values[i + 2]});
+    }
+    return result;
   }
 
   @Test

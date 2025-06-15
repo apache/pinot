@@ -25,7 +25,6 @@ import org.apache.pinot.spi.data.IngestionSchemaValidator;
 
 /**
  * Driver that creates and writes index segments to disk from data that is stored on disk.
- *
  * Nov 6, 2014
  */
 

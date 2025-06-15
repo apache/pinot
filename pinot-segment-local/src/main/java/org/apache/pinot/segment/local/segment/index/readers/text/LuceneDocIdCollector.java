@@ -44,9 +44,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class LuceneDocIdCollector implements Collector {
 
   private final MutableRoaringBitmap _docIds;
-  private final LuceneTextIndexReader.DocIdTranslator _docIdTranslator;
+  private final DocIdTranslator _docIdTranslator;
 
-  public LuceneDocIdCollector(MutableRoaringBitmap docIds, LuceneTextIndexReader.DocIdTranslator docIdTranslator) {
+  public LuceneDocIdCollector(MutableRoaringBitmap docIds, DocIdTranslator docIdTranslator) {
     _docIds = docIds;
     _docIdTranslator = docIdTranslator;
   }

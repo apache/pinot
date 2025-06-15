@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -65,6 +66,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private ColumnIndexDirectory _columnIndexDirectory;
   private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
+  private boolean _hasMultiColumnTextIndex;
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
   // prepare env for subsequent processing on the segment.
@@ -267,6 +269,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       default:
         break;
     }
+
     if (_segmentMetadata.getStarTreeV2MetadataList() != null) {
       try {
         _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
@@ -274,6 +277,10 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         throw new RuntimeException(e);
       }
     }
+
+    _hasMultiColumnTextIndex = _segmentMetadata.getMultiColumnTextMetadata() != null
+        && SegmentDirectoryPaths.findTextIndexIndexFile(_segmentDirectory, MultiColumnTextIndexConstants.INDEX_DIR_NAME)
+        != null;
   }
 
   @Override
@@ -360,6 +367,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public boolean hasStarTreeIndex() {
       return _starTreeIndexReader != null;
+    }
+
+    @Override
+    public boolean hasMultiColumnTextIndex() {
+      return _hasMultiColumnTextIndex;
     }
 
     @Override
