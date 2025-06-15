@@ -61,15 +61,13 @@ public class ErrorMseBlock implements MseBlock.Eos {
   public static ErrorMseBlock fromMap(Map<QueryErrorCode, String> errorMessages) {
     int stage;
     int worker;
-    String server;
+    String server = QueryThreadContext.isInitialized() ? QueryThreadContext.getInstanceId() : "unknown";
     if (MseWorkerThreadContext.isInitialized()) {
       stage = MseWorkerThreadContext.getStageId();
       worker = MseWorkerThreadContext.getWorkerId();
-      server = QueryThreadContext.getInstanceId();
     } else {
       stage = -1; // Default value when not initialized
       worker = -1; // Default value when not initialized
-      server = null; // Default value when not initialized
     }
     return new ErrorMseBlock(stage, worker, server, errorMessages);
   }
