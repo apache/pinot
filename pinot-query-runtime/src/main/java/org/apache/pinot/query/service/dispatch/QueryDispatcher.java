@@ -164,18 +164,23 @@ public class QueryDispatcher {
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+    boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
+        cancelled = true;
+        return result.withStats(statsFromCancel);
+      }
+      return result;
     } catch (Exception ex) {
-      return tryRecover(context.getRequestId(), servers, ex);
-    } catch (Throwable e) {
-      // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId);
-      throw e;
+      QueryResult queryResult = tryRecover(context.getRequestId(), servers, ex);
+      cancelled = true;
+      return queryResult;
     } finally {
-      if (isQueryCancellationEnabled()) {
-        _serversByQuery.remove(requestId);
+      if (!cancelled) {
+        cancel(requestId, servers);
       }
     }
   }
@@ -199,7 +204,6 @@ public class QueryDispatcher {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
       // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
-      cancel(requestId, servers);
       throw ex;
     }
     // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
@@ -785,6 +789,14 @@ public class QueryDispatcher {
       _queryStats.add(queryStats.getCurrentStats().close());
       for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
+      }
+    }
+
+    public QueryResult withStats(MultiStageQueryStats newQueryStats) {
+      if (_processingException != null) {
+        return new QueryResult(_processingException, newQueryStats, _brokerReduceTimeMs);
+      } else {
+        return new QueryResult(_resultTable, newQueryStats, _brokerReduceTimeMs);
       }
     }
 
