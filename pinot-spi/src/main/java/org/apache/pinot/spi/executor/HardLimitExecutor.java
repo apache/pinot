@@ -23,12 +23,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
  */
 public class HardLimitExecutor extends DecoratorExecutorService {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HardLimitExecutor.class);
 
   private final AtomicInteger _running;
   private final int _max;
@@ -46,7 +50,12 @@ public class HardLimitExecutor extends DecoratorExecutorService {
    */
   public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
     try {
-      int maxThreads = Integer.parseInt(config.getProperty(
+      int serverConfigLimit = config.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
+          CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS);
+      if (serverConfigLimit > 0) {
+        return serverConfigLimit;
+      }
+      int maxThreadsFromClusterConfig = Integer.parseInt(config.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
       ));
@@ -54,13 +63,13 @@ public class HardLimitExecutor extends DecoratorExecutorService {
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
       ));
-      if (maxThreads <= 0 || hardLimitFactor <= 0) {
+      if (maxThreadsFromClusterConfig <= 0 || hardLimitFactor <= 0) {
         return 0;
       }
-      return maxThreads * hardLimitFactor;
+      return maxThreadsFromClusterConfig * hardLimitFactor;
     } catch (NumberFormatException e) {
-      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)
-          * Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR);
+      LOGGER.warn("Failed to parse multi-stage executor hard limit from config. Hard limiting will be disabled.", e);
+      return -1;
     }
   }
 
