@@ -30,6 +30,8 @@ import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -104,12 +106,25 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   @Override
   public Geometry deserialize(byte[] bytes) {
-    return GeometrySerializer.deserialize(bytes);
+    try {
+      return GeometrySerializer.deserialize(bytes);
+    } catch (Exception e) {
+      // For invalid serialized geometry, return null so that the doc can be skipped
+      return null;
+    }
   }
 
   @Override
   public void add(Geometry geometry)
       throws IOException {
+    if (geometry == null) {
+      ServerMetrics metrics = ServerMetrics.get();
+      if (metrics != null) {
+        metrics.addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+      }
+      _nextDocId++;
+      return;
+    }
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
