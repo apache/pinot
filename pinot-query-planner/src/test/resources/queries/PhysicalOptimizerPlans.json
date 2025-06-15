@@ -75,10 +75,10 @@
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n  PhysicalJoin(condition=[AND(=($0, $10), >($2, $11))], joinType=[inner])",
-          "\n    PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
           "\n      PhysicalFilter(condition=[>=($2, 0)])",
           "\n        PhysicalTableScan(table=[[default, a]])",
-          "\n    PhysicalExchange(exchangeStrategy=[BROADCAST_EXCHANGE])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[1]])",
           "\n      PhysicalTableScan(table=[[default, b]])",
           "\n"
         ]
