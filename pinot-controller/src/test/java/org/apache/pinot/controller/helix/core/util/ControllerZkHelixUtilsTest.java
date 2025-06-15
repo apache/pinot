@@ -21,7 +21,7 @@ package org.apache.pinot.controller.helix.core.util;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
@@ -42,7 +42,7 @@ public class ControllerZkHelixUtilsTest {
     // Setup job limits
     ControllerConf controllerConf = mock(ControllerConf.class);
     when(controllerConf.getMaxTableRebalanceZkJobs()).thenReturn(2);
-    ControllerJobType.init(controllerConf);
+    ControllerJobTypes.init(controllerConf);
 
     TableRebalanceProgressStats inProgressStats = new TableRebalanceProgressStats();
     inProgressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
@@ -53,24 +53,24 @@ public class ControllerZkHelixUtilsTest {
 
     Map<String, Map<String, String>> jobMetadataMap = Map.of(
         "job1", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(inProgressStats)),
         "job2", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(completedStats)),
         "job3", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "2000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(abortedStats)),
         "job4", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "4000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(inProgressStats)),
         "job5", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "5000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(inProgressStats))
     );
 
     Map<String, Map<String, String>> updatedJobMetadataMap =
-        ControllerZkHelixUtils.expireControllerJobsInZk(jobMetadataMap, ControllerJobType.TABLE_REBALANCE);
+        ControllerZkHelixUtils.expireControllerJobsInZk(jobMetadataMap, ControllerJobTypes.TABLE_REBALANCE);
     // Even though the limit is 2, we should not delete the in-progress jobs
     assertEquals(updatedJobMetadataMap.size(), 3);
     assertEquals(updatedJobMetadataMap.keySet(), Set.of("job1", "job4", "job5"));
@@ -82,7 +82,7 @@ public class ControllerZkHelixUtilsTest {
     // Setup job limits
     ControllerConf controllerConf = mock(ControllerConf.class);
     when(controllerConf.getMaxTableRebalanceZkJobs()).thenReturn(2);
-    ControllerJobType.init(controllerConf);
+    ControllerJobTypes.init(controllerConf);
 
     TableRebalanceProgressStats completedStats = new TableRebalanceProgressStats();
     completedStats.setStatus(RebalanceResult.Status.DONE);
@@ -91,24 +91,24 @@ public class ControllerZkHelixUtilsTest {
 
     Map<String, Map<String, String>> jobMetadataMap = Map.of(
         "job1", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(completedStats)),
         "job2", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "5000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(completedStats)),
         "job3", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(abortedStats)),
         "job4", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "2000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(completedStats)),
         "job5", Map.of(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "4000",
-            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name(),
+            CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name(),
             RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, JsonUtils.objectToString(abortedStats))
     );
 
     Map<String, Map<String, String>> updatedJobMetadataMap =
-        ControllerZkHelixUtils.expireControllerJobsInZk(jobMetadataMap, ControllerJobType.TABLE_REBALANCE);
+        ControllerZkHelixUtils.expireControllerJobsInZk(jobMetadataMap, ControllerJobTypes.TABLE_REBALANCE);
     assertEquals(updatedJobMetadataMap.size(), 2);
     // Retain the two most recent jobs based on submission time
     assertEquals(updatedJobMetadataMap.keySet(), Set.of("job2", "job5"));

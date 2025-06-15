@@ -94,7 +94,7 @@ import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
@@ -281,7 +281,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
     ContinuousJfrStarter.init(_config);
-    ControllerJobType.init(_config);
+    ControllerJobTypes.init(_config);
   }
 
   /// Returns the default cluster configs to be stored in ZK as Helix cluster config. These configs will then be

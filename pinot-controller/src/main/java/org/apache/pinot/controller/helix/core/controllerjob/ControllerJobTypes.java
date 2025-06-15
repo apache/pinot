@@ -26,6 +26,8 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
+import org.apache.pinot.spi.controller.ControllerJobType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,20 +36,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller jobs that store metadata in the ZK property store.
  */
-public enum ControllerJobType {
+public enum ControllerJobTypes implements ControllerJobType {
   RELOAD_SEGMENT,
   FORCE_COMMIT,
   TABLE_REBALANCE,
   TENANT_REBALANCE;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerJobType.class);
-  private static final EnumMap<ControllerJobType, Integer> ZK_NUM_JOBS_LIMIT = new EnumMap<>(ControllerJobType.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerJobTypes.class);
+  private static final EnumMap<ControllerJobTypes, Integer> ZK_NUM_JOBS_LIMIT = new EnumMap<>(ControllerJobTypes.class);
 
-  /**
-   * Gets the maximum number of job metadata entries that can be stored in ZK for this job type.
-   */
+  @Override
   public Integer getZkNumJobsLimit() {
-    return ZK_NUM_JOBS_LIMIT.getOrDefault(this, ControllerConf.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+    return ZK_NUM_JOBS_LIMIT.getOrDefault(this, CommonConstants.ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
   }
 
   public static void init(ControllerConf controllerConf) {
@@ -57,13 +57,7 @@ public enum ControllerJobType {
     ZK_NUM_JOBS_LIMIT.put(TENANT_REBALANCE, controllerConf.getMaxTenantRebalanceZkJobs());
   }
 
-  /**
-   * Checks if the job metadata entry can be safely deleted. Note that the job metadata entry will only be attempted
-   * to be deleted when the number of entries in the job metadata map exceeds the configured limit for the job type.
-   *
-   * @param jobMetadataEntry The job metadata entry to check - a pair of job ID and job metadata map
-   * @return true if the job metadata entry can be safely deleted, false otherwise
-   */
+  @Override
   public boolean canDelete(Pair<String, Map<String, String>> jobMetadataEntry) {
     switch (this) {
       case TABLE_REBALANCE:
