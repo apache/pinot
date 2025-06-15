@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.join;
 
-import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -26,12 +25,10 @@ import javax.annotation.Nullable;
 
 public abstract class PrimitiveLookupTable extends LookupTable {
 
-  private Object _valueForNullKey;
-
   @Override
   public void addRow(@Nullable Object key, Object[] row) {
     if (key == null) {
-      _valueForNullKey = computeNewValue(row, _valueForNullKey);
+      // Do nothing: SQL semantics ignore null keys
       return;
     }
     addRowNotNullKey(key, row);
@@ -40,9 +37,6 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   @Override
   public void finish() {
     if (!_keysUnique) {
-      if (_valueForNullKey != null) {
-        _valueForNullKey = convertValueToList(_valueForNullKey);
-      }
       finishNotNullKey();
     }
   }
@@ -54,7 +48,8 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   @Override
   public boolean containsKey(@Nullable Object key) {
     if (key == null) {
-      return _valueForNullKey != null;
+      // SQL semantics: null never matches
+      return false;
     }
     return containsNotNullKey(key);
   }
@@ -65,7 +60,8 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   @Override
   public Object lookup(@Nullable Object key) {
     if (key == null) {
-      return _valueForNullKey;
+      // SQL semantics: null lookup returns null
+      return null;
     }
     return lookupNotNullKey(key);
   }
@@ -75,28 +71,7 @@ public abstract class PrimitiveLookupTable extends LookupTable {
   @SuppressWarnings("rawtypes")
   @Override
   public Set<Map.Entry<Object, Object>> entrySet() {
-    Set<Map.Entry<Object, Object>> notNullSet = notNullKeyEntrySet();
-    if (_valueForNullKey != null) {
-      Set<Map.Entry<Object, Object>> nullEntry = Set.of(new Map.Entry<>() {
-        @Override
-        public Object getKey() {
-          return null;
-        }
-
-        @Override
-        public Object getValue() {
-          return _valueForNullKey;
-        }
-
-        @Override
-        public Object setValue(Object value) {
-          throw new UnsupportedOperationException();
-        }
-      });
-      return Sets.union(notNullSet, nullEntry);
-    } else {
-      return notNullSet;
-    }
+    return notNullKeyEntrySet();
   }
 
   protected abstract Set<Map.Entry<Object, Object>> notNullKeyEntrySet();
