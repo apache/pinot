@@ -509,6 +509,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
+  public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
+    if (CollectionUtils.isEmpty(partitionIds)) {
+      return _ingestionDelayTracker.stopTrackingIngestionDelayForAllPartitions();
+    }
+    for (Integer partitionId: partitionIds) {
+      _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionId);
+    }
+    return partitionIds;
+  }
+
   private void doAddConsumingSegment(String segmentName)
       throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
