@@ -69,11 +69,13 @@ import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -92,6 +94,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,20 +155,23 @@ public class TableRebalancer {
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
+  private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader) {
+      @Nullable TableSizeReader tableSizeReader,
+      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
     _helixManager = helixManager;
     _tableRebalanceObserver = Objects.requireNonNullElseGet(tableRebalanceObserver, NoOpTableRebalanceObserver::new);
     _helixDataAccessor = helixManager.getHelixDataAccessor();
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
     _tableSizeReader = tableSizeReader;
+    _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null, null);
+    this(helixManager, null, null, null, null, null);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -231,14 +237,18 @@ public class TableRebalancer {
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
+    boolean forceCommitBeforeMoved =
+        tableConfig.getTableType() == TableType.REALTIME && rebalanceConfig.isForceCommitBeforeMoved();
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
             + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
-            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}",
+            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}, "
+            + "forceCommitBeforeMoved: {}",
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
-        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement);
+        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
+        forceCommitBeforeMoved);
 
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
@@ -383,7 +393,16 @@ public class TableRebalancer {
 
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
-
+      if (forceCommitBeforeMoved) {
+        Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
+        if (!consumingSegmentsToMoveNext.isEmpty()) {
+          currentIdealState =
+              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
+          currentAssignment = currentIdealState.getRecord().getMapFields();
+          targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+              tierToInstancePartitionsMap, rebalanceConfig);
+        }
+      }
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
       idealStateRecord.setMapFields(targetAssignment);
@@ -473,6 +492,10 @@ public class TableRebalancer {
     // StrictReplicaGroupAssignment::rebalanceTable() and similar limitations apply here as well
     Object2IntOpenHashMap<String> segmentPartitionIdMap = new Object2IntOpenHashMap<>();
 
+    boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+    PartitionIdFetcher partitionIdFetcher =
+        new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
+            isStrictRealtimeSegmentAssignment);
     // We repeat the following steps until the target assignment is reached:
     // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't converge within the
     //    timeout.
@@ -508,66 +531,100 @@ public class TableRebalancer {
 
       // Re-calculate the target assignment if IdealState changed while waiting for ExternalView to converge
       ZNRecord idealStateRecord = idealState.getRecord();
-      if (idealStateRecord.getVersion() != expectedVersion) {
-        tableRebalanceLogger.info(
-            "IdealState version changed while waiting for ExternalView to converge, re-calculating the target "
-                + "assignment");
-        Map<String, Map<String, String>> oldAssignment = currentAssignment;
-        currentAssignment = idealStateRecord.getMapFields();
-        expectedVersion = idealStateRecord.getVersion();
+      Map<String, Map<String, String>> nextAssignment;
+      boolean needsRecalculation;
+      boolean shouldForceCommit = forceCommitBeforeMoved;
 
-        // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply the
-        // same target instance state map for these segments to the new ideal state as the target assignment
-        boolean segmentsToMoveChanged = false;
-        if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
-          // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment for
-          // new added segments is based on the existing assignment
-          segmentsToMoveChanged = true;
-        } else {
-          for (String segment : segmentsToMove) {
-            Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
-            Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
-            // TODO: Consider allowing segment state change from CONSUMING to ONLINE
-            if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
-              tableRebalanceLogger.info(
-                  "Segment state changed in IdealState from: {} to: {} for segment: {}, re-calculating the target "
-                      + "assignment based on the new IdealState",
-                  oldInstanceStateMap, currentInstanceStateMap, segment);
-              segmentsToMoveChanged = true;
-              break;
+      do {
+        needsRecalculation = false;
+
+        // Step 1: Handle version mismatch and recalculate if needed
+        if (idealStateRecord.getVersion() != expectedVersion) {
+          tableRebalanceLogger.info(
+              "IdealState version changed while waiting for ExternalView to converge, re-calculating the target "
+                  + "assignment");
+          Map<String, Map<String, String>> oldAssignment = currentAssignment;
+          currentAssignment = idealStateRecord.getMapFields();
+          expectedVersion = idealStateRecord.getVersion();
+
+          // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply
+          // the same target instance state map for these segments to the new ideal state as the target assignment
+          boolean segmentsToMoveChanged = false;
+          if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
+            // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment
+            // for new added segments is based on the existing assignment
+            segmentsToMoveChanged = true;
+          } else {
+            for (String segment : segmentsToMove) {
+              Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
+              Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
+              // TODO: Consider allowing segment state change from CONSUMING to ONLINE
+              if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
+                tableRebalanceLogger.info(
+                    "Segment state changed in IdealState from: {} to: {} for segment: {}, re-calculating the target "
+                        + "assignment based on the new IdealState",
+                    oldInstanceStateMap, currentInstanceStateMap, segment);
+                segmentsToMoveChanged = true;
+                break;
+              }
+            }
+          }
+          if (segmentsToMoveChanged) {
+            try {
+              // Re-calculate the instance partitions in case the instance configs changed during the rebalance
+              instancePartitionsMap =
+                  getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
+                      tableRebalanceLogger).getLeft();
+              tierToInstancePartitionsMap =
+                  getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
+                      minimizeDataMovement, tableRebalanceLogger).getLeft();
+              targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
+                  tierToInstancePartitionsMap, rebalanceConfig);
+            } catch (Exception e) {
+              onReturnFailure("Caught exception while re-calculating the target assignment, aborting the rebalance", e,
+                  tableRebalanceLogger);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                  "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
+                  tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+            }
+          } else {
+            tableRebalanceLogger.info(
+                "No state change found for segments to be moved, re-calculating the target assignment based on the "
+                    + "previous target assignment");
+            Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
+            // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
+            targetAssignment = new TreeMap<>(currentAssignment);
+            for (String segment : segmentsToMove) {
+              targetAssignment.put(segment, oldTargetAssignment.get(segment));
             }
           }
         }
-        if (segmentsToMoveChanged) {
-          try {
-            // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-            instancePartitionsMap =
-                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, minimizeDataMovement,
-                    tableRebalanceLogger).getLeft();
-            tierToInstancePartitionsMap =
-                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
-                    minimizeDataMovement, tableRebalanceLogger).getLeft();
-            targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
-                tierToInstancePartitionsMap, rebalanceConfig);
-          } catch (Exception e) {
-            onReturnFailure("Caught exception while re-calculating the target assignment, aborting the rebalance", e,
-                tableRebalanceLogger);
-            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-                "Caught exception while re-calculating the target assignment: " + e, instancePartitionsMap,
-                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+
+        // Step 2: Handle force commit if flag is set, then recalculate if force commit occurred
+        if (shouldForceCommit) {
+          nextAssignment =
+              getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+                  lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
+          Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
+
+          if (!consumingSegmentsToMoveNext.isEmpty()) {
+            tableRebalanceLogger.info("Force committing {} consuming segments before moving them",
+                consumingSegmentsToMoveNext.size());
+            needsRecalculation = true;
+            _tableRebalanceObserver.onTrigger(
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
+                null);
+            idealState =
+                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
+                    tableRebalanceLogger);
+            idealStateRecord = idealState.getRecord();
+            _tableRebalanceObserver.onTrigger(
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
+                new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
           }
-        } else {
-          tableRebalanceLogger.info(
-              "No state change found for segments to be moved, re-calculating the target assignment based on the "
-                  + "previous target assignment");
-          Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
-          // Other instance assignment code returns a TreeMap to keep it sorted, doing the same here
-          targetAssignment = new TreeMap<>(currentAssignment);
-          for (String segment : segmentsToMove) {
-            targetAssignment.put(segment, oldTargetAssignment.get(segment));
-          }
+          shouldForceCommit = false; // Only attempt force commit once
         }
-      }
+      } while (needsRecalculation);
 
       if (currentAssignment.equals(targetAssignment)) {
         String msg =
@@ -593,11 +650,8 @@ public class TableRebalancer {
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
-      boolean isStrictRealtimeSegmentAssignment = (segmentAssignment instanceof StrictRealtimeSegmentAssignment);
-      PartitionIdFetcher partitionIdFetcher =
-          new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
-              isStrictRealtimeSegmentAssignment);
-      Map<String, Map<String, String>> nextAssignment =
+
+      nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
               lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
       tableRebalanceLogger.info(
@@ -1969,5 +2023,51 @@ public class TableRebalancer {
       _instanceStateMap = instanceStateMap;
       _availableInstances = availableInstances;
     }
+  }
+
+  @VisibleForTesting
+  static Set<String> getMovingConsumingSegments(Map<String, Map<String, String>> currentAssignment,
+      Map<String, Map<String, String>> targetAssignment) {
+    Set<String> movingConsumingSegments = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> currentInstanceStateMap = entry.getValue();
+      Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
+      if (targetInstanceStateMap != null && targetInstanceStateMap.values().stream()
+          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && targetInstanceStateMap.values().stream()
+          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING))) {
+        if (!currentInstanceStateMap.keySet().equals(targetInstanceStateMap.keySet())) {
+          movingConsumingSegments.add(segmentName);
+        }
+      }
+    }
+    return movingConsumingSegments;
+  }
+
+  private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType,
+      @Nullable Set<String> segmentsToCommit, Logger tableRebalanceLogger) {
+    if (_pinotLLCRealtimeSegmentManager != null) {
+      ForceCommitBatchConfig forceCommitBatchConfig =
+          ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
+      segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
+          segmentsToCommit == null ? null : StringUtil.join(",", segmentsToCommit.toArray(String[]::new)),
+          forceCommitBatchConfig);
+      try {
+        // Wait until all committed segments have their status set to DONE.
+        // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
+        // guarantee there will be available peers for the new instance to download (e.g. the only available replica
+        // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
+        // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
+        // happens only after the committing segment status is set to DONE.
+        _pinotLLCRealtimeSegmentManager.waitUntilPrevBatchIsComplete(tableNameWithType, segmentsToCommit,
+            forceCommitBatchConfig);
+      } catch (Exception e) {
+        tableRebalanceLogger.warn("Failed to wait for previous batch to complete", e);
+      }
+    } else {
+      tableRebalanceLogger.warn(
+          "PinotLLCRealtimeSegmentManager is not initialized, cannot force commit consuming segments");
+    }
+    return _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
   }
 }
