@@ -31,10 +31,12 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -56,6 +58,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -76,6 +80,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,15 +109,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TENANT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
@@ -304,8 +312,10 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.READ)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the instance partitions of a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
-      @ApiResponse(code = 404, message = "Instance partitions not found")})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")
+  })
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -333,9 +343,11 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update an instance partition for a server type in a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
       @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
-      @ApiResponse(code = 500, message = "Error updating the tenant")})
+      @ApiResponse(code = 500, message = "Error updating the tenant")
+  })
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
@@ -384,31 +396,14 @@ public class PinotTenantRestletResource {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
-      if (tenantName.equals(tableConfigTenant)) {
+      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
+      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
         tables.add(table);
-      }
-      if (tableConfig.getTenantConfig().getTagOverrideConfig() != null) {
-        String completed = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted();
-        if (completed != null && getRawTenantName(completed).equals(tenantName)) {
-          tables.add(table);
-        }
-        String consuming = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming();
-        if (consuming != null && getRawTenantName(consuming).equals(tenantName)) {
-          tables.add(table);
-        }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
-  }
-
-  private String getRawTenantName(String tenantName) {
-    if (tenantName.lastIndexOf("_") > 0) {
-      return tenantName.substring(0, tenantName.lastIndexOf("_"));
-    }
-    return tenantName;
   }
 
   private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
@@ -688,11 +683,65 @@ public class PinotTenantRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.REBALANCE_TENANT_TABLES)
   @Path("/tenants/{tenantName}/rebalance")
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TenantRebalanceResult.class),
+      @ApiResponse(code = 400, message = "Bad usage by specifying both include/excludeTables and "
+          + "parallelWhitelist/Blacklist at the same time."),
+      @ApiResponse(code = 500, message = "Internal server error during rebalance")
+  })
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig config) {
+      @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Number of table rebalance jobs allowed to run at the same time", required = true, example =
+          "1")
+      @QueryParam("degreeOfParallelism") Integer degreeOfParallelism,
+      @ApiParam(value =
+          "Comma separated list of tables with type that should be included in this tenant rebalance"
+              + " job. Leaving blank defaults to include all tables from the tenant. Example: table1_REALTIME, "
+              + "table2_REALTIME",
+          example = "")
+      @QueryParam("includeTables") String includeTables,
+      @ApiParam(value =
+          "Comma separated list of tables with type that would be excluded in this tenant rebalance"
+              + " job. These tables will be removed from includeTables (that said, if a table appears in both list, "
+              + "it will be excluded). Example: table1_REALTIME, table2_REALTIME",
+          example = "")
+      @QueryParam("excludeTables") String excludeTables,
+      @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
+      @QueryParam("verboseResult") Boolean verboseResult,
+      @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
+      TenantRebalanceConfig config) {
     // TODO decide on if the tenant rebalance should be database aware or not
     config.setTenantName(tenantName);
+    // Query params should override the config provided in the body, if present
+    if (degreeOfParallelism != null) {
+      config.setDegreeOfParallelism(degreeOfParallelism);
+    }
+    if (verboseResult != null) {
+      config.setVerboseResult(verboseResult);
+    }
+    if (includeTables != null) {
+      config.setIncludeTables(Arrays.stream(StringUtil.split(includeTables, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
+    }
+    if (excludeTables != null) {
+      config.setExcludeTables(Arrays.stream(StringUtil.split(excludeTables, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
+    }
+    boolean isParallelListSet = !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty();
+
+    boolean isIncludeExcludeListSet = !config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty();
+
+    // Setting both parallel and include/exclude lists is not allowed. The rebalancer use the old logic if
+    // parallel white/blacklist is set, otherwise use the new logic (see DefaultTenantRebalancer). Setting both is a
+    // bad use.
+    if (isParallelListSet && isIncludeExcludeListSet) {
+      throw new ControllerApplicationException(LOGGER,
+          "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time.",
+          Response.Status.BAD_REQUEST);
+    }
     return _tenantRebalancer.rebalance(config);
   }
 
