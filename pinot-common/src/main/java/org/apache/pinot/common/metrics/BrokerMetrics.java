@@ -37,8 +37,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
   private static final BrokerMetrics NOOP = new BrokerMetrics(new NoopPinotMetricsRegistry());
   private static final AtomicReference<BrokerMetrics> BROKER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
-  private static final String PREFERRED_GROUP_SET_TAG = "preferredGroupOptSet";
-  private static final String PREFERRED_GROUP_UNSET_TAG = "preferredGroupOptUnset";
+  private static final String PREFERRED_POOL_SET_TAG = "preferredPoolOptSet";
+  private static final String PREFERRED_POOL_UNSET_TAG = "preferredPoolOptUnset";
 
   /**
    * register the brokerMetrics onto this class, so that we don't need to pass it down as a parameter
@@ -88,11 +88,13 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
     return BrokerGauge.values();
   }
 
-  public static String getTagForPreferredGroup(Map<String, String> queryOption) {
+  public static String getTagForPreferredPool(Map<String, String> queryOption) {
     if (queryOption == null) {
-      return PREFERRED_GROUP_UNSET_TAG;
+      return PREFERRED_POOL_UNSET_TAG;
     }
-    return queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_REPLICAS)
-        ? PREFERRED_GROUP_SET_TAG : PREFERRED_GROUP_UNSET_TAG;
+    // backward compatibility to check ORDERED_PREFERRED_REPLICAS here
+    return (queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_POOLS)
+            || queryOption.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ORDERED_PREFERRED_REPLICAS))
+        ? PREFERRED_POOL_SET_TAG : PREFERRED_POOL_UNSET_TAG;
   }
 }

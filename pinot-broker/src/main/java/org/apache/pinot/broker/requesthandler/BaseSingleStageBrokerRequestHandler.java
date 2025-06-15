@@ -761,7 +761,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           remainingTimeMs, serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
-    brokerResponse.setReplicaGroups(Stream.concat(
+    brokerResponse.setPools(Stream.concat(
             offlineExecutionServers != null ? offlineExecutionServers.stream() : Stream.empty(),
             realtimeExecutionServers != null ? realtimeExecutionServers.stream() : Stream.empty())
         .map(ServerInstance::getPool)
@@ -809,9 +809,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
     }
 
-    for (int group : brokerResponse.getReplicaGroups()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_QUERIES, 1,
-          BrokerMetrics.getTagForPreferredGroup(sqlNodeAndOptions.getOptions()), String.valueOf(group));
+    for (int pool : brokerResponse.getPools()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredPool(sqlNodeAndOptions.getOptions()), String.valueOf(pool));
     }
 
     // Log query and stats
