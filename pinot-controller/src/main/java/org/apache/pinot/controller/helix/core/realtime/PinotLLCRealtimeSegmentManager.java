@@ -105,6 +105,8 @@ import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -2514,27 +2516,18 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    boolean isPartialUpsertEnabled =
-        tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
-    boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
-    if ((isPartialUpsertEnabled || isDedupEnabled) && !repairErrorSegmentsForPartialUpsertOrDedup) {
+    if (!allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig)) {
       // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
-      LOGGER.error("Skipping repair for errored segments in table: {} because dedup or partial upsert is enabled.",
-          realtimeTableName);
+      LOGGER.error("Skipping repair for errored segments in table: {}.", realtimeTableName);
       return;
     } else {
-      if ((isPartialUpsertEnabled || isDedupEnabled)) {
-        LOGGER.info(
-            "Repairing error segments in table: {} as repairErrorSegmentForPartialUpsertOrDedup is set to true",
-            realtimeTableName);
-      }
+      LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
     }
-
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);
@@ -2570,6 +2563,36 @@ public class PinotLLCRealtimeSegmentManager {
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
+  }
+
+  private boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
+      TableConfig tableConfig) {
+    if (repairErrorSegmentsForPartialUpsertOrDedup) {
+      // If API context has repairErrorSegmentsForPartialUpsertOrDedup=true, allow repair.
+      return true;
+    }
+
+    boolean isPartialUpsertEnabled = (tableConfig.getUpsertConfig() != null) && (tableConfig.getUpsertConfig().getMode()
+        == UpsertConfig.Mode.PARTIAL);
+    if (isPartialUpsertEnabled) {
+      // If isPartialUpsert is enabled, do not allow repair.
+      return false;
+    }
+
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
+    if (isDedupEnabled) {
+      DisasterRecoveryMode disasterRecoveryMode = dedupConfig.getDisasterRecoveryMode();
+      if (disasterRecoveryMode == null) {
+        // If dedup is enabled and disaster recovery mode is null, do not allow repair of error segment.
+        return false;
+      } else if (disasterRecoveryMode == DisasterRecoveryMode.BEST_EFFORT) {
+        // If dedup is enabled and disaster recovery mode is BEST_EFFORT, allow repair of error segment.
+        return true;
+      }
+    }
+
+    return true;
   }
 
   /**
