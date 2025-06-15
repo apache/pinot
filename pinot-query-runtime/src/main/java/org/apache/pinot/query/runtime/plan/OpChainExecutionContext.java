@@ -29,6 +29,7 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -41,7 +42,8 @@ public class OpChainExecutionContext {
 
   private final MailboxService _mailboxService;
   private final long _requestId;
-  private final long _deadlineMs;
+  private final long _activeDeadlineMs;
+  private final long _passiveDeadlineMs;
   private final Map<String, String> _opChainMetadata;
   private final StageMetadata _stageMetadata;
   private final WorkerMetadata _workerMetadata;
@@ -56,14 +58,24 @@ public class OpChainExecutionContext {
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
 
-
+  @Deprecated
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
+      Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
+      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
+      boolean sendStats) {
+    this(mailboxService, requestId, deadlineMs, deadlineMs, opChainMetadata, stageMetadata, workerMetadata,
+        pipelineBreakerResult, parentContext, sendStats);
+  }
+
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId,
+      long activeDeadlineMs, long passiveDeadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
       @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
       boolean sendStats) {
     _mailboxService = mailboxService;
     _requestId = requestId;
-    _deadlineMs = deadlineMs;
+    _activeDeadlineMs = activeDeadlineMs;
+    _passiveDeadlineMs = passiveDeadlineMs;
     _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _workerMetadata = workerMetadata;
@@ -74,6 +86,17 @@ public class OpChainExecutionContext {
     _pipelineBreakerResult = pipelineBreakerResult;
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
     _parentContext = parentContext;
+  }
+
+  public static OpChainExecutionContext fromQueryContext(MailboxService mailboxService,
+      Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
+      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
+      boolean sendStats) {
+    long requestId = QueryThreadContext.getRequestId();
+    long activeDeadlineMs = QueryThreadContext.getActiveDeadlineMs();
+    long passiveDeadlineMs = QueryThreadContext.getPassiveDeadlineMs();
+    return new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs,
+        opChainMetadata, stageMetadata, workerMetadata, pipelineBreakerResult, parentContext, sendStats);
   }
 
   public MailboxService getMailboxService() {
@@ -96,8 +119,37 @@ public class OpChainExecutionContext {
     return _server;
   }
 
+  /// Returns the deadline in milliseconds for the OpChain to complete when it is actively waiting for data.
+  ///
+  /// This deadline should only be used for _active_ waits, like when a
+  /// [HashJoinOperator][org.apache.pinot.query.runtime.operator.HashJoinOperator] is building the hash table.
+  ///
+  /// This should not be used for _passive_ waits, like when the a
+  /// [MailboxReceiveOperator][org.apache.pinot.query.runtime.operator.MailboxReceiveOperator] or a
+  /// [PipelineBreakerOperator][org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator] passively waits
+  /// for data to arrive.
+  public long getActiveDeadlineMs() {
+    return _activeDeadlineMs;
+  }
+
+  /// For backward compatibility, we return the active deadline as the default.
+  /// This should be used for active waits only.
+  /// @deprecated Use {@link #getActiveDeadlineMs()} instead.
   public long getDeadlineMs() {
-    return _deadlineMs;
+    return getActiveDeadlineMs();
+  }
+
+  /// Returns the deadline in milliseconds for the OpChain to complete when it is passively waiting for data.
+  ///
+  /// This deadline should only be used for _passive_ waits, like when the
+  /// [MailboxReceiveOperator][org.apache.pinot.query.runtime.operator.MailboxReceiveOperator] or a
+  /// [PipelineBreakerOperator][org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator]
+  /// passively waits for data to arrive.
+  ///
+  /// This should not be used for _active_ waits, like when the a
+  /// [HashJoinOperator][org.apache.pinot.query.runtime.operator.HashJoinOperator] is building the hash table.
+  public long getPassiveDeadlineMs() {
+    return _passiveDeadlineMs;
   }
 
   public Map<String, String> getOpChainMetadata() {
