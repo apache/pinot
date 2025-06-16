@@ -31,16 +31,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
-public class PriorityGroupInstanceSelectorTest {
+public class PriorityPoolInstanceSelectorTest {
 
   private AdaptiveServerSelector _adaptiveServerSelector;
-  private PriorityGroupInstanceSelector _selector;
+  private PriorityPoolInstanceSelector _selector;
   private ServerSelectionContext _context;
 
   @BeforeMethod
   public void setUp() {
     _adaptiveServerSelector = mock(AdaptiveServerSelector.class);
-    _selector = new PriorityGroupInstanceSelector(_adaptiveServerSelector);
+    _selector = new PriorityPoolInstanceSelector(_adaptiveServerSelector);
     _context = mock(ServerSelectionContext.class);
   }
 
@@ -64,7 +64,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server2", 2),
         createCandidate("server3", 3)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
+    when(_context.getOrderedPreferredPools()).thenReturn(Collections.emptyList());
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
@@ -83,7 +83,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server2", 2),
         createCandidate("server3", 1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server2");
 
     // Execute
@@ -92,7 +92,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server2");
-    assertEquals(result.getReplicaGroup(), 2);
+    assertEquals(result.getPool(), 2);
   }
 
   @Test
@@ -103,7 +103,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", 3)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server1");
 
     // Execute
@@ -112,7 +112,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server1");
-    assertEquals(result.getReplicaGroup(), 1);
+    assertEquals(result.getPool(), 1);
   }
 
   @Test
@@ -122,7 +122,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server4", -1),
         createCandidate("server5", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server4");
 
     // Execute
@@ -131,7 +131,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertNotNull(result);
     assertEquals(result.getInstance(), "server4");
-    assertEquals(result.getReplicaGroup(), -1);
+    assertEquals(result.getPool(), -1);
   }
 
   @Test
@@ -149,7 +149,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
+    when(_context.getOrderedPreferredPools()).thenReturn(Collections.emptyList());
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
         Pair.of("server1", 0.1),
         Pair.of("server2", 0.2),
@@ -173,7 +173,7 @@ public class PriorityGroupInstanceSelectorTest {
         createCandidate("server3", 1),
         createCandidate("server4", -1)
     );
-    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_context.getOrderedPreferredPools()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
         Pair.of("server1", 0.1),
         Pair.of("server2", 0.2),
@@ -192,7 +192,7 @@ public class PriorityGroupInstanceSelectorTest {
   private SegmentInstanceCandidate createCandidate(String instance, int replicaGroup) {
     SegmentInstanceCandidate candidate = mock(SegmentInstanceCandidate.class);
     when(candidate.getInstance()).thenReturn(instance);
-    when(candidate.getReplicaGroup()).thenReturn(replicaGroup);
+    when(candidate.getPool()).thenReturn(replicaGroup);
     return candidate;
   }
 }

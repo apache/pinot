@@ -30,27 +30,33 @@ import static org.testng.Assert.assertEquals;
 public class BrokerMetricsTest {
 
   @Test
-  public void testGetTagForPreferredGroup() {
+  public void testGetTagForPreferredPool() {
     // Test case 1: queryOption is null
-    assertEquals(BrokerMetrics.getTagForPreferredGroup(null), "preferredGroupOptUnset",
-        "Should return preferredGroupOptUnset when queryOption is null");
+    assertEquals(BrokerMetrics.getTagForPreferredPool(null), "preferredPoolOptUnset",
+        "Should return preferredPoolOptUnset when queryOption is null");
 
     // Test case 2: queryOption is empty
     Map<String, String> emptyQueryOption = new HashMap<>();
-    assertEquals(BrokerMetrics.getTagForPreferredGroup(emptyQueryOption), "preferredGroupOptUnset",
-        "Should return preferredGroupOptUnset when queryOption is empty");
+    assertEquals(BrokerMetrics.getTagForPreferredPool(emptyQueryOption), "preferredPoolOptUnset",
+        "Should return preferredPoolOptUnset when queryOption is empty");
 
-    // Test case 3: queryOption does not contain ORDERED_PREFERRED_REPLICAS
-    Map<String, String> queryOptionWithoutPreferredGroup = new HashMap<>();
-    queryOptionWithoutPreferredGroup.put("someOtherOption", "value");
-    assertEquals(BrokerMetrics.getTagForPreferredGroup(queryOptionWithoutPreferredGroup),
-        "preferredGroupOptUnset",
-        "Should return preferredGroupOptUnset when queryOption does not contain ORDERED_PREFERRED_REPLICAS");
+    // Test case 3: queryOption does not contain ORDERED_PREFERRED_POOLS
+    Map<String, String> queryOptionWithoutPreferredPool = new HashMap<>();
+    queryOptionWithoutPreferredPool.put("someOtherOption", "value");
+    assertEquals(BrokerMetrics.getTagForPreferredPool(queryOptionWithoutPreferredPool),
+        "preferredPoolOptUnset",
+        "Should return preferredPoolOptUnset when queryOption does not contain ORDERED_PREFERRED_POOLS");
 
-    // Test case 4: queryOption contains ORDERED_PREFERRED_REPLICAS
+    // Test case 4: queryOption contains ORDERED_PREFERRED_POOLS
+    Map<String, String> queryOptionWithPreferredPool = new HashMap<>();
+    queryOptionWithPreferredPool.put("orderedPreferredPools", "0");
+    assertEquals(BrokerMetrics.getTagForPreferredPool(queryOptionWithPreferredPool), "preferredPoolOptSet",
+        "Should return preferredPoolOptSet when queryOption contains ORDERED_PREFERRED_POOLS");
+
+    // Test case 5: queryOption contains ORDERED_PREFERRED_REPLICAS
     Map<String, String> queryOptionWithPreferredGroup = new HashMap<>();
     queryOptionWithPreferredGroup.put("orderedPreferredReplicas", "0");
-    assertEquals(BrokerMetrics.getTagForPreferredGroup(queryOptionWithPreferredGroup), "preferredGroupOptSet",
-        "Should return preferredGroupOptSet when queryOption contains ORDERED_PREFERRED_REPLICAS");
+    assertEquals(BrokerMetrics.getTagForPreferredPool(queryOptionWithPreferredGroup), "preferredPoolOptSet",
+        "Should return preferredPoolOptSet when queryOption contains ORDERED_PREFERRED_POOLS");
   }
 }
