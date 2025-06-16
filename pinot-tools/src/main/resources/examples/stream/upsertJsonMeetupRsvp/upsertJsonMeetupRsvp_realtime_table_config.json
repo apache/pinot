@@ -26,6 +26,9 @@
         "functionName": "Hashcode",
         "numPartitions": 2
       }
+    },
+    "multiColumnTextIndexConfig": {
+      "columns": ["visibility", "response"]
     }
   },
   "instanceAssignmentConfigMap": {

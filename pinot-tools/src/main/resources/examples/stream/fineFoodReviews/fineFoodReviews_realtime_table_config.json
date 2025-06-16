@@ -13,7 +13,10 @@
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"]
+    "noDictionaryColumns": ["Text"],
+    "multiColumnTextIndexConfig": {
+      "columns": ["UserId", "ProductId", "Summary"]
+    }
   },
   "routing": {
     "segmentPrunerTypes": [

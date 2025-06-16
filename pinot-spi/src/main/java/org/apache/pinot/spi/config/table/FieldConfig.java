@@ -48,12 +48,14 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
   public static final String TEXT_INDEX_STOP_WORD_INCLUDE_KEY = "stopWordInclude";
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
+  public static final String TEXT_INDEX_CASE_SENSITIVE_KEY = "caseSensitive";
   public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
   public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS = "luceneAnalyzerClass";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS = "luceneAnalyzerClassArgs";
   public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES = "luceneAnalyzerClassArgTypes";
   public static final String TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS = "luceneQueryParserClass";
+  public static final String TEXT_INDEX_LUCENE_USE_LBS_MERGE_POLICY = "luceneUseLogByteSizeMergePolicy";
   public static final String TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE = "luceneDocIdTranslatorMode";
   public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS =
       "org.apache.lucene.analysis.standard.StandardAnalyzer";

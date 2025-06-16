@@ -281,6 +281,18 @@ public class CommonConstants {
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(Integer.MAX_VALUE);
 
+    // Preprocess throttle config specifically for StarTree index rebuild
+    public static final String CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM =
+        "pinot.server.max.segment.multicol.text.index.preprocess.parallelism";
+    // Setting to Integer.MAX_VALUE to effectively disable throttling by default
+    public static final String DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM =
+        String.valueOf(Integer.MAX_VALUE);
+    public static final String CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.multicol.text.index.preprocess.parallelism.before.serving.queries";
+    // Setting the before serving queries to Integer.MAX_VALUE to effectively disable throttling by default
+    public static final String DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        String.valueOf(Integer.MAX_VALUE);
+
     // Download throttle config
     public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
         "pinot.server.max.segment.download.parallelism";
@@ -471,7 +483,7 @@ public class CommonConstants {
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
     public static final String CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN =
-            "pinot.broker.enable.dynamic.filtering.semijoin";
+        "pinot.broker.enable.dynamic.filtering.semijoin";
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
@@ -1605,7 +1617,7 @@ public class CommonConstants {
      * Enable splitting of data block payload during mailbox transfer.
      */
     public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =
-          "pinot.query.runner.enable.data.block.payload.split";
+        "pinot.query.runner.enable.data.block.payload.split";
     public static final boolean DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT = false;
 
     /**
@@ -1645,6 +1657,7 @@ public class CommonConstants {
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+
     public enum JoinOverFlowMode {
       THROW, BREAK
     }

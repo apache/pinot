@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -88,6 +89,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an index segment creator.
+ *
  */
 // TODO: Check resource leaks
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
@@ -191,8 +193,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Initialize index creation
     _segmentIndexCreationInfo = new SegmentIndexCreationInfo();
     _indexCreationInfoMap = new TreeMap<>();
-
-    // Check if has star tree
     _indexCreator = new SegmentColumnarIndexCreator();
 
     // Ensure that the output directory exists
@@ -388,12 +388,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
-    // Convert segment format if necessary
     convertFormatIfNecessary(segmentOutputDir);
 
-    // Build star-tree V2 if necessary
     if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(segmentOutputDir);
+      buildMultiColumnTextIndex(segmentOutputDir);
     }
     updatePostSegmentCreationIndexes(segmentOutputDir);
 
@@ -420,6 +419,34 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
   }
 
+  private void buildMultiColumnTextIndex(File segmentOutputDir)
+      throws Exception {
+    if (_config.getMultiColumnTextIndexConfig() != null) {
+      PinotConfiguration segmentDirectoryConfigs =
+          new PinotConfiguration(Map.of(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap));
+
+      SegmentDirectoryLoaderContext segmentLoaderContext =
+          new SegmentDirectoryLoaderContext.Builder()
+              .setTableConfig(_config.getTableConfig())
+              .setSchema(_config.getSchema())
+              .setSegmentName(_segmentName)
+              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
+              .build();
+
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(segmentOutputDir.toURI(), segmentLoaderContext);
+          SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
+        MultiColumnTextIndexHandler handler =
+            new MultiColumnTextIndexHandler(segmentDirectory,
+                _config.getIndexConfigsByColName(),
+                _config.getMultiColumnTextIndexConfig(),
+                _config.getTableConfig());
+        handler.updateIndices(segmentWriter);
+        handler.postUpdateIndicesCleanup(segmentWriter);
+      }
+    }
+  }
+
   private void updatePostSegmentCreationIndexes(File indexDir)
       throws Exception {
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
@@ -433,9 +460,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
 
       SegmentDirectoryLoaderContext segmentLoaderContext =
-          new SegmentDirectoryLoaderContext.Builder().setTableConfig(_config.getTableConfig())
-              .setSchema(_config.getSchema()).setSegmentName(_segmentName)
-              .setSegmentDirectoryConfigs(segmentDirectoryConfigs).build();
+          new SegmentDirectoryLoaderContext.Builder()
+              .setTableConfig(_config.getTableConfig())
+              .setSchema(_config.getSchema())
+              .setSegmentName(_segmentName)
+              .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
+              .build();
 
       IndexLoadingConfig indexLoadingConfig =
           new IndexLoadingConfig(null, _config.getTableConfig(), _config.getSchema());
