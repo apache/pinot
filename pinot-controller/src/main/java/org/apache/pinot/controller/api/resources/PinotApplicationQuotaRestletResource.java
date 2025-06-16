@@ -58,10 +58,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
         SWAGGER_AUTHORIZATION_KEY, description =
         "The format of the key is  ```\"Basic <token>\" or \"Bearer "
-            + "<token>\"```"), @ApiKeyAuthDefinition(name = CommonConstants.APPLICATION, in =
-    ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.APPLICATION, description =
-    "Application context passed through http header. If no context is provided 'default' application "
-        + "context will be considered.")
+            + "<token>\"```")
 }))
 @Path("/")
 public class PinotApplicationQuotaRestletResource {
