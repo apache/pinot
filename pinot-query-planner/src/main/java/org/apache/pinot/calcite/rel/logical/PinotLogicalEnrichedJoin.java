@@ -23,7 +23,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
@@ -43,12 +42,6 @@ public class PinotLogicalEnrichedJoin extends Join {
   private final RexNode _filter;
   @Nullable
   private final List<RexNode> _projects;
-  @Nullable
-  private final RelCollation _collation;
-  @Nullable
-  private final RexNode _fetch;
-  @Nullable
-  private final RexNode _offset;
   // currently variableSet of Project Rel is ignored since this EnrichedJoinRel
   //   is created at the end of logical transformations.
   //   We don't support nested expressions in execution
@@ -58,8 +51,7 @@ public class PinotLogicalEnrichedJoin extends Join {
       List<RelHint> hints, RelNode left, RelNode right, RexNode joinCondition,
       Set<CorrelationId> variablesSet, JoinRelType joinType,
       @Nullable RexNode filter, @Nullable List<RexNode> projects,
-      @Nullable RelDataType projectRowType, @Nullable Set<CorrelationId> projectVariableSet,
-      @Nullable RelCollation collation, @Nullable RexNode fetch, @Nullable RexNode offset) {
+      @Nullable RelDataType projectRowType, @Nullable Set<CorrelationId> projectVariableSet) {
     super(cluster, traitSet, hints, left, right, joinCondition, variablesSet, joinType);
     _filter = filter;
     _projects = projects;
@@ -68,16 +60,14 @@ public class PinotLogicalEnrichedJoin extends Join {
     //   otherwise it's the same as _joinRowType
     _projectedRowType = projectRowType == null ? _joinRowType : projectRowType;
     _projectVariableSet = projectVariableSet;
-    _collation = collation;
-    _fetch = fetch;
-    _offset = offset;
   }
 
   @Override
-  public PinotLogicalEnrichedJoin copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right, JoinRelType joinType,
-      boolean semiJoinDone) {
-    return new PinotLogicalEnrichedJoin(getCluster(), traitSet, getHints(), left, right, conditionExpr, getVariablesSet(), getJoinType(),
-        _filter, _projects, _projectedRowType, _projectVariableSet, _collation, _fetch, _offset);
+  public PinotLogicalEnrichedJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
+      RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
+    return new PinotLogicalEnrichedJoin(getCluster(), traitSet, getHints(), left, right,
+        conditionExpr, getVariablesSet(), getJoinType(),
+        _filter, _projects, _projectedRowType, _projectVariableSet);
   }
 
   @Override protected RelDataType deriveRowType() {
@@ -98,18 +88,5 @@ public class PinotLogicalEnrichedJoin extends Join {
   @Nullable
   public List<RexNode> getProjects() {
     return _projects;
-  }
-
-  @Nullable
-  public RelCollation getCollation() { return _collation; }
-
-  @Nullable
-  public RexNode getFetch() {
-    return _fetch;
-  }
-
-  @Nullable
-  public RexNode getOffset() {
-    return _offset;
   }
 }

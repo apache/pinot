@@ -202,7 +202,6 @@ public final class PlanNodeToRelConverter {
           _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedJoin", attributes,
               node.getDataSchema(), readAlreadyPushedChildren(node)));
         }
-
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),

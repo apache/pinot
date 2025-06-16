@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -78,6 +79,8 @@ public class PlanNodeDeserializer {
         return deserializeWindowNode(protoNode);
       case EXPLAINNODE:
         return deserializeExplainedNode(protoNode);
+      case ENRICHEDJOINNODE:
+        return deserializeEnrichedJoinNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -106,6 +109,21 @@ public class PlanNodeDeserializer {
         convertJoinStrategy(protoJoinNode.getJoinStrategy()),
         protoJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
             protoJoinNode.getMatchCondition()) : null);
+  }
+
+  private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
+    Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
+    return new EnrichedJoinNode(protoNode.getStageId(),
+        extractDataSchema(protoEnrichedJoinNode.getJoinResultDataSchema()), extractDataSchema(protoNode),
+        extractNodeHint(protoNode), extractInputs(protoNode), convertJoinType(protoEnrichedJoinNode.getJoinType()),
+        protoEnrichedJoinNode.getLeftKeysList(),
+        protoEnrichedJoinNode.getRightKeysList(), convertExpressions(protoEnrichedJoinNode.getNonEquiConditionsList()),
+        convertJoinStrategy(protoEnrichedJoinNode.getJoinStrategy()),
+        protoEnrichedJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
+            protoEnrichedJoinNode.getMatchCondition()) : null,
+        protoEnrichedJoinNode.hasFilterCondition() ? ProtoExpressionToRexExpression.convertExpression(
+            protoEnrichedJoinNode.getFilterCondition()) : null,
+        convertExpressions(protoEnrichedJoinNode.getProjectsList()));
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
@@ -186,6 +204,17 @@ public class PlanNodeDeserializer {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
+  }
+
+  private static DataSchema extractDataSchema(Plan.DataSchema protoDataSchema) {
+    String[] columnNames = protoDataSchema.getColumnNamesList().toArray(new String[0]);
+    int numColumns = columnNames.length;
+    List<Expressions.ColumnDataType> protoColumnDataTypes = protoDataSchema.getColumnDataTypesList();
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnDataTypes[i] = ProtoExpressionToRexExpression.convertColumnDataType(protoColumnDataTypes.get(i));
+    }
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {

@@ -426,21 +426,17 @@ public final class RelToPlanNodeConverter {
     }
 
     @Nullable
-    RexExpression filter = rel.getFilter() == null ?
-        null : RexExpressionUtils.fromRexNode(rel.getFilter());
+    RexExpression filter = rel.getFilter() == null
+        ? null : RexExpressionUtils.fromRexNode(rel.getFilter());
     @Nullable
-    List<RexExpression> projects = rel.getProjects() == null ?
-        null : RexExpressionUtils.fromRexNodes(rel.getProjects());
-    @Nullable
-    List<RelFieldCollation> collations = rel.getCollation() == null ? null : rel.getCollation().getFieldCollations();
-    // fetch and offset are -1 if fields in rel are null
-    int fetch = RexExpressionUtils.getValueAsInt(rel.getFetch());
-    int offset = RexExpressionUtils.getValueAsInt(rel.getOffset());
+    List<RexExpression> projects = rel.getProjects() == null
+        ? null : RexExpressionUtils.fromRexNodes(rel.getProjects());
 
-    // TODO: check what matchCondition is for.
-    return new EnrichedJoinNode(DEFAULT_STAGE_ID, joinResultSchema, projectedSchema, NodeHint.fromRelHints(rel.getHints()), inputs, joinType,
-        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions), joinStrategy,
-        null, filter, projects, collations, fetch, offset);
+    return new EnrichedJoinNode(DEFAULT_STAGE_ID, joinResultSchema, projectedSchema,
+        NodeHint.fromRelHints(rel.getHints()), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        joinStrategy,
+        null, filter, projects);
   }
 
   private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
