@@ -18,17 +18,20 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionInfo;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionUtils;
+import org.apache.pinot.broker.routing.segmentpartition.SinglePartitionInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -37,18 +40,16 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code SinglePartitionColumnSegmentPruner} prunes segments based on their partition metadata stored in ZK. The
- * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
- */
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final String _tableNameWithType;
   private final String _partitionColumn;
-  private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
+  private final Map<SinglePartitionInfo, Set<String>> _partitionToSegmentMap = new ConcurrentHashMap<>();
+  private final Set<String> _unPartitionedSegments = ConcurrentHashMap.newKeySet();
+  private final ReadWriteLock _mapLock = new ReentrantReadWriteLock();
 
   public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
-    _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
+    _tableNameWithType = tableNameWithType;
   }
 
   @Override
@@ -59,24 +60,53 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       String segment = onlineSegments.get(idx);
       SegmentPartitionInfo partitionInfo =
           SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecords.get(idx));
-      if (partitionInfo != null) {
-        _partitionInfoMap.put(segment, partitionInfo);
+      addSegmentToPartitionIndex(segment, partitionInfo);
+    }
+  }
+
+  private void addSegmentToPartitionIndex(String segment, SegmentPartitionInfo partitionInfo) {
+    if (partitionInfo == null || partitionInfo.getPartitionColumn() == null) {
+      _unPartitionedSegments.add(segment);
+      return;
+    }
+    _unPartitionedSegments.remove(segment);
+    Set<SinglePartitionInfo> singlePartitionInfos = partitionInfo.getPartitions()
+        .stream()
+        .map(p -> new SinglePartitionInfo(partitionInfo.getPartitionColumn(), partitionInfo.getPartitionFunction(), p))
+        .collect(Collectors.toSet());
+    _mapLock.readLock().lock();
+    try {
+      for (SinglePartitionInfo singlePartitionInfo : singlePartitionInfos) {
+        _partitionToSegmentMap.computeIfAbsent(singlePartitionInfo, k -> ConcurrentHashMap.newKeySet()).add(segment);
       }
+      _partitionToSegmentMap.entrySet()
+          .stream()
+          .filter(entry -> !singlePartitionInfos.contains(entry.getKey()))
+          .forEach(e -> e.getValue().remove(segment));
+    } finally {
+      _mapLock.readLock().unlock();
     }
   }
 
   @Override
-  public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
+  public void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
-    // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-    //       ones. The refreshed segment ZK metadata change won't be picked up.
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord znRecord = znRecords.get(idx);
-      _partitionInfoMap.computeIfAbsent(segment,
-          k -> SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, k, znRecord));
+      if (_partitionToSegmentMap.values().stream().noneMatch(set -> set.contains(segment))) {
+        addSegmentToPartitionIndex(segment,
+            SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord));
+      }
     }
-    _partitionInfoMap.keySet().retainAll(onlineSegments);
+    _mapLock.writeLock().lock();
+    try {
+      _unPartitionedSegments.retainAll(onlineSegments);
+      _partitionToSegmentMap.values().forEach(set -> set.retainAll(onlineSegments));
+      _partitionToSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+    } finally {
+      _mapLock.writeLock().unlock();
+    }
   }
 
   @Override
@@ -84,9 +114,11 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     SegmentPartitionInfo partitionInfo =
         SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord);
     if (partitionInfo != null) {
-      _partitionInfoMap.put(segment, partitionInfo);
+      addSegmentToPartitionIndex(segment, partitionInfo);
     } else {
-      _partitionInfoMap.remove(segment);
+      _unPartitionedSegments.add(segment);
+      _partitionToSegmentMap.values().forEach(set -> set.remove(segment));
+      _partitionToSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
   }
 
@@ -96,18 +128,18 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
     if (filterExpression == null) {
       return segments;
     }
-    Set<String> selectedSegments = new HashSet<>();
-    for (String segment : segments) {
-      SegmentPartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-      if (partitionInfo == null || partitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO || isPartitionMatch(
-          filterExpression, partitionInfo)) {
-        selectedSegments.add(segment);
-      }
-    }
+    Set<String> selectedSegments = _partitionToSegmentMap.entrySet()
+        .stream()
+        .filter(entry -> isPartitionMatch(filterExpression, entry.getKey()))
+        .map(Map.Entry::getValue)
+        .flatMap(Set::stream)
+        .filter(segments::contains)
+        .collect(Collectors.toSet());
+    _unPartitionedSegments.stream().filter(segments::contains).forEach(selectedSegments::add);
     return selectedSegments;
   }
 
-  private boolean isPartitionMatch(Expression filterExpression, SegmentPartitionInfo partitionInfo) {
+  private boolean isPartitionMatch(Expression filterExpression, SinglePartitionInfo partitionInfo) {
     Function function = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
@@ -129,8 +161,8 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
       case EQUALS: {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
-          return partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-              .getPartition(RequestContextUtils.getStringValue(operands.get(1))));
+          return partitionInfo.getPartition() == partitionInfo.getPartitionFunction()
+              .getPartition(RequestContextUtils.getStringValue(operands.get(1)));
         } else {
           return true;
         }
@@ -140,7 +172,7 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
         if (identifier != null && identifier.getName().equals(_partitionColumn)) {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
+            if (partitionInfo.getPartition() == (partitionInfo.getPartitionFunction()
                 .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
               return true;
             }
