@@ -824,7 +824,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
   }
 
-  private SegmentMultiColTextIndexPreprocessThrottler createMultiColumnIndexPreprocessThrottler() {
+  protected SegmentMultiColTextIndexPreprocessThrottler createMultiColumnIndexPreprocessThrottler() {
     int maxConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM));
