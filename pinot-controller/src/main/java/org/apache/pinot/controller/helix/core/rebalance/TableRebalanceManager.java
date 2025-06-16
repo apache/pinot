@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +37,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobType;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -210,7 +209,7 @@ public class TableRebalanceManager {
    */
   public List<String> cancelRebalance(String tableNameWithType) {
     List<String> cancelledJobIds = new ArrayList<>();
-    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
+    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
         jobMetadata -> {
           String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
           try {
@@ -246,7 +245,7 @@ public class TableRebalanceManager {
   public ServerRebalanceJobStatusResponse getRebalanceStatus(String jobId)
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata =
-        _resourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+        _resourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TABLE_REBALANCE);
     if (controllerJobZKMetadata == null) {
       LOGGER.warn("Rebalance job with ID: {} not found", jobId);
       throw new NotFoundException("Rebalance job with ID: " + jobId + " not found");
@@ -292,7 +291,7 @@ public class TableRebalanceManager {
   public static String rebalanceJobInProgress(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // Get all jobMetadata for the given table with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
-        ControllerZkHelixUtils.getAllControllerJobs(EnumSet.of(ControllerJobType.TABLE_REBALANCE),
+        ControllerZkHelixUtils.getAllControllerJobs(Set.of(ControllerJobTypes.TABLE_REBALANCE),
             jobMetadata -> tableNameWithType.equals(
                 jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)), propertyStore);
 
