@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -77,7 +78,6 @@ import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
@@ -95,6 +95,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -116,6 +117,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -766,7 +768,7 @@ public class PinotTableRestletResource {
   }
 
   public Map<String, String> getControllerJobMetadata(String jobId) {
-    return _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+    return _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TABLE_REBALANCE);
   }
 
   @DELETE
@@ -1130,15 +1132,24 @@ public class PinotTableRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-    Set<String> jobTypesToFilter = null;
+    Set<ControllerJobType> jobTypesToFilter = null;
     if (StringUtils.isNotEmpty(jobTypesString)) {
-      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')))
-          .stream().collect(Collectors.toSet());
+      jobTypesToFilter = new HashSet<>();
+      for (String jobTypeStr : StringUtils.split(jobTypesString, ',')) {
+        ControllerJobTypes jobType;
+        try {
+          jobType = ControllerJobTypes.valueOf(jobTypeStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+          throw new ControllerApplicationException(LOGGER, "Unknown job type: " + jobTypeStr,
+              Response.Status.BAD_REQUEST);
+        }
+        jobTypesToFilter.add(jobType);
+      }
     }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       result.putAll(_pinotHelixResourceManager.getAllJobs(jobTypesToFilter == null
-              ? ControllerJobType.VALID_CONTROLLER_JOB_TYPE : jobTypesToFilter,
+              ? new HashSet<>(EnumSet.allOf(ControllerJobTypes.class)) : jobTypesToFilter,
           jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
               .equals(tableNameWithType)));
     }

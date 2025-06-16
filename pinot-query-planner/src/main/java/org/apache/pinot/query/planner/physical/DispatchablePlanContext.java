@@ -20,15 +20,18 @@ package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import org.apache.calcite.runtime.PairList;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -42,25 +45,38 @@ import org.slf4j.LoggerFactory;
 
 public class DispatchablePlanContext {
   private static final Logger LOGGER = LoggerFactory.getLogger(DispatchablePlanContext.class);
+
   private final WorkerManager _workerManager;
-
   private final long _requestId;
-  private final Set<String> _tableNames;
-  private final PairList<Integer, String> _resultFields;
-
   private final PlannerContext _plannerContext;
-  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
-  private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap;
+  private final PairList<Integer, String> _resultFields;
+  private final Set<String> _tableNames;
+
+  private final Set<String> _nonLookupTables;
+  private final Set<QueryServerInstance> _leafServerInstances;
+
+  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
+  private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
       PairList<Integer, String> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;
     _requestId = requestId;
     _plannerContext = plannerContext;
-    _dispatchablePlanMetadataMap = new HashMap<>();
-    _dispatchablePlanStageRootMap = new HashMap<>();
     _resultFields = resultFields;
     _tableNames = tableNames;
+
+    if (QueryOptionsUtils.isUseLeafServerForIntermediateStage(plannerContext.getOptions(),
+        plannerContext.getEnvConfig().defaultUseLeafServerForIntermediateStage())) {
+      // Use only leaf servers for intermediate stages
+      _leafServerInstances = new HashSet<>();
+      _nonLookupTables = null;
+    } else {
+      // Use all servers (excluding lookup tables) for intermediate stages
+      _leafServerInstances = null;
+      _nonLookupTables = Sets.newHashSetWithExpectedSize(tableNames.size());
+    }
   }
 
   public WorkerManager getWorkerManager() {
@@ -71,17 +87,36 @@ public class DispatchablePlanContext {
     return _requestId;
   }
 
-  // Returns all the table names.
-  public Set<String> getTableNames() {
-    return _tableNames;
+  public PlannerContext getPlannerContext() {
+    return _plannerContext;
   }
 
   public PairList<Integer, String> getResultFields() {
     return _resultFields;
   }
 
-  public PlannerContext getPlannerContext() {
-    return _plannerContext;
+  // Returns all the table names.
+  public Set<String> getTableNames() {
+    return _tableNames;
+  }
+
+  /// Returns `true` if we want to use servers for leaf stages as the workers for the intermediate stages.
+  public boolean isUseLeafServerForIntermediateStage() {
+    return _nonLookupTables == null;
+  }
+
+  /// Tracks non-lookup tables queried in leaf stages, which are used to determine the servers to use for intermediate
+  /// stages. Should be used only when leaf servers are NOT directly used for intermediate stages.
+  public Set<String> getNonLookupTables() {
+    assert !isUseLeafServerForIntermediateStage();
+    return _nonLookupTables;
+  }
+
+  /// Tracks servers that are used for leaf stages, which are used to determine the servers to use for intermediate
+  /// stages. Should be used only when leaf servers are directly used for intermediate stages.
+  public Set<QueryServerInstance> getLeafServerInstances() {
+    assert isUseLeafServerForIntermediateStage();
+    return _leafServerInstances;
   }
 
   public Map<Integer, DispatchablePlanMetadata> getDispatchablePlanMetadataMap() {

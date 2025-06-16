@@ -50,11 +50,11 @@ import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
@@ -233,7 +233,7 @@ public class PinotRealtimeTableResource {
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(forceCommitJobId,
-            ControllerJobType.FORCE_COMMIT);
+            ControllerJobTypes.FORCE_COMMIT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + forceCommitJobId,
           Response.Status.NOT_FOUND);
@@ -259,7 +259,7 @@ public class PinotRealtimeTableResource {
       controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
           JsonUtils.objectToString(segmentsYetToBeCommitted));
       _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
-          ControllerJobType.FORCE_COMMIT);
+          ControllerJobTypes.FORCE_COMMIT);
     }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);

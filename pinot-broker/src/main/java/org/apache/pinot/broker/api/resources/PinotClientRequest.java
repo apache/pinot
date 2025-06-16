@@ -78,6 +78,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -292,7 +293,8 @@ public class PinotClientRequest {
     try {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
-        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext);
+        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext,
+          makeHttpIdentity(requestCtx));
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
           return;
@@ -536,8 +538,8 @@ public class PinotClientRequest {
   }
 
   private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
-      RequestContext requestContext) {
-    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
+    RequestContext requestContext, RequesterIdentity requesterIdentity) {
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext, requesterIdentity);
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

@@ -125,9 +125,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
-      RequestContext requestContext) {
+      RequestContext requestContext, RequesterIdentity requesterIdentity) {
     if (_timeSeriesRequestHandler != null) {
-      return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, requestContext);
+      return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, requestContext,
+        requesterIdentity);
     }
     return new PinotBrokerTimeSeriesResponse("error", null, "error", "Time series query engine not enabled.");
   }
