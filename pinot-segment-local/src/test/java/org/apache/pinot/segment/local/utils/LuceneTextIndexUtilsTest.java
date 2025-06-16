@@ -33,7 +33,6 @@ import org.apache.lucene.search.WildcardQuery;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.util.Arrays;
 
 public class LuceneTextIndexUtilsTest {
   @Test
