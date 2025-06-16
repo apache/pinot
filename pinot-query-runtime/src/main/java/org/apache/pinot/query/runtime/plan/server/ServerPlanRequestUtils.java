@@ -113,7 +113,7 @@ public class ServerPlanRequestUtils {
       QueryExecutor leafQueryExecutor,
       ExecutorService executorService,
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
-      boolean explain,@Nullable Map<String, String> rowFilters) {
+      boolean explain, @Nullable Map<String, String> rowFilters) {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
     ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
