@@ -21,6 +21,7 @@ package org.apache.pinot.core.auth;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -66,7 +67,7 @@ public class BasicAuthTest {
         .hasPermission("write"));
 
     Assert.assertEquals(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
-        ImmutableSet.of("read"))
+        ImmutableSet.of("read"), Map.of("myTable", ImmutableList.of("cityID > 100")))
         .getRLSFilters("myTable"), Optional.of(ImmutableList.of("cityID > 100")));
   }
 }
