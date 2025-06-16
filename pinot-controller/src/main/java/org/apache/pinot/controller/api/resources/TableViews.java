@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -188,7 +187,7 @@ public class TableViews {
           + " order of sequence number"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
-  public String getBadSegments(
+  public String getBadLLCSegmentsPerPartition(
       @ApiParam(value = "Name of the table.", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     try {
