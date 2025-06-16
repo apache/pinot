@@ -29,7 +29,6 @@ import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -37,7 +36,9 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.regex.JavaUtilPattern;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
@@ -95,6 +96,12 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
     return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
         + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    properties.put(ControllerConf.CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK, 2);
   }
 
   @Test
@@ -1284,10 +1291,10 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
     jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
         JsonUtils.objectToString(progressStats));
-    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobTypes.TABLE_REBALANCE,
         prevJobMetadata -> true);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
@@ -1306,7 +1313,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     progressStats.setStatus(RebalanceResult.Status.DONE);
     jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
         JsonUtils.objectToString(progressStats));
-    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, ControllerJobTypes.TABLE_REBALANCE,
         prevJobMetadata -> true);
 
     // Stop the added server
@@ -1314,6 +1321,62 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TestUtils.waitForCondition(
         aVoid -> getHelixResourceManager().dropInstance(serverStarter.getInstanceId()).isSuccessful(),
         60_000L, "Failed to drop added server");
+  }
+
+  @Test
+  public void testRebalanceJobZkMetadataCleanup()
+      throws Exception {
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(getTableName());
+    // Manually write some rebalance job metadata to ZK - an IN_PROGRESS job and two DONE jobs. The ZK job limit for
+    // table rebalances been overridden to 2 in this test, so the first DONE job should be cleaned up when the second
+    // DONE job is added.
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    String inProgressJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, inProgressJobId);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000");
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
+    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, inProgressJobId, jobMetadata,
+        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(
+        _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
+
+    // Add a DONE rebalance
+    String doneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, doneJobId);
+    progressStats.setStatus(RebalanceResult.Status.DONE);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "randomTable_REALTIME");
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(progressStats));
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, String.valueOf(System.currentTimeMillis()));
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, doneJobId, jobMetadata,
+        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
+
+    // Add another DONE rebalance
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "anotherTable_REALTIME");
+    String anotherDoneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() + 1000));
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, anotherDoneJobId);
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, anotherDoneJobId, jobMetadata,
+        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+
+    assertNotNull(
+        _helixResourceManager.getControllerJobZKMetadata(anotherDoneJobId, ControllerJobTypes.TABLE_REBALANCE));
+
+    // Verify that the first DONE job is cleaned up
+    assertNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
+
+    // Verify that the in-progress job is still there even though it has the oldest submission time
+    assertNotNull(
+        _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
   }
 
   private String getReloadJobIdFromResponse(String response) {
