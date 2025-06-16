@@ -233,7 +233,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     ObjectNode stats = brokerResponse instanceof BrokerResponseNativeV2
         ? ((BrokerResponseNativeV2) brokerResponse).getStageStats()
         : JsonNodeFactory.instance.objectNode();
-    String successfullyStr = brokerResponse.getExceptions().isEmpty()
+    String completionStatus = brokerResponse.getExceptions().isEmpty()
         ? "successfully"
         : "with errors " + brokerResponse.getExceptions();
     String logTemplate = "Request finished {} in {}ms. Stats: {}";
@@ -242,24 +242,24 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (brokerResponse.getExceptions().isEmpty() || successfulSummarizeLevel.compareTo(Level.INFO) <= 0) {
       switch (successfulSummarizeLevel) {
         case TRACE:
-          LOGGER.trace(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          LOGGER.trace(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
           break;
         case INFO:
-          LOGGER.info(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          LOGGER.info(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
           break;
         case WARN:
-          LOGGER.warn(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          LOGGER.warn(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
           break;
         case ERROR:
-          LOGGER.error(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          LOGGER.error(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
           break;
         case DEBUG:
         default:
-          LOGGER.debug(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+          LOGGER.debug(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
           break;
       }
     } else {
-      LOGGER.info(MSE_STATS_MARKER, logTemplate, successfullyStr, brokerResponse.getTimeUsedMs(), stats);
+      LOGGER.info(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
     }
   }
 
