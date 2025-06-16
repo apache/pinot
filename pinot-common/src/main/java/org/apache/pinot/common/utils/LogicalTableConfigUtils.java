@@ -151,8 +151,9 @@ public class LogicalTableConfigUtils {
       String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
       if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
         throw new IllegalArgumentException(
-            "Invalid logical table. Reason: 'physicalTableName' should have the same database name as logical table: "
-                + databaseName + " != " + physicalTableDatabaseName);
+            "Invalid logical table. Reason: '" + physicalTableName
+                + "' should have the same database name as logical table: " + databaseName + " != "
+                + physicalTableDatabaseName);
       }
 
       // validate physical table exists

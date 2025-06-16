@@ -313,13 +313,13 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       addLogicalTableConfig(logicalTableConfig);
     }).getMessage();
     assertTrue(
-        msg.contains("Reason: 'physicalTableName' should have the same database name as logical table: db1 != default"),
+        msg.contains("Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"),
         msg);
 
     // Test update logical table with different database prefix
     msg = expectThrows(IOException.class, () -> updateLogicalTableConfig(logicalTableConfig)).getMessage();
     assertTrue(
-        msg.contains("Reason: 'physicalTableName' should have the same database name as logical table: db1 != default"),
+        msg.contains("Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"),
         msg);
   }
 

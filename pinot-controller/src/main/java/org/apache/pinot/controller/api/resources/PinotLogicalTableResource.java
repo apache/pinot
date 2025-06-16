@@ -30,6 +30,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -150,11 +151,11 @@ public class PinotLogicalTableResource {
 
   private void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
     // Translate physical table names to include the database name
-    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
-    for (Map.Entry<String, PhysicalTableConfig> entry : logicalTableConfig.getPhysicalTableConfigMap().entrySet()) {
-      String physicalTableName = DatabaseUtils.translateTableName(entry.getKey(), headers);
-      physicalTableConfigMap.put(physicalTableName, entry.getValue());
-    }
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap().entrySet()
+        .stream()
+        .map(entry -> Map.entry(DatabaseUtils.translateTableName(entry.getKey(), headers), entry.getValue()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
     logicalTableConfig.setPhysicalTableConfigMap(physicalTableConfigMap);
 
     // Translate refOfflineTableName and refRealtimeTableName to include the database name
