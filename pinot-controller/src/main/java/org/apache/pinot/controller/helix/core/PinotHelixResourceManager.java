@@ -1569,11 +1569,9 @@ public class PinotHelixResourceManager {
           reloadAllSegments(tableNameWithType, false, null);
         }
       } else {
-        // Send schema refresh message to all tables that use this schema
+        LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
         for (String tableNameWithType : tableNamesWithType) {
-          LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
-          sendTableConfigSchemaRefreshMessage(tableNameWithType, getServerInstancesForTable(tableNameWithType,
-              TableNameBuilder.getTableTypeFromTableName(tableNameWithType)));
+          sendTableConfigSchemaRefreshMessage(tableNameWithType);
         }
       }
     } catch (TableNotFoundException e) {
@@ -3155,6 +3153,7 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Sends table config refresh message to brokers.
   private void sendTableConfigRefreshMessage(String tableNameWithType) {
     TableConfigRefreshMessage tableConfigRefreshMessage = new TableConfigRefreshMessage(tableNameWithType);
 
@@ -3173,6 +3172,32 @@ public class PinotHelixResourceManager {
       LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
       LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
+    }
+  }
+
+  /// Sends table config and schema refresh message to servers.
+  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
+    TableConfigSchemaRefreshMessage refreshMessage = new TableConfigSchemaRefreshMessage(tableNameWithType);
+
+    // Send table config and schema refresh message to servers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableNameWithType);
+    recipientCriteria.setSessionSpecific(true);
+
+    // Send message with no callback and infinite timeout on the recipient
+    try {
+      int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria, refreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} table config and schema refresh messages for table: {}", numMessagesSent,
+            tableNameWithType);
+      } else {
+        LOGGER.warn("No table config and schema refresh message sent for table: {}", tableNameWithType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while sending table config and schema refresh message for table: {}",
+          tableNameWithType, e);
     }
   }
 
@@ -3239,7 +3264,7 @@ public class PinotHelixResourceManager {
   private void sendRoutingTableRebuildMessage(String tableNameWithType) {
     RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
 
-    // Send table config refresh message to brokers
+    // Send routing table rebuild message to brokers
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
@@ -3255,27 +3280,6 @@ public class PinotHelixResourceManager {
           tableNameWithType);
     } else {
       LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
-    }
-  }
-
-  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType, List<String> instances) {
-    TableConfigSchemaRefreshMessage refreshMessage = new TableConfigSchemaRefreshMessage(tableNameWithType);
-    for (String instance : instances) {
-      // Send refresh message to servers
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setInstanceName(instance);
-      recipientCriteria.setSessionSpecific(true);
-      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-      // Send message with no callback and infinite timeout on the recipient
-      int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
-      if (numMessagesSent > 0) {
-        LOGGER.info("Sent {} schema refresh messages to servers for table: {} for instance: {}", numMessagesSent,
-            tableNameWithType, instance);
-      } else {
-        LOGGER.warn("No schema refresh message sent to servers for table: {} for instance: {}", tableNameWithType,
-            instance);
-      }
     }
   }
 
