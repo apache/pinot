@@ -65,7 +65,7 @@ public interface BrokerRequestHandler {
    * Run a query and use the time-series engine.
    */
   default PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
-      RequestContext requestContext) {
+      RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity) {
     throw new UnsupportedOperationException("Handler does not support Time Series requests");
   }
 

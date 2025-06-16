@@ -101,7 +101,7 @@ public class BloomFilterSegmentPrunerTest {
       throws IOException {
     IndexSegment indexSegment = mockIndexSegment(new String[]{"1.0", "2.0", "3.0", "5.0", "7.0", "21.0"});
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    when(indexSegment.getDataSourceNullable("column")).thenReturn(dataSource);
     runPruner(Collections.singletonList(indexSegment),
         "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 0.0", 1);
   }
@@ -169,7 +169,7 @@ public class BloomFilterSegmentPrunerTest {
     when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
 
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    when(indexSegment.getDataSourceNullable("column")).thenReturn(dataSource);
     // Add support for bloom filter
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     BloomFilterReaderBuilder builder = new BloomFilterReaderBuilder();

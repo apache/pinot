@@ -393,21 +393,25 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(
-        queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY));
   }
 
-  public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+  public static boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
     String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION));
   }
 
   public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION));
+  }
+
+  public static boolean isUseLeafServerForIntermediateStage(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
   public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions) {
