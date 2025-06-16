@@ -556,6 +556,9 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to skip a given set of rules
+        public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
+
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
@@ -707,12 +710,6 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
-
-
-      public static final String PLANNER_RULE_SKIP = "plannerRule_skip";
-      public static String skipRule(String ruleString) {
-        return PLANNER_RULE_SKIP + ruleString;
-      }
     }
 
     public static class FailureDetector {

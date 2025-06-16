@@ -169,9 +169,12 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    if (options != null && !noRulesSkipped(options)) {
-      // dynamically create optProgram according to rule options
-      optProgram = getOptProgram(options);
+    if (options != null && !options.isEmpty()) {
+      Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
+      if (skipRuleSet != null && !skipRuleSet.isEmpty()) {
+        // dynamically create optProgram according to rule options
+        optProgram = getOptProgram(skipRuleSet);
+      }
     }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
@@ -485,10 +488,10 @@ public class QueryEnvironment {
    * - In the second phase, it performs predicate pushdown -> projection pushdown -> predicate pushdown.
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
-   * @param options query options
+   * @param skipRuleSet parsed skipped rule name set from query options
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(@Nullable Map<String, String> options) {
+  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -501,16 +504,16 @@ public class QueryEnvironment {
     List<RelOptRule> filterPushdownRules;
     List<RelOptRule> projectPushdownRules;
     List<RelOptRule> pruneRules;
-    if (options == null || noRulesSkipped(options)) {
+    if (skipRuleSet == null) {
       basicRules = PinotQueryRuleSets.BASIC_RULES;
       filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
       projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
       pruneRules = PinotQueryRuleSets.PRUNE_RULES;
     } else {
-      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, options);
-      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, options);
-      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, options);
-      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, options);
+      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
+      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
+      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
+      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
     }
 
 
@@ -538,13 +541,8 @@ public class QueryEnvironment {
   }
 
   // util func to check no rules are skipped
-  private static boolean noRulesSkipped(Map<String, String> options) {
-    for (Map.Entry<String, String> configEntry : options.entrySet()) {
-      if (configEntry.getKey().startsWith(CommonConstants.Broker.PlannerRuleNames.PLANNER_RULE_SKIP)) {
-        return false;
-      }
-    }
-    return true;
+  private static boolean noRulesSkipped(Set<String> set) {
+    return set.isEmpty();
   }
 
   /**
@@ -553,14 +551,14 @@ public class QueryEnvironment {
    * key returning from {@link CommonConstants.Broker}.skipRule(rule description).
    *
    * @param rules static list of rules
-   * @param options query options
+   * @param skipRuleSet skip rule set from options
    * @return filtered list of rules
    */
-  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Map<String, String> options) {
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet) {
     List<RelOptRule> filteredRules = new ArrayList<>();
     for (RelOptRule relOptRule : rules) {
       String ruleName = relOptRule.toString();
-      if (isRuleSkipped(ruleName, options)) {
+      if (isRuleSkipped(ruleName, skipRuleSet)) {
         continue;
       }
       filteredRules.add(relOptRule);
@@ -571,12 +569,12 @@ public class QueryEnvironment {
   /**
    * Whether a rule is skipped, rules not skipped by default
    * @param ruleName description of the rule
-   * @param skipMap query skipMap
+   * @param skipRuleSet query skipSet
    * @return false if corresponding key is not in skipMap or the value is "false", else true
    */
-  private static boolean isRuleSkipped(String ruleName, Map<String, String> skipMap) {
+  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet) {
     // can put rule-specific default behavior here
-    return Boolean.parseBoolean(skipMap.get(CommonConstants.Broker.PlannerRuleNames.skipRule(ruleName)));
+    return skipRuleSet.contains(ruleName);
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,

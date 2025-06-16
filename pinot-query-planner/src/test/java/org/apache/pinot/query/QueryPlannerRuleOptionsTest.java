@@ -22,13 +22,13 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames.skipRule;
 import static org.testng.Assert.*;
 
 
@@ -38,7 +38,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
     Map<String, String> options = new HashMap<>();
     // disable rule
-    options.put(PlannerRuleNames.skipRule(ruleToSkip), "true");
+    options.put(CommonConstants.Broker.Request.QueryOptionKey.SKIP_PLANNER_RULES, ruleToSkip);
     SqlNodeAndOptions sqlNodeAndOptions =
         new SqlNodeAndOptions(
             sqlNode,
@@ -262,6 +262,30 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "      PinotLogicalTableScan(table=[[default, a]])\n"
             + "    PinotLogicalExchange(distribution=[broadcast])\n"
             + "      PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testDisableTwoRulesSeparatedByComma() {
+    // test disable PinotJoinPushTransitivePredicatesRule
+    String query = "EXPLAIN PLAN FOR\n"
+        + "SELECT * FROM a, b\n"
+        + "WHERE a.col1 = b.col1\n";
+
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.FILTER_INTO_JOIN.concat(",")
+        .concat(PlannerRuleNames.PROJECT_REMOVE));
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalProject(col1=[$0], col2=[$1], col3=[$2], col4=[$3], col5=[$4], col6=[$5], col7=[$6],"
+            + " ts=[$7], ts_timestamp=[$8], col10=[$9], col20=[$10], col30=[$11], col40=[$12], col50=[$13],"
+            + " col60=[$14], col70=[$15], ts0=[$16], ts_timestamp0=[$17])\n"
+            + "  LogicalFilter(condition=[=($0, $9)])\n"
+            + "    LogicalJoin(condition=[true], joinType=[inner])\n"
+            + "      PinotLogicalExchange(distribution=[random])\n"
+            + "        PinotLogicalTableScan(table=[[default, a]])\n"
+            + "      PinotLogicalExchange(distribution=[broadcast])\n"
+            + "        PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
   }
 }
