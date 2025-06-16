@@ -1710,6 +1710,20 @@ public class TableConfigUtilsTest {
     }
 
     schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMultiValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig())
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "Upsert/Dedup primary key column: myCol cannot be of multi-value type");
+    }
+
+    schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     Map<String, String> streamConfigs = getStreamConfigs();
@@ -1932,6 +1946,7 @@ public class TableConfigUtilsTest {
     String invalidCol = "invalidCol";
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(stringTypeDelCol, FieldSpec.DataType.STRING)
         .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
@@ -2001,10 +2016,33 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "The deleteRecordColumn - mvCol must be a single-valued column");
     }
 
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myPkCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension(stringTypeDelCol, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
+        .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
+    streamConfigs = getStreamConfigs();
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(stringTypeDelCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should fail table creation when PK column type is multi-valued.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup primary key column: myPkCol cannot be of multi-value type");
+    }
+
     // upsert deleted-keys-ttl configs with no deleted column
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeletedKeysTTL(3600);
@@ -2021,6 +2059,7 @@ public class TableConfigUtilsTest {
     // multiple comparison columns set for deleted-keys-ttl
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
     upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
@@ -2058,6 +2097,7 @@ public class TableConfigUtilsTest {
     boolean dropOutOfOrderRecord = true;
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.BOOLEAN).build();
     streamConfigs = getStreamConfigs();
 
@@ -2078,6 +2118,7 @@ public class TableConfigUtilsTest {
     // outOfOrderRecordColumn not of type BOOLEAN
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myPkCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
 

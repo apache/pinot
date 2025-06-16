@@ -99,6 +99,8 @@ public abstract class MultiStageOperator
     Tracing.ThreadAccountantOps.sampleMSE();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
+          + getExplainName());
     }
   }
 

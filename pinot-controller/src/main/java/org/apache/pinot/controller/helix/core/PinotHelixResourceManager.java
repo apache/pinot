@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -113,7 +114,6 @@ import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
@@ -149,12 +149,14 @@ import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssign
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -170,6 +172,8 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -237,6 +241,7 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
+  private final QueryWorkloadManager _queryWorkloadManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -263,6 +268,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _queryWorkloadManager = new QueryWorkloadManager(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -542,6 +548,11 @@ public class PinotHelixResourceManager {
   public List<InstanceConfig> getAllMinionInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isMinion(instance.getId())).collect(Collectors.toList());
+  }
+
+  public List<String> getAllServerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isServer)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -1831,7 +1842,7 @@ public class PinotHelixResourceManager {
           .put(tableNameWithType, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
       return is;
     });
-
+    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
   }
 
@@ -2195,6 +2206,8 @@ public class PinotHelixResourceManager {
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
+    // TODO: Propagate workload for tables if there is change is change instance characteristics
+    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
   }
 
   public void deleteUser(String username) {
@@ -2382,8 +2395,8 @@ public class PinotHelixResourceManager {
    * @return Map representing the job's ZK properties
    */
   @Nullable
-  public Map<String, String> getControllerJobZKMetadata(String jobId, String jobType) {
-    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+  public Map<String, String> getControllerJobZKMetadata(String jobId, ControllerJobType jobType) {
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType.name());
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
     return jobsZnRecord != null ? jobsZnRecord.getMapFields().get(jobId) : null;
   }
@@ -2392,7 +2405,7 @@ public class PinotHelixResourceManager {
    * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
+  public Map<String, Map<String, String>> getAllJobs(Set<ControllerJobType> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker) {
     return ControllerZkHelixUtils.getAllControllerJobs(jobTypes, jobMetadataChecker, _propertyStore);
   }
@@ -2412,14 +2425,14 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.RELOAD_SEGMENT.name());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentNames);
     if (instanceName != null) {
       jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME, instanceName);
     }
-    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.RELOAD_SEGMENT);
   }
 
   /**
@@ -2436,13 +2449,13 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.RELOAD_SEGMENT.name());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
     if (instanceName != null) {
       jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME, instanceName);
     }
-    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.RELOAD_SEGMENT);
   }
 
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
@@ -2451,11 +2464,11 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.FORCE_COMMIT);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.FORCE_COMMIT.name());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
-    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.FORCE_COMMIT);
   }
 
   /**
@@ -2465,7 +2478,7 @@ public class PinotHelixResourceManager {
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobType) {
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType) {
     return addControllerJobToZK(jobId, jobMetadata, jobType, prev -> true);
   }
 
@@ -2476,7 +2489,7 @@ public class PinotHelixResourceManager {
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobType,
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,
       Predicate<Map<String, String>> prevJobMetadataChecker) {
     return ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, jobId, jobMetadata, jobType,
         prevJobMetadataChecker);
@@ -2489,8 +2502,9 @@ public class PinotHelixResourceManager {
    * @param updater to modify the job metadata in place
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean updateJobsForTable(String tableNameWithType, String jobType, Consumer<Map<String, String>> updater) {
-    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+  public boolean updateJobsForTable(String tableNameWithType, ControllerJobType jobType,
+      Consumer<Map<String, String>> updater) {
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType.name());
     Stat stat = new Stat();
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
     if (jobsZnRecord == null) {
@@ -2912,14 +2926,21 @@ public class PinotHelixResourceManager {
     Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
 
+    List<String> failedInstances = new ArrayList<>();
     for (String instance : instanceSet) {
       if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Skipping resetting for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
             instance);
       } else {
         LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
-        resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
+        resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName), failedInstances);
       }
+    }
+
+    if (!failedInstances.isEmpty()) {
+      throw new RuntimeException(
+          "Reset segment failed for table: " + tableNameWithType + ", segment: " + segmentName + ", instances: "
+              + failedInstances);
     }
   }
 
@@ -2960,12 +2981,30 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Resetting segments: {} of table: {}", instanceToResetSegmentsMap, tableNameWithType);
+
+    List<String> failedInstances = new ArrayList<>();
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
-      resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
+      resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue(), failedInstances);
     }
 
     LOGGER.info("Reset segments for table {} finished. With the following segments skipped: {}", tableNameWithType,
         instanceToSkippedSegmentsMap);
+
+    if (!failedInstances.isEmpty()) {
+      throw new RuntimeException(
+          "Reset segment failed for table: " + tableNameWithType + ", instances: " + failedInstances);
+    }
+  }
+
+  private void resetPartitionAllState(String instance, String tableNameWithType, Set<String> segmentNames,
+      List<String> failedInstances) {
+    try {
+      resetPartitionAllState(instance, tableNameWithType, segmentNames);
+    } catch (Exception e) {
+      LOGGER.error("Failed to reset segment: {} of table: {} on instance: {}", segmentNames, tableNameWithType,
+          instance, e);
+      failedInstances.add(instance);
+    }
   }
 
   private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
@@ -2984,7 +3023,8 @@ public class PinotHelixResourceManager {
    * This util is similar to {@link HelixAdmin#resetPartition(String, String, String, List)}.
    * However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
    */
-  private void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
+  @VisibleForTesting
+  void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
     LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
         resetPartitionNames == null ? "NULL" : resetPartitionNames, resourceName, instanceName, _helixClusterName);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
@@ -4760,6 +4800,53 @@ public class PinotHelixResourceManager {
       tagMinInstanceMap.put(brokerTag, 1);
     }
     return tagMinInstanceMap;
+  }
+
+  public List<QueryWorkloadConfig> getAllQueryWorkloadConfigs() {
+    return ZKMetadataProvider.getAllQueryWorkloadConfigs(_propertyStore);
+  }
+
+  @Nullable
+  public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) {
+    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, queryWorkloadName);
+  }
+
+  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) {
+    if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
+      throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
+          + queryWorkloadConfig.getQueryWorkloadName());
+    }
+    _queryWorkloadManager.propagateWorkloadUpdateMessage(queryWorkloadConfig);
+  }
+
+  public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
+    instanceToRefreshMessageMap.forEach((instance, message) -> {
+      Criteria criteria = new Criteria();
+      criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      criteria.setInstanceName(instance);
+      criteria.setSessionSpecific(true);
+
+      int numMessagesSent = _helixZkManager.getMessagingService().send(criteria, message, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
+      } else {
+        LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+      }
+    });
+  }
+
+  public void deleteQueryWorkloadConfig(String workload) {
+    QueryWorkloadConfig queryWorkloadConfig = getQueryWorkloadConfig(workload);
+    if (queryWorkloadConfig == null) {
+      LOGGER.warn("Query workload config for {} does not exist, skipping deletion", workload);
+      return;
+    }
+    _queryWorkloadManager.propagateDeleteWorkloadMessage(queryWorkloadConfig);
+    ZKMetadataProvider.deleteQueryWorkloadConfig(_propertyStore, workload);
+  }
+
+  public QueryWorkloadManager getQueryWorkloadManager() {
+    return _queryWorkloadManager;
   }
 
   /*

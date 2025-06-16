@@ -68,7 +68,6 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -240,31 +239,8 @@ public class PinotQueryResource {
   private List<String> getInstanceIds(String query, List<String> tableNames, String database) {
     List<String> instanceIds;
     if (!tableNames.isEmpty()) {
-      List<TableConfig> tableConfigList = getListTableConfigs(tableNames, database);
-      List<LogicalTableConfig> logicalTableConfigList = null;
-      // First check for table configs, if not found, check for logical table configs.
-      if (tableConfigList.size() != tableNames.size()) {
-        logicalTableConfigList = getListLogicalTableConfigs(tableNames, database);
-        // If config is not found for all tables, then find the tables that are not found.
-        if ((tableConfigList.size() + logicalTableConfigList.size()) != tableNames.size()) {
-          Set<String> tableNamesFoundSet = new HashSet<>();
-          for (TableConfig tableConfig : tableConfigList) {
-            tableNamesFoundSet.add(tableConfig.getTableName());
-          }
-          for (LogicalTableConfig logicalTableConfig : logicalTableConfigList) {
-            tableNamesFoundSet.add(logicalTableConfig.getTableName());
-          }
-
-          List<String> tablesNotFound = tableNames.stream().filter(name -> !tableNamesFoundSet.contains(name))
-              .collect(Collectors.toList());
-
-          throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException(
-              "Unable to find table in cluster, table does not exist for tables: " + tablesNotFound);
-        }
-      }
-
       // find the unions of all the broker tenant tags of the queried tables.
-      Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList, logicalTableConfigList);
+      Set<String> brokerTenantsUnion = getBrokerTenants(tableNames, database);
       if (brokerTenantsUnion.isEmpty()) {
         throw QueryErrorCode.BROKER_REQUEST_SEND.asException("Unable to find broker tenant for tables: " + tableNames);
       }
@@ -332,38 +308,44 @@ public class PinotQueryResource {
   }
 
   // given a list of tables, returns the list of tableConfigs
-  private List<TableConfig> getListTableConfigs(List<String> tableNames, String database) {
-    List<TableConfig> allTableConfigList = new ArrayList<>();
+  private Set<String> getBrokerTenants(List<String> tableNames, String database) {
+    Set<String> brokerTenants = new HashSet<>(tableNames.size());
+    List<String> tablesNotFound = new ArrayList<>(tableNames.size());
     for (String tableName : tableNames) {
+      boolean found = false;
       String actualTableName = _pinotHelixResourceManager.getActualTableName(tableName, database);
-      List<TableConfig> tableConfigList = new ArrayList<>();
       if (_pinotHelixResourceManager.hasRealtimeTable(actualTableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(actualTableName)));
+        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(actualTableName))
+            .getTenantConfig().getBroker());
+        found = true;
       }
       if (_pinotHelixResourceManager.hasOfflineTable(actualTableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(actualTableName)));
+        brokerTenants.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(actualTableName))
+            .getTenantConfig().getBroker());
+        found = true;
       }
-      // If no table configs found for the table, skip it.
-      if (!tableConfigList.isEmpty()) {
-        allTableConfigList.addAll(tableConfigList);
+
+      if (!found) {
+        actualTableName = _pinotHelixResourceManager.getActualLogicalTableName(tableName, database);
+        LogicalTableConfig logicalTableConfig =
+            _pinotHelixResourceManager.getLogicalTableConfig(actualTableName);
+        if (logicalTableConfig != null) {
+          brokerTenants.add(logicalTableConfig.getBrokerTenant());
+          found = true;
+        }
+      }
+
+      if (!found) {
+        tablesNotFound.add(tableName);
       }
     }
-    return allTableConfigList;
-  }
 
-  private List<LogicalTableConfig> getListLogicalTableConfigs(List<String> tableNames, String database) {
-    List<LogicalTableConfig> allLogicalTableConfigList = new ArrayList<>();
-    for (String tableName : tableNames) {
-      String actualTableName = _pinotHelixResourceManager.getActualLogicalTableName(tableName, database);
-      LogicalTableConfig logicalTableConfig =
-          _pinotHelixResourceManager.getLogicalTableConfig(actualTableName);
-      if (logicalTableConfig != null) {
-        allLogicalTableConfigList.add(logicalTableConfig);
-      }
+    if (!tablesNotFound.isEmpty()) {
+      throw QueryErrorCode.TABLE_DOES_NOT_EXIST.asException(
+          "Unable to find table in cluster, table does not exist for tables: " + tablesNotFound);
     }
-    return allLogicalTableConfigList;
+    return brokerTenants;
   }
-
 
   private String selectRandomInstanceId(List<String> instanceIds) {
     if (instanceIds.isEmpty()) {
@@ -386,22 +368,6 @@ public class PinotQueryResource {
           instanceConfig -> instanceConfig.containsTag(TagNameUtils.getBrokerTagForTenant(brokerTenant)));
     }
     return brokerInstanceConfigs.map(InstanceConfig::getInstanceName).collect(Collectors.toList());
-  }
-
-  // return the union of brokerTenants from the tables list.
-  private Set<String> getBrokerTenantsUnion(List<TableConfig> tableConfigList,
-      @Nullable List<LogicalTableConfig> logicalTableConfigList) {
-    Set<String> tableBrokerTenants = new HashSet<>();
-    for (TableConfig tableConfig : tableConfigList) {
-      tableBrokerTenants.add(tableConfig.getTenantConfig().getBroker());
-    }
-
-    if (logicalTableConfigList != null) {
-      for (LogicalTableConfig logicalTableConfig : logicalTableConfigList) {
-        tableBrokerTenants.add(logicalTableConfig.getBrokerTenant());
-      }
-    }
-    return tableBrokerTenants;
   }
 
   private StreamingOutput sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,

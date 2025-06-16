@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,10 +34,10 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -79,12 +78,19 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
    * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
+   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
    * @return result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
-      String rebalanceJobId, boolean trackRebalanceProgress)
+      String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
+    if (allowRetries && !trackRebalanceProgress) {
+      throw new IllegalArgumentException(
+          "Rebalance retries are only supported when rebalance progress is tracked in ZK");
+    }
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
@@ -93,7 +99,7 @@ public class TableRebalanceManager {
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig),
+          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig, allowRetries),
           _resourceManager.getPropertyStore());
     }
     return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
@@ -109,11 +115,14 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
    * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
+   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
    * @return a CompletableFuture that will complete with the result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType,
-      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress)
+      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -125,7 +134,8 @@ public class TableRebalanceManager {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress);
+            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress,
+                allowRetries);
           } catch (TableNotFoundException e) {
             // Should not happen since we already checked for table existence
             throw new RuntimeException(e);
@@ -147,6 +157,7 @@ public class TableRebalanceManager {
    * @param rebalanceConfig configuration for the rebalance operation
    * @param zkBasedTableRebalanceObserver observer to track rebalance progress in ZK
    * @return a CompletableFuture that will complete with the result of the rebalance operation
+   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType, TableConfig tableConfig,
       String rebalanceJobId, RebalanceConfig rebalanceConfig,
@@ -198,7 +209,7 @@ public class TableRebalanceManager {
    */
   public List<String> cancelRebalance(String tableNameWithType) {
     List<String> cancelledJobIds = new ArrayList<>();
-    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
+    boolean updated = _resourceManager.updateJobsForTable(tableNameWithType, ControllerJobTypes.TABLE_REBALANCE,
         jobMetadata -> {
           String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
           try {
@@ -234,7 +245,7 @@ public class TableRebalanceManager {
   public ServerRebalanceJobStatusResponse getRebalanceStatus(String jobId)
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata =
-        _resourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+        _resourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TABLE_REBALANCE);
     if (controllerJobZKMetadata == null) {
       LOGGER.warn("Rebalance job with ID: {} not found", jobId);
       throw new NotFoundException("Rebalance job with ID: " + jobId + " not found");
@@ -280,7 +291,7 @@ public class TableRebalanceManager {
   public static String rebalanceJobInProgress(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // Get all jobMetadata for the given table with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
-        ControllerZkHelixUtils.getAllControllerJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
+        ControllerZkHelixUtils.getAllControllerJobs(Set.of(ControllerJobTypes.TABLE_REBALANCE),
             jobMetadata -> tableNameWithType.equals(
                 jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)), propertyStore);
 

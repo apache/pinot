@@ -72,7 +72,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
@@ -87,6 +86,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -533,7 +533,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
