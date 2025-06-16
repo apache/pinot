@@ -3502,9 +3502,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
             + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
-    // TODO: investigate why changing description will result in changing of order here
-    //    Might be because the set is HashMap, the order is determined by the hash of the key,
-    //    which is the description
     assertEquals(response2Json.get("rows").get(0).get(2).asText(),
         "Rule Execution Times\n"
             + "Rule: FilterProjectTransposeRule -> Time: *\n"

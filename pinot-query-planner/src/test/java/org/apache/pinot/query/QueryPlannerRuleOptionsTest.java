@@ -28,7 +28,7 @@ import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.skipRule;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames.skipRule;
 import static org.testng.Assert.*;
 
 
@@ -38,7 +38,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
     Map<String, String> options = new HashMap<>();
     // disable rule
-    options.put(skipRule(ruleToSkip), "true");
+    options.put(PlannerRuleNames.skipRule(ruleToSkip), "true");
     SqlNodeAndOptions sqlNodeAndOptions =
         new SqlNodeAndOptions(
             sqlNode,
@@ -252,7 +252,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "SELECT * FROM a, b\n"
         + "WHERE a.col1 = b.col1\n";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_FILTER_INTO_JOIN);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.FILTER_INTO_JOIN);
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"

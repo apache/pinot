@@ -57,7 +57,7 @@ public class PinotQueryRuleSets {
   public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
       PinotFilterIntoJoinRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_FILTER_INTO_JOIN),
+          .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       // push filter through an aggregation
       FilterAggregateTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
@@ -145,7 +145,7 @@ public class PinotQueryRuleSets {
   // single HepInstruction.
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_FILTER_INTO_JOIN),
+          .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       FilterAggregateTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
       FilterSetOpTransposeRule.Config.DEFAULT

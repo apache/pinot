@@ -149,6 +149,7 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
+    // default optProgram with no skip rule options
     _optProgram = getOptProgram(null);
   }
 
@@ -167,8 +168,11 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
-    // dynamically create optProgram according to rule options
-    HepProgram optProgram = getOptProgram(options);
+    HepProgram optProgram = _optProgram;
+    if (options != null && !noRulesSkipped(options)) {
+      // dynamically create optProgram according to rule options
+      optProgram = getOptProgram(options);
+    }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
@@ -536,7 +540,7 @@ public class QueryEnvironment {
   // util func to check no rules are skipped
   private static boolean noRulesSkipped(Map<String, String> options) {
     for (Map.Entry<String, String> configEntry : options.entrySet()) {
-      if (configEntry.getKey().startsWith(CommonConstants.Broker.PLANNER_RULE_SKIP)) {
+      if (configEntry.getKey().startsWith(CommonConstants.Broker.PlannerRuleNames.PLANNER_RULE_SKIP)) {
         return false;
       }
     }
@@ -572,8 +576,7 @@ public class QueryEnvironment {
    */
   private static boolean isRuleSkipped(String ruleName, Map<String, String> skipMap) {
     // can put rule-specific default behavior here
-    return Boolean.parseBoolean(skipMap.get(CommonConstants.Broker.skipRule(ruleName));
-    );
+    return Boolean.parseBoolean(skipMap.get(CommonConstants.Broker.PlannerRuleNames.skipRule(ruleName)));
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,

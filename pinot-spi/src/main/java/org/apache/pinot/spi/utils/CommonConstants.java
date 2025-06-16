@@ -670,7 +670,7 @@ public class CommonConstants {
      * to check if rule is disabled.
      */
     public static class PlannerRuleNames {
-      public static final String PINOT_FILTER_INTO_JOIN = "PinotFilterIntoJoinRule";
+      public static final String FILTER_INTO_JOIN = "FilterIntoJoinRule";
       public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTransposeRule";
       public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTransposeRule";
       public static final String PINOT_PROJECT_JOIN_TRANSPOSE = "ProjectJoinTransposeRule";
@@ -707,10 +707,12 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
-    }
-    public static final String PLANNER_RULE_SKIP = "plannerRule_skip";
-    public static String skipRule(String ruleString) {
-      return PLANNER_RULE_SKIP + ruleString;
+
+
+      public static final String PLANNER_RULE_SKIP = "plannerRule_skip";
+      public static String skipRule(String ruleString) {
+        return PLANNER_RULE_SKIP + ruleString;
+      }
     }
 
     public static class FailureDetector {
