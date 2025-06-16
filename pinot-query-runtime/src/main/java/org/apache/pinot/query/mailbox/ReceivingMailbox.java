@@ -101,15 +101,19 @@ public class ReceivingMailbox {
    * <p>
    * Contrary to {@link #offer(MseBlock, List, long)}, the block may be an error block.
    */
-  public ReceivingMailboxStatus offerRaw(ByteBuffer byteBuffer, long timeoutMs)
+  public ReceivingMailboxStatus offerRaw(List<ByteBuffer> byteBuffers, long timeoutMs)
       throws IOException {
     MseBlock block;
     updateWaitCpuTime();
-    _stats.merge(StatKey.DESERIALIZED_BYTES, byteBuffer.remaining());
+    int totalBytes = 0;
+    for (ByteBuffer bb: byteBuffers) {
+      totalBytes += bb.remaining();
+    }
+    _stats.merge(StatKey.DESERIALIZED_BYTES, totalBytes);
     _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
 
     long now = System.currentTimeMillis();
-    DataBlock dataBlock = DataBlockUtils.readFrom(byteBuffer);
+    DataBlock dataBlock = DataBlockUtils.deserialize(byteBuffers);
     _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
 
     if (dataBlock instanceof MetadataBlock) {
@@ -117,8 +121,11 @@ public class ReceivingMailbox {
       if (exceptions.isEmpty()) {
         block = SuccessMseBlock.INSTANCE;
       } else {
+        MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
         Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        setErrorBlock(new ErrorMseBlock(exceptionsByQueryError), dataBlock.getStatsByStage());
+        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(),
+            metadataBlock.getServerId(), exceptionsByQueryError);
+        setErrorBlock(errorBlock, dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;
       }
     } else {

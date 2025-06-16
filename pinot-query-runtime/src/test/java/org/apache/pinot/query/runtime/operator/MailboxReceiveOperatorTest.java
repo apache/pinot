@@ -54,7 +54,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MailboxReceiveOperatorTest {
@@ -77,9 +79,9 @@ public class MailboxReceiveOperatorTest {
   @BeforeClass
   public void setUp() {
     MailboxInfos mailboxInfosBoth = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));
-    _stageMetadataBoth = new StageMetadata(0,
-        Stream.of(0, 1).map(workerId -> new WorkerMetadata(workerId, Map.of(1, mailboxInfosBoth), Map.of()))
-            .collect(Collectors.toList()), Map.of());
+    _stageMetadataBoth = new StageMetadata(0, Stream.of(0, 1)
+        .map(workerId -> new WorkerMetadata(workerId, Map.of(1, mailboxInfosBoth), Map.of()))
+        .collect(Collectors.toList()), Map.of());
     MailboxInfos mailboxInfos1 = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0)));
     _stageMetadata1 =
         new StageMetadata(0, List.of(new WorkerMetadata(0, Map.of(1, mailboxInfos1), Map.of())), Map.of());
@@ -145,8 +147,7 @@ public class MailboxReceiveOperatorTest {
   public void shouldReceiveSingletonErrorMailbox() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.errorWithStats(new RuntimeException(errorMessage), List.of()));
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.errorWithStats(new RuntimeException(errorMessage), List.of()));
     try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
       MseBlock block = operator.nextBlock();
       assertTrue(block.isError());
@@ -176,13 +177,10 @@ public class MailboxReceiveOperatorTest {
     Object[] row2 = new Object[]{2, 2};
     Object[] row3 = new Object[]{3, 3};
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3),
-        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3), OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithEmptyStats());
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       // Receive first block from server1
@@ -199,12 +197,10 @@ public class MailboxReceiveOperatorTest {
   public void shouldGetReceptionReceiveErrorMailbox() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.errorWithEmptyStats(new RuntimeException(errorMessage)));
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.errorWithEmptyStats(new RuntimeException(errorMessage)));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row),
         OperatorTestUtil.eosWithEmptyStats());
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       MseBlock block = operator.nextBlock();
@@ -219,13 +215,10 @@ public class MailboxReceiveOperatorTest {
     Object[] row2 = new Object[]{2, 2};
     Object[] row3 = new Object[]{3, 3};
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3),
-        OperatorTestUtil.eosWithEmptyStats());
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row3), OperatorTestUtil.eosWithEmptyStats());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    when(_mailbox2.poll()).thenReturn(
-        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
         OperatorTestUtil.eosWithEmptyStats());
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       // Receive first block from server1
@@ -244,25 +237,19 @@ public class MailboxReceiveOperatorTest {
   public void differentUpstreamStatsProduceEmptyStats()
       throws IOException {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    List<DataBuffer> stats1 = new MultiStageQueryStats.Builder(1)
-        .addLast(open ->
-            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
-                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
-                .close())
-        .build()
-        .serialize();
+    List<DataBuffer> stats1 = new MultiStageQueryStats.Builder(1).addLast(
+        open -> open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+            .addLastOperator(Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
+            .close()).build().serialize();
     ReceivingMailbox.MseBlockWithStats block1 = OperatorTestUtil.eosWithStats(stats1);
     when(_mailbox1.poll()).thenReturn(block1);
 
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
-    List<DataBuffer> stats2 = new MultiStageQueryStats.Builder(1)
-        .addLast(open ->
-            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
-                .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
-                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
-                .close())
-        .build()
-        .serialize();
+    List<DataBuffer> stats2 = new MultiStageQueryStats.Builder(1).addLast(
+        open -> open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+            .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
+            .addLastOperator(Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
+            .close()).build().serialize();
     ReceivingMailbox.MseBlockWithStats block2 = OperatorTestUtil.eosWithStats(stats2);
     when(_mailbox2.poll()).thenReturn(block2);
 

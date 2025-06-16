@@ -19,30 +19,20 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.File;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -50,101 +40,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.fail;
 
 
-/**
- * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
- * two month overlap).
- */
-public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String TENANT_NAME = "TestTenant";
-  private static final int NUM_OFFLINE_SEGMENTS = 8;
-  private static final int NUM_REALTIME_SEGMENTS = 6;
-
-  @Override
-  protected String getBrokerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected String getServerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-  }
-
-  protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
-        TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
-  }
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start Zk, Kafka and Pinot
-    startHybridCluster();
-
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
-    addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
-
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
-
-    // Set up the H2 connection
-    setUpH2Connection(avroFiles);
-
-    // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
-  }
-
-  protected void startHybridCluster()
-      throws Exception {
-    startZk();
-    startController();
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    // Set max segment preprocess parallelism to 10
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(10));
-    // Set max segment startree preprocess parallelism to 6
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
-    // Set max segment download parallelism to 12 to test that all segments can be processed
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(12));
-    startBroker();
-    startServers(2);
-    startKafka();
-
-    // Create tenants
-    createServerTenant(TENANT_NAME, 1, 1);
-  }
-
+public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTest {
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
@@ -415,40 +311,54 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testVirtualColumnQueries();
   }
 
-  @AfterClass
-  public void tearDown()
+  @Test(dataProvider = "useBothQueryEngines")
+  void testControllerQuerySubmit(boolean useMultiStageQueryEngine)
       throws Exception {
-    // Try deleting the tables and check that they have no routing table
-    String tableName = getTableName();
-    dropOfflineTable(tableName);
-    dropRealtimeTable(tableName);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getTableName();
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
 
-    // Routing should be removed after deleting all tables
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        getDebugInfo("debug/routingTable/" + tableName);
-        return false;
-      } catch (Exception e) {
-        // only return true if 404 not found error is thrown.
-        return e.getMessage().contains("Got error status code: 404");
-      }
-    }, 60_000L, "Routing table is not empty after dropping all tables");
+    // Offline table
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    cleanupHybridCluster();
+    tableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown";
+    response = postQueryToController(query);
+    if (useMultiStageQueryEngine) {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+          .containsMessage("TableDoesNotExistError");
+    } else {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING)
+          .containsMessage("BrokerResourceMissingError");
+    }
   }
 
-  /**
-   * Can be overridden to preserve segments.
-   *
-   * @throws Exception
-   */
-  protected void cleanupHybridCluster()
+  @Test
+  void testControllerJoinQuerySubmit()
       throws Exception {
-    FileUtils.deleteDirectory(_tempDir);
+    setUseMultiStageQueryEngine(true);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM unknown JOIN " + getTableName()
+        + " ON unknown.FlightNum = " + getTableName() + ".FlightNum";
+    JsonNode response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    query = "SELECT count(*) FROM unknown_1 JOIN unknown_2  ON "
+        + "unknown_1.FlightNum = unknown_2.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
   }
 }

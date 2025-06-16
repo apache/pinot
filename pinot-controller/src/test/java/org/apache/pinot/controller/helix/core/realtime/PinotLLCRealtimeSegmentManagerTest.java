@@ -1367,7 +1367,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testGetPartitionIds()
       throws Exception {
     List<StreamConfig> streamConfigs = List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs());
-    IdealState idealState = new IdealState("table");
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numPartitions = 2;
 
@@ -1830,6 +1830,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
         return IntStream.range(0, _numPartitions).mapToObj(i -> new PartitionGroupMetadata(i, PARTITION_OFFSET))
             .collect(Collectors.toList());
       }
+    }
+
+    @Override
+    List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+        boolean forceGetOffsetFromStream) {
+      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
     }
 
     @Override

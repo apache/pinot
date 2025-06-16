@@ -29,10 +29,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.entity.EntityBuilder;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -65,25 +67,39 @@ import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
@@ -91,6 +107,9 @@ import static org.testng.Assert.*;
 
 
 public class ControllerTest {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
+
   public static final String LOCAL_HOST = "localhost";
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
@@ -142,6 +161,8 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected TableRebalanceManager _tableRebalanceManager;
+  protected TableSizeReader _tableSizeReader;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -150,6 +171,21 @@ public class ControllerTest {
    */
   public static ControllerTest getInstance() {
     return DEFAULT_INSTANCE;
+  }
+
+  public List<String> createHybridTables(List<String> tableNames)
+      throws IOException {
+    List<String> tableNamesWithType = new ArrayList<>();
+    for (String tableName : tableNames) {
+      addDummySchema(tableName);
+      TableConfig offlineTable = createDummyTableConfig(tableName, TableType.OFFLINE);
+      TableConfig realtimeTable = createDummyTableConfig(tableName, TableType.REALTIME);
+      addTableConfig(offlineTable);
+      addTableConfig(realtimeTable);
+      tableNamesWithType.add(offlineTable.getTableName());
+      tableNamesWithType.add(realtimeTable.getTableName());
+    }
+    return tableNamesWithType;
   }
 
   public String getHelixClusterName() {
@@ -228,6 +264,7 @@ public class ControllerTest {
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
     overrideControllerConf(properties);
     return properties;
   }
@@ -271,6 +308,8 @@ public class ControllerTest {
       _controllerDataDir = _controllerConfig.getDataDir();
       _helixResourceManager = _controllerStarter.getHelixResourceManager();
       _helixManager = _controllerStarter.getHelixControllerManager();
+      _tableRebalanceManager = _controllerStarter.getTableRebalanceManager();
+      _tableSizeReader = _controllerStarter.getTableSizeReader();
       _helixDataAccessor = _helixManager.getHelixDataAccessor();
       ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
       // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
@@ -359,6 +398,28 @@ public class ControllerTest {
         addFakeBrokerInstanceToAutoJoinHelixCluster(BROKER_INSTANCE_ID_PREFIX + i, isSingleTenant);
       }
     }
+  }
+
+  public static LogicalTableConfig getDummyLogicalTableConfig(String tableName, List<String> physicalTableNames,
+      String brokerTenant) {
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
+    for (String physicalTableName : physicalTableNames) {
+      physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
+    }
+    String offlineTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isOfflineTableResource).findFirst().orElse(null);
+    String realtimeTableName =
+        physicalTableNames.stream().filter(TableNameBuilder::isRealtimeTableResource).findFirst().orElse(null);
+    LogicalTableConfigBuilder builder = new LogicalTableConfigBuilder()
+        .setTableName(tableName)
+        .setBrokerTenant(brokerTenant)
+        .setRefOfflineTableName(offlineTableName)
+        .setRefRealtimeTableName(realtimeTableName)
+        .setQuotaConfig(new QuotaConfig(null, "99999"))
+        .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
+        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
+        .setPhysicalTableConfigMap(physicalTableConfigMap);
+    return builder.build();
   }
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -641,6 +702,19 @@ public class ControllerTest {
     return schema;
   }
 
+  public static TableConfig createDummyTableConfig(String tableName, TableType tableType) {
+    TableConfigBuilder builder = new TableConfigBuilder(tableType);
+    if (tableType == TableType.REALTIME) {
+      builder.setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+    }
+    return builder.setTableName(tableName)
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .build();
+  }
+
   public static Schema createDummySchemaWithPrimaryKey(String tableName) {
     Schema schema = createDummySchema(tableName);
     schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
@@ -686,9 +760,19 @@ public class ControllerTest {
     getControllerRequestClient().addTableConfig(tableConfig);
   }
 
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().addLogicalTableConfig(logicalTableConfig);
+  }
+
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().updateTableConfig(tableConfig);
+  }
+
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().updateLogicalTableConfig(logicalTableConfig);
   }
 
   public void toggleTableState(String tableName, TableType type, boolean enable)
@@ -721,6 +805,11 @@ public class ControllerTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+  }
+
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    getControllerRequestClient().deleteLogicalTable(logicalTableName);
   }
 
   public void waitForEVToAppear(String tableNameWithType) {
@@ -778,9 +867,9 @@ public class ControllerTest {
     return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
   }
 
-  public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
+  public String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
   public String reloadRealtimeTable(String tableName)
@@ -823,6 +912,87 @@ public class ControllerTest {
     }
   }
 
+  public void runRealtimeSegmentValidationTask(String tableName)
+      throws IOException {
+    runPeriodicTask("RealtimeSegmentValidationManager", tableName, TableType.REALTIME);
+  }
+
+  public void runPeriodicTask(String taskName, String tableName, TableType tableType)
+      throws IOException {
+    sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+  }
+
+  public void pauseTable(String tableName)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        if (pauseStatusDetails.getConsumingSegments().isEmpty()) {
+          return true;
+        }
+        LOGGER.warn("Table not yet paused. Response " + pauseStatusDetails);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 2000, 60_000L, "Failed to pause table: " + tableName);
+  }
+
+  public void resumeTable(String tableName)
+      throws IOException {
+    resumeTable(tableName, "lastConsumed");
+  }
+
+  public void resumeTable(String tableName, String offsetCriteria)
+      throws IOException {
+    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName)
+        + "?consumeFrom=" + offsetCriteria);
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatusDetails pauseStatusDetails =
+            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
+                PauseStatusDetails.class);
+        // Its possible no segment is in consuming state, so check pause flag
+        if (!pauseStatusDetails.getPauseFlag()) {
+          return true;
+        }
+        LOGGER.warn("Pause flag is not yet set to false. Response " + pauseStatusDetails);
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 2000, 60_000L, "Failed to resume table: " + tableName);
+  }
+
+  public void waitForNumSegmentsInDesiredStateInEV(String tableName, String desiredState,
+      int desiredNumConsumingSegments, TableType type) {
+    TestUtils.waitForCondition((aVoid) -> {
+          try {
+            AtomicInteger numConsumingSegments = new AtomicInteger(0);
+            TableViews.TableView tableView = getExternalView(tableName, type);
+            Map<String, Map<String, String>> viewForType =
+                type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
+            viewForType.values().forEach((v) -> {
+              numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals(desiredState)).count());
+            });
+            return numConsumingSegments.get() == desiredNumConsumingSegments;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 5000, 60_000L,
+        "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName
+    );
+  }
+
+  public TableViews.TableView getExternalView(String tableName, TableType type)
+      throws IOException {
+    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
+    return JsonUtils.stringToObject(state, TableViews.TableView.class);
+  }
+
   public static String sendGetRequest(String urlString)
       throws IOException {
     return sendGetRequest(urlString, null);
@@ -861,6 +1031,24 @@ public class ControllerTest {
           getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
+   * stringified response.
+   * @param urlString the URL to send the POST request to
+   * @param payload the payload to send in the POST request
+   * @return a Pair containing the status code and the stringified response
+   */
+  public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
       throw new IOException(e);
     }
   }
@@ -1090,11 +1278,25 @@ public class ControllerTest {
     assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getSchemaNames()));
   }
 
+  @DataProvider
+  public Object[][] tableTypeProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
+  }
+
   /**
    * Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
    * test functionality.
    */
   public void cleanup() {
+    // Delete logical tables
+    List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();
+    for (String logicalTableName : logicalTables) {
+      _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+    }
+
     // Delete all tables
     List<String> tables = _helixResourceManager.getAllTables();
     for (String tableNameWithType : tables) {
@@ -1113,7 +1315,7 @@ public class ControllerTest {
     }, 60_000L, "Failed to clean up all the external views");
 
     // Delete all schemas.
-    List<String> schemaNames = _helixResourceManager.getSchemaNames();
+    List<String> schemaNames = _helixResourceManager.getAllSchemaNames();
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
         getHelixResourceManager().deleteSchema(schemaName);

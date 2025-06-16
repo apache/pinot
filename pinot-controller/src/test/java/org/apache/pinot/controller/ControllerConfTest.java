@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -88,9 +90,10 @@ public class ControllerConfTest {
    * are thrown when invalid new configurations are read (there is no fall-back to the corresponding
    * valid deprecated configuration). For all valid new configurations, they override the
    * corresponding deprecated configuration.
+   * Added fallback logic to use valid deprecated config when new config is invalid.
    */
   @Test
-  public void invalidNewConfigShouldThrowExceptionOnReadWithoutFallbackToCorrespondingValidDeprecatedConfig() {
+  public void invalidNewConfigShouldNotThrowExceptionOnReadWithFallbackToCorrespondingValidDeprecatedConfig() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     int durationInSeconds = getRandomDurationInSeconds();
@@ -99,9 +102,24 @@ public class ControllerConfTest {
     String randomPeriodInMinutes = getRandomPeriodInMinutes();
     NEW_CONFIGS.forEach(config -> controllerConfig.put(config, randomPeriodInMinutes));
     //put some invalid new configs
-    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, getRandomString());
+    String randomInvalidString = getRandomString();
+    controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, randomInvalidString);
     ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertThrows(IllegalArgumentException.class, conf::getRetentionControllerFrequencyInSeconds);
+    Assert.assertEquals(
+        conf.getRetentionControllerFrequencyInSeconds(),
+        durationInSeconds, // expected fallback value
+        "Should fallback to deprecated config value"
+    );
+    //test to assert that invalid config is captured in the invalid config map value
+    Map<String, String> invalidConfigs = conf.getInvalidConfigs();
+    Assert.assertTrue(invalidConfigs.containsKey(RETENTION_MANAGER_FREQUENCY_PERIOD));
+    Assert.assertEquals(
+        conf.getInvalidConfigs().get(RETENTION_MANAGER_FREQUENCY_PERIOD),
+        String.format(
+            "Invalid time spec '%s' for config '%s'. Falling back to default config.",
+            randomInvalidString, RETENTION_MANAGER_FREQUENCY_PERIOD
+        )
+    );
   }
 
   /**
@@ -149,6 +167,9 @@ public class ControllerConfTest {
     Assert.assertFalse(conf.getSegmentRelocatorDowntime());
     Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -1);
     Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+    Assert.assertFalse(conf.isSegmentRelocatorIncludingConsuming());
+    Assert.assertEquals(conf.getSegmentRelocatorMinimizeDataMovement(), Enablement.ENABLE);
+    Assert.assertEquals(conf.getSegmentRelocatorBatchSizePerServer(), RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER);
   }
 
   @Test
@@ -159,6 +180,9 @@ public class ControllerConfTest {
     properties.put(SEGMENT_RELOCATOR_DOWNTIME, true);
     properties.put(SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS, -2);
     properties.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
+    properties.put(SEGMENT_RELOCATOR_INCLUDE_CONSUMING, true);
+    properties.put(SEGMENT_RELOCATOR_MINIMIZE_DATA_MOVEMENT, "DISABLE");
+    properties.put(SEGMENT_RELOCATOR_BATCH_SIZE_PER_SERVER, 42);
 
     ControllerConf conf = new ControllerConf(properties);
     Assert.assertTrue(conf.getSegmentRelocatorReassignInstances());
@@ -166,6 +190,9 @@ public class ControllerConfTest {
     Assert.assertTrue(conf.getSegmentRelocatorDowntime());
     Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -2);
     Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+    Assert.assertTrue(conf.isSegmentRelocatorIncludingConsuming());
+    Assert.assertEquals(conf.getSegmentRelocatorMinimizeDataMovement(), Enablement.DISABLE);
+    Assert.assertEquals(conf.getSegmentRelocatorBatchSizePerServer(), 42);
   }
 
   @Test

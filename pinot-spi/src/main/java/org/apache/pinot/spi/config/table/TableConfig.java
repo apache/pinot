@@ -332,6 +332,11 @@ public class TableConfig extends BaseJsonConfig {
     _upsertConfig = upsertConfig;
   }
 
+  @JsonIgnore
+  public boolean isUpsertEnabled() {
+    return _upsertConfig != null && _upsertConfig.getMode() != UpsertConfig.Mode.NONE;
+  }
+
   @Nullable
   public DedupConfig getDedupConfig() {
     return _dedupConfig;
@@ -375,57 +380,10 @@ public class TableConfig extends BaseJsonConfig {
     _tierConfigsList = tierConfigsList;
   }
 
+  @Deprecated
   @JsonIgnore
   public UpsertConfig.Mode getUpsertMode() {
     return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
-  }
-
-  @JsonIgnore
-  public boolean isUpsertEnabled() {
-    return _upsertConfig != null && _upsertConfig.getMode() != UpsertConfig.Mode.NONE;
-  }
-
-  @JsonIgnore
-  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
-    return _upsertConfig == null ? UpsertConfig.ConsistencyMode.NONE : _upsertConfig.getConsistencyMode();
-  }
-
-  @JsonIgnore
-  @Nullable
-  public List<String> getUpsertComparisonColumns() {
-    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumns();
-  }
-
-  @JsonIgnore
-  public double getUpsertMetadataTTL() {
-    return _upsertConfig == null ? 0 : _upsertConfig.getMetadataTTL();
-  }
-
-  @JsonIgnore
-  public String getDedupTimeColumn() {
-    return _dedupConfig == null ? null : _dedupConfig.getDedupTimeColumn();
-  }
-
-  @JsonIgnore
-  public double getDedupMetadataTTL() {
-    return _dedupConfig == null ? 0 : _dedupConfig.getMetadataTTL();
-  }
-
-  @JsonIgnore
-  @Nullable
-  public String getUpsertDeleteRecordColumn() {
-    return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
-  }
-
-  @JsonIgnore
-  @Nullable
-  public String getOutOfOrderRecordColumn() {
-    return _upsertConfig == null ? null : _upsertConfig.getOutOfOrderRecordColumn();
-  }
-
-  @JsonIgnore
-  public boolean isDropOutOfOrderRecord() {
-    return _upsertConfig != null && _upsertConfig.isDropOutOfOrderRecord();
   }
 
   @JsonProperty(TUNER_CONFIG_LIST_KEY)

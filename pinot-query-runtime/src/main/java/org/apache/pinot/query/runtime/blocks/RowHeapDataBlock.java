@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
+
 /// A block that contains data in row heap format.
 /// This means that the data is stored as list of rows, where each row is an array of objects and each object is a
 /// reference to the cell value.
@@ -42,7 +43,7 @@ public class RowHeapDataBlock implements MseBlock.Data {
   private final List<Object[]> _rows;
   /// This is a hack we created to support different hash exchange distributions.
   /// We should find a new way to keep this information that is more solid than the current one.
-  /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator] and
+  /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafOperator] and
   /// [org.apache.pinot.query.runtime.operator.AggregateOperator] and consumed in
   /// [org.apache.pinot.query.runtime.operator.exchange.HashExchange] when we need to shuffle data.
   /// This means that the value of this attribute is the same for all blocks in the stage, so we should be able to

@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -44,23 +45,28 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.Enablement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Periodic task to run rebalancer in background to
- * 1. relocate COMPLETED segments to tag overrides
- * 2. relocate ONLINE segments to tiers if tier configs are set
+ * Periodic task to run rebalancer in background to:
+ * <ol>
+ * <li> Relocate COMPLETED segments to tag overrides
+ * <li> Relocate ONLINE segments to tiers if tier configs are set
+ * </ol>
  * Allow at most one replica unavailable during rebalance. Not applicable for HLC tables.
  */
 public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
+  private final TableRebalanceManager _tableRebalanceManager;
   private final ExecutorService _executorService;
   private final HttpClientConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
@@ -75,17 +81,22 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
   private final boolean _includeConsuming;
-  private final RebalanceConfig.MinimizeDataMovementOptions _minimizeDataMovement;
+  private final Enablement _minimizeDataMovement;
+  private final int _batchSizePerServer;
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
+  @Nullable
+  private final Set<String> _tablesUndergoingRebalance;
 
-  public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
-      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService, HttpClientConnectionManager connectionManager) {
+  public SegmentRelocator(TableRebalanceManager tableRebalanceManager,
+      PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
+      ControllerConf config, ControllerMetrics controllerMetrics, ExecutorService executorService,
+      HttpClientConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
+    _tableRebalanceManager = tableRebalanceManager;
     _executorService = executorService;
     _connectionManager = connectionManager;
     _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
@@ -96,14 +107,15 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _downtime = config.getSegmentRelocatorDowntime();
     _minAvailableReplicas = config.getSegmentRelocatorMinAvailableReplicas();
     _bestEfforts = config.getSegmentRelocatorBestEfforts();
-    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
-    _minimizeDataMovement = config.getSegmentRelocatorRebalanceMinimizeDataMovement();
     // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
     long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
     _externalViewCheckIntervalInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
+    _includeConsuming = config.isSegmentRelocatorIncludingConsuming();
+    _minimizeDataMovement = config.getSegmentRelocatorMinimizeDataMovement();
+    _batchSizePerServer = config.getSegmentRelocatorBatchSizePerServer();
 
     if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
       _waitingTables = ConcurrentHashMap.newKeySet();
@@ -119,20 +131,27 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
           LOGGER.warn("Got interrupted while rebalancing tables sequentially", e);
         }
       });
+      _tablesUndergoingRebalance = null;
     } else {
       _waitingTables = null;
       _waitingQueue = null;
+      _tablesUndergoingRebalance = ConcurrentHashMap.newKeySet();
     }
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
     if (_waitingTables == null) {
-      LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
-      _executorService.submit(() -> rebalanceTable(tableNameWithType));
-      return;
+      assert _tablesUndergoingRebalance != null;
+      if (!_tablesUndergoingRebalance.contains(tableNameWithType)) {
+        LOGGER.debug("Rebalance table: {} immediately", tableNameWithType);
+        _executorService.submit(() -> rebalanceTable(tableNameWithType));
+      } else {
+        LOGGER.info("The previous rebalance has not yet completed, skip rebalancing table {}", tableNameWithType);
+      }
+    } else {
+      putTableToWait(tableNameWithType);
     }
-    putTableToWait(tableNameWithType);
   }
 
   @VisibleForTesting
@@ -193,7 +212,16 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
     rebalanceConfig.setIncludeConsuming(_includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
+    rebalanceConfig.setBatchSizePerServer(_batchSizePerServer);
 
+    if (_tablesUndergoingRebalance != null) {
+      LOGGER.debug("Start rebalancing table: {}, adding to tablesUndergoingRebalance", tableNameWithType);
+      if (!_tablesUndergoingRebalance.add(tableNameWithType)) {
+        LOGGER.warn("Skip rebalancing table: {}, table already exists in tablesUndergoingRebalance, a rebalance "
+            + "must have already been started", tableNameWithType);
+        return;
+      }
+    }
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
@@ -201,8 +229,14 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // all segments are put on the right servers. If any segments are not on their target tier, the server local
       // tier migration is triggered for them, basically asking the hosting servers to reload them. The segment
       // target tier may get changed between the two sequential actions, but cluster states converge eventually.
-      RebalanceResult rebalance = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
-          TableRebalancer.createUniqueRebalanceJobIdentifier(), false);
+
+      // We're not using the async rebalance API here because we want to run this on a separate thread pool from the
+      // rebalance thread pool that is used for user initiated rebalances.
+
+      // Retries are disabled because SegmentRelocator itself is a periodic controller task, so we don't want the
+      // RebalanceChecker to unnecessarily retry any such failed rebalances.
+      RebalanceResult rebalance = _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
+          TableRebalancer.createUniqueRebalanceJobIdentifier(), true, false);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
@@ -218,6 +252,11 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       }
     } catch (Throwable t) {
       LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+    } finally {
+      if (_tablesUndergoingRebalance != null) {
+        LOGGER.debug("Done rebalancing table: {}, removing from tablesUndergoingRebalance", tableNameWithType);
+        _tablesUndergoingRebalance.remove(tableNameWithType);
+      }
     }
   }
 
@@ -268,7 +307,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         }
       }
     }
-    if (serverToSegmentsToMigrate.size() > 0) {
+    if (!serverToSegmentsToMigrate.isEmpty()) {
       LOGGER.info("Notify servers: {} to move segments to new tiers locally", serverToSegmentsToMigrate.keySet());
       reloadSegmentsForLocalTierMigration(tableNameWithType, serverToSegmentsToMigrate, messagingService);
     } else {

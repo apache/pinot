@@ -46,7 +46,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -337,7 +337,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
 
         Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-        String statName = LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
+        String statName = LeafOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
         int numSegmentsQueried = entry.getValue().get(statName).asInt();
         Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
       }
@@ -356,7 +356,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (except == null) {
         throw e;
       } else {
-        Pattern pattern = Pattern.compile(except);
+        Pattern pattern = Pattern.compile(except, Pattern.DOTALL);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
             String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
                 except));

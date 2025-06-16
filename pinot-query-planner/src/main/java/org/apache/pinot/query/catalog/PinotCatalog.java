@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.catalog;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -63,15 +63,25 @@ public class PinotCatalog implements Schema {
    * @param name name of the table.
    * @return table object used by calcite planner.
    */
+  @Nullable
   @Override
   public Table getTable(String name) {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
 
-    Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
+    if (tableName == null) {
+      tableName = _tableCache.getActualLogicalTableName(physicalTableName);
+    }
+
+    if (tableName == null) {
+      return null;
+    }
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
-    Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
+    if (schema == null) {
+      return null;
+    }
+
     return new PinotTable(schema);
   }
 
@@ -81,15 +91,10 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    Set<String> result = new HashSet<>();
-    for (String tableName: _tableCache.getTableNameMap().keySet()) {
-      if (DatabaseUtils.isPartOfDatabase(tableName, _databaseName)) {
-        result.add(tableName);
-        // if table has no prefix the next add(n) will have no effect
-        result.add(DatabaseUtils.removeDatabasePrefix(tableName, _databaseName));
-      }
-    }
-    return result;
+    return Stream.concat(_tableCache.getTableNameMap().keySet().stream(),
+            _tableCache.getLogicalTableNameMap().keySet().stream())
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+        .collect(Collectors.toSet());
   }
 
   @Override

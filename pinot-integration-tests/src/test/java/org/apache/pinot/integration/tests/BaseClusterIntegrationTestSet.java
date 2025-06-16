@@ -281,6 +281,28 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay "
         + "FROM mytable";
     testQuery(query);
+
+    // Test CAST
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS VARCHAR) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL'";
+    testQuery(query);
+    query =
+        "SELECT CAST(CAST(ArrTime AS STRING) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
+            + "ORDER BY ArrTime DESC";
+    h2Query =
+        "SELECT CAST(CAST(ArrTime AS VARCHAR) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL' ORDER BY ArrTime DESC";
+    testQuery(query, h2Query);
+
+    // Test orderedPreferredReplicas option which will fallbacks to non preferred replica groups
+    // when non of preferred replicas is available
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredReplicas=0|1)";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
+    query = "SET orderedPreferredReplicas='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
   }
 
   private void testHardcodedQueriesV2()
@@ -308,18 +330,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   private void testHardCodedQueriesV1()
       throws Exception {
-    String query;
-    String h2Query;
-    // TODO: move to common when multistage support CAST AS 'LONG', for now it must use: CAST AS BIGINT
-    query =
-        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
-            + "'DL'";
-    testQuery(query);
-    query =
-        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
-            + "ORDER BY ArrTime DESC";
-    testQuery(query);
-
     // Non-Standard SQL syntax:
     // IN_ID_SET
     {

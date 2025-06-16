@@ -242,7 +242,9 @@ public class TableRebalanceProgressStats {
       int remainingSegmentsToChange) {
     double elapsedTimeInSeconds = (double) (System.currentTimeMillis() - startTime) / 1000.0;
     int segmentsAlreadyChanged = totalSegmentsToChange - remainingSegmentsToChange;
-    return segmentsAlreadyChanged == 0 ? totalSegmentsToChange == 0 ? 0.0 : -1.0
+    // If carry over + remaining segments to change are > total segments to change then number of segments already
+    // changed may be -ve, in which case we should just set the default value as we cannot measure elapsed time
+    return segmentsAlreadyChanged <= 0 ? totalSegmentsToChange == 0 ? 0.0 : -1.0
         : (double) remainingSegmentsToChange / (double) segmentsAlreadyChanged * elapsedTimeInSeconds;
   }
 
@@ -337,6 +339,24 @@ public class TableRebalanceProgressStats {
       _averageSegmentSizeInBytes = 0;
       _totalEstimatedDataToBeMovedInBytes = 0;
       _startTimeMs = 0;
+    }
+
+    RebalanceProgressStats(RebalanceProgressStats other) {
+      _totalSegmentsToBeAdded = other._totalSegmentsToBeAdded;
+      _totalSegmentsToBeDeleted = other._totalSegmentsToBeDeleted;
+      _totalRemainingSegmentsToBeAdded = other._totalRemainingSegmentsToBeAdded;
+      _totalRemainingSegmentsToBeDeleted = other._totalRemainingSegmentsToBeDeleted;
+      _totalRemainingSegmentsToConverge = other._totalRemainingSegmentsToConverge;
+      _totalCarryOverSegmentsToBeAdded = other._totalCarryOverSegmentsToBeAdded;
+      _totalCarryOverSegmentsToBeDeleted = other._totalCarryOverSegmentsToBeDeleted;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = other._totalUniqueNewUntrackedSegmentsDuringRebalance;
+      _percentageRemainingSegmentsToBeAdded = other._percentageRemainingSegmentsToBeAdded;
+      _percentageRemainingSegmentsToBeDeleted = other._percentageRemainingSegmentsToBeDeleted;
+      _estimatedTimeToCompleteAddsInSeconds = other._estimatedTimeToCompleteAddsInSeconds;
+      _estimatedTimeToCompleteDeletesInSeconds = other._estimatedTimeToCompleteDeletesInSeconds;
+      _averageSegmentSizeInBytes = other._averageSegmentSizeInBytes;
+      _totalEstimatedDataToBeMovedInBytes = other._totalEstimatedDataToBeMovedInBytes;
+      _startTimeMs = other._startTimeMs;
     }
 
     @Override

@@ -36,7 +36,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -61,6 +63,9 @@ public class PinotBrokerRouting {
   @Inject
   BrokerRoutingManager _routingManager;
 
+  @Inject
+  private HelixManager _helixManager;
+
   @PUT
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
@@ -71,9 +76,13 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String buildRouting(
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String physicalOrLogicalTableName,
       @Context HttpHeaders headers) {
-    _routingManager.buildRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
+    if (ZKMetadataProvider.isLogicalTableExists(_helixManager.getHelixPropertyStore(), physicalOrLogicalTableName)) {
+      _routingManager.buildRoutingForLogicalTable(physicalOrLogicalTableName);
+    } else {
+      _routingManager.buildRouting(DatabaseUtils.translateTableName(physicalOrLogicalTableName, headers));
+    }
     return "Success";
   }
 
@@ -104,9 +113,13 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String removeRouting(
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String physicalOrLogicalTableName,
       @Context HttpHeaders headers) {
-    _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
+    if (ZKMetadataProvider.isLogicalTableExists(_helixManager.getHelixPropertyStore(), physicalOrLogicalTableName)) {
+      _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTableName);
+    } else {
+      _routingManager.removeRouting(DatabaseUtils.translateTableName(physicalOrLogicalTableName, headers));
+    }
     return "Success";
   }
 }

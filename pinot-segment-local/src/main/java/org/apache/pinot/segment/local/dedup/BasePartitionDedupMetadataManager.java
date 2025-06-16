@@ -97,6 +97,11 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   }
 
   @Override
+  public DedupContext getContext() {
+    return _context;
+  }
+
+  @Override
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
     throw new UnsupportedOperationException(
         "checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) is " + "deprecated!");

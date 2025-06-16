@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, DialogContent, Grid, makeStyles, Theme} from '@material-ui/core';
+import { createStyles, DialogContent, Grid, makeStyles, Theme, Button, ButtonGroup } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import SimpleAccordion from '../../SimpleAccordion';
 import AddTableComponent from './AddTableComponent';
@@ -47,6 +47,11 @@ const useStyles = makeStyles((theme: Theme) =>
     },
   })
 );
+// View modes for simple form or raw JSON editing
+enum EditView {
+  SIMPLE = "SIMPLE",
+  JSON = "JSON"
+}
 
 type Props = {
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void,
@@ -143,6 +148,8 @@ export default function AddRealtimeTableOp({
   tableType
 }: Props) {
   const classes = useStyles();
+  const [editView, setEditView] = useState<EditView>(EditView.SIMPLE);
+  const [jsonTableObj, setJsonTableObj] = useState(JSON.parse(JSON.stringify(defaultTableObj)));
   const [tableObj, setTableObj] = useState(JSON.parse(JSON.stringify(defaultTableObj)));
   const [schemaObj, setSchemaObj] = useState(JSON.parse(JSON.stringify(defaultSchemaObj)));
   const [tableName, setTableName] = useState('');
@@ -163,6 +170,14 @@ export default function AddRealtimeTableOp({
   useEffect(()=>{
     setTableObj({...tableObj,"tableType":tableType})
   },[])
+  // Sync state when toggling between simple and JSON view
+  useEffect(() => {
+    if (editView === EditView.JSON) {
+      setJsonTableObj(JSON.parse(JSON.stringify(tableObj)));
+    } else {
+      setTableObj(JSON.parse(JSON.stringify(jsonTableObj)));
+    }
+  }, [editView]);
 
   const updateSchemaObj = async (tableName) => {
     //table name is same as schema name
@@ -238,15 +253,33 @@ const checkFields = (tableObj,fields) => {
   };
 
   const handleSave = async () => {
-    if(await validateTableConfig()){
-      const tableCreationResp = await PinotMethodUtils.saveTableAction(tableObj);
-      dispatch({
-        type: (tableCreationResp.error || typeof tableCreationResp === 'string') ? 'error' : 'success',
-        message: tableCreationResp.error || tableCreationResp.status || tableCreationResp,
-        show: true
-      });
-      tableCreationResp.status && fetchData();
-      tableCreationResp.status && hideModal(null);
+    // Determine which config to save based on view
+    const configToSave = editView === EditView.SIMPLE ? tableObj : jsonTableObj;
+    // Validate based on view
+    if (editView === EditView.SIMPLE) {
+      if (!await validateTableConfig()) {
+        return;
+      }
+    } else {
+      const validTable = await PinotMethodUtils.validateTableAction(configToSave);
+      if (validTable.error || typeof validTable === 'string') {
+        dispatch({
+          type: 'error',
+          message: validTable.error || validTable,
+          show: true
+        });
+        return;
+      }
+    }
+    const tableCreationResp = await PinotMethodUtils.saveTableAction(configToSave);
+    dispatch({
+      type: (tableCreationResp.error || typeof tableCreationResp === 'string') ? 'error' : 'success',
+      message: tableCreationResp.error || tableCreationResp.status || tableCreationResp,
+      show: true
+    });
+    if (tableCreationResp.status) {
+      fetchData();
+      hideModal(null);
     }
   };
 
@@ -267,13 +300,32 @@ const checkFields = (tableObj,fields) => {
       open={true}
       handleClose={hideModal}
       handleSave={handleSave}
-      title={`Add ${tableType} Table`}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Add {tableType} Table</span>
+          <ButtonGroup size="small" color="primary">
+            <Button
+              variant={editView === EditView.SIMPLE ? 'contained' : 'outlined'}
+              onClick={() => setEditView(EditView.SIMPLE)}
+            >
+              Simple
+            </Button>
+            <Button
+              variant={editView === EditView.JSON ? 'contained' : 'outlined'}
+              onClick={() => setEditView(EditView.JSON)}
+            >
+              Json
+            </Button>
+          </ButtonGroup>
+        </div>
+      }
       size="xl"
       disableBackdropClick={true}
       disableEscapeKeyDown={true}
     >
       <DialogContent>
-        <Grid container spacing={2}>
+        {editView === EditView.SIMPLE && (
+          <Grid container spacing={2}>
           <Grid item xs={12}>
             <SimpleAccordion
               headerTitle="Add Table"
@@ -395,6 +447,19 @@ const checkFields = (tableObj,fields) => {
             </div>
           </Grid>
         </Grid>
+        )}
+        {editView === EditView.JSON && (
+          <CustomCodemirror
+            data={jsonTableObj}
+            isEditable={true}
+            returnCodemirrorValue={(newValue) => {
+              try {
+                const jsonObj = JSON.parse(newValue);
+                setJsonTableObj(jsonObj);
+              } catch (e) {}
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

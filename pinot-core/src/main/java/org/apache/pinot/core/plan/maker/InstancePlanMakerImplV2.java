@@ -217,6 +217,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipStarTree
     queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions));
 
+    // Set accurateGroupByWithoutOrderBy
+    queryContext.setAccurateGroupByWithoutOrderBy(
+        QueryOptionsUtils.isAccurateGroupByWithoutOrderBy(queryOptions));
+
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
 
@@ -380,8 +384,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       for (Pair<AggregationFunction, FilterContext> filteredAggregationFunction : filtAggrFuns) {
         FilterContext right = filteredAggregationFunction.getRight();
         if (right != null) {
-          Predicate predicate = right.getPredicate();
-          predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+          overrideWithExpressionHints(right, indexSegment, expressionOverrideHints);
         }
       }
     }

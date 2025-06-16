@@ -29,16 +29,16 @@ import javax.annotation.Nullable;
  * The {@code DoubleLookupTable} is a lookup table for double keys.
  */
 @SuppressWarnings("unchecked")
-public class DoubleLookupTable extends LookupTable {
+public class DoubleLookupTable extends PrimitiveLookupTable {
   private final Double2ObjectOpenHashMap<Object> _lookupTable = new Double2ObjectOpenHashMap<>(INITIAL_CAPACITY);
 
   @Override
-  public void addRow(Object key, Object[] row) {
+  public void addRowNotNullKey(Object key, Object[] row) {
     _lookupTable.compute((double) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
-  public void finish() {
+  public void finishNotNullKey() {
     if (!_keysUnique) {
       for (Double2ObjectMap.Entry<Object> entry : _lookupTable.double2ObjectEntrySet()) {
         convertValueToList(entry);
@@ -47,19 +47,19 @@ public class DoubleLookupTable extends LookupTable {
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  public boolean containsNotNullKey(Object key) {
     return _lookupTable.containsKey((double) key);
   }
 
   @Nullable
   @Override
-  public Object lookup(Object key) {
+  public Object lookupNotNullKey(Object key) {
     return _lookupTable.get((double) key);
   }
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
+  public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.double2ObjectEntrySet();
   }
 }

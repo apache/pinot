@@ -39,9 +39,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.integration.tests.models.DummyTableUpsertMetadataManager;
-import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -49,7 +47,8 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -392,9 +391,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   public void testDefaultMetadataManagerClass()
       throws Exception {
     PinotConfiguration serverConf = getServerConf(NUM_SERVERS);
-    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-            HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
-            TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
+    serverConf.setProperty(Joiner.on(".")
+            .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+                Server.Upsert.DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
     BaseServerStarter serverStarter = startOneServer(serverConf);
 
@@ -446,7 +445,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     String tableName = "gameScoresWithCompaction";
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     tableConfig.setTaskConfig(getCompactionTaskConfig());
     updateTableConfig(tableConfig);

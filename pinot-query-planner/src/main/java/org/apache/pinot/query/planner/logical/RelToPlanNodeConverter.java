@@ -37,6 +37,7 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -49,6 +50,7 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -58,7 +60,6 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
@@ -93,12 +94,9 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
-  private final TableCache _tableCache;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
-      TableCache tableCache) {
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     _tracker = tracker;
-    _tableCache = tableCache;
   }
 
   /**
@@ -126,6 +124,13 @@ public final class RelToPlanNodeConverter {
         _joinFound = true;
       }
       result = convertLogicalJoin((LogicalJoin) node);
+    } else if (node instanceof LogicalAsofJoin) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
+      if (!_joinFound) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
+        _joinFound = true;
+      }
+      result = convertLogicalAsofJoin((LogicalAsofJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
@@ -185,7 +190,7 @@ public final class RelToPlanNodeConverter {
       }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
+        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null);
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {
@@ -206,11 +211,17 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), literalRows);
   }
 
+  /**
+   * TODO: Add support for exclude clauses ({@link org.apache.calcite.rex.RexWindowExclusion})
+   */
   private WindowNode convertLogicalWindow(LogicalWindow node) {
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(node.groups.size() == 1, "Only a single window group is allowed, got: %s",
         node.groups.size());
     Window.Group windowGroup = node.groups.get(0);
+
+    Preconditions.checkState(windowGroup.exclude == RexWindowExclusion.EXCLUDE_NO_OTHER,
+        "EXCLUDE clauses for window functions are not currently supported");
 
     int numAggregates = windowGroup.aggCalls.size();
     List<RexExpression.FunctionCall> aggCalls = new ArrayList<>(numAggregates);
@@ -290,7 +301,7 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
-    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
@@ -353,6 +364,47 @@ public final class RelToPlanNodeConverter {
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy);
+  }
+
+  private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
+    JoinInfo joinInfo = join.analyzeCondition();
+    DataSchema dataSchema = toDataSchema(join.getRowType());
+    List<PlanNode> inputs = convertInputs(join.getInputs());
+    JoinRelType joinType = join.getJoinType();
+
+    // Basic validations
+    Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
+    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty(),
+        "Non-equi conditions are not supported for ASOF join, got: %s", joinInfo.nonEquiConditions);
+    Preconditions.checkState(joinType == JoinRelType.ASOF || joinType == JoinRelType.LEFT_ASOF,
+        "Join type should be ASOF or LEFT_ASOF, got: %s", joinType);
+
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+    int numLeftColumns = left.getDataSchema().size();
+    int numResultColumns = dataSchema.size();
+    int numRightColumns = right.getDataSchema().size();
+    Preconditions.checkState(numLeftColumns + numRightColumns == numResultColumns,
+        "Invalid number of columns for join type: %s, left: %s, right: %s, result: %s", joinType, numLeftColumns,
+        numRightColumns, numResultColumns);
+
+    RexExpression matchCondition = RexExpressionUtils.fromRexNode(join.getMatchCondition());
+    Preconditions.checkState(matchCondition != null, "ASOF_JOIN must have a match condition");
+    Preconditions.checkState(matchCondition instanceof RexExpression.FunctionCall,
+        "ASOF JOIN only supports function call match condition, got: %s", matchCondition);
+
+    List<RexExpression> matchKeys = ((RexExpression.FunctionCall) matchCondition).getFunctionOperands();
+    // TODO: Add support for MATCH_CONDITION containing two columns of different types. In that case, there would be
+    //       a CAST RexExpression.FunctionCall on top of the RexExpression.InputRef, and the physical ASOF join operator
+    //       can't currently handle that.
+    Preconditions.checkState(
+        matchKeys.size() == 2 && matchKeys.get(0) instanceof RexExpression.InputRef
+            && matchKeys.get(1) instanceof RexExpression.InputRef,
+        "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
+
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
   }
 
   private List<PlanNode> convertInputs(List<RelNode> inputs) {

@@ -49,6 +49,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -56,18 +57,17 @@ import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableD
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
-import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
+import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -150,33 +150,23 @@ public class MutableSegmentImpl implements MutableSegment {
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private boolean _indexCapacityThresholdBreached;
-
   private final IdMap<FixedIntArray> _recordIdMap;
-
-  private volatile int _numDocsIndexed = 0;
   private final int _numKeyColumns;
-
   // Cache the physical (non-virtual) field specs
   private final Collection<FieldSpec> _physicalFieldSpecs;
   private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
   private final Collection<ComplexFieldSpec> _physicalComplexFieldSpecs;
-
-  // default message metadata
-  private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
-  private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
-
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _dedupTimeColumn;
-
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
-  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
-  private final String _upsertOutOfOrderRecordColumn;
   private final boolean _upsertDropOutOfOrderRecord;
+  private final String _upsertOutOfOrderRecordColumn;
+  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
+
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -187,6 +177,11 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
+  private boolean _indexCapacityThresholdBreached;
+  private volatile int _numDocsIndexed = 0;
+  // default message metadata
+  private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
+  private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -394,23 +389,20 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
-    if (_partitionDedupMetadataManager != null) {
-      _dedupTimeColumn = config.getDedupTimeColumn() == null ? _timeColumnName : config.getDedupTimeColumn();
-    } else {
-      _dedupTimeColumn = null;
-    }
+    _dedupTimeColumn =
+        _partitionDedupMetadataManager != null ? _partitionDedupMetadataManager.getContext().getDedupTimeColumn()
+            : null;
 
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
-    _upsertConsistencyMode = config.getUpsertConsistencyMode();
     if (_partitionUpsertMetadataManager != null) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
-      List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
-      _upsertComparisonColumns =
-          upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
-      _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
-      _upsertOutOfOrderRecordColumn = config.getUpsertOutOfOrderRecordColumn();
-      _upsertDropOutOfOrderRecord = config.isUpsertDropOutOfOrderRecord();
+      UpsertContext upsertContext = _partitionUpsertMetadataManager.getContext();
+      _upsertComparisonColumns = upsertContext.getComparisonColumns();
+      _deleteRecordColumn = upsertContext.getDeleteRecordColumn();
+      _upsertDropOutOfOrderRecord = upsertContext.isDropOutOfOrderRecord();
+      _upsertOutOfOrderRecordColumn = upsertContext.getOutOfOrderRecordColumn();
+      _upsertConsistencyMode = upsertContext.getConsistencyMode();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
@@ -420,11 +412,60 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       _upsertComparisonColumns = null;
       _deleteRecordColumn = null;
+      _upsertDropOutOfOrderRecord = false;
+      _upsertOutOfOrderRecordColumn = null;
+      _upsertConsistencyMode = null;
       _validDocIds = null;
       _queryableDocIds = null;
-      _upsertOutOfOrderRecordColumn = null;
-      _upsertDropOutOfOrderRecord = false;
     }
+  }
+
+  private static Map<String, Pair<String, ValueAggregator>> getMetricsAggregators(RealtimeSegmentConfig segmentConfig) {
+    if (segmentConfig.aggregateMetrics()) {
+      return fromAggregateMetrics(segmentConfig);
+    } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
+      return fromAggregationConfig(segmentConfig);
+    } else {
+      return Collections.emptyMap();
+    }
+  }
+
+  private static Map<String, Pair<String, ValueAggregator>> fromAggregateMetrics(RealtimeSegmentConfig segmentConfig) {
+    Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
+
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+    for (String metricName : segmentConfig.getSchema().getMetricNames()) {
+      columnNameToAggregator.put(metricName, Pair.of(metricName,
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
+    }
+    return columnNameToAggregator;
+  }
+
+  private static Map<String, Pair<String, ValueAggregator>> fromAggregationConfig(RealtimeSegmentConfig segmentConfig) {
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+
+    Preconditions.checkState(!segmentConfig.aggregateMetrics(),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
+    for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
+      ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
+      // validation is also done when the table is created, this is just a sanity check.
+      Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+          "aggregation function must be a function: %s", config);
+      FunctionContext functionContext = expressionContext.getFunction();
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      TableConfigUtils.validateIngestionAggregation(functionType);
+      ExpressionContext argument = functionContext.getArguments().get(0);
+      Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
+          "aggregator function argument must be a identifier: %s", config);
+
+      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
+          ValueAggregatorFactory.getValueAggregator(functionType,
+              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
+    }
+
+    return columnNameToAggregator;
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -659,7 +700,8 @@ public class MutableSegmentImpl implements MutableSegment {
    * @throws UnsupportedOperationException if the length of an MV column would exceed the
    * capacity of a chunk in the ForwardIndex
    */
-  private void validateLengthOfMVColumns(GenericRow row) throws UnsupportedOperationException {
+  private void validateLengthOfMVColumns(GenericRow row)
+      throws UnsupportedOperationException {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       FieldSpec fieldSpec = indexContainer._fieldSpec;
@@ -680,7 +722,6 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
   }
-
 
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -704,6 +745,7 @@ public class MutableSegmentImpl implements MutableSegment {
         indexContainer._minValue = dictionary.getMinVal();
         indexContainer._maxValue = dictionary.getMaxVal();
       }
+      updateIndexCapacityThresholdBreached(dictionary, entry.getKey());
     }
   }
 
@@ -790,7 +832,9 @@ public class MutableSegmentImpl implements MutableSegment {
         int dictId = indexContainer._dictId;
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
-            indexEntry.getValue().add(value, dictId, docId);
+            MutableIndex mutableIndex = indexEntry.getValue();
+            mutableIndex.add(value, dictId, docId);
+            updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
@@ -831,24 +875,43 @@ public class MutableSegmentImpl implements MutableSegment {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
             mutableIndex.add(values, dictIds, docId);
-            // Few of the Immutable version of the mutable index are bounded by size like FixedBitMVForwardIndex.
-            // If num of values overflows or size is above limit, A mutable index is unable to convert to
-            // an immutable index and segment build fails causing the realtime consumption to stop.
-            // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
-            // implementations are changed.
-            if (!_indexCapacityThresholdBreached && !mutableIndex.canAddMore()) {
-              _logger.info(
-                  "Index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
-                  indexEntry.getKey(), column
-              );
-              _indexCapacityThresholdBreached = true;
-            }
+            updateIndexCapacityThresholdBreached(mutableIndex, indexEntry.getKey(), column);
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
         }
         indexContainer._valuesInfo.updateMVNumValues(values.length);
       }
+    }
+  }
+
+  private void updateIndexCapacityThresholdBreached(MutableIndex mutableIndex, IndexType indexType, String column) {
+    // Few of the Immutable version of the mutable index are bounded by size like
+    // {@link VarByteChunkForwardIndexWriterV4#putBytes(byte[])} and {@link FixedBitMVForwardIndex}
+    // If num of values or size is above limit, A mutable index is unable to convert to an immutable index and segment
+    // build fails causing the realtime consumption to stop. Hence, The below check is a temporary measure to avoid
+    // such scenarios until immutable index implementations are changed.
+    if (!_indexCapacityThresholdBreached && !mutableIndex.canAddMore()) {
+      _logger.info(
+          "Index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
+          indexType, column
+      );
+      _indexCapacityThresholdBreached = true;
+    }
+  }
+
+  private void updateIndexCapacityThresholdBreached(MutableDictionary dictionary, String column) {
+    // If optimizeDictionary is enabled, Immutable version of the mutable dictionary may become raw forward index.
+    // Some of them may be bounded by size like
+    // {@link VarByteChunkForwardIndexWriterV4#putBytes(byte[])} and {@link FixedBitMVForwardIndex}
+    // If num of values or size is above limit, A mutable index is unable to convert to an immutable index and segment
+    // build fails causing the realtime consumption to stop. Hence, The below check is a temporary measure to avoid
+    // such scenarios until immutable index implementations are changed.
+    if (!_indexCapacityThresholdBreached && !dictionary.canAddMore()) {
+      _logger.info(
+          "Dictionary for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true", column
+      );
+      _indexCapacityThresholdBreached = true;
     }
   }
 
@@ -984,24 +1047,36 @@ public class MutableSegmentImpl implements MutableSegment {
     return physicalColumnNames;
   }
 
+  @Nullable
   @Override
-  public DataSource getDataSource(String column) {
+  public DataSource getDataSourceNullable(String column) {
     IndexContainer indexContainer = _indexContainerMap.get(column);
     if (indexContainer != null) {
       // Physical column
       return indexContainer.toDataSource();
-    } else {
-      // Virtual column
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-      Preconditions.checkState(fieldSpec != null && fieldSpec.isVirtualColumn(), "Failed to find column: %s", column);
-      // TODO: Refactor virtual column provider to directly generate data source
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
-      return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
-          virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
     }
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    if (fieldSpec != null && fieldSpec.isVirtualColumn()) {
+      // Virtual column
+      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      return VirtualColumnProviderFactory.buildProvider(virtualColumnContext).buildDataSource(virtualColumnContext);
+    }
+    return null;
   }
 
+  @Override
+  public DataSource getDataSource(String column, Schema schema) {
+    DataSource dataSource = getDataSourceNullable(column);
+    if (dataSource != null) {
+      return dataSource;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
+        schema.getSchemaName());
+    return IndexSegmentUtils.createVirtualDataSource(new VirtualColumnContext(fieldSpec, _numDocsIndexed));
+  }
+
+  @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;
@@ -1339,54 +1414,6 @@ public class MutableSegmentImpl implements MutableSegment {
           throw new IllegalStateException("Invalid type=" + dataType);
       }
     }
-  }
-
-  private static Map<String, Pair<String, ValueAggregator>> getMetricsAggregators(RealtimeSegmentConfig segmentConfig) {
-    if (segmentConfig.aggregateMetrics()) {
-      return fromAggregateMetrics(segmentConfig);
-    } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
-      return fromAggregationConfig(segmentConfig);
-    } else {
-      return Collections.emptyMap();
-    }
-  }
-
-  private static Map<String, Pair<String, ValueAggregator>> fromAggregateMetrics(RealtimeSegmentConfig segmentConfig) {
-    Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
-        "aggregateMetrics cannot be enabled if AggregationConfig is set");
-
-    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-    for (String metricName : segmentConfig.getSchema().getMetricNames()) {
-      columnNameToAggregator.put(metricName, Pair.of(metricName,
-          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
-    }
-    return columnNameToAggregator;
-  }
-
-  private static Map<String, Pair<String, ValueAggregator>> fromAggregationConfig(RealtimeSegmentConfig segmentConfig) {
-    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-
-    Preconditions.checkState(!segmentConfig.aggregateMetrics(),
-        "aggregateMetrics cannot be enabled if AggregationConfig is set");
-    for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
-      ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
-      // validation is also done when the table is created, this is just a sanity check.
-      Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
-          "aggregation function must be a function: %s", config);
-      FunctionContext functionContext = expressionContext.getFunction();
-      AggregationFunctionType functionType =
-          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-      TableConfigUtils.validateIngestionAggregation(functionType);
-      ExpressionContext argument = functionContext.getArguments().get(0);
-      Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-          "aggregator function argument must be a identifier: %s", config);
-
-      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
-          ValueAggregatorFactory.getValueAggregator(functionType,
-              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
-    }
-
-    return columnNameToAggregator;
   }
 
   private class IndexContainer implements Closeable {

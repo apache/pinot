@@ -380,7 +380,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
-  public void segmentBeingCommmitted() {
+  public void segmentBeingCommitted() {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";

@@ -45,10 +45,7 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalUnion;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalValues;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
-import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRule;
 import org.apache.pinot.query.planner.physical.v2.opt.PhysicalOptRuleSet;
-import org.apache.pinot.query.planner.physical.v2.opt.RuleExecutor;
-import org.apache.pinot.query.planner.physical.v2.opt.RuleExecutors;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +66,9 @@ public class RelToPRelConverter {
     // Step-2: Assign traits
     rootPRelNode = TraitAssignment.assign(rootPRelNode, context);
     // Step-3: Run physical optimizer rules.
-    var ruleAndExecutorList = PhysicalOptRuleSet.create(context, tableCache);
-    for (var ruleAndExecutor : ruleAndExecutorList) {
-      PRelOptRule rule = ruleAndExecutor.getLeft();
-      RuleExecutor executor = RuleExecutors.create(ruleAndExecutor.getRight(), rule, context);
-      rootPRelNode = executor.execute(rootPRelNode);
+    var pRelTransformers = PhysicalOptRuleSet.create(context, tableCache);
+    for (var pRelTransformer : pRelTransformers) {
+      rootPRelNode = pRelTransformer.execute(rootPRelNode);
     }
     return rootPRelNode;
   }
@@ -99,9 +94,11 @@ public class RelToPRelConverter {
     } else if (relNode instanceof PinotLogicalAggregate) {
       Preconditions.checkState(inputs.size() == 1, "Expected exactly 1 input of agg. Found: %s", inputs);
       PinotLogicalAggregate aggRel = (PinotLogicalAggregate) relNode;
+      // Use AggType.DIRECT here because at this point aggregation split hasn't happened yet.
+      AggregateNode.AggType aggType = AggregateNode.AggType.DIRECT;
       return new PhysicalAggregate(aggRel.getCluster(), aggRel.getTraitSet(), aggRel.getHints(), aggRel.getGroupSet(),
           aggRel.getGroupSets(), aggRel.getAggCallList(), nodeIdGenerator.get(), inputs.get(0), null, false,
-          AggregateNode.AggType.DIRECT, false, List.of(), 0);
+          aggType, aggRel.isLeafReturnFinalResult(), aggRel.getCollations(), aggRel.getLimit());
     } else if (relNode instanceof Join) {
       Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
       Join join = (Join) relNode;

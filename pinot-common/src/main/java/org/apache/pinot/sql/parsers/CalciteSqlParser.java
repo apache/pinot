@@ -100,6 +100,8 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     long parseStartTimeNs = System.nanoTime();
 
+    sql = ParserUtils.sanitizeSql(sql);
+
     // extract and remove OPTIONS string
     List<String> options = extractOptionsFromSql(sql);
     if (!options.isEmpty()) {
@@ -118,7 +120,7 @@ public class CalciteSqlParser {
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
     } catch (Throwable e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql + ": " + e.getMessage(), e);
     }
   }
 

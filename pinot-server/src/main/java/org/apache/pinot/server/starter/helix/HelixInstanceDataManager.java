@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -42,10 +44,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.config.provider.LogicalTableMetadataCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -63,9 +67,11 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -79,7 +85,11 @@ import org.slf4j.LoggerFactory;
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+  private final Map<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+
+  // Logical table metadata cache to cache logical table configs, schemas, and offline/realtime table configs.
+  private final LogicalTableMetadataCache _logicalTableMetadataCache = new LogicalTableMetadataCache();
+
   // TODO: Consider making segment locks per table instead of per instance
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
@@ -130,9 +140,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     initInstanceDataDir(instanceDataDir);
 
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-    if (!instanceSegmentTarDir.exists()) {
-      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
-    }
+    initInstanceSegmentTarDir(instanceSegmentTarDir);
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
@@ -160,7 +168,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
-  private void initInstanceDataDir(File instanceDataDir) {
+  @VisibleForTesting
+  void initInstanceDataDir(File instanceDataDir) {
     if (!instanceDataDir.exists()) {
       Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
     } else {
@@ -184,6 +193,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+    // Ensure we can write to the instance data dir
+    Preconditions.checkState(instanceDataDir.canWrite(), "Cannot write to the instance data dir: %s", instanceDataDir);
+  }
+
+  @VisibleForTesting
+  void initInstanceSegmentTarDir(File instanceSegmentTarDir) {
+    if (!instanceSegmentTarDir.exists()) {
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
+          instanceSegmentTarDir);
+    }
+    // Ensure we can write to the instance segment tar dir
+    Preconditions.checkState(instanceSegmentTarDir.canWrite(), "Cannot write to the instance segment tar dir: %s",
+        instanceSegmentTarDir);
   }
 
   @Override
@@ -211,6 +233,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void start() {
     _propertyStore = _helixManager.getHelixPropertyStore();
+    // Initialize logical table metadata cache
+    _logicalTableMetadataCache.init(_propertyStore);
+
     LOGGER.info("Helix instance data manager started");
   }
 
@@ -238,6 +263,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
+    // shutdown logical table metadata cache
+    _logicalTableMetadataCache.shutdown();
     LOGGER.info("Helix instance data manager shut down");
   }
 
@@ -297,6 +324,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
             _segmentReloadExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
@@ -513,5 +541,39 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       });
     }
+  }
+
+  @Nullable
+  @Override
+  public LogicalTableContext getLogicalTableContext(String logicalTableName) {
+    Schema schema = _logicalTableMetadataCache.getSchema(logicalTableName);
+    if (schema == null) {
+      LOGGER.warn("Failed to find schema for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+    LogicalTableConfig logicalTableConfig = _logicalTableMetadataCache.getLogicalTableConfig(logicalTableName);
+    if (logicalTableConfig == null) {
+      LOGGER.warn("Failed to find logical table config for logical table: {}, skipping", logicalTableName);
+      return null;
+    }
+
+    TableConfig offlineTableConfig = null;
+    if (logicalTableConfig.getRefOfflineTableName() != null) {
+      offlineTableConfig = _logicalTableMetadataCache.getTableConfig(logicalTableConfig.getRefOfflineTableName());
+      if (offlineTableConfig == null) {
+        LOGGER.warn("Failed to find offline table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+
+    TableConfig realtimeTableConfig = null;
+    if (logicalTableConfig.getRefRealtimeTableName() != null) {
+      realtimeTableConfig = _logicalTableMetadataCache.getTableConfig(logicalTableConfig.getRefRealtimeTableName());
+      if (realtimeTableConfig == null) {
+        LOGGER.warn("Failed to find realtime table config for logical table: {}, skipping", logicalTableName);
+        return null;
+      }
+    }
+    return new LogicalTableContext(logicalTableConfig, schema, offlineTableConfig, realtimeTableConfig);
   }
 }

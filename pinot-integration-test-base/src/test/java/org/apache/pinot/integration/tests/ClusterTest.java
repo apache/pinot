@@ -48,6 +48,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.client.ConnectionFactory;
@@ -87,6 +88,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Listeners;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getTimeSeriesQueryApiUrl;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -550,6 +552,22 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
+   * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
+   * This is used for testing timeseries queries.
+   */
+  public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
+    try {
+      Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
+        String.valueOf(startTime), "end", String.valueOf(endTime));
+      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(getBrokerBaseApiUrl()), queryParams);
+      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
+      return sanitizeResponse(responseJsonNode);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get timeseries query: " + query, e);
+    }
+  }
+
+  /**
    * Queries the broker's query endpoint (/query/sql)
    */
   public JsonNode queryBrokerHttpEndpoint(@Language("sql") String query)
@@ -628,21 +646,27 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   private static JsonNode sanitizeResponse(JsonNode responseJsonNode) {
+    JsonNode resultTable = responseJsonNode.get("resultTable");
+    if (resultTable == null) {
+      return responseJsonNode;
+    }
+    JsonNode rows = resultTable.get("rows");
+    if (rows == null || rows.isEmpty()) {
+      return responseJsonNode;
+    }
     try {
-      DataSchema schema =
-          JsonUtils.jsonNodeToObject(responseJsonNode.get("resultTable").get("dataSchema"), DataSchema.class);
-      JsonNode rowsJsonNode = responseJsonNode.get("resultTable").get("rows");
-      if (rowsJsonNode != null) {
-        for (int i = 0; i < rowsJsonNode.size(); i++) {
-          ArrayNode rowJsonNode = (ArrayNode) rowsJsonNode.get(i);
-          for (int j = 0; j < schema.size(); j++) {
-            DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(j);
-            JsonNode jsonValue = rowJsonNode.get(j);
-            if (columnDataType.isArray()) {
-              rowJsonNode.set(j, extractArray(columnDataType, jsonValue));
-            } else if (columnDataType != DataSchema.ColumnDataType.MAP) {
-              rowJsonNode.set(j, extractValue(columnDataType, jsonValue));
-            }
+      int numRows = rows.size();
+      DataSchema dataSchema = JsonUtils.jsonNodeToObject(resultTable.get("dataSchema"), DataSchema.class);
+      int numColumns = dataSchema.size();
+      for (int i = 0; i < numRows; i++) {
+        ArrayNode row = (ArrayNode) rows.get(i);
+        for (int j = 0; j < numColumns; j++) {
+          DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(j);
+          JsonNode value = row.get(j);
+          if (columnDataType.isArray()) {
+            row.set(j, extractArray(columnDataType, value));
+          } else if (columnDataType != DataSchema.ColumnDataType.MAP) {
+            row.set(j, extractValue(columnDataType, value));
           }
         }
       }
@@ -831,5 +855,14 @@ public abstract class ClusterTest extends ControllerTest {
     if (useMultiStageQueryEngine()) {
       throw new SkipException("Some queries fail when using multi-stage engine");
     }
+  }
+
+  private static String buildQueryUrl(String baseUrl, Map<String, String> params) throws Exception {
+    URIBuilder builder = new URIBuilder(baseUrl);
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      builder.addParameter(entry.getKey(), entry.getValue());
+    }
+    URI uri = builder.build();
+    return uri.toString();
   }
 }

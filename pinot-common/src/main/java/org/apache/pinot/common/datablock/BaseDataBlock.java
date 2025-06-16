@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -84,7 +85,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressWarnings("DuplicatedCode")
 public abstract class BaseDataBlock implements DataBlock {
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
-  // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
+  /// Only values from QueryErrorCode are allowed as keys, but readers should not assume that given newer components
+  /// may have more error codes.
   protected Map<Integer, String> _errCodeToExceptionMap;
 
   protected final int _numRows;
@@ -402,7 +405,14 @@ public abstract class BaseDataBlock implements DataBlock {
     if (_serialized == null) {
       _serialized = DataBlockUtils.serialize(this);
     }
-    return _serialized;
+    // Return a copy of the serialized data to avoid external modification.
+    List<ByteBuffer> copy = new ArrayList<>(_serialized.size());
+    for (ByteBuffer page: _serialized) {
+      ByteBuffer pageCopy = page.duplicate();
+      pageCopy.order(page.order());
+      copy.add(pageCopy);
+    }
+    return copy;
   }
 
   @Override

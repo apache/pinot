@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
@@ -58,6 +58,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -1372,15 +1373,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test1.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
     // create an NRT index reader
     SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
 
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"machine learning\"");
 
     // acquire a searcher
@@ -1542,8 +1543,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test2.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    CaseAwareStandardAnalyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(50);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1553,7 +1554,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.addDocument(docToIndex);
 
     // create an NRT index reader from the writer -- should see one uncommitted document
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
     IndexReader indexReader1 = DirectoryReader.open(indexWriter);
     IndexSearcher searcher1 = new IndexSearcher(indexReader1);
@@ -1592,9 +1593,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
     // create and open a writer
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1608,7 +1609,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // start writer and reader
     Thread writer = new Thread(new RealtimeWriter(indexWriter));
-    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, standardAnalyzer));
+    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, analyzer));
 
     writer.start();
     realtimeReader.start();
@@ -1674,8 +1675,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     private final QueryParser _queryParser;
     private final SearcherManager _searcherManager;
 
-    RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
-      _queryParser = new QueryParser("skill", standardAnalyzer);
+    RealtimeReader(SearcherManager searcherManager, Analyzer analyzer) {
+      _queryParser = new QueryParser("skill", analyzer);
       _searcherManager = searcherManager;
     }
 

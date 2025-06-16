@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.helix;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 
 
 public class PinotHelixPropertyStoreZnRecordProvider {
@@ -44,11 +45,15 @@ public class PinotHelixPropertyStoreZnRecordProvider {
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forTable(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/CONFIGS/TABLES");
+    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/CONFIGS/TABLE");
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forSegments(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, "/SEGMENTS");
+  }
+
+  public static PinotHelixPropertyStoreZnRecordProvider forLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    return new PinotHelixPropertyStoreZnRecordProvider(propertyStore, ZkPaths.LOGICAL_TABLE_PARENT_PATH);
   }
 
   public ZNRecord get(String name) {

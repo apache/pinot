@@ -25,8 +25,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -43,6 +48,10 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -110,6 +119,17 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
           System.currentTimeMillis()).getSegmentName());
     }
 
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      return new ZNRecord(segmentName);
+    });
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
@@ -117,12 +137,12 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_B_NAME, null, null),
         new TierConfig(TIER_C_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_C_NAME, null, null));
-
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).setStreamConfigs(streamConfigs).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
 
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
@@ -358,8 +378,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
       return llcSegmentName.getSequenceNumber() >= 5 && llcSegmentName.getSequenceNumber() < 15;
     }
   }
@@ -374,8 +394,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
       return llcSegmentName.getSequenceNumber() >= 0 && llcSegmentName.getSequenceNumber() < 5;
     }
   }
@@ -390,7 +410,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
       return false;
     }
   }

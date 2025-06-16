@@ -28,6 +28,7 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   public static final String STAR = "*";
   public static final AggregationFunctionColumnPair COUNT_STAR =
       new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
+  public static final String COUNT_STAR_NAME = COUNT_STAR.toColumnName();
 
   private final AggregationFunctionType _functionType;
   private final String _column;

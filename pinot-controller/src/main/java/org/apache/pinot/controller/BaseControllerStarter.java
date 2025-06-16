@@ -48,6 +48,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.InstanceConfig;
@@ -93,6 +94,7 @@ import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
@@ -100,6 +102,9 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
@@ -137,6 +142,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -201,11 +207,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
-  protected ExecutorService _tenantRebalanceExecutorService;
+  // This executor should be used by all code paths for user initiated rebalances, so that the controller config
+  // CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS is honored.
+  protected ExecutorService _rebalancerExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
+  protected RebalancePreChecker _rebalancePreChecker;
+  protected TableRebalanceManager _tableRebalanceManager;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -213,16 +223,19 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _config = new ControllerConf(pinotConfiguration.toMap());
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
+    _controllerMode = _config.getControllerMode();
+    if (_controllerMode == ControllerConf.ControllerMode.DUAL
+        || _controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
+      HelixSetupUtils.setupHelixClusterWithDefaultConfigs(_helixZkURL, _helixClusterName, getDefaultClusterConfigs());
+    }
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+    applyCustomConfigs(_config);
 
-    PinotInsecureMode.setPinotInInsecureMode(Boolean.valueOf(
-        _config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     setupHelixSystemProperties();
     IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
-    _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
@@ -236,7 +249,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (_helixParticipantInstanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
       Preconditions.checkState(InstanceTypeUtils.isController(_helixParticipantInstanceId),
-          "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE,
+          "Instance id must have prefix '%s', got '%s'", Helix.PREFIX_OF_CONTROLLER_INSTANCE,
           _helixParticipantInstanceId);
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
@@ -259,9 +272,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
-      _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
-          "tenant-rebalance-thread-%d");
-      _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
     // Initialize the table config tuner registry.
@@ -271,6 +281,23 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
 
     ContinuousJfrStarter.init(_config);
+    ControllerJobTypes.init(_config);
+  }
+
+  /// Returns the default cluster configs to be stored in ZK as Helix cluster config. These configs will then be
+  /// propagated to all the instance configs to control the default behavior for each component.
+  /// Can be overridden to add more configs.
+  protected Map<String, String> getDefaultClusterConfigs() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true");
+    configs.put(Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
+    configs.put(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(Helix.DEFAULT_HYPERLOGLOG_LOG2M));
+    configs.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, "true");
+    return configs;
+  }
+
+  /// Can be overridden to apply custom configs to the controller conf.
+  protected void applyCustomConfigs(ControllerConf controllerConf) {
   }
 
   // If thread pool size is not configured executor will use cached thread pool
@@ -282,7 +309,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+      if (config.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
         final String inferredHostname = NetUtils.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);
@@ -299,14 +326,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
-        _config.getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
-            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+        _config.getProperty(Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   private void setupHelixClusterConstraints() {
-    String maxStateTransitions =
-        _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
-            CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
+    String maxStateTransitions = _config.getProperty(Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+        Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
@@ -328,7 +353,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
    * @return A new instance of PinotHelixResourceManager.
    */
   protected PinotHelixResourceManager createHelixResourceManager() {
-    return new PinotHelixResourceManager(_config, _executorService);
+    return new PinotHelixResourceManager(_config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -368,6 +393,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   public StaleInstancesCleanupTask getStaleInstancesCleanupTask() {
     return _staleInstancesCleanupTask;
+  }
+
+  public TableRebalanceManager getTableRebalanceManager() {
+    return _tableRebalanceManager;
+  }
+
+  public TableSizeReader getTableSizeReader() {
+    return _tableSizeReader;
   }
 
   @Override
@@ -430,7 +463,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _helixControllerInstanceId);
 
     // Emit helix controller metrics
-    _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+    _controllerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _helixControllerManager.isConnected() ? 1L : 0L);
     // Deprecated, since getting the leadership of Helix does not mean Helix has been ready for pinot.
     _controllerMetrics.addCallbackGauge("helix.leader", () -> _helixControllerManager.isLeader() ? 1L : 0L);
@@ -517,12 +550,20 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _tableSizeReader =
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
-    _helixResourceManager.registerTableSizeReader(_tableSizeReader);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _diskUtilizationChecker);
+    _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
+    _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getDiskUtilizationThreshold());
+    _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
+        "rebalance-thread-%d");
+    _tableRebalanceManager =
+        new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
+            _rebalancerExecutorService);
+    _tenantRebalancer =
+        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -560,6 +601,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_helixParticipantInstanceId).named(CONTROLLER_INSTANCE_ID);
         bind(_helixResourceManager).to(PinotHelixResourceManager.class);
         bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+        bind(_tableRebalanceManager).to(TableRebalanceManager.class);
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
@@ -588,7 +630,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApp.start(_listenerConfigs);
+    _adminApp.start(_listenerConfigs, _controllerMetrics);
 
     enforceTableConfigAndSchema();
 
@@ -780,7 +822,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
           (resourceConfigList, changeContext) -> _leadControllerManager.onResourceConfigChange());
     } catch (Exception e) {
       throw new RuntimeException(
-          "Error registering resource config listener for " + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+          "Error registering resource config listener for " + Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
     }
   }
 
@@ -791,8 +833,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig, () -> Collections.singletonList(Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     updated |= HelixHelper.updatePinotVersion(instanceConfig);
 
@@ -839,15 +880,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _tableSizeReader);
     periodicTasks.add(_segmentStatusChecker);
-    _rebalanceChecker = new RebalanceChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        _executorService);
+    _rebalanceChecker =
+        new RebalanceChecker(_tableRebalanceManager, _helixResourceManager, _leadControllerManager, _config,
+            _controllerMetrics);
     periodicTasks.add(_rebalanceChecker);
     _realtimeConsumerMonitor =
         new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics,
             _executorService);
     periodicTasks.add(_realtimeConsumerMonitor);
-    _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        _executorService, _connectionManager);
+    _segmentRelocator =
+        new SegmentRelocator(_tableRebalanceManager, _helixResourceManager, _leadControllerManager, _config,
+            _controllerMetrics, _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
     _staleInstancesCleanupTask =
         new StaleInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
@@ -947,8 +990,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();
       _executorService.awaitTermination(10L, TimeUnit.SECONDS);
-      _tenantRebalanceExecutorService.shutdownNow();
-      _tenantRebalanceExecutorService.awaitTermination(10L, TimeUnit.SECONDS);
+      _rebalancerExecutorService.shutdownNow();
+      _rebalancerExecutorService.awaitTermination(10L, TimeUnit.SECONDS);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }

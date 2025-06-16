@@ -63,6 +63,7 @@ public class SegmentMetadataUtils {
       propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
     }
     savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
+    // TODO: Revisit if we can save the overhead of reloading the metadata when invoked from ForwardIndexHandler
     segmentDirectory.reloadMetadata();
     return segmentDirectory.getSegmentMetadata();
   }
