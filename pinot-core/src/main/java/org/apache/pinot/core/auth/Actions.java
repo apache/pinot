@@ -120,6 +120,7 @@ public class Actions {
     public static final String DELETE_SEGMENT = "DeleteSegment";
     public static final String DELETE_TABLE = "DeleteTable";
     public static final String DELETE_TIME_BOUNDARY = "DeleteTimeBoundary";
+    public static final String DELETE_INGESTION_METRICS = "DeleteIngestionMetrics";
     public static final String DISABLE_TABLE = "DisableTable";
     public static final String DOWNLOAD_SEGMENT = "DownloadSegment";
     public static final String ENABLE_TABLE = "EnableTable";
