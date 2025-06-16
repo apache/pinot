@@ -214,7 +214,7 @@ public class PinotTableInstances {
   public SuccessResponse removeIngestionMetrics(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Instance id of the server", required = true) @PathParam("instanceId") String instanceId,
-      @Nullable @ApiParam(value = "List of Partition Ids (optional)") @QueryParam("partitionId")
+      @ApiParam(value = "List of Partition Ids (optional)") @QueryParam("partitionId") @Nullable
       Set<Integer> partitionIds,
       @Context HttpHeaders headers) {
     try {
