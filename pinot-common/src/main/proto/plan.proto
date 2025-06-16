@@ -111,11 +111,9 @@ message EnrichedJoinNode {
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
   Expression matchCondition = 6;
-  Expression filterCondition = 7;
+  optional Expression filterCondition = 7;
   repeated Expression projects = 8;
-  repeated Collation collations = 9;
-  int32 fetch = 10;
-  int32 offset = 11;
+  DataSchema joinResultDataSchema = 9;
 }
 
 enum ExchangeType {

@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -141,11 +140,14 @@ public class PlanNodeSerializer {
           .addAllRightKeys(node.getRightKeys())
           .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
           .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
-          .setFilterCondition(RexExpressionToProtoExpression.convertExpression(node.getFilterCondition()))
-          .addAllProjects(convertExpressions(node.getProjects() == null ? Collections.emptyList() : node.getProjects()))
-          .addAllCollations(convertCollations(node.getCollations() == null ? Collections.emptyList() : node.getCollations()))
-          .setFetch(node.getFetch())
-          .setOffset(node.getOffset());
+          .addAllProjects(convertExpressions(node.getProjects() == null
+              ? Collections.emptyList() : node.getProjects()))
+          .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
+
+      if (node.getFilterCondition() != null) {
+        enrichedJoinNode.setFilterCondition(
+            RexExpressionToProtoExpression.convertExpression(node.getFilterCondition()));
+      }
 
       if (node.getMatchCondition() != null) {
         enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));

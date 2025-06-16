@@ -93,7 +93,9 @@ public class PlanNodeSorter {
     }
 
     @Override
-    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) { return visitJoin(node, comparator); }
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) {
+      return visitJoin(node, comparator);
+    }
 
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, Comparator<PlanNode> comparator) {
