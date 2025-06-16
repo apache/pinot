@@ -21,8 +21,6 @@ package org.apache.pinot.core.auth;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.testng.Assert;
 import org.testng.annotations.Test;

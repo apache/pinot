@@ -48,7 +48,7 @@ import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.get
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
   private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ";
   public static final Map<String, String> AUTH_HEADER_USER_2 = Map.of("Authorization", AUTH_TOKEN_USER_2);
-  private static final String DEFAULT_TABLE_NAME_2= "mytable2";
+  private static final String DEFAULT_TABLE_NAME_2 = "mytable2";
 
   protected List<File> _avroFiles;
   private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTest.class);
@@ -226,7 +226,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         + "    from mytable2 "
         + "  )) "
         + "  and AirlineID = '19805'";
-    String queryWithFiltersForUser2 ="SELECT COUNT(*), AVG(ActualElapsedTime)"
+    String queryWithFiltersForUser2 = "SELECT COUNT(*), AVG(ActualElapsedTime)"
         + "    FROM mytable "
         + "    WHERE ActualElapsedTime > 0.1 * ABS(("
         + "            SELECT AVG(ActualElapsedTime) AS avg_profit"
@@ -243,7 +243,6 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     Assert.assertTrue(
         compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER), queryBroker(query, AUTH_HEADER_USER_2)));
   }
-
 
   private JsonNode queryBroker(String query, Map<String, String> headers)
       throws Exception {

@@ -140,7 +140,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity,@NotNull String table) {
+    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, @NotNull String table) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       Preconditions.checkState(principalOpt.isPresent(), "Principal is not authorized");
