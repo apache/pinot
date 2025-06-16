@@ -572,10 +572,7 @@ public class QueryEnvironment {
    */
   private static boolean isRuleSkipped(String ruleName, Map<String, String> skipMap) {
     // can put rule-specific default behavior here
-    return Boolean.parseBoolean(
-        skipMap.getOrDefault(
-            CommonConstants.Broker.skipRule(ruleName), Boolean.FALSE.toString()
-        )
+    return Boolean.parseBoolean(skipMap.get(CommonConstants.Broker.skipRule(ruleName));
     );
   }
 
