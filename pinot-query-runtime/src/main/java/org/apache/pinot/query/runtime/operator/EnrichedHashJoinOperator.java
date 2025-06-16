@@ -59,8 +59,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     _resultColumnSize = _joinResultSchema.size();
 
     // input of filter is join result
-    _filterOperand = node.getFilterCondition() == null ?
-        null : TransformOperandFactory.getTransformOperand(node.getFilterCondition(), _joinResultSchema);
+    _filterOperand = node.getFilterCondition() == null
+        ? null : TransformOperandFactory.getTransformOperand(node.getFilterCondition(), _joinResultSchema);
 
     List<RexExpression> projectExpressions = node.getProjects();
     if (projectExpressions == null) {
@@ -70,9 +70,9 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     } else {
       _projectOperands = new ArrayList<>();
       // input of project is filter result, which has same schema as join result
-      projectExpressions.forEach( (x) -> {
-          _projectOperands.add(TransformOperandFactory.getTransformOperand(x, _joinResultSchema));
-        });
+      projectExpressions.forEach((x) -> {
+        _projectOperands.add(TransformOperandFactory.getTransformOperand(x, _joinResultSchema));
+      });
       _projectResultSize = projectExpressions.size();
     }
   }
@@ -83,6 +83,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   }
 
   // TODO: check null in advance and do code specialization
+
   /** filter a row by left and right child, return whether the row is kept */
   private boolean filterRow(List<Object> rowView) {
     if (_filterOperand == null) {
@@ -98,7 +99,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       return rowView.toArray();
     }
     Object[] resultRow = new Object[_projectResultSize];
-    for (int i=0; i<_projectResultSize; i++) {
+    for (int i = 0; i < _projectResultSize; i++) {
       resultRow[i] = _projectOperands.get(i).apply(rowView);
     }
     return resultRow;
@@ -115,7 +116,9 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     // TODO: this should handle different orders of filter, project
     JoinedRowView rowView = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
     // filter
-    if (!filterRow(rowView)) { return; }
+    if (!filterRow(rowView)) {
+      return;
+    }
     // project, this incurs one copy of the element
     Object[] joinedRow = projectRow(rowView);
     rows.add(joinedRow);
@@ -124,7 +127,9 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   /** filter, project on a joined row view */
   private void filterProject(List<Object> rowView, List<Object[]> rows) {
     // filter
-    if (!filterRow(rowView)) { return; }
+    if (!filterRow(rowView)) {
+      return;
+    }
     // project, this incurs one copy of the element
     Object[] joinedRow = projectRow(rowView);
     rows.add(joinedRow);
@@ -336,7 +341,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
     @Override
     public Object get(int i) {
-      return i < _leftSize ? (_leftRow == null ? null : _leftRow[i]) : (_rightRow == null ? null : _rightRow[i - _leftSize]);
+      return i < _leftSize ? (_leftRow == null ? null : _leftRow[i])
+          : (_rightRow == null ? null : _rightRow[i - _leftSize]);
     }
 
     @Override
