@@ -81,7 +81,9 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   }
 
   @Override
-  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) { return visitJoin(node, context); }
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
+  }
 
   @Override
   public PlanNode visitMailboxReceive(MailboxReceiveNode node, Context context) {

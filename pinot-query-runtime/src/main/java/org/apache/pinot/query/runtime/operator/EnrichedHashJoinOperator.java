@@ -1,32 +1,38 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
-import org.apache.arrow.util.Preconditions;
-import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 
 
 public class EnrichedHashJoinOperator extends HashJoinOperator {
@@ -36,11 +42,6 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   @Nullable
   private final List<TransformOperand> _projectOperands;
   private final int _projectResultSize;
-  @Nullable
-  private final PriorityQueue<Object[]> _priorityQueue;
-  private final int _offset;
-  private final int _numRowsToKeep;
-  private int _rowsSeen = 0;
   private final DataSchema _joinResultSchema;
   // _projectResultSchema is currently not used because sort operation
   //    does not care about input schema
@@ -74,24 +75,6 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         });
       _projectResultSize = projectExpressions.size();
     }
-
-    _offset = Math.max(node.getOffset(), 0);
-    int fetch = node.getFetch();
-
-    // TODO: see if this need to be converted to input args
-    int defaultHolderCapacity = SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
-    int defaultResponseLimit = CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT;
-    _numRowsToKeep = fetch > 0 ? fetch + _offset : defaultResponseLimit;
-
-    List<RelFieldCollation> collations = node.getCollations();
-    if (collations == null || collations.isEmpty()) {
-      _priorityQueue = null;
-    } else {
-      // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
-      // which elements to keep and which to remove based on the limits.
-      _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
-          new SortUtils.SortComparator(collations, true));
-    }
   }
 
   @Override
@@ -121,76 +104,30 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return resultRow;
   }
 
-  /** sort-limit on a row, add it to rows if no sort, or to _priorityQueue if there's sort */
-  private void sortLimitRow(Object[] row, List<Object[]> rows) {
-    if (_priorityQueue == null) {
-      // limit only, terminate if enough rows
-      if (_rowsSeen++ == _numRowsToKeep) {
-        earlyTerminate();
-        logger().debug("EnrichedHashJoinOperator: seen enough rows with no sort, early terminating");
-        return;
-      }
-      rows.add(row);
-    } else {
-      // sort is actually needed
-      logger().debug("EnrichedHashJoinOperator: insert row {}", row);
-      SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
-    }
-  }
-
   /** read result from _priorityQueue if sort needed, else return rows */
   private List<Object[]> getOutputRows(List<Object[]> rows) {
-    if (_priorityQueue == null) {
-      return rows;
-    }
-    int resultSize = _priorityQueue.size() - _offset;
-    Preconditions.checkState(resultSize >= 0,
-        "EnrichedHashJoinOperator sort-limit result size < 0");
-    rows = new ArrayList<Object[]>(Arrays.asList(new Object[resultSize][]));
-    // TODO: check this really skipped offset?
-    for (int i = resultSize - 1; i >= 0; i--) {
-      Object[] row = _priorityQueue.poll();
-      rows.set(i, row);
-    }
-    logger().debug("EnrichedJoinOperator: emitting final result {}, early terminating", rows);
-    earlyTerminate();
     return rows;
   }
 
-  /** filter, project, sort-limit on the left and right row by creating a view */
-  private void filterProjectSortLimit (Object[] leftRow, Object[] rightRow, List<Object[]> rows,
+  /** filter, project on the left and right row by creating a view */
+  private void filterProject(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
-    // TODO: this should handle different orders of filter, project, sortLimit
+    // TODO: this should handle different orders of filter, project
     JoinedRowView rowView = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
     // filter
     if (!filterRow(rowView)) { return; }
     // project, this incurs one copy of the element
     Object[] joinedRow = projectRow(rowView);
-    // sort-limit
-    sortLimitRow(joinedRow, rows);
+    rows.add(joinedRow);
   }
 
-  /** filter, project, sort-limit on a joined row view */
-  private void filterProjectSortLimit (List<Object> rowView, List<Object[]> rows) {
+  /** filter, project on a joined row view */
+  private void filterProject(List<Object> rowView, List<Object[]> rows) {
     // filter
     if (!filterRow(rowView)) { return; }
     // project, this incurs one copy of the element
     Object[] joinedRow = projectRow(rowView);
-    // sort-limit
-    sortLimitRow(joinedRow, rows);
-  }
-
-  @Override
-  // TODO: Optimize this to avoid unnecessary object copy.
-  protected Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
-    Object[] resultRow = new Object[_resultColumnSize];
-    if (leftRow != null) {
-      System.arraycopy(leftRow, 0, resultRow, 0, leftRow.length);
-    }
-    if (rightRow != null) {
-      System.arraycopy(rightRow, 0, resultRow, _leftColumnSize, rightRow.length);
-    }
-    return resultRow;
+    rows.add(joinedRow);
   }
 
   /**
@@ -209,7 +146,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
           continue;
         }
         // join row with null, then project-merge-sort-limit
-        filterProjectSortLimit(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
+        filterProject(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
       }
     } else {
       for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
@@ -217,13 +154,13 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {
-            filterProjectSortLimit(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
+            filterProject(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
           }
         } else {
           int numRightRows = rightRows.size();
           int unmatchedIndex = 0;
           while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
-            filterProjectSortLimit(null, rightRows.get(unmatchedIndex++), rows, _resultColumnSize, _leftColumnSize);
+            filterProject(null, rightRows.get(unmatchedIndex++), rows, _resultColumnSize, _leftColumnSize);
           }
         }
       }
@@ -237,7 +174,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       if (isMaxRowsLimitReached(rows.size())) {
         return;
       }
-      filterProjectSortLimit(leftRow, null, rows, _resultColumnSize, _leftColumnSize);
+      filterProject(leftRow, null, rows, _resultColumnSize, _leftColumnSize);
     }
   }
 
@@ -289,7 +226,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
             break;
           }
           // filter project sortLimit on the produced row
-          filterProjectSortLimit(resultRowView, rows);
+          filterProject(resultRowView, rows);
           if (_matchedRightRows != null) {
             _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
           }
@@ -324,7 +261,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
               break;
             }
             // filter project sortLimit on the produced row
-            filterProjectSortLimit(resultRowView, rows);
+            filterProject(resultRowView, rows);
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
               _matchedRightRows.computeIfAbsent(key, k -> new BitSet(numRightRows)).set(i);
@@ -352,7 +289,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // ANTI-JOIN only checks non-existence of the key
       if (!_rightTable.containsKey(key)) {
-        filterProjectSortLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
+        filterProject(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
     }
 
@@ -368,7 +305,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // SEMI-JOIN only checks existence of the key
       if (_rightTable.containsKey(key)) {
-        filterProjectSortLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
+        filterProject(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
     }
 

@@ -229,15 +229,6 @@ class PlanNodeMerger {
       if (!Objects.equals(node.getProjects(), otherNode.getProjects())) {
         return null;
       }
-      if (!Objects.equals(node.getCollations(), otherNode.getCollations())) {
-        return null;
-      }
-      if (!Objects.equals(node.getFetch(), otherNode.getFetch())) {
-        return null;
-      }
-      if (!Objects.equals(node.getOffset(), otherNode.getOffset())) {
-        return null;
-      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;
