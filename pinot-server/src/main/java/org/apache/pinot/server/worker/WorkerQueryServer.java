@@ -31,19 +31,19 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 public class WorkerQueryServer {
   private final int _queryServicePort;
-  private final PinotConfiguration _configuration;
+  private final PinotConfiguration _serverConf;
 
   private final QueryServer _queryWorkerService;
 
-  public WorkerQueryServer(PinotConfiguration configuration, InstanceDataManager instanceDataManager,
+  public WorkerQueryServer(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats) {
-    _configuration = toWorkerQueryConfig(configuration);
-    String instanceId = _configuration.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
-    _queryServicePort = _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+    _serverConf = toWorkerQueryConfig(serverConf);
+    String instanceId = _serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
+    _queryServicePort = _serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(_configuration, instanceDataManager, tlsConfig, sendStats::isSendStats);
-    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, configuration);
+    queryRunner.init(_serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
+    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, serverConf);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {

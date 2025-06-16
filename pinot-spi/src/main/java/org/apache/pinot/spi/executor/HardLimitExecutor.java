@@ -45,21 +45,21 @@ public class HardLimitExecutor extends DecoratorExecutorService {
 
   /**
    * Returns the hard limit of the number of threads that can be used by the multi-stage executor.
-   * @param config Pinot configuration
+   * @param serverConf Pinot configuration
    * @return hard limit of the number of threads that can be used by the multi-stage executor (no hard limit if <= 0)
    */
-  public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
+  public static int getMultiStageExecutorHardLimit(PinotConfiguration serverConf) {
     try {
-      int serverConfigLimit = config.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
+      int serverConfigLimit = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
           CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS);
       if (serverConfigLimit > 0) {
         return serverConfigLimit;
       }
-      int maxThreadsFromClusterConfig = Integer.parseInt(config.getProperty(
+      int maxThreadsFromClusterConfig = Integer.parseInt(serverConf.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
       ));
-      int hardLimitFactor = Integer.parseInt(config.getProperty(
+      int hardLimitFactor = Integer.parseInt(serverConf.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
       ));
@@ -69,7 +69,7 @@ public class HardLimitExecutor extends DecoratorExecutorService {
       return maxThreadsFromClusterConfig * hardLimitFactor;
     } catch (NumberFormatException e) {
       LOGGER.warn("Failed to parse multi-stage executor hard limit from config. Hard limiting will be disabled.", e);
-      return -1;
+      return 0;
     }
   }
 
