@@ -25,7 +25,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>34</version>
+    <version>35</version>
     <relativePath />
   </parent>
 
@@ -144,7 +144,7 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.19.0</jackson.version>
+    <jackson.version>2.19.1</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.47</jersey.version>
@@ -271,7 +271,7 @@
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.1.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
-    <okio.version>3.12.0</okio.version>
+    <okio.version>3.13.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
