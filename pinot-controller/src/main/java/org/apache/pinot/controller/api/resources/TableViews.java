@@ -179,12 +179,12 @@ public class TableViews {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/badSegments")
+  @Path("/tables/{tableName}/badLLCSegmentsPerPartition")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
-  @ApiOperation(value = "Get bad segment names per partition group for a realtime table.", notes = "Get a sorted list"
-      + " of bad segments per partition group (sort order is in increasing order of segment sequence number)")
+  @ApiOperation(value = "Get bad LLC segment names per partition id for a realtime table.", notes = "Get a sorted "
+      + "list of bad segments per partition id (sort order is in increasing order of segment sequence number)")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Returns a map of partition group IDs to the list of segment names in sorted"
+      @ApiResponse(code = 200, message = "Returns a map of partition IDs to the list of segment names in sorted"
           + " order of sequence number"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
@@ -213,16 +213,18 @@ public class TableViews {
         return JsonUtils.objectToPrettyString(new HashMap<>());
       }
 
-      Map<Integer, SortedSet<LLCSegmentName>> partitionGroupIdToSegments = new HashMap<>();
+      Map<Integer, SortedSet<LLCSegmentName>> partitionIdToSegments = new HashMap<>();
       for (SegmentStatusInfo segmentStatusInfo : segmentStatusInfoList) {
         String segmentName = segmentStatusInfo.getSegmentName();
         LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-        Preconditions.checkNotNull(llcSegmentName, "Unable to convert segmentName to LLCSegment.");
-        partitionGroupIdToSegments.computeIfAbsent(llcSegmentName.getPartitionGroupId(), k -> new TreeSet<>())
+        if (llcSegmentName == null) {
+          continue;
+        }
+        partitionIdToSegments.computeIfAbsent(llcSegmentName.getPartitionGroupId(), k -> new TreeSet<>())
             .add(llcSegmentName);
       }
 
-      return JsonUtils.objectToPrettyString(partitionGroupIdToSegments);
+      return JsonUtils.objectToPrettyString(partitionIdToSegments);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
