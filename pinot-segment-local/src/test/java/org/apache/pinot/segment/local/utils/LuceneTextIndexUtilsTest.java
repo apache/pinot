@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
+import org.apache.lucene.queries.spans.SpanOrQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.BooleanClause;
@@ -32,11 +33,12 @@ import org.apache.lucene.search.WildcardQuery;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 
 public class LuceneTextIndexUtilsTest {
   @Test
   public void testBooleanQueryRewrittenToSpanQuery() {
-    // Test 1: The input is a boolean query with 2 clauses: "*pache pino*"
+    // Test 1: OR query with wildcards: "*apche OR pino*"
     BooleanQuery.Builder builder = new BooleanQuery.Builder();
     WildcardQuery wildcardQuery = new WildcardQuery(new Term("field", "*apche"));
     PrefixQuery prefixQuery = new PrefixQuery(new Term("field", "pino"));
@@ -45,15 +47,15 @@ public class LuceneTextIndexUtilsTest {
 
     SpanQuery[] spanQueries1 =
         {new SpanMultiTermQueryWrapper<>(wildcardQuery), new SpanMultiTermQueryWrapper<>(prefixQuery)};
-    SpanQuery expectedQuery = new SpanNearQuery(spanQueries1, 0, true);
+    SpanQuery expectedQuery = new SpanOrQuery(spanQueries1);
     Assert.assertEquals(expectedQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(builder.build()));
 
-    // Test 2: The input is a boolean query with 3 clauses: "*pache real pino*"
+    // Test 2: AND query with wildcards: "*apche AND real AND pino*"
     builder = new BooleanQuery.Builder();
     Term term = new Term("field", "real");
-    builder.add(new BooleanClause(wildcardQuery, BooleanClause.Occur.SHOULD))
-        .add(new BooleanClause(new TermQuery(term), BooleanClause.Occur.SHOULD))
-        .add(new BooleanClause(prefixQuery, BooleanClause.Occur.SHOULD));
+    builder.add(new BooleanClause(wildcardQuery, BooleanClause.Occur.MUST))
+        .add(new BooleanClause(new TermQuery(term), BooleanClause.Occur.MUST))
+        .add(new BooleanClause(prefixQuery, BooleanClause.Occur.MUST));
 
     SpanQuery[] spanQueries2 =
         {new SpanMultiTermQueryWrapper<>(wildcardQuery), new SpanTermQuery(term), new SpanMultiTermQueryWrapper<>(
@@ -61,7 +63,7 @@ public class LuceneTextIndexUtilsTest {
     expectedQuery = new SpanNearQuery(spanQueries2, 0, true);
     Assert.assertEquals(expectedQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(builder.build()));
 
-    // Test 3: The input is a boolean query with 3 clauses: "*pache real* pino*"
+    // Test 3: OR query with multiple wildcards: "*apche OR pino* OR pino*"
     builder = new BooleanQuery.Builder();
     builder.add(new BooleanClause(wildcardQuery, BooleanClause.Occur.SHOULD))
         .add(new BooleanClause(prefixQuery, BooleanClause.Occur.SHOULD))
@@ -69,18 +71,18 @@ public class LuceneTextIndexUtilsTest {
 
     SpanQuery[] spanQueries3 = {new SpanMultiTermQueryWrapper<>(wildcardQuery), new SpanMultiTermQueryWrapper<>(
         prefixQuery), new SpanMultiTermQueryWrapper<>(prefixQuery)};
-    expectedQuery = new SpanNearQuery(spanQueries3, 0, true);
+    expectedQuery = new SpanOrQuery(spanQueries3);
     Assert.assertEquals(expectedQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(builder.build()));
 
-    // Test 4: The input is a boolean query with 1 clause: "*pino*".
+    // Test 4: Single wildcard query: "*pino*"
     WildcardQuery wildcardQuery1 = new WildcardQuery(new Term("field", "*pino*"));
     builder = new BooleanQuery.Builder();
     builder.add(new BooleanClause(wildcardQuery1, BooleanClause.Occur.SHOULD));
     SpanQuery[] spanQueries4 = {new SpanMultiTermQueryWrapper<>(wildcardQuery1)};
-    expectedQuery = new SpanNearQuery(spanQueries4, 0, true);
+    expectedQuery = new SpanOrQuery(spanQueries4);
     Assert.assertEquals(expectedQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(builder.build()));
 
-    // Test 5: Boolean queries without any wildcard/prefix subqueries are left unchanged.
+    // Test 5: Boolean queries without any wildcard/prefix subqueries are left unchanged
     builder = new BooleanQuery.Builder();
     builder.add(new BooleanClause(new TermQuery(term), BooleanClause.Occur.SHOULD))
         .add(new BooleanClause(new TermQuery(term), BooleanClause.Occur.SHOULD));

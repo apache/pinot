@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.utils;
 import java.util.ArrayList;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
+import org.apache.lucene.queries.spans.SpanNotQuery;
+import org.apache.lucene.queries.spans.SpanOrQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
@@ -33,7 +35,6 @@ import org.apache.lucene.search.WildcardQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
@@ -41,9 +42,13 @@ public class LuceneTextIndexUtils {
   }
 
   /**
+   * Converts a BooleanQuery to appropriate SpanQuery based on its clauses.
+   * For AND operations, uses SpanNearQuery with specified slop.
+   * For OR operations, uses SpanOrQuery.
+   * For NOT operations, uses SpanNotQuery.
    *
    * @param query a Lucene query
-   * @return a span query with 0 slop and the original clause order if the input query is boolean query with one or more
+   * @return a span query if the input query is boolean query with one or more
    * prefix or wildcard subqueries; the same query otherwise.
    */
   public static Query convertToMultiTermSpanQuery(Query query) {
@@ -51,9 +56,34 @@ public class LuceneTextIndexUtils {
       return query;
     }
     LOGGER.debug("Perform rewriting for the phrase query {}.", query);
+
+    BooleanQuery booleanQuery = (BooleanQuery) query;
     ArrayList<SpanQuery> spanQueryLst = new ArrayList<>();
     boolean prefixOrSuffixQueryFound = false;
-    for (BooleanClause clause : ((BooleanQuery) query).clauses()) {
+    boolean isOrQuery = false;
+    boolean hasNotClause = false;
+    SpanQuery notQuery = null;
+
+    // First pass: Check query type and collect NOT clauses
+    for (BooleanClause clause : booleanQuery.clauses()) {
+      if (clause.getOccur() == BooleanClause.Occur.SHOULD) {
+        isOrQuery = true;
+      } else if (clause.getOccur() == BooleanClause.Occur.MUST_NOT) {
+        hasNotClause = true;
+        Query q = clause.getQuery();
+        if (q instanceof WildcardQuery || q instanceof PrefixQuery) {
+          notQuery = new SpanMultiTermQueryWrapper<>((AutomatonQuery) q);
+        } else if (q instanceof TermQuery) {
+          notQuery = new SpanTermQuery(((TermQuery) q).getTerm());
+        }
+      }
+    }
+
+    // Second pass: Process non-NOT clauses
+    for (BooleanClause clause : booleanQuery.clauses()) {
+      if (clause.getOccur() == BooleanClause.Occur.MUST_NOT) {
+        continue; // Skip NOT clauses as they're handled separately
+      }
       Query q = clause.getQuery();
       if (q instanceof WildcardQuery || q instanceof PrefixQuery) {
         prefixOrSuffixQueryFound = true;
@@ -65,11 +95,28 @@ public class LuceneTextIndexUtils {
         return query;
       }
     }
+
     if (!prefixOrSuffixQueryFound) {
       return query;
     }
-    SpanNearQuery spanNearQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
-    LOGGER.debug("The phrase query {} is re-written as {}", query, spanNearQuery);
-    return spanNearQuery;
+
+    // Create appropriate span query based on operation type
+    SpanQuery baseQuery;
+    if (isOrQuery) {
+      baseQuery = new SpanOrQuery(spanQueryLst.toArray(new SpanQuery[0]));
+      LOGGER.debug("The OR query {} is re-written as {}", query, baseQuery);
+    } else {
+      baseQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
+      LOGGER.debug("The AND query {} is re-written as {}", query, baseQuery);
+    }
+
+    // Apply NOT operation if present
+    if (hasNotClause && notQuery != null) {
+      SpanNotQuery spanNotQuery = new SpanNotQuery(baseQuery, notQuery);
+      LOGGER.debug("Applied NOT operation to query: {}", spanNotQuery);
+      return spanNotQuery;
+    }
+
+    return baseQuery;
   }
 }
