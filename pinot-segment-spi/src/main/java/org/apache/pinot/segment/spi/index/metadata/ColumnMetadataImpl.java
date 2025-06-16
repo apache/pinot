@@ -178,9 +178,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   @VisibleForTesting
   public long getIndexSizeFor(IndexType type) {
     short indexId = IndexService.getInstance().getNumericId(type);
-    for (int i = 0, n = getNumIndexes(); i < n; i++) {
-      if (indexId == getIndexType(i)) {
-        return getIndexSize(i);
+    for (long typeAndSize : _indexTypeSizeList) {
+      if (indexId == unpackIndexType(typeAndSize)) {
+        return unpackIndexSize(typeAndSize);
       }
     }
 
@@ -198,13 +198,21 @@ public class ColumnMetadataImpl implements ColumnMetadata {
   }
 
   @Override
-  public short getIndexType(int index) {
-    return (short) ((_indexTypeSizeList.getLong(index) >>> 48));
+  public short getIndexType(int position) {
+    return unpackIndexType(_indexTypeSizeList.getLong(position));
+  }
+
+  private static short unpackIndexType(long typeAndSize) {
+    return (short) ((typeAndSize >>> 48));
   }
 
   @Override
-  public long getIndexSize(int i) {
-    return (_indexTypeSizeList.getLong(i) & SIZE_MASK);
+  public long getIndexSize(int position) {
+    return unpackIndexSize(_indexTypeSizeList.getLong(position));
+  }
+
+  private static long unpackIndexSize(long typeAndSize) {
+    return typeAndSize & SIZE_MASK;
   }
 
   @JsonIgnore
@@ -385,9 +393,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     IndexService service = IndexService.getInstance();
     Map<IndexType<?, ?, ?>, Long> result = new HashMap<>();
 
-    for (int i = 0, n = getNumIndexes(); i < n; i++) {
-      short type = getIndexType(i);
-      long size = getIndexSize(i);
+    for (long typeAndSize : _indexTypeSizeList) {
+      short type = unpackIndexType(typeAndSize);
+      long size = unpackIndexSize(typeAndSize);
       result.put(service.get(type), size);
     }
 
