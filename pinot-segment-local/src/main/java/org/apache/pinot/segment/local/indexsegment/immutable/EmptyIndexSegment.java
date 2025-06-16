@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -33,6 +34,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -79,7 +82,19 @@ public class EmptyIndexSegment implements ImmutableSegment {
   @Override
   public DataSource getDataSourceNullable(String column) {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    return columnMetadata != null ? new EmptyDataSource(columnMetadata) : null;
+    return columnMetadata != null ? new EmptyDataSource(columnMetadata.getFieldSpec()) : null;
+  }
+
+  @Override
+  public DataSource getDataSource(String column, Schema schema) {
+    DataSource dataSource = getDataSourceNullable(column);
+    if (dataSource != null) {
+      return dataSource;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
+        schema.getSchemaName());
+    return new EmptyDataSource(fieldSpec);
   }
 
   @Nullable

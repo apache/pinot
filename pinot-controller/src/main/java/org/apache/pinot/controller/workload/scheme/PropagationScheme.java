@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.controller.workload.scheme;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Set;
+import org.apache.pinot.spi.config.workload.NodeConfig;
 
-
-public class ControllerJobType {
-  private ControllerJobType() {
-  }
-  public static final String RELOAD_SEGMENT = "RELOAD_SEGMENT";
-  public static final String FORCE_COMMIT = "FORCE_COMMIT";
-  public static final String TABLE_REBALANCE = "TABLE_REBALANCE";
-  public static final String TENANT_REBALANCE = "TENANT_REBALANCE";
-  public static final Set<String>
-      VALID_CONTROLLER_JOB_TYPE = ImmutableSet.of(RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE);
+/**
+ * PropagationScheme is used to resolve instances based on the {@link NodeConfig}
+ * 1. It helps to identify which instances to propagate the workload to based on the node configuration
+ * 2. It helps among which instances the {@link org.apache.pinot.spi.config.workload.EnforcementProfile} should be split
+ */
+public interface PropagationScheme {
+  /**
+   * Resolve the instances based on the node type and node configuration
+   * @param nodeConfig The {@link NodeConfig} to resolve the instances
+   * @return The set of instances to propagate the workload
+   */
+  Set<String> resolveInstances(NodeConfig nodeConfig);
 }

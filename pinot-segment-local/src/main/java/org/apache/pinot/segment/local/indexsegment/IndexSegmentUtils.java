@@ -16,28 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.column;
+package org.apache.pinot.segment.local.indexsegment;
 
+import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
-import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Shared implementation code between column providers.
- */
-public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
-
-  protected ColumnMetadataImpl.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
-    return new ColumnMetadataImpl.Builder().setFieldSpec(context.getFieldSpec())
-        .setTotalDocs(context.getTotalDocCount());
+public class IndexSegmentUtils {
+  private IndexSegmentUtils() {
   }
 
-  @Override
-  public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    return new VirtualColumnIndexContainer(buildForwardIndex(context), buildInvertedIndex(context),
-        buildDictionary(context));
+  /// Returns a virtual [DataSource] per the given [VirtualColumnContext].
+  public static DataSource createVirtualDataSource(VirtualColumnContext context) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    VirtualColumnProvider virtualColumnProvider;
+    if (fieldSpec.getVirtualColumnProvider() != null) {
+      virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(context);
+    } else {
+      virtualColumnProvider = new DefaultNullValueVirtualColumnProvider();
+    }
+    return virtualColumnProvider.buildDataSource(context);
   }
 }
