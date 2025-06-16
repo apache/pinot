@@ -147,6 +147,7 @@ public class PinotQueryRuleSets {
       PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
+      PinotWindowSplitRule.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
       PinotSetOpExchangeNodeInsertRule.INSTANCE,
 
@@ -166,6 +167,7 @@ public class PinotQueryRuleSets {
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
       PinotLogicalAggregateRule.SortAggregate.INSTANCE,
       PinotLogicalAggregateRule.PinotLogicalAggregateConverter.INSTANCE,
+      PinotWindowSplitRule.INSTANCE,
       // Evaluate the Literal filter nodes
       CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
