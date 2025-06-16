@@ -47,6 +47,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected final QueryContext _queryContext;
 
   protected long _threadCpuTimeNs;
+  protected long _threadMemAllocatedBytes;
   protected long _systemActivitiesCpuTimeNs;
 
   public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<SegmentContext> segmentContexts,
@@ -92,36 +93,41 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected InstanceResponseBlock buildInstanceResponseBlock(BaseResultsBlock baseResultsBlock) {
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(baseResultsBlock);
     instanceResponseBlock.addMetadata(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(_threadCpuTimeNs));
+    instanceResponseBlock.addMetadata(MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName(),
+        String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
     return instanceResponseBlock;
   }
 
   protected BaseResultsBlock getBaseBlock() {
-    if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
-      long startWallClockTimeNs = System.nanoTime();
+    long startWallClockTimeNs = System.nanoTime();
+    ThreadResourceUsageProvider mainThreadResourceUsageProvider = new ThreadResourceUsageProvider();
 
-      ThreadResourceUsageProvider mainThreadResourceUsageProvider = new ThreadResourceUsageProvider();
-      BaseResultsBlock resultsBlock = getCombinedResults();
-      long mainThreadCpuTimeNs = mainThreadResourceUsageProvider.getThreadTimeNs();
+    BaseResultsBlock resultsBlock = getCombinedResults();
 
-      long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
-      /*
-       * If/when the threadCpuTime based instrumentation is done for other parts of execution (planning, pruning etc),
-       * we will have to change the wallClockTime computation accordingly. Right now everything under
-       * InstanceResponseOperator is the one that is instrumented with threadCpuTime.
-       */
-      long multipleThreadCpuTimeNs = resultsBlock.getExecutionThreadCpuTimeNs();
-      int numServerThreads = resultsBlock.getNumServerThreads();
-      _systemActivitiesCpuTimeNs = calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs,
-          mainThreadCpuTimeNs, numServerThreads);
-      _threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
+    // No-ops if CPU time measurement and/or memory allocation measurements are not enabled.
+    long mainThreadCpuTimeNs = mainThreadResourceUsageProvider.getThreadTimeNs();
+    long mainThreadMemAllocatedBytes = mainThreadResourceUsageProvider.getThreadAllocatedBytes();
 
-      return resultsBlock;
-    } else {
-      return getCombinedResults();
-    }
+    long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
+
+    calculateResourceUsage(resultsBlock.getNumServerThreads(), resultsBlock.getExecutionThreadCpuTimeNs(),
+        mainThreadCpuTimeNs, resultsBlock.getExecutionThreadMemAllocatedBytes(), mainThreadMemAllocatedBytes,
+        totalWallClockTimeNs);
+
+    return resultsBlock;
   }
+
+  private void calculateResourceUsage(int numServerThreads, long multipleThreadCpuTimeNs, long mainThreadCpuTimeNs,
+      long multipleThreadMemAllocatedBytes, long mainThreadMemAllocatedBytes, long totalWallClockTimeNs) {
+    _threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
+    _threadMemAllocatedBytes = mainThreadMemAllocatedBytes + multipleThreadMemAllocatedBytes;
+    _systemActivitiesCpuTimeNs = mainThreadCpuTimeNs == 0 ? 0
+        : calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, mainThreadCpuTimeNs,
+            numServerThreads);
+  }
+
 
   protected BaseResultsBlock getCombinedResults() {
     try {

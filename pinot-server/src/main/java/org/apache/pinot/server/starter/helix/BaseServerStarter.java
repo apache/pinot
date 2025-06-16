@@ -644,40 +644,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
 
-    int maxPreprocessConcurrency = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
-            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
-    int maxPreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
-            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
-    // Relax throttling until the server is ready to serve queries
-    SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler =
-        new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries,
-            false);
-    int maxStarTreePreprocessConcurrency = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
-            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
-    int maxStarTreePreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
-            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
-    // Relax throttling until the server is ready to serve queries
-    SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler =
-        new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
-            maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
-    int maxDownloadConcurrency = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
-            Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM));
-    int maxDownloadConcurrencyBeforeServingQueries = Integer.parseInt(
-        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
-            Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES));
-    // Relax throttling until the server is ready to serve queries
-    SegmentDownloadThrottler segmentDownloadThrottler =
-        new SegmentDownloadThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, false);
-    _segmentOperationsThrottler =
-        new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
-            segmentDownloadThrottler);
+    if (_segmentOperationsThrottler == null) {
+      // Only create segment operation throttlers if null
+      SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler =
+          createSegmentAllIndexPreprocessThrottler();
+      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler =
+          createSegmentStarTreePreprocessThrottler();
+      SegmentDownloadThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
+      _segmentOperationsThrottler =
+          new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
+              segmentDownloadThrottler);
+    }
 
-    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf);
+    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
         sendStatsPredicate);
@@ -719,11 +698,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
 
-    LOGGER.info("Initializing and registering the SendStatsPredicate");
-    try {
-      _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
-    } catch (Exception e) {
-      LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
+    if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
+      LOGGER.info("Initializing and registering the SendStatsPredicate");
+      try {
+        _helixManager.addInstanceConfigChangeListener(sendStatsPredicate);
+      } catch (Exception e) {
+        LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
+      }
     }
 
     // Start restlet server for admin API endpoint
@@ -825,6 +806,42 @@ public abstract class BaseServerStarter implements ServiceStartable {
       serverMetrics.addTimedValue(
           ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     }
+  }
+
+  protected SegmentAllIndexPreprocessThrottler createSegmentAllIndexPreprocessThrottler() {
+    int maxPreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
+    int maxPreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    return new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency,
+        maxPreprocessConcurrencyBeforeServingQueries, false);
+  }
+
+  protected SegmentStarTreePreprocessThrottler createSegmentStarTreePreprocessThrottler() {
+    int maxStarTreePreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
+    int maxStarTreePreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    return new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
+        maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
+  }
+
+  protected SegmentDownloadThrottler createSegmentDownloadThrottler() {
+    int maxDownloadConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM));
+    int maxDownloadConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    return new SegmentDownloadThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
+        false);
   }
 
   /**

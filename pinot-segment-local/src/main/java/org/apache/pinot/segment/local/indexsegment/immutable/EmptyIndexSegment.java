@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.indexsegment.immutable;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -59,14 +58,6 @@ public class EmptyIndexSegment implements ImmutableSegment {
   }
 
   @Override
-  public DataSource getDataSource(String column) {
-    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    Preconditions.checkNotNull(columnMetadata,
-        "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
-    return new EmptyDataSource(columnMetadata);
-  }
-
-  @Override
   public Set<String> getColumnNames() {
     return _segmentMetadata.getSchema().getColumnNames();
   }
@@ -84,6 +75,14 @@ public class EmptyIndexSegment implements ImmutableSegment {
   public void destroy() {
   }
 
+  @Nullable
+  @Override
+  public DataSource getDataSourceNullable(String column) {
+    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
+    return columnMetadata != null ? new EmptyDataSource(columnMetadata) : null;
+  }
+
+  @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;

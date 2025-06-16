@@ -128,7 +128,15 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
+    return getMatchingDocIds(filter);
+  }
 
+  @Override
+  public MutableRoaringBitmap getMatchingDocIds(Object filterObj) {
+    if (!(filterObj instanceof FilterContext)) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterObj);
+    }
+    FilterContext filter = (FilterContext) filterObj;
     if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
       // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
       // to get the correct result, and it cannot be nested

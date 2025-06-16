@@ -16,19 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.core.data.manager.realtime;
 
-package org.apache.pinot.segment.local.segment.index.map;
+public class SegmentBuildFailureException extends Exception {
+  public SegmentBuildFailureException(String errorMessage, Throwable cause) {
+    super(errorMessage, cause);
+  }
 
-import com.google.auto.service.AutoService;
-import org.apache.pinot.segment.spi.index.IndexPlugin;
-
-
-@AutoService(IndexPlugin.class)
-public class MapIndexPlugin implements IndexPlugin<MapIndexType> {
-  public static final MapIndexType INSTANCE = new MapIndexType();
-
-  @Override
-  public MapIndexType getIndexType() {
-    return INSTANCE;
+  public SegmentBuildFailureException(String errorMessage) {
+    super(errorMessage);
   }
 }

@@ -582,6 +582,15 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
+
+    // Test Runtime Exception is thrown when build segment fails.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._failSegmentBuildAndReplace = true;
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      Assert.expectThrows(RuntimeException.class, () -> segmentDataManager.goOnlineFromConsuming(metadata));
+    }
   }
 
   @Test
@@ -874,6 +883,7 @@ public class RealtimeSegmentDataManagerTest {
     public Field _shouldStop;
     public Field _stopReason;
     public Field _segmentBuildFailedWithDeterministicError;
+    public boolean _failSegmentBuildAndReplace = false;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -939,7 +949,8 @@ public class RealtimeSegmentDataManagerTest {
       return new PartitionConsumer();
     }
 
-    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime)
+        throws SegmentBuildFailureException {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
     }
@@ -1023,7 +1034,7 @@ public class RealtimeSegmentDataManagerTest {
     @Override
     protected boolean buildSegmentAndReplace() {
       _buildAndReplaceCalled = true;
-      return true;
+      return !_failSegmentBuildAndReplace;
     }
 
     @Override

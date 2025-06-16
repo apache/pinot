@@ -54,7 +54,7 @@ public class DistinctPlanNode implements PlanNode {
     if (_queryContext.getFilter() == null && expressions.size() == 1) {
       String column = expressions.get(0).getIdentifier();
       if (column != null) {
-        DataSource dataSource = _indexSegment.getDataSource(column);
+        DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
         if (dataSource.getDictionary() != null) {
           if (!_queryContext.isNullHandlingEnabled()) {
             return new DictionaryBasedDistinctOperator(dataSource, _queryContext);

@@ -721,6 +721,7 @@ public class TablesResource {
           validDocIdsMetadata.put("segmentSizeInBytes",
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
+        validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {

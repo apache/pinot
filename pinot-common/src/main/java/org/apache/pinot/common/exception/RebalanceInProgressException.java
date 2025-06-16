@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.map;
+package org.apache.pinot.common.exception;
 
-import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
-import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
-import org.apache.pinot.spi.config.table.MapIndexConfig;
-
-
-public class MutableMapIndexImpl implements MutableIndex {
-  public MutableMapIndexImpl(MutableIndexContext context, MapIndexConfig config) {
+/**
+ * Exception thrown when a rebalance operation is attempted while another rebalance is already in progress for the same
+ * table. This helps to prevent concurrent table rebalances.
+ */
+public class RebalanceInProgressException extends Exception {
+  public RebalanceInProgressException(String message) {
+    super(message);
   }
 
-  @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
-  }
-
-  @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  public RebalanceInProgressException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

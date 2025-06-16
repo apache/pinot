@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -50,7 +52,6 @@ import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -60,6 +61,7 @@ import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -96,6 +98,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -366,8 +369,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
     CompileResult compileResult =
-          compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
-              accessControl);
+        compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
+            accessControl);
 
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
       /*
@@ -406,8 +409,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS
-      if (hasExceededQPSQuota(database, physicalTableNames, requestContext)) {
-        String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      if (!_queryQuotaManager.acquireDatabase(database)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+        return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+      }
+      if (!_queryQuotaManager.acquireLogicalTable(tableName)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for table: %s.", requestId, query, tableName);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
 
@@ -749,6 +761,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           remainingTimeMs, serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
+    brokerResponse.setReplicaGroups(Stream.concat(
+            offlineExecutionServers != null ? offlineExecutionServers.stream() : Stream.empty(),
+            realtimeExecutionServers != null ? realtimeExecutionServers.stream() : Stream.empty())
+        .map(ServerInstance::getPool)
+        .collect(Collectors.toSet()));
 
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
@@ -792,6 +809,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
     }
 
+    for (int group : brokerResponse.getReplicaGroups()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredGroup(sqlNodeAndOptions.getOptions()), String.valueOf(group));
+    }
+
     // Log query and stats
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
@@ -815,9 +837,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
         return new CompileResult(new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
             "It seems that the query is only supported by the multi-stage query engine, please retry the query "
-                    + "using "
-                    + "the multi-stage query engine "
-                    + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)"));
+                + "using "
+                + "the multi-stage query engine "
+                + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)"));
       } else {
         return new CompileResult(
             new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()));

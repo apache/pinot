@@ -17,7 +17,7 @@
  * under the License.
  */
 
-// Copied from Calcite 1.39.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
+// Copied from Calcite 1.40.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
 // Modified parts are marked with "PINOT CUSTOMIZATION START/END".
 
 <@pp.dropOutputFile />
@@ -185,6 +185,7 @@ public class ${parser.class} extends SqlAbstractParserImpl
                 final String sql =
                     ((SourceStringReader) reader).getSourceString();
                 parser.setOriginalSql(sql);
+                parser.jj_input_stream.ReInit(reader, 1, 1, sql.length());
             }
           return parser;
         }
@@ -1120,17 +1121,19 @@ SqlNodeList SqlStmtList() :
     SqlNode stmt;
 }
 {
-    stmt = SqlStmt() {
-        stmtList.add(stmt);
-    }
     (
-        <SEMICOLON>
-        [
-            stmt = SqlStmt() {
-                stmtList.add(stmt);
-            }
-        ]
-    )*
+        stmt = SqlStmt() {
+            stmtList.add(stmt);
+        }
+        (
+            <SEMICOLON>
+            [
+                stmt = SqlStmt() {
+                    stmtList.add(stmt);
+                }
+            ]
+        )*
+    )?
     <EOF>
     {
         return new SqlNodeList(stmtList, Span.of(stmtList).pos());

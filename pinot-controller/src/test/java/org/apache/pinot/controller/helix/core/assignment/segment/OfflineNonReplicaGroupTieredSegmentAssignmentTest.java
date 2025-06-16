@@ -26,8 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -43,6 +48,10 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -100,6 +109,17 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
 
   @BeforeClass
   public void setUp() {
+    HelixManager helixManager = mock(HelixManager.class);
+    //noinspection rawtypes
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
+      String path = invocation.getArgument(0, String.class);
+      String segmentName = path.substring(path.lastIndexOf('/') + 1);
+      return new ZNRecord(segmentName);
+    });
+    //noinspection unchecked
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
     List<TierConfig> tierConfigList = Lists.newArrayList(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TAG_A_NAME, null, null),
@@ -111,7 +131,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setTierConfigList(tierConfigList).build();
 
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
@@ -260,8 +280,8 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 50 && segId < 70;
     }
   }
@@ -276,8 +296,8 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 70 && segId < 100;
     }
   }
@@ -292,8 +312,8 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     @Override
-    public boolean selectSegment(String tableNameWithType, String segmentName) {
-      int segId = Integer.parseInt(segmentName.split("_")[1]);
+    public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
+      int segId = Integer.parseInt(segmentZKMetadata.getSegmentName().split("_")[1]);
       return segId >= 120;
     }
   }

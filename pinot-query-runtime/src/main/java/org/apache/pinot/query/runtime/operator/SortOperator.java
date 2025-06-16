@@ -80,7 +80,7 @@ public class SortOperator extends MultiStageOperator {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
       _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
-          new SortUtils.SortComparator(_dataSchema, collations, true));
+          new SortUtils.SortComparator(collations, true));
       _rows = null;
     }
   }

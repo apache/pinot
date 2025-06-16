@@ -151,6 +151,25 @@ public class ServerQueryLogger {
           TimeUnit.NANOSECONDS);
     }
 
+    long threadMemAllocatedBytes = getLongValue(responseMetadata, MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName(), 0);
+    if (threadMemAllocatedBytes > 0) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.THREAD_MEM_ALLOCATED_BYTES,
+          threadMemAllocatedBytes);
+    }
+    long responseSerMemAllocatedBytes =
+        getLongValue(responseMetadata, MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(), 0);
+    if (responseSerMemAllocatedBytes > 0) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.RESPONSE_SER_MEM_ALLOCATED_BYTES,
+          responseSerMemAllocatedBytes);
+    }
+    long totalMemAllocatedBytes = threadMemAllocatedBytes + responseSerMemAllocatedBytes;
+    if (totalMemAllocatedBytes > 0) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.TOTAL_MEM_ALLOCATED_BYTES,
+          totalMemAllocatedBytes);
+    }
+
+
+
     TimerContext timerContext = request.getTimerContext();
     long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
 
@@ -162,7 +181,9 @@ public class ServerQueryLogger {
               + "invalid/limit/value)={}/{}/{}/{}/{}/{}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},"
               + "minConsumingFreshnessMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
-              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", request.getRequestId(),
+              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}, "
+              + "threadMemAllocatedBytes(total/thread/resSer)={}/{}/{}",
+          request.getRequestId(),
           tableNameWithType,
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numConsumingSegmentsQueried,
           numConsumingSegmentsProcessed, numConsumingSegmentsMatched, numSegmentsPrunedInvalid,
@@ -172,7 +193,8 @@ public class ServerQueryLogger {
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           request.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, schedulerType,
-          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
+          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs,
+          totalMemAllocatedBytes, threadMemAllocatedBytes, responseSerMemAllocatedBytes);
 
       // Limit the dropping log message at most once per second.
       if (_droppedReportRateLimiter.tryAcquire()) {

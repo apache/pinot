@@ -21,8 +21,11 @@ package org.apache.pinot.common.utils.config;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -188,6 +191,21 @@ public class QueryOptionsUtils {
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
+  }
+
+  public static List<Integer> getOrderedPreferredReplicas(Map<String, String> queryOptions) {
+    String orderedPreferredReplicas = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    if (orderedPreferredReplicas == null) {
+      return Collections.emptyList();
+    }
+    // cannot use comma as the delimiter of replica group list
+    // because query option use comma as the delimiter of different options
+    String[] replicas = orderedPreferredReplicas.split("\\|");
+    List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
+    for (String replica : replicas) {
+      preferredReplicas.add(Integer.parseInt(replica.trim()));
+    }
+    return preferredReplicas;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
@@ -374,6 +392,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
+  public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(
+        queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
+  }
+
   public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
     String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
@@ -381,6 +404,26 @@ public class QueryOptionsUtils {
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
+  }
+
+  public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION, "false"));
+  }
+
+  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
+  }
+
+  public static boolean isUseLiteMode(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
+  }
+
+  public static boolean isUseBrokerPruning(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
+  }
+
+  public static boolean isRunInBroker(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "false"));
   }
 
   @Nullable

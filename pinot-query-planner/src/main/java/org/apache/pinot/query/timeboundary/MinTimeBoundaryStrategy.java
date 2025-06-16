@@ -20,6 +20,7 @@ package org.apache.pinot.query.timeboundary;
 
 import com.google.auto.service.AutoService;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -36,35 +37,41 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 @AutoService(TimeBoundaryStrategy.class)
 public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
 
+  private static final String INCLUDED_TABLES = "includedTables";
+  Map<String, DateTimeFormatSpec> _dateTimeFormatSpecMap;
+
+  @Override
+  public void init(LogicalTableConfig logicalTableConfig, TableCache tableCache) {
+    List<String> includedTables = getTimeBoundaryTableNames(logicalTableConfig);
+    _dateTimeFormatSpecMap = new HashMap<>(includedTables.size());
+    for (String physicalTableName : includedTables) {
+      String rawTableName = TableNameBuilder.extractRawTableName(physicalTableName);
+      Schema schema = tableCache.getSchema(rawTableName);
+      TableConfig tableConfig = tableCache.getTableConfig(physicalTableName);
+      Preconditions.checkArgument(tableConfig != null, "Table config not found for table: %s", physicalTableName);
+      Preconditions.checkArgument(schema != null, "Schema not found for table: %s", physicalTableName);
+      String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      Preconditions.checkArgument(dateTimeFieldSpec != null, "Time column not found in schema for table: %s",
+          physicalTableName);
+      DateTimeFormatSpec specFormatSpec = dateTimeFieldSpec.getFormatSpec();
+      _dateTimeFormatSpecMap.put(physicalTableName, specFormatSpec);
+    }
+  }
+
   @Override
   public String getName() {
     return "min";
   }
 
   @Override
-  public TimeBoundaryInfo computeTimeBoundary(LogicalTableConfig logicalTableConfig, TableCache tableCache,
-      RoutingManager routingManager) {
+  public TimeBoundaryInfo computeTimeBoundary(RoutingManager routingManager) {
     TimeBoundaryInfo minTimeBoundaryInfo = null;
     long minTimeBoundary = Long.MAX_VALUE;
-    Map<String, Object> parameters = logicalTableConfig.getTimeBoundaryConfig().getParameters();
-    List<String> includedTables =
-        parameters != null ? (List) parameters.getOrDefault("includedTables", List.of()) : List.of();
-    for (String physicalTableName : includedTables) {
-      TimeBoundaryInfo current = routingManager.getTimeBoundaryInfo(physicalTableName);
+    for (Map.Entry<String, DateTimeFormatSpec> entry : _dateTimeFormatSpecMap.entrySet()) {
+      TimeBoundaryInfo current = routingManager.getTimeBoundaryInfo(entry.getKey());
       if (current != null) {
-        String rawTableName = TableNameBuilder.extractRawTableName(physicalTableName);
-        Schema schema = tableCache.getSchema(rawTableName);
-        TableConfig tableConfig = tableCache.getTableConfig(physicalTableName);
-        Preconditions.checkArgument(tableConfig != null,
-            "Table config not found for table: %s", physicalTableName);
-        Preconditions.checkArgument(schema != null,
-            "Schema not found for table: %s", physicalTableName);
-        String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-        DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
-        Preconditions.checkArgument(dateTimeFieldSpec != null,
-            "Time column not found in schema for table: %s", physicalTableName);
-        DateTimeFormatSpec specFormatSpec = dateTimeFieldSpec.getFormatSpec();
-        long currentTimeBoundaryMillis = specFormatSpec.fromFormatToMillis(current.getTimeValue());
+        long currentTimeBoundaryMillis = entry.getValue().fromFormatToMillis(current.getTimeValue());
         if (minTimeBoundaryInfo == null) {
           minTimeBoundaryInfo = current;
           minTimeBoundary = currentTimeBoundaryMillis;
@@ -75,5 +82,11 @@ public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
       }
     }
     return minTimeBoundaryInfo;
+  }
+
+  @Override
+  public List<String> getTimeBoundaryTableNames(LogicalTableConfig logicalTableConfig) {
+    Map<String, Object> parameters = logicalTableConfig.getTimeBoundaryConfig().getParameters();
+    return parameters != null ? (List) parameters.getOrDefault(INCLUDED_TABLES, List.of()) : List.of();
   }
 }

@@ -33,8 +33,8 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.routing.TablePartitionInfo;
-import org.apache.pinot.core.routing.TablePartitionInfo.PartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -306,7 +306,7 @@ public class QueryEnvironmentTestBase {
         factory.registerSegment(port2, entry.getKey(), segment);
       }
     }
-    Map<String, TablePartitionInfo> partitionInfoMap = null;
+    Map<String, TablePartitionReplicatedServersInfo> partitionInfoMap = null;
     if (MapUtils.isNotEmpty(partitionedSegmentsMap)) {
       partitionInfoMap = new HashMap<>();
       for (Map.Entry<String, Pair<String, List<List<String>>>> entry : partitionedSegmentsMap.entrySet()) {
@@ -321,10 +321,10 @@ public class QueryEnvironmentTestBase {
           String hostname = i < (numPartitions / 2) ? hostname1 : hostname2;
           partitionIdToInfoMap[i] = new PartitionInfo(Collections.singleton(hostname), partitionIdToSegmentsMap.get(i));
         }
-        TablePartitionInfo tablePartitionInfo =
-            new TablePartitionInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions, partitionIdToInfoMap,
-                Collections.emptyList());
-        partitionInfoMap.put(tableNameWithType, tablePartitionInfo);
+        TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
+            new TablePartitionReplicatedServersInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions,
+                partitionIdToInfoMap, Collections.emptyList());
+        partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);

@@ -73,8 +73,10 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
   private final AggregationFunction<?, ?>[] _aggFunctions;
-  private final MultistageAggregationExecutor _aggregationExecutor;
-  private final MultistageGroupByExecutor _groupByExecutor;
+  @Nullable
+  private MultistageAggregationExecutor _aggregationExecutor;
+  @Nullable
+  private MultistageGroupByExecutor _groupByExecutor;
 
   @Nullable
   private MseBlock.Eos _eosBlock;
@@ -123,7 +125,7 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         groupTrimSize = GroupByUtils.getTableCapacity(limit, minGroupTrimSize);
         if (groupTrimSize < Integer.MAX_VALUE) {
-          comparator = new SortUtils.SortComparator(_resultSchema, collations, true);
+          comparator = new SortUtils.SortComparator(collations, true);
         }
       }
     }
@@ -205,13 +207,17 @@ public class AggregateOperator extends MultiStageOperator {
     if (finalBlock.isError()) {
       return finalBlock;
     }
-    return produceAggregatedBlock();
+    MseBlock mseBlock = produceAggregatedBlock();
+    _aggregationExecutor = null;
+    _groupByExecutor = null;
+    return mseBlock;
   }
 
   private MseBlock produceAggregatedBlock() {
     if (_aggregationExecutor != null) {
       return new RowHeapDataBlock(_aggregationExecutor.getResult(), _resultSchema, _aggFunctions);
     } else {
+      assert _groupByExecutor != null;
       List<Object[]> rows;
       if (_comparator != null) {
         rows = _groupByExecutor.getResult(_comparator, _groupTrimSize);
@@ -253,6 +259,7 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private MseBlock.Eos consumeGroupBy() {
+    assert _groupByExecutor != null;
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _groupByExecutor.processBlock((MseBlock.Data) block);
@@ -268,6 +275,7 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private MseBlock.Eos consumeAggregation() {
+    assert _aggregationExecutor != null;
     MseBlock block = _input.nextBlock();
     while (block.isData()) {
       _aggregationExecutor.processBlock((MseBlock.Data) block);

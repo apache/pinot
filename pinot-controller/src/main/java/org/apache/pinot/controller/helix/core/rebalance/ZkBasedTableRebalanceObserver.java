@@ -25,10 +25,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -43,7 +45,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTableRebalanceObserver.class);
   private final String _tableNameWithType;
   private final String _rebalanceJobId;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
   private final TableRebalanceContext _tableRebalanceContext;
   // These previous stats are used for rollback scenarios where the IdealState update fails due to a version
@@ -59,13 +61,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final ControllerMetrics _controllerMetrics;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager) {
+      TableRebalanceContext tableRebalanceContext, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
-    Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
+    Preconditions.checkState(propertyStore != null, "ZkHelixPropertyStore cannot be null");
     _tableNameWithType = tableNameWithType;
     _rebalanceJobId = rebalanceJobId;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _propertyStore = propertyStore;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
     _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats();
@@ -279,8 +281,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private void trackStatsInZk() {
     Map<String, String> jobMetadata =
         createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats, _tableRebalanceContext);
-    _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
-        prevJobMetadata -> {
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, _rebalanceJobId, jobMetadata,
+        ControllerJobType.TABLE_REBALANCE, prevJobMetadata -> {
           // In addition to updating job progress status, the observer also checks if the job status is IN_PROGRESS.
           // If not, then no need to update the job status, and we keep this status to end the job promptly.
           if (prevJobMetadata == null) {

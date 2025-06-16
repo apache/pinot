@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,9 +57,9 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -78,6 +77,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
+  private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
   private String _timeColumn;
   private TimeUnit _timeUnit;
   private Duration _timeGranularity;
@@ -149,6 +149,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentName;
     _schema = schema;
     _creationTime = creationTime;
+    _zkCreationTime = creationTime;
   }
 
   /**
@@ -289,16 +290,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   /**
-   * Helper method to add the physical columns from source list to destination collection.
+   * Helper method to add the physical columns from source list to destination set.
    */
-  private static void addPhysicalColumns(List src, Collection<String> dest) {
+  private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
       String column = o.toString();
-      if (!column.isEmpty() && !dest.contains(column)) {
-        // Skip virtual columns starting with '$', but keep time column with granularity as physical column
-        if (column.charAt(0) == '$' && !TimestampIndexUtils.isValidColumnWithGranularity(column)) {
-          continue;
-        }
+      if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
+        // NOTE:
+        //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform
+        //   this extra check to handle historical bad segments.
+        // TODO:
+        //   We need a better way to identify virtual columns. This info is currently missing from the metadata file.
+        //   Virtual column is a column with virtual column provider configured in the schema.
         dest.add(column);
       }
     }
@@ -378,6 +381,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getIndexCreationTime() {
     return _creationTime;
+  }
+
+  /**
+   * Returns the ZooKeeper creation time for upsert consistency.
+   * This refers to the time set by controller while creating the consuming segment. It is used to ensure consistent
+   * creation time across replicas for upsert operations.
+   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  public long getZkCreationTime() {
+    return _zkCreationTime;
+  }
+
+  /**
+   * Sets the ZooKeeper creation time for upsert consistency.
+   * @param zkCreationTime ZK creation time in milliseconds
+   */
+  public void setZkCreationTime(long zkCreationTime) {
+    _zkCreationTime = zkCreationTime;
   }
 
   @Override

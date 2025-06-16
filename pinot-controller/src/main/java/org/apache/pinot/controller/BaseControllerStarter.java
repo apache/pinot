@@ -101,6 +101,9 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
@@ -203,11 +206,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
-  protected ExecutorService _tenantRebalanceExecutorService;
+  // This executor should be used by all code paths for user initiated rebalances, so that the controller config
+  // CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS is honored.
+  protected ExecutorService _rebalancerExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
+  protected RebalancePreChecker _rebalancePreChecker;
+  protected TableRebalanceManager _tableRebalanceManager;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -264,9 +271,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
-      _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
-          "tenant-rebalance-thread-%d");
-      _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
     // Initialize the table config tuner registry.
@@ -347,7 +351,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
    * @return A new instance of PinotHelixResourceManager.
    */
   protected PinotHelixResourceManager createHelixResourceManager() {
-    return new PinotHelixResourceManager(_config, _executorService);
+    return new PinotHelixResourceManager(_config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -387,6 +391,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   public StaleInstancesCleanupTask getStaleInstancesCleanupTask() {
     return _staleInstancesCleanupTask;
+  }
+
+  public TableRebalanceManager getTableRebalanceManager() {
+    return _tableRebalanceManager;
+  }
+
+  public TableSizeReader getTableSizeReader() {
+    return _tableSizeReader;
   }
 
   @Override
@@ -536,12 +548,20 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _tableSizeReader =
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
-    _helixResourceManager.registerTableSizeReader(_tableSizeReader);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _diskUtilizationChecker);
+    _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
+    _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getDiskUtilizationThreshold());
+    _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
+        "rebalance-thread-%d");
+    _tableRebalanceManager =
+        new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
+            _rebalancerExecutorService);
+    _tenantRebalancer =
+        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -579,6 +599,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_helixParticipantInstanceId).named(CONTROLLER_INSTANCE_ID);
         bind(_helixResourceManager).to(PinotHelixResourceManager.class);
         bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+        bind(_tableRebalanceManager).to(TableRebalanceManager.class);
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
@@ -857,15 +878,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _tableSizeReader);
     periodicTasks.add(_segmentStatusChecker);
-    _rebalanceChecker = new RebalanceChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        _executorService);
+    _rebalanceChecker =
+        new RebalanceChecker(_tableRebalanceManager, _helixResourceManager, _leadControllerManager, _config,
+            _controllerMetrics);
     periodicTasks.add(_rebalanceChecker);
     _realtimeConsumerMonitor =
         new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics,
             _executorService);
     periodicTasks.add(_realtimeConsumerMonitor);
-    _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        _executorService, _connectionManager);
+    _segmentRelocator =
+        new SegmentRelocator(_tableRebalanceManager, _helixResourceManager, _leadControllerManager, _config,
+            _controllerMetrics, _executorService, _connectionManager);
     periodicTasks.add(_segmentRelocator);
     _staleInstancesCleanupTask =
         new StaleInstancesCleanupTask(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
@@ -965,8 +988,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();
       _executorService.awaitTermination(10L, TimeUnit.SECONDS);
-      _tenantRebalanceExecutorService.shutdownNow();
-      _tenantRebalanceExecutorService.awaitTermination(10L, TimeUnit.SECONDS);
+      _rebalancerExecutorService.shutdownNow();
+      _rebalancerExecutorService.awaitTermination(10L, TimeUnit.SECONDS);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }

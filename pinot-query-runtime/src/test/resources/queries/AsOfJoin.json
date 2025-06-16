@@ -1,0 +1,418 @@
+{
+  "as_of_join_queries": {
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["b", 2],
+          ["c", 3],
+          ["d", 4],
+          ["e", 5]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["b", 2],
+          ["a", 1],
+          ["c", 3],
+          ["a", 2],
+          ["c", 1],
+          ["b", 3],
+          ["d", 5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["c", 3, "c", 1]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col >= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col < {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["b", 2, "b", 3],
+          ["d", 4, "d", 5]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col <= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3],
+          ["d", 4, "d", 5]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, null, null],
+          ["b", 2, null, null],
+          ["c", 3, "c", 1],
+          ["d", 4, null, null],
+          ["e", 5, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col >= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3],
+          ["d", 4, null, null],
+          ["e", 5, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col < {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["b", 2, "b", 3],
+          ["c", 3, null, null],
+          ["d", 4, "d", 5],
+          ["e", 5, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col <= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3],
+          ["d", 4, "d", 5],
+          ["e", 5, null, null]
+        ]
+      }
+    ]
+  },
+  "as_of_join_queries_without_hash_key_join": {
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["b", 2],
+          ["c", 3],
+          ["d", 4],
+          ["e", 5]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["b", 2],
+          ["a", 1],
+          ["c", 3],
+          ["a", 4],
+          ["c", 7],
+          ["b", 6],
+          ["d", 5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON true",
+        "outputs": [
+          ["b", 2, "a", 1],
+          ["c", 3, "b", 2],
+          ["d", 4, "c", 3],
+          ["e", 5, "a", 4]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON true",
+        "outputs": [
+          ["a", 1, null, null],
+          ["b", 2, "a", 1],
+          ["c", 3, "b", 2],
+          ["d", 4, "c", 3],
+          ["e", 5, "a", 4]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col >= {t2}.asof_col) ON true",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3],
+          ["d", 4, "a", 4],
+          ["e", 5, "d", 5]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col < {t2}.asof_col) ON true",
+        "outputs": [
+          ["a", 1, "b", 2],
+          ["b", 2, "c", 3],
+          ["c", 3, "a", 4],
+          ["d", 4, "d", 5],
+          ["e", 5, "b", 6]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col <= {t2}.asof_col) ON true",
+        "outputs": [
+          ["a", 1, "a", 1],
+          ["b", 2, "b", 2],
+          ["c", 3, "c", 3],
+          ["d", 4, "a", 4],
+          ["e", 5, "d", 5]
+        ]
+      }
+    ]
+  },
+  "as_of_join_queries_with_nulls": {
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["a", 5],
+          ["b", 3],
+          ["c", null],
+          ["d", 4],
+          ["e", 7],
+          ["f", 10],
+          ["g", 12]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 0],
+          ["a", 2],
+          ["a", null],
+          ["b", 2],
+          ["b", null],
+          ["c", 5],
+          ["d", 4],
+          ["d", 6],
+          ["f", null],
+          ["f", 11],
+          ["g", null],
+          ["h", 9]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 0],
+          ["a", 5, "a", 2],
+          ["b", 3, "b", 2]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col >= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 0],
+          ["a", 5, "a", 2],
+          ["b", 3, "b", 2],
+          ["d", 4, "d", 4]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col < {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["d", 4, "d", 6],
+          ["f", 10, "f", 11]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col <= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["d", 4, "d", 4],
+          ["f", 10, "f", 11]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 0],
+          ["a", 5, "a", 2],
+          ["b", 3, "b", 2],
+          ["c", null, null, null],
+          ["d", 4, null, null],
+          ["e", 7, null, null],
+          ["f", 10, null, null],
+          ["g", 12, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col >= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 0],
+          ["a", 5, "a", 2],
+          ["b", 3, "b", 2],
+          ["c", null, null, null],
+          ["d", 4, "d", 4],
+          ["e", 7, null, null],
+          ["f", 10, null, null],
+          ["g", 12, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col < {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["a", 5, null, null],
+          ["b", 3, null, null],
+          ["c", null, null, null],
+          ["d", 4, "d", 6],
+          ["e", 7, null, null],
+          ["f", 10, "f", 11],
+          ["g", 12, null, null]
+        ]
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col <= {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "outputs": [
+          ["a", 1, "a", 2],
+          ["a", 5, null, null],
+          ["b", 3, null, null],
+          ["c", null, null, null],
+          ["d", 4, "d", 4],
+          ["e", 7, null, null],
+          ["f", 10, "f", 11],
+          ["g", 12, null, null]
+        ]
+      }
+    ]
+  },
+  "as_of_join_unsupported_scenarios": {
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", 1],
+          ["b", 2],
+          ["c", 3],
+          ["d", 4],
+          ["e", 5]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "key_col", "type": "STRING"},
+          {"name": "asof_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["b", 2],
+          ["a", 1],
+          ["c", 3],
+          ["a", 2],
+          ["c", 1],
+          ["b", 3],
+          ["d", 5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col)",
+        "expectedException": ".*exception while parsing query.*",
+        "comment": "Calcite currently doesn't support ASOF JOINs without an ON clause. This isn't just a parser limitation, since the assumption is also built into the validator."
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col)",
+        "expectedException": ".*exception while parsing query.*",
+        "comment": "Calcite currently doesn't support ASOF JOINs without an ON clause. This isn't just a parser limitation, since the assumption is also built into the validator."
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col AND {t1}.asof_col > 0",
+        "expectedException": ".*ASOF JOIN condition must be a conjunction of equality comparisons.*"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col != {t2}.key_col",
+        "expectedException": ".*ASOF JOIN condition must be a conjunction of equality comparisons.*"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col) ON {t1}.key_col = {t2}.key_col OR {t1}.asof_col = {t2}.asof_col",
+        "expectedException": ".*ASOF JOIN condition must be a conjunction of equality comparisons.*"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*exception while parsing query.*",
+        "comment": "MATCH_CONDITION is required for ASOF JOINs"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} LEFT ASOF JOIN {t2} ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*exception while parsing query.*",
+        "comment": "MATCH_CONDITION is required for ASOF JOINs"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col != {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col = {t2}.asof_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col OR {t1}.key_col > {t1}.key_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.asof_col AND {t1}.key_col > {t1}.key_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > 0) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t1}.key_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF JOIN MATCH_CONDITION must be a comparison between columns from the two inputs.*",
+        "comment": "MATCH_CONDITION only supports a single predicate comparing two columns that is one out of: (>, >=, <, <=)"
+      },
+      {
+        "sql": "SELECT {t1}.key_col, {t1}.asof_col, {t2}.key_col, {t2}.asof_col FROM {t1} ASOF JOIN {t2} MATCH_CONDITION({t1}.asof_col > {t2}.key_col) ON {t1}.key_col = {t2}.key_col",
+        "expectedException": ".*ASOF_JOIN only supports match conditions with a comparison between two columns of the same type.*",
+        "comment": "We currently don't support MATCH_CONDITION comparing columns of different types"
+      }
+    ]
+  }
+}

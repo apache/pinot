@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +43,8 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
@@ -53,6 +56,7 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -87,7 +91,6 @@ import org.slf4j.LoggerFactory;
  *   <li>Support for look-up join.</li>
  *   <li>Support for partition parallelism and the colocated join hint. See F2 in #15455.</li>
  *   <li>Support for Hybrid Tables for automatic partitioning inference.</li>
- *   <li>Server pruning based on filter predicates.</li>
  * </ul>
  */
 public class LeafStageWorkerAssignmentRule extends PRelOptRule {
@@ -112,7 +115,13 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @Override
   public PRelNode onMatch(PRelOptRuleCall call) {
     if (call._currentNode.unwrap() instanceof TableScan) {
-      return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId());
+      PRelNode leafStageRoot = extractCurrentLeafStageParent(call._parents);
+      leafStageRoot = leafStageRoot == null ? call._currentNode : leafStageRoot;
+      String tableName = getActualTableName((TableScan) call._currentNode.unwrap());
+      PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQueryForRouting(tableName, leafStageRoot.unwrap(),
+          !QueryOptionsUtils.isUseBrokerPruning(_physicalPlannerContext.getQueryOptions()));
+      return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId(),
+          pinotQuery);
     }
     PRelNode currentNode = call._currentNode;
     Preconditions.checkState(currentNode.isLeafStage(), "Leaf stage worker assignment called for non-leaf stage node:"
@@ -124,11 +133,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return currentNode.with(currentNode.getPRelInputs(), derivedDistribution);
   }
 
-  private PhysicalTableScan assignTableScan(PhysicalTableScan tableScan, long requestId) {
+  private PhysicalTableScan assignTableScan(PhysicalTableScan tableScan, long requestId, PinotQuery pinotQuery) {
     // Step-1: Init tableName, table options, routing table and time boundary info.
     String tableName = Objects.requireNonNull(getActualTableName(tableScan), "Table not found");
     Map<String, String> tableOptions = getTableOptions(tableScan.getHints());
-    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, requestId);
+    Map<String, RoutingTable> routingTableMap = getRoutingTable(pinotQuery, requestId);
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
     // acquire time boundary info if it is a hybrid table.
     TimeBoundaryInfo timeBoundaryInfo = null;
@@ -150,6 +159,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
       Map<ServerInstance, ServerRouteInfo> tmp = routingTable.getServerInstanceToSegmentsMap();
       for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : tmp.entrySet()) {
+        // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,
             "Entry for server %s and table type: %s already exist!", serverEntry.getKey(), tableType);
@@ -172,8 +182,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         routingTableMap.keySet());
     boolean inferInvalidPartitionSegment = QueryOptionsUtils.isInferInvalidSegmentPartition(
         _physicalPlannerContext.getQueryOptions());
+    boolean inferRealtimeSegmentPartition = QueryOptionsUtils.isInferRealtimeSegmentPartition(
+        _physicalPlannerContext.getQueryOptions());
     TableScanWorkerAssignmentResult workerAssignmentResult = assignTableScan(tableName, fieldNames,
-        instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment);
+        instanceIdToSegments, tablePartitionInfoMap, inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
     TableScanMetadata metadata = new TableScanMetadata(Set.of(tableName), workerAssignmentResult._workerIdToSegmentsMap,
         tableOptions, segmentUnavailableMap, timeBoundaryInfo);
     return tableScan.with(workerAssignmentResult._pinotDataDistribution, metadata);
@@ -186,7 +198,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult assignTableScan(String tableName, List<String> fieldNames,
       InstanceIdToSegments instanceIdToSegments, Map<String, TablePartitionInfo> tpiMap,
-      boolean inferInvalidPartitionSegment) {
+      boolean inferInvalidPartitionSegment, boolean inferRealtimeSegmentPartition) {
     Set<String> tableTypes = instanceIdToSegments.getActiveTableTypes();
     Set<String> partitionedTableTypes = tableTypes.stream().filter(tpiMap::containsKey).collect(Collectors.toSet());
     Preconditions.checkState(!tableTypes.isEmpty(), "No routing entry for offline or realtime type");
@@ -199,7 +211,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         TablePartitionInfo tpi = tpiMap.get(tableType);
         TableScanWorkerAssignmentResult assignmentResult = attemptPartitionedDistribution(tableNameWithType,
             fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)), tpi,
-            inferInvalidPartitionSegment);
+            inferInvalidPartitionSegment, inferRealtimeSegmentPartition);
         if (tpi != null && CollectionUtils.isNotEmpty(tpi.getSegmentsWithInvalidPartition())) {
           // Use SegmentPartitionMetadataManager's logs to find the segments with invalid partitions.
           BROKER_METRICS.addMeteredTableValue(tableNameWithType, BrokerMeter.INVALID_SEGMENT_PARTITION_IN_QUERY,
@@ -249,13 +261,22 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
       List<String> fieldNames, Map<String, List<String>> instanceIdToSegmentsMap,
-      @Nullable TablePartitionInfo tablePartitionInfo, boolean inferInvalidSegmentPartition) {
+      @Nullable TablePartitionInfo tablePartitionInfo, boolean inferInvalidSegmentPartition,
+      boolean inferRealtimeSegmentPartition) {
     if (tablePartitionInfo == null) {
       return null;
     }
     String tableType =
         Objects.requireNonNull(TableNameBuilder.getTableTypeFromTableName(tableNameWithType),
             "Illegal state: expected table name with type").toString();
+    if (TableType.valueOf(tableType) == TableType.REALTIME && inferRealtimeSegmentPartition) {
+      // If we are inferring partitioning for realtime segments, we need to build the TPI with inferred partitions.
+      tablePartitionInfo = buildTablePartitionInfoWithInferredPartitions(tableNameWithType, instanceIdToSegmentsMap,
+          tablePartitionInfo);
+      if (tablePartitionInfo == null) {
+        return null;
+      }
+    }
     int numPartitions = tablePartitionInfo.getNumPartitions();
     int keyIndex = fieldNames.indexOf(tablePartitionInfo.getPartitionColumn());
     String function = tablePartitionInfo.getPartitionFunctionName();
@@ -288,18 +309,18 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     // For each partition, we expect at most 1 server which will be stored in this array.
     String[] partitionToServerMap = new String[tablePartitionInfo.getNumPartitions()];
-    TablePartitionInfo.PartitionInfo[] partitionInfos = tablePartitionInfo.getPartitionInfoMap();
     Map<Integer, List<String>> segmentsByPartition = new HashMap<>();
     // Ensure each partition is assigned to exactly 1 server.
     for (int partitionNum = 0; partitionNum < numPartitions; partitionNum++) {
-      TablePartitionInfo.PartitionInfo info = partitionInfos[partitionNum];
       List<String> selectedSegments = new ArrayList<>();
-      if (info != null) {
+      List<String> segmentsForPartition = tablePartitionInfo.getSegmentsByPartition().get(partitionNum);
+      if (!segmentsForPartition.isEmpty()) {
         String chosenServer;
-        for (String segment : info._segments) {
+        for (String segment : segmentsForPartition) {
           chosenServer = segmentToServer.get(segment);
           // segmentToServer may return null if TPI has a segment not present in instanceIdToSegmentsMap.
-          // This can happen when the segment was not selected for the query (due to pruning for instance).
+          // This can happen when the segment was not selected for the query, which may be because of pruning,
+          // or because the segment is optional because it is new.
           if (chosenServer != null) {
             selectedSegments.add(segment);
             if (partitionToServerMap[partitionNum] == null) {
@@ -345,6 +366,36 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     PinotDataDistribution dataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         workers, workers.hashCode(), ImmutableSet.of(desc), null);
     return new TableScanWorkerAssignmentResult(dataDistribution, workerIdToSegmentsMap);
+  }
+
+  @VisibleForTesting
+  @Nullable
+  static TablePartitionInfo buildTablePartitionInfoWithInferredPartitions(String tableNameWithType,
+      Map<String, List<String>> instanceIdToSegmentsMap, TablePartitionInfo tablePartitionInfo) {
+    Preconditions.checkState(TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableNameWithType)),
+        "Table %s is not a realtime table. Cannot infer partitions for invalid segments", tableNameWithType);
+    String partitionColumn = tablePartitionInfo.getPartitionColumn();
+    String partitionFunctionName = tablePartitionInfo.getPartitionFunctionName();
+    int numPartitions = tablePartitionInfo.getNumPartitions();
+    List<String> segmentsWithInvalidPartition = List.of();
+    // compute segmentsByPartition by getting segments from the map and inferring partition from segment name.
+    List<List<String>> segmentsByPartition = new ArrayList<>();
+    for (int i = 0; i < numPartitions; i++) {
+      segmentsByPartition.add(new ArrayList<>());
+    }
+    for (Map.Entry<String, List<String>> entry : instanceIdToSegmentsMap.entrySet()) {
+      List<String> segments = entry.getValue();
+      for (String segment : segments) {
+        int partitionId = inferPartitionId(segment, numPartitions);
+        if (partitionId == -1) {
+          return null;
+        } else {
+          segmentsByPartition.get(partitionId).add(segment);
+        }
+      }
+    }
+    return new TablePartitionInfo(tableNameWithType, partitionColumn, partitionFunctionName, numPartitions,
+        segmentsByPartition, segmentsWithInvalidPartition);
   }
 
   /**
@@ -399,6 +450,25 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return segments;
   }
 
+  @Nullable
+  static PRelNode extractCurrentLeafStageParent(Deque<PRelNode> parents) {
+    for (PRelNode parent : parents) {
+      if (parent.isLeafStage()) {
+        return parent;
+      }
+    }
+    return null;
+  }
+
+  static PinotQuery deepCopyWithTableType(PinotQuery pinotQuery, TableType tableType) {
+    PinotQuery newPinotQuery = pinotQuery.deepCopy();
+    DataSource dataSource = new DataSource();
+    dataSource.setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
+    newPinotQuery.setDataSource(dataSource);
+    return newPinotQuery;
+  }
+
   private Map<String, TablePartitionInfo> calculateTablePartitionInfo(String tableName, Set<String> tableTypes) {
     Map<String, TablePartitionInfo> result = new HashMap<>();
     if (tableTypes.contains("OFFLINE")) {
@@ -421,25 +491,28 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   /**
    * Acquire routing table for items listed in TableScanNode.
    *
-   * @param tableName table name with or without type suffix.
+   * @param pinotQuery the PinotQuery with filters, project and table-scan information.
    * @return keyed-map from table type(s) to routing table(s).
    */
-  private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId) {
+  private Map<String, RoutingTable> getRoutingTable(PinotQuery pinotQuery, long requestId) {
+    String tableName = pinotQuery.getDataSource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
     RoutingTable routingTable;
     if (tableType == null) {
-      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE, requestId);
+      PinotQuery offlineTableTypeQuery = deepCopyWithTableType(pinotQuery, TableType.OFFLINE);
+      routingTable = getRoutingTableSingleTableType(offlineTableTypeQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.OFFLINE.name(), routingTable);
       }
-      routingTable = getRoutingTable(rawTableName, TableType.REALTIME, requestId);
+      PinotQuery realtimeTableTypeQuery = deepCopyWithTableType(pinotQuery, TableType.REALTIME);
+      routingTable = getRoutingTableSingleTableType(realtimeTableTypeQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(TableType.REALTIME.name(), routingTable);
       }
     } else {
-      routingTable = getRoutingTable(tableName, tableType, requestId);
+      routingTable = getRoutingTableSingleTableType(pinotQuery, requestId);
       if (routingTable != null) {
         routingTableMap.put(tableType.name(), routingTable);
       }
@@ -447,11 +520,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return routingTableMap;
   }
 
-  private RoutingTable getRoutingTable(String tableName, TableType tableType, long requestId) {
-    String tableNameWithType =
-        TableNameBuilder.forType(tableType).tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
-    return _routingManager.getRoutingTable(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""), requestId);
+  private RoutingTable getRoutingTableSingleTableType(PinotQuery pinotQuery, long requestId) {
+    return _routingManager.getRoutingTable(CalciteSqlCompiler.convertToBrokerRequest(pinotQuery), requestId);
   }
 
   private Map<String, String> getTableOptions(List<RelHint> hints) {

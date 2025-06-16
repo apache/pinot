@@ -31,6 +31,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
@@ -164,10 +165,38 @@ public class LogicalTableConfigUtils {
       }
     }
 
+    // validate ref offline table name is offline table type
+    if (logicalTableConfig.getRefOfflineTableName() != null
+        && !TableNameBuilder.isOfflineTableResource(logicalTableConfig.getRefOfflineTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refOfflineTableName' should be an offline table type");
+    }
+
+    // validate ref realtime table name is realtime table type
+    if (logicalTableConfig.getRefRealtimeTableName() != null
+        && !TableNameBuilder.isRealtimeTableResource(logicalTableConfig.getRefRealtimeTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refRealtimeTableName' should be a realtime table type");
+    }
+
     // validate ref offline table name is not null or empty when offline tables exists
     if (!offlineTableNames.isEmpty() && StringUtils.isEmpty(logicalTableConfig.getRefOfflineTableName())) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: 'refOfflineTableName' should not be null or empty when offline table exists");
+    }
+
+    // validate ref offline table name is null when offline tables is empty
+    if (offlineTableNames.isEmpty() && !StringUtils.isEmpty(logicalTableConfig.getRefOfflineTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refOfflineTableName' should be null or empty when offline tables do not "
+              + "exist");
+    }
+
+    // validate ref realtime table name is null when realtime tables is empty
+    if (realtimeTableNames.isEmpty() && !StringUtils.isEmpty(logicalTableConfig.getRefRealtimeTableName())) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'refRealtimeTableName' should be null or empty when realtime tables do not "
+              + "exist");
     }
 
     // validate ref realtime table name is not null or empty when realtime tables exists
@@ -227,6 +256,18 @@ public class LogicalTableConfigUtils {
         && (timeBoundaryConfig.getParameters() == null || timeBoundaryConfig.getParameters().isEmpty())) {
       throw new IllegalArgumentException(
           "Invalid logical table. Reason: 'timeBoundaryConfig.parameters' should not be null or empty");
+    }
+  }
+
+  public static boolean checkPhysicalTableRefExists(LogicalTableConfig logicalTableConfig, String tableName) {
+    Set<String> physicalTableNames = logicalTableConfig.getPhysicalTableConfigMap().keySet();
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      return physicalTableNames.contains(offlineTableName) || physicalTableNames.contains(realtimeTableName);
+    } else {
+      return physicalTableNames.contains(tableName);
     }
   }
 }
