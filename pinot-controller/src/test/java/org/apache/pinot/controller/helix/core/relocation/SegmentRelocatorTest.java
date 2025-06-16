@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
@@ -119,8 +120,9 @@ public class SegmentRelocatorTest {
     ControllerConf conf = mock(ControllerConf.class);
     when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
-        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
-            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
+        new SegmentRelocator(mock(TableRebalanceManager.class), mock(PinotHelixResourceManager.class),
+            mock(LeadControllerManager.class), conf, mock(ControllerMetrics.class), mock(ExecutorService.class),
+            mock(HttpClientConnectionManager.class));
     int cnt = 10;
     Random random = new Random();
     for (int i = 0; i < cnt; i++) {
@@ -150,8 +152,9 @@ public class SegmentRelocatorTest {
     ControllerConf conf = mock(ControllerConf.class);
     when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
-        new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
-            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
+        new SegmentRelocator(mock(TableRebalanceManager.class), mock(PinotHelixResourceManager.class),
+            mock(LeadControllerManager.class), conf, mock(ControllerMetrics.class), mock(ExecutorService.class),
+            mock(HttpClientConnectionManager.class));
     ExecutorService runner = Executors.newCachedThreadPool();
     Random random = new Random();
     int cnt = 10;

@@ -121,8 +121,11 @@ public class ReceivingMailbox {
       if (exceptions.isEmpty()) {
         block = SuccessMseBlock.INSTANCE;
       } else {
+        MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
         Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        setErrorBlock(new ErrorMseBlock(exceptionsByQueryError), dataBlock.getStatsByStage());
+        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(),
+            metadataBlock.getServerId(), exceptionsByQueryError);
+        setErrorBlock(errorBlock, dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;
       }
     } else {

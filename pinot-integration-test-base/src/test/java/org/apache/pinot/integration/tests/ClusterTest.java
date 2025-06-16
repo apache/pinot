@@ -555,12 +555,12 @@ public abstract class ClusterTest extends ControllerTest {
    * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
    * This is used for testing timeseries queries.
    */
-  public JsonNode getTimeseriesQuery(String query, long startTime, long endTime) {
+  public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
         String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(getBrokerBaseApiUrl()), queryParams);
-      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, Map.of()));
+      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
     } catch (Exception e) {
       throw new RuntimeException("Failed to get timeseries query: " + query, e);

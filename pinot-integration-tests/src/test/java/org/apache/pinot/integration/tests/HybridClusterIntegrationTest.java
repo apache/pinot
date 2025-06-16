@@ -26,10 +26,12 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -307,5 +309,56 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     super.testVirtualColumnQueries();
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  void testControllerQuerySubmit(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM " + getTableName();
+    JsonNode response = postQueryToController(query);
+    assertNoError(response);
+
+    // Offline table
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    tableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    query = "SELECT count(*) FROM " + tableName;
+    response = postQueryToController(query);
+    assertNoError(response);
+
+    query = "SELECT count(*) FROM unknown";
+    response = postQueryToController(query);
+    if (useMultiStageQueryEngine) {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+          .containsMessage("TableDoesNotExistError");
+    } else {
+      QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING)
+          .containsMessage("BrokerResourceMissingError");
+    }
+  }
+
+  @Test
+  void testControllerJoinQuerySubmit()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    // Hybrid Table
+    @Language("sql")
+    String query = "SELECT count(*) FROM unknown JOIN " + getTableName()
+        + " ON unknown.FlightNum = " + getTableName() + ".FlightNum";
+    JsonNode response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
+
+    query = "SELECT count(*) FROM unknown_1 JOIN unknown_2  ON "
+        + "unknown_1.FlightNum = unknown_2.FlightNum";
+    response = postQueryToController(query);
+    QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
+        .containsMessage("TableDoesNotExistError");
   }
 }

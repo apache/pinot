@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -136,6 +137,7 @@ public class TableConfigBuilder {
   private List<TunerConfig> _tunerConfigList;
   private JsonNode _tierOverwrites;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
+  private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -337,6 +339,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setMultiColumnTextIndexConfig(
+      MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
+    _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+    return this;
+  }
+
   public TableConfigBuilder setJsonIndexColumns(List<String> jsonIndexColumns) {
     _jsonIndexColumns = jsonIndexColumns;
     return this;
@@ -505,6 +513,7 @@ public class TableConfigBuilder {
     indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setMultiColumnTextIndexConfig(_multiColumnTextIndexConfig);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
     indexingConfig.setOptimizeDictionary(_optimizeDictionary);
