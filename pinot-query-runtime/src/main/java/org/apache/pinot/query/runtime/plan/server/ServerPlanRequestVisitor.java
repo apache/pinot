@@ -232,7 +232,6 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
           }
           pinotQuery.setSelectList(selectList);
         }
-
       }
     } else {
       // For lookup join, visit the right child and set it as the leaf boundary.
