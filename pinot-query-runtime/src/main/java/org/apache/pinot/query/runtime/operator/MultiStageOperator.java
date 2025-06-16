@@ -92,7 +92,7 @@ public abstract class MultiStageOperator
   /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
   /// due to resource constraints.
   protected void sampleAndCheckInterruption(long deadlineMs) {
-    if (System.currentTimeMillis() - deadlineMs > 0) {
+    if (System.currentTimeMillis() >= deadlineMs) {
       earlyTerminate();
       throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
     }
