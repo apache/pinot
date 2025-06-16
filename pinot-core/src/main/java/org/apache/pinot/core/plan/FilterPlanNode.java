@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -274,6 +275,13 @@ public class FilterPlanNode implements PlanNode {
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
+              if (textIndexReader == null) {
+                MultiColumnTextMetadata meta = _indexSegment.getSegmentMetadata().getMultiColumnTextMetadata();
+                if (meta != null && meta.getColumns().contains(column)) {
+                  textIndexReader = _indexSegment.getMultiColumnTextIndex();
+                }
+              }
+
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
               // We could check for real time and segment Lucene reader, but easier to check the other way round
@@ -281,7 +289,12 @@ public class FilterPlanNode implements PlanNode {
                   || textIndexReader instanceof NativeMutableTextIndex) {
                 throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
               }
-              return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
+
+              if (textIndexReader.isMultiColumn()) {
+                return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs);
+              } else {
+                return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
+              }
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.

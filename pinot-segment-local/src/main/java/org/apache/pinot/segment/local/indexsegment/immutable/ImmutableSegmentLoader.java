@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexCo
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -283,8 +284,14 @@ public class ImmutableSegmentLoader {
       starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 
+    MultiColumnLuceneTextIndexReader mcTextReader = null;
+    if (segmentReader.hasMultiColumnTextIndex()) {
+      mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
+    }
+
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer,
+            mcTextReader);
     LOGGER.info("Successfully loaded segment: {} with SegmentDirectory", segmentName);
     return segment;
   }

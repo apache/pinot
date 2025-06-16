@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -51,6 +52,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -85,8 +87,10 @@ public class TableIndexingTest {
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final SegmentOperationsThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(2, 4, true));
+      new SegmentAllIndexPreprocessThrottler(2, 4, true),
+      new SegmentStarTreePreprocessThrottler(1, 2, true),
+      new SegmentDownloadThrottler(2, 4, true),
+      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";
   public static final String COLUMN_MONTH_NAME = "$col$MONTH";
@@ -109,7 +113,7 @@ public class TableIndexingTest {
   private void createTestCases() {
     String[] indexTypes = {
         "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-        "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
+        "native_text_index", "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
     };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
@@ -383,6 +387,20 @@ public class TableIndexingTest {
               }
             ] */
           indexTypes.add(FieldConfig.IndexType.TEXT);
+          break;
+        case "multi_col_text_index":
+             /* multi col text index
+              "tableIndexConfig": {
+                "multiColumnTextIndexConfig": {
+                  "columns": ["text_col_1"]
+                  "properties": {
+                  ...
+                  }
+                },
+              }
+             */
+
+          idxCfg.setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of(field.getName())));
           break;
         case "range_index":
             /* range index (supported for dictionary encoded columns of any type as well as raw encoded columns
@@ -706,6 +724,14 @@ public class TableIndexingTest {
       }
     }
     stats.put("startree_index", starTrees);
+
+    int multiColCount = 0;
+    if (segment.getSegmentMetadata().getMultiColumnTextMetadata() != null && segment.getSegmentMetadata()
+        .getMultiColumnTextMetadata().getColumns().contains(columnName)) {
+      multiColCount = 1;
+    }
+
+    stats.put("multi_col_text_index", multiColCount);
     return stats;
   }
 }
