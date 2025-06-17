@@ -171,7 +171,7 @@ public class QueryEnvironment {
     HepProgram optProgram = _optProgram;
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (skipRuleSet != null && !skipRuleSet.isEmpty()) {
+      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
         // dynamically create optProgram according to rule options
         optProgram = getOptProgram(skipRuleSet);
       }
