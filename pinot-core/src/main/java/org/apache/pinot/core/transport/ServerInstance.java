@@ -32,7 +32,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_REPLICA_GROUP_ID;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
 public final class ServerInstance {
@@ -102,7 +102,7 @@ public final class ServerInstance {
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
     _adminEndpoint = null;
-    _pool = FALLBACK_REPLICA_GROUP_ID;
+    _pool = FALLBACK_POOL_ID;
   }
 
   public String getInstanceId() {
@@ -194,12 +194,12 @@ public final class ServerInstance {
   int extractPool(InstanceConfig instanceConfig) {
     Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
     if (pools == null || pools.isEmpty()) {
-      return FALLBACK_REPLICA_GROUP_ID;
+      return FALLBACK_POOL_ID;
     }
     Set<String> groups = new HashSet<>(pools.values());
     if (groups.size() != 1) {
       LOGGER.warn("Instance: {} belongs to multiple groups: {}", _instanceId, groups);
-      return FALLBACK_REPLICA_GROUP_ID;
+      return FALLBACK_POOL_ID;
     }
     // The type of the field pools of org.apache.pinot.spi.config.instance.Instance uses Map<String, Integer>.
     // Thus it is safe to directly use Integer.parseInt without checking the parsing exception

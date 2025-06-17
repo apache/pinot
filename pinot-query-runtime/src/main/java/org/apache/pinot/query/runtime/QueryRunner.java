@@ -83,6 +83,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
@@ -130,6 +131,10 @@ public class QueryRunner {
   @Nullable
   private JoinOverFlowMode _joinOverflowMode;
   @Nullable
+  private Integer _maxRowsInWindow;
+  @Nullable
+  private WindowOverFlowMode _windowOverflowMode;
+  @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
 
@@ -176,6 +181,13 @@ public class QueryRunner {
 
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
+
+    String maxRowsInWindowStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
+    _maxRowsInWindow = maxRowsInWindowStr != null ? Integer.parseInt(maxRowsInWindowStr) : null;
+
+    String windowOverflowModeStr =
+        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
+    _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
 
     ExecutorService baseExecutorService = ExecutorServiceUtils.create(
         config,
@@ -461,6 +473,23 @@ public class QueryRunner {
     if (joinOverflowMode != null) {
       opChainMetadata.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
     }
+
+    Integer maxRowsInWindow = QueryOptionsUtils.getMaxRowsInWindow(opChainMetadata);
+    if (maxRowsInWindow == null) {
+      maxRowsInWindow = _maxRowsInWindow;
+    }
+    if (maxRowsInWindow != null) {
+      opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_WINDOW, Integer.toString(maxRowsInWindow));
+    }
+
+    WindowOverFlowMode windowOverflowMode = QueryOptionsUtils.getWindowOverflowMode(opChainMetadata);
+    if (windowOverflowMode == null) {
+      windowOverflowMode = _windowOverflowMode;
+    }
+    if (windowOverflowMode != null) {
+      opChainMetadata.put(QueryOptionKey.WINDOW_OVERFLOW_MODE, windowOverflowMode.name());
+    }
+
     return opChainMetadata;
   }
 

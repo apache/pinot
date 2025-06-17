@@ -60,8 +60,6 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
-  public static final String APPLICATION = "application";
-
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -487,7 +485,10 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
-    // would set the group to -1 in the routing table for that server.
+    // would set the pool to -1 in the routing table for that server.
+    public static final int FALLBACK_POOL_ID = -1;
+    // keep the variable to pass the compability test
+    @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
 
     public static class Request {
@@ -543,7 +544,9 @@ public class CommonConstants {
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
 
+        @Deprecated
         public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
+        public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";

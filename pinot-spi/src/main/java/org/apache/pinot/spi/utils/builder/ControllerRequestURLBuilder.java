@@ -277,7 +277,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableGet(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableGet(tableName, null);
+  }
+
+  public String forTableGet(String tableName, TableType tableType) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (tableType != null) {
+      url += "?type=" + tableType.name();
+    }
+    return url;
   }
 
   public String forTableDelete(String tableName) {

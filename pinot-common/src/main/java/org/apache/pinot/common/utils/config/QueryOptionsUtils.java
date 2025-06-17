@@ -193,19 +193,23 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
   }
 
-  public static List<Integer> getOrderedPreferredReplicas(Map<String, String> queryOptions) {
-    String orderedPreferredReplicas = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    if (orderedPreferredReplicas == null) {
+  public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
+    String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
+      // backward compatibility
+      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    }
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }
-    // cannot use comma as the delimiter of replica group list
+    // cannot use comma as the delimiter of pool list
     // because query option use comma as the delimiter of different options
-    String[] replicas = orderedPreferredReplicas.split("\\|");
-    List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
-    for (String replica : replicas) {
-      preferredReplicas.add(Integer.parseInt(replica.trim()));
+    String[] pools = orderedPreferredPools.split("\\|");
+    List<Integer> preferredPools = new ArrayList<>(pools.length);
+    for (String pool : pools) {
+      preferredPools.add(Integer.parseInt(pool.trim()));
     }
-    return preferredReplicas;
+    return preferredPools;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {

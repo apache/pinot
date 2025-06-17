@@ -25,7 +25,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**
- * This class encapsulates query options and ordered preferred replica groups that influence how
+ * This class encapsulates query options and ordered preferred pools that influence how
  * servers are selected for query execution.
  */
 public class ServerSelectionContext {
@@ -34,34 +34,34 @@ public class ServerSelectionContext {
    * These options are passed into the context class to avoid endless constructor argument changes
    * as new server selection preferences are added. Examples of such options include:
    * <ul>
-   *   <li>Preferred replica groups for routing</li>
+   *   <li>Preferred pools for routing</li>
    *   <li>Boolean fixedReplicaGroup</li>
    *   <li>Other server selection related configurations in the future</li>
    * </ul>
    * The options are processed once during construction to extract relevant information
-   * (like ordered preferred groups) to avoid repeated parsing.
+   * (like ordered preferred pools) to avoid repeated parsing.
    */
   private final Map<String, String> _queryOptions;
   // If some query options need further processing, store the parsing result below to avoid duplicate parsing.
-  private final List<Integer> _orderedPreferredGroups;
+  private final List<Integer> _orderedPreferredPools;
 
   /**
    * Creates a new server selection context with the given query options.
-   * The ordered preferred groups are extracted from the query options using
-   * {@link QueryOptionsUtils#getOrderedPreferredReplicas(Map)}.
+   * The ordered preferred pools are extracted from the query options using
+   * {@link QueryOptionsUtils#getOrderedPreferredPools(Map)}.
    *
    * @param queryOptions map of query options that may contain server selection preferences
    */
   public ServerSelectionContext(Map<String, String> queryOptions) {
     _queryOptions = queryOptions == null ? Collections.emptyMap() : queryOptions;
-    _orderedPreferredGroups = QueryOptionsUtils.getOrderedPreferredReplicas(_queryOptions);
+    _orderedPreferredPools = QueryOptionsUtils.getOrderedPreferredPools(_queryOptions);
   }
 
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
   }
 
-  public List<Integer> getOrderedPreferredGroups() {
-    return _orderedPreferredGroups;
+  public List<Integer> getOrderedPreferredPools() {
+    return _orderedPreferredPools;
   }
 }
