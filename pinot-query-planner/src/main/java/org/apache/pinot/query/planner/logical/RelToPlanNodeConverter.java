@@ -67,6 +67,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -80,6 +81,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,18 +427,33 @@ public final class RelToPlanNodeConverter {
       joinStrategy = JoinNode.JoinStrategy.HASH;
     }
 
-    @Nullable
-    RexExpression filter = rel.getFilter() == null
-        ? null : RexExpressionUtils.fromRexNode(rel.getFilter());
-    @Nullable
-    List<RexExpression> projects = rel.getProjects() == null
-        ? null : RexExpressionUtils.fromRexNodes(rel.getProjects());
+    // convert filter and project RexNode into RexExpression
+    List<PlannerUtils.FilterProjectRex> filterProjectRexes = getFilterProjectRexes(rel);
 
     return new EnrichedJoinNode(DEFAULT_STAGE_ID, joinResultSchema, projectedSchema,
         NodeHint.fromRelHints(rel.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy,
-        null, filter, projects);
+        null,
+        filterProjectRexes);
+  }
+
+  @NotNull
+  private static List<PlannerUtils.FilterProjectRex> getFilterProjectRexes(PinotLogicalEnrichedJoin rel) {
+    List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNode = rel.getFilterProjectRexNodes();
+    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    filterProjectRexNode.forEach((node) -> {
+      if(node.getType() == PinotLogicalEnrichedJoin.FilterProjectRexNodeType.FILTER) {
+        filterProjectRexes.add(new PlannerUtils.FilterProjectRex(RexExpressionUtils.fromRexNode(node.getFilter())));
+      } else {
+        filterProjectRexes.add(
+            new PlannerUtils.FilterProjectRex(
+                RexExpressionUtils.fromRexNodes(node.getProjectAndResultRowType().getProject()),
+                toDataSchema(node.getProjectAndResultRowType().getDataType())
+            ));
+      }
+    });
+    return filterProjectRexes;
   }
 
   private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
