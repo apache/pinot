@@ -48,6 +48,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -189,13 +190,10 @@ public class IngestionDelayTracker {
     _clock = Clock.systemUTC();
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
-    Preconditions.checkNotNull(_realTimeTableDataManager.getStreamIngestionConfig(),
-        "Stream ingestion config is null for table=" + _tableNameWithType);
-    List<Map<String, String>> streamConfigMaps =
-        _realTimeTableDataManager.getStreamIngestionConfig().getStreamConfigMaps();
-    Preconditions.checkState(!streamConfigMaps.isEmpty(), "No stream config map found for table=" + _tableNameWithType);
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(
+        _realTimeTableDataManager.getCachedTableConfigAndSchema().getKey());
     _streamConsumerFactory =
-        StreamConsumerFactoryProvider.create(new StreamConfig(_tableNameWithType, streamConfigMaps.get(0)));
+        StreamConsumerFactoryProvider.create(new StreamConfig(_tableNameWithType, streamConfigMap));
     if (realtimeTableDataManager.getInstanceDataManagerConfig() != null
         && realtimeTableDataManager.getInstanceDataManagerConfig().getConfig() != null) {
       PinotConfiguration pinotConfiguration = realtimeTableDataManager.getInstanceDataManagerConfig().getConfig();
