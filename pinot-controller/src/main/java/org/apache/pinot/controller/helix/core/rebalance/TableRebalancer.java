@@ -493,13 +493,19 @@ public class TableRebalancer {
         new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
             isStrictRealtimeSegmentAssignment);
     // We repeat the following steps until the target assignment is reached:
-    // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't converge within the
-    //    timeout.
+    // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't make progress within
+    //    the timeout.
     // 2. When IdealState changes during step 1, re-calculate the target assignment based on the new IdealState (current
     //    assignment).
-    // 3. Check if the target assignment is reached. Rebalance is done if it is reached.
-    // 4. Calculate the next assignment based on the current assignment, target assignment and min available replicas.
-    // 5. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
+    // 3. If forceCommitBeforeMoved is enabled, do:
+    //  3.1 calculate the next assignment based on the current assignment, target
+    //      assignment, batch size per server, and min available replicas.
+    //  3.2 Force commit the consuming segments that would be moved in the next assignment, and wait for them to finish
+    //  3.3 Recalculate the target assignment based on the new IdealState
+    // 4. Check if the target assignment is reached. Rebalance is done if it is reached.
+    // 5. Calculate the next assignment based on the current assignment, target assignment, batch size per server,
+    // and min available replicas.
+    // 6. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
     //
     // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
     //       in the previous round are also converged.
