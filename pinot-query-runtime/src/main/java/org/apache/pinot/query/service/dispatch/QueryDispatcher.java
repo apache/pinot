@@ -167,7 +167,7 @@ public class QueryDispatcher {
     boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      QueryResult result = runReducerFromQueryThread(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      QueryResult result = runReducerFromQueryThread(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
         cancelled = true;
