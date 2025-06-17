@@ -27,9 +27,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -42,6 +43,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.avro.Schema.create;
+import static org.apache.avro.Schema.createUnion;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -53,6 +56,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_TABLE_NAME = "TextIndicesTest";
 
+  private static final String TEXT_COLUMN_NULL_NAME = "nullable_skills";
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TEXT_COLUMN_NAME_CASE_SENSITIVE = "skills_case_sensitive";
   private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
@@ -81,27 +85,9 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     return null;
   }
 
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
-  }
-
   @Override
   protected List<String> getNoDictionaryColumns() {
-    return List.of(TEXT_COLUMN_NAME, TEXT_COLUMN_NAME_CASE_SENSITIVE);
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
+    return List.of(TEXT_COLUMN_NULL_NAME, TEXT_COLUMN_NAME, TEXT_COLUMN_NAME_CASE_SENSITIVE);
   }
 
   @Override
@@ -112,6 +98,12 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+
+    FieldConfig nullableTextConfig =
+        new FieldConfig(TEXT_COLUMN_NULL_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes,
+            null,
+            null);
+
     FieldConfig textColumnFieldConfig =
         new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes, null,
             null);
@@ -149,7 +141,8 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     FieldConfig textColumnNativeFieldConfig =
         new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
             textColumnNativeIndexes, null, null);
-    return Arrays.asList(textColumnFieldConfig, textColumnCaseSensitiveFieldConfig, textColumnNativeFieldConfig);
+    return Arrays.asList(nullableTextConfig, textColumnFieldConfig, textColumnCaseSensitiveFieldConfig,
+        textColumnNativeFieldConfig);
   }
 
   @Override
@@ -159,7 +152,13 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   public Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+    return new Schema.SchemaBuilder()
+        .setSchemaName(getTableName())
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField(TEXT_COLUMN_NULL_NAME, FieldSpec.DataType.STRING, field -> {
+          field.setNullable(true);
+          field.setDefaultNullValue(null);
+        })
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
@@ -188,18 +187,21 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
     File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
-        new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME_CASE_SENSITIVE,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
-        new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME_NATIVE,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
-        new org.apache.avro.Schema.Field(TIME_COLUMN_NAME,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null, null)));
+    avroSchema.setFields(Arrays.asList(
+        new Field(TEXT_COLUMN_NULL_NAME, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
+        new Field(TEXT_COLUMN_NAME,
+            create(Type.STRING), null, null),
+        new Field(TEXT_COLUMN_NAME_CASE_SENSITIVE,
+            create(Type.STRING), null, null),
+        new Field(TEXT_COLUMN_NAME_NATIVE,
+            create(Type.STRING), null, null),
+        new Field(TIME_COLUMN_NAME,
+            create(Type.LONG), null, null)));
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put(TEXT_COLUMN_NULL_NAME, i % 2 == 0 ? null : skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME, skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME_CASE_SENSITIVE, skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME_NATIVE, skills.get(i % NUM_SKILLS));
@@ -212,13 +214,23 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   public TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setNullHandlingEnabled(false)
+        .build();
   }
 
   @Test(dataProvider = "useBothQueryEngines")

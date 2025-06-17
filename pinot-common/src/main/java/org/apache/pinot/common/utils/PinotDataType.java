@@ -157,7 +157,7 @@ public enum PinotDataType {
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMP");
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to TIMESTAMP");
     }
 
     @Override

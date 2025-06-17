@@ -23,8 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -90,29 +88,26 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    TextIndexConfig textIndexConfig = indexConfigs.getConfig(StandardIndexes.text());
+    if (textIndexConfig.isEnabled()) {
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
+          "Cannot create TEXT index on column: %s of stored type other than STRING", fieldSpec.getName());
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative((tableConfig, schema) -> {
-          List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-          if (fieldConfigList == null) {
-            return Collections.emptyMap();
-          }
-          Map<String, TextIndexConfig> result = new HashMap<>();
-          for (FieldConfig fieldConfig : fieldConfigList) {
-            if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
-              String column = fieldConfig.getName();
-              Map<String, String> properties = fieldConfig.getProperties();
-              FSTType fstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
-              result.put(column, new TextIndexConfigBuilder(fstType).withProperties(properties).build());
-            }
-          }
-          return result;
-        });
+  protected ColumnConfigDeserializer<TextIndexConfig> createDeserializerForLegacyConfigs() {
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.TEXT, (tableConfig, fieldConfig) -> {
+      Map<String, String> properties = fieldConfig.getProperties();
+      FSTType fstType = TextIndexUtils.isFstTypeNative(properties) ? FSTType.NATIVE : FSTType.LUCENE;
+      return new TextIndexConfigBuilder(fstType).withProperties(properties).build();
+    });
   }
 
   @Override

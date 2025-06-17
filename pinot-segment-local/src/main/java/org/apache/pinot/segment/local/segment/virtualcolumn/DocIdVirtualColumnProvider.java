@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import java.io.IOException;
-import org.apache.pinot.segment.local.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -33,7 +31,7 @@ import org.apache.pinot.spi.utils.Pairs;
 /**
  * Virtual column provider that returns the document id.
  */
-public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
+public class DocIdVirtualColumnProvider implements VirtualColumnProvider {
   private static final DocIdSortedIndexReader DOC_ID_SORTED_INDEX_READER = new DocIdSortedIndexReader();
 
   @Override
@@ -47,15 +45,19 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   }
 
   @Override
-  public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
-    ColumnMetadataImpl.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
-    columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setSorted(true).setHasDictionary(true);
-    return columnMetadataBuilder.build();
+  public InvertedIndexReader<?> buildInvertedIndex(VirtualColumnContext context) {
+    return DOC_ID_SORTED_INDEX_READER;
   }
 
   @Override
-  public InvertedIndexReader<?> buildInvertedIndex(VirtualColumnContext context) {
-    return DOC_ID_SORTED_INDEX_READER;
+  public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
+    int numDocs = context.getTotalDocCount();
+    return new ColumnMetadataImpl.Builder().setFieldSpec(context.getFieldSpec())
+        .setTotalDocs(numDocs)
+        .setCardinality(numDocs)
+        .setSorted(true)
+        .setHasDictionary(true)
+        .build();
   }
 
   private static class DocIdSortedIndexReader implements SortedIndexReader<ForwardIndexReaderContext> {
@@ -76,8 +78,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
     }
   }
 }

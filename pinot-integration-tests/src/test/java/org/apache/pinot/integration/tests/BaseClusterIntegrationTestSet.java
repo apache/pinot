@@ -295,12 +295,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "'DL' ORDER BY ArrTime DESC";
     testQuery(query, h2Query);
 
-    // Test orderedPreferredReplicas option which will fallbacks to non preferred replica groups
-    // when non of preferred replicas is available
-    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredReplicas=0|1)";
+    // Test orderedPreferredPools option which will fallbacks to non preferred Pools
+    // when non of preferred Pools is available
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";
     h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     testQuery(query, h2Query);
-    query = "SET orderedPreferredReplicas='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    query = "SET orderedPreferredPools='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
     testQuery(query, h2Query);
   }

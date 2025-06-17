@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
@@ -103,8 +104,10 @@ public class BaseTableDataManagerTest {
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
   static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2, 4, true),
-      new SegmentDownloadThrottler(2, 4, true));
+      new SegmentAllIndexPreprocessThrottler(2, 4, true),
+      new SegmentStarTreePreprocessThrottler(2, 4, true),
+      new SegmentDownloadThrottler(2, 4, true),
+      new SegmentMultiColTextIndexPreprocessThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()

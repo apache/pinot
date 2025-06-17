@@ -64,6 +64,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -164,18 +165,23 @@ public class QueryDispatcher {
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+    boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
+        cancelled = true;
+        return result.withStats(statsFromCancel);
+      }
+      return result;
     } catch (Exception ex) {
-      return tryRecover(context.getRequestId(), servers, ex);
-    } catch (Throwable e) {
-      // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId);
-      throw e;
+      QueryResult queryResult = tryRecover(context.getRequestId(), servers, ex);
+      cancelled = true;
+      return queryResult;
     } finally {
-      if (isQueryCancellationEnabled()) {
-        _serversByQuery.remove(requestId);
+      if (!cancelled) {
+        cancel(requestId, servers);
       }
     }
   }
@@ -199,7 +205,6 @@ public class QueryDispatcher {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
       // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
-      cancel(requestId, servers);
       throw ex;
     }
     // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
@@ -610,7 +615,11 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+    try (
+        QueryThreadContext.CloseableContext mseCloseableCtx = MseWorkerThreadContext.open();
+        OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+      MseWorkerThreadContext.setStageId(0);
+      MseWorkerThreadContext.setWorkerId(0);
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
@@ -637,18 +646,28 @@ public class QueryDispatcher {
     }
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isError()) {
-      Map<QueryErrorCode, String> queryExceptions = ((ErrorMseBlock) block).getErrorMessages();
+      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+      Map<QueryErrorCode, String> queryExceptions = errorBlock.getErrorMessages();
 
       String errorMessage;
       Map.Entry<QueryErrorCode, String> error;
+      String from;
+      if (errorBlock.getStageId() >= 0) {
+        from = " from stage " + errorBlock.getStageId();
+        if (errorBlock.getServerId() != null) {
+          from += " on " + errorBlock.getServerId();
+        }
+      } else {
+        from = "";
+      }
       if (queryExceptions.size() == 1) {
         error = queryExceptions.entrySet().iterator().next();
-        errorMessage = "Received 1 error from servers: " + error.getValue();
+        errorMessage = "Received 1 error" + from + ": " + error.getValue();
       } else {
         error = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
-        errorMessage = "Received " + queryExceptions.size() + " errors from servers. "
+        errorMessage = "Received " + queryExceptions.size() + " errors" + from + ". "
                 + "The one with highest priority is: " + error.getValue();
       }
       QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);
@@ -775,6 +794,14 @@ public class QueryDispatcher {
       _queryStats.add(queryStats.getCurrentStats().close());
       for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
+      }
+    }
+
+    public QueryResult withStats(MultiStageQueryStats newQueryStats) {
+      if (_processingException != null) {
+        return new QueryResult(_processingException, newQueryStats, _brokerReduceTimeMs);
+      } else {
+        return new QueryResult(_resultTable, newQueryStats, _brokerReduceTimeMs);
       }
     }
 
