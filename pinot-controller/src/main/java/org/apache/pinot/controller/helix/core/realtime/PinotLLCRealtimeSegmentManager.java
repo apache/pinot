@@ -810,7 +810,7 @@ public class PinotLLCRealtimeSegmentManager {
       }
     } else {
       LOGGER.info(
-          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused",
+          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused.",
           committingSegmentName, realtimeTableName);
     }
     return newConsumingSegmentName;
