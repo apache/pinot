@@ -2012,14 +2012,13 @@ public class TableRebalancer {
     return movingConsumingSegments;
   }
 
-  private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType,
-      @Nullable Set<String> segmentsToCommit, Logger tableRebalanceLogger) {
+  private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType, Set<String> segmentsToCommit,
+      Logger tableRebalanceLogger) {
     if (_pinotLLCRealtimeSegmentManager != null) {
       ForceCommitBatchConfig forceCommitBatchConfig =
           ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
       segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
-          segmentsToCommit == null ? null : StringUtil.join(",", segmentsToCommit.toArray(String[]::new)),
-          forceCommitBatchConfig);
+          StringUtil.join(",", segmentsToCommit.toArray(String[]::new)), forceCommitBatchConfig);
       try {
         // Wait until all committed segments have their status set to DONE.
         // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot

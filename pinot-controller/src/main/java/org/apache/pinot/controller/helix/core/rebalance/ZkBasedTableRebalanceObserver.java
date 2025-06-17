@@ -152,8 +152,6 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         }
         break;
       case FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER:
-        LOGGER.info("triggered force commit for consuming segments for table: {}",
-            _tableNameWithType);
         _tableRebalanceProgressStats.getRebalanceProgressStatsOverall()._isForceCommittingConsumingSegments = true;
         _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep()._isForceCommittingConsumingSegments = true;
         trackStatsInZk();
