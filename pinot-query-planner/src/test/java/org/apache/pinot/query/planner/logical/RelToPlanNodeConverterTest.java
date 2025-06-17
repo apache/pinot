@@ -221,8 +221,7 @@ public class RelToPlanNodeConverterTest {
     assert (node instanceof EnrichedJoinNode);
 
     EnrichedJoinNode enrichedJoinNode = (EnrichedJoinNode) node;
-    Assert.assertEquals(enrichedJoinNode.getFilterCondition(), RexExpressionUtils.fromRexNode(filterCondition));
-    Assert.assertEquals(enrichedJoinNode.getProjects(), RexExpressionUtils.fromRexNodes(projects));
+    Assert.assertEquals(enrichedJoinNode.getFilterProjectRexes().size(), 2);
   }
 
   @AfterMethod

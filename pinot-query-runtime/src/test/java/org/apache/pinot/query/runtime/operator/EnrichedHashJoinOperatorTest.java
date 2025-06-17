@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -348,10 +349,18 @@ public class EnrichedHashJoinOperatorTest {
       PlanNode.NodeHint nodeHint,
       RexExpression matchCondition, RexExpression filterCondition, List<RexExpression> projects
   ) {
+    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    if (filterCondition != null) {
+      filterProjectRexes.add(new PlannerUtils.FilterProjectRex(filterCondition));
+    }
+    if (projects != null) {
+      filterProjectRexes.add(new PlannerUtils.FilterProjectRex(projects, resultSchema));
+    }
     return new EnrichedHashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
         new EnrichedJoinNode(-1, resultSchema, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys,
             nonEquiConditions,
-            JoinNode.JoinStrategy.HASH, matchCondition, filterCondition, projects));
+            JoinNode.JoinStrategy.HASH, matchCondition,
+            filterProjectRexes));
   }
 
   private EnrichedHashJoinOperator getProjectedOperator(DataSchema leftSchema, DataSchema joinSchema,
@@ -360,10 +369,18 @@ public class EnrichedHashJoinOperatorTest {
       PlanNode.NodeHint nodeHint,
       RexExpression matchCondition, RexExpression filterCondition, List<RexExpression> projects
   ) {
+    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    if (filterCondition != null) {
+      filterProjectRexes.add(new PlannerUtils.FilterProjectRex(filterCondition));
+    }
+    if (projects != null) {
+      filterProjectRexes.add(new PlannerUtils.FilterProjectRex(projects, projectSchema));
+    }
     return new EnrichedHashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
         new EnrichedJoinNode(-1, joinSchema, projectSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys,
             nonEquiConditions,
-            JoinNode.JoinStrategy.HASH, matchCondition, filterCondition, projects));
+            JoinNode.JoinStrategy.HASH, matchCondition,
+            filterProjectRexes));
   }
 
   private HashJoinOperator getBasicOperator(DataSchema resultSchema, JoinRelType joinType,
