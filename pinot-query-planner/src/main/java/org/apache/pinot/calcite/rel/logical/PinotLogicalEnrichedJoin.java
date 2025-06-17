@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.logical;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -29,36 +30,96 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 
 public class PinotLogicalEnrichedJoin extends Join {
+
+  public enum FilterProjectRexNodeType {
+    FILTER,
+    PROJECT
+  }
+
+  public static class ProjectAndResultRowType {
+    private final List<RexNode> _project;
+    private final RelDataType _dataType;
+
+    public ProjectAndResultRowType(List<RexNode> project, RelDataType resultRowType) {
+      _project = project;
+      _dataType = resultRowType;
+    }
+
+    public List<RexNode> getProject() {
+      return _project;
+    }
+
+    public RelDataType getDataType() {
+      return _dataType;
+    }
+  }
+
+  public static class FilterProjectRexNode {
+    private final FilterProjectRexNodeType _type;
+    @Nullable
+    private final RexNode _filter;
+    @Nullable
+    private final ProjectAndResultRowType _projectAndResultRowType;
+
+    public FilterProjectRexNode(RexNode filter) {
+      _type = FilterProjectRexNodeType.FILTER;
+      _filter = filter;
+      _projectAndResultRowType = null;
+    }
+
+    public FilterProjectRexNode(List<RexNode> project, RelDataType resultDataType) {
+      _type = FilterProjectRexNodeType.PROJECT;
+      _filter = null;
+      _projectAndResultRowType = new ProjectAndResultRowType(project, resultDataType);
+    }
+
+    public FilterProjectRexNodeType getType() {
+      return _type;
+    }
+
+    @Nullable
+    public RexNode getFilter() {
+      return _filter;
+    }
+
+    @Nullable
+    public ProjectAndResultRowType getProjectAndResultRowType() {
+      return _projectAndResultRowType;
+    }
+  }
+
   private final RelDataType _joinRowType;
-  private final RelDataType _projectedRowType;
-  @Nullable
-  private final RexNode _filter;
-  @Nullable
-  private final List<RexNode> _projects;
+  private final RelDataType _outputRowType;
+  private final List<FilterProjectRexNode> _filterProjectRexNodes;
   // currently variableSet of Project Rel is ignored since this EnrichedJoinRel
   //   is created at the end of logical transformations.
   //   We don't support nested expressions in execution
   private final Set<CorrelationId> _projectVariableSet;
+  @Nullable private final List<RexNode> _squashedProjects;
 
   public PinotLogicalEnrichedJoin(RelOptCluster cluster, RelTraitSet traitSet,
       List<RelHint> hints, RelNode left, RelNode right, RexNode joinCondition,
       Set<CorrelationId> variablesSet, JoinRelType joinType,
-      @Nullable RexNode filter, @Nullable List<RexNode> projects,
-      @Nullable RelDataType projectRowType, @Nullable Set<CorrelationId> projectVariableSet) {
+      List<FilterProjectRexNode> filterProjectRexNodes,
+      @Nullable RelDataType outputRowType, @Nullable Set<CorrelationId> projectVariableSet) {
     super(cluster, traitSet, hints, left, right, joinCondition, variablesSet, joinType);
-    _filter = filter;
-    _projects = projects;
+    _filterProjectRexNodes = filterProjectRexNodes;
+    _squashedProjects = squashProjects();
     _joinRowType = getJoinRowType();
-    // if there's projection, getRowType() should return projected row type as output row type
+    // TODO: make sure this aligns with filterProjectRexNodes
+    // if there's projection, getRowType() should return the final projected row type as output row type
     //   otherwise it's the same as _joinRowType
-    _projectedRowType = projectRowType == null ? _joinRowType : projectRowType;
+    _outputRowType = outputRowType == null ? _joinRowType : outputRowType;
     _projectVariableSet = projectVariableSet;
   }
 
@@ -67,11 +128,12 @@ public class PinotLogicalEnrichedJoin extends Join {
       RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     return new PinotLogicalEnrichedJoin(getCluster(), traitSet, getHints(), left, right,
         conditionExpr, getVariablesSet(), getJoinType(),
-        _filter, _projects, _projectedRowType, _projectVariableSet);
+        _filterProjectRexNodes, _outputRowType, _projectVariableSet);
   }
 
-  @Override protected RelDataType deriveRowType() {
-    return checkNotNull(_projectedRowType);
+  @Override
+  protected RelDataType deriveRowType() {
+    return checkNotNull(_outputRowType);
   }
 
   public final RelDataType getJoinRowType() {
@@ -80,13 +142,38 @@ public class PinotLogicalEnrichedJoin extends Join {
         getSystemFieldList());
   }
 
-  @Nullable
-  public RexNode getFilter() {
-    return _filter;
+  public List<FilterProjectRexNode> getFilterProjectRexNodes() {
+    return _filterProjectRexNodes;
   }
 
-  @Nullable
   public List<RexNode> getProjects() {
-    return _projects;
+    return _squashedProjects == null ? Collections.emptyList() : _squashedProjects;
+  }
+
+  /** combine all projects in _filterProjectRexNodes into a single project */
+  @Nullable private List<RexNode> squashProjects() {
+    List<RexNode> prevProject = null;
+    for (FilterProjectRexNode node: _filterProjectRexNodes) {
+      if (node.getType() == FilterProjectRexNodeType.FILTER) {
+        continue;
+      }
+      List<RexNode> project = node.getProjectAndResultRowType().getProject();
+      if (prevProject == null) {
+        prevProject = project;
+        continue;
+      }
+      // combine project
+      prevProject = combineProjects(project, prevProject);
+    }
+    return prevProject;
+  }
+
+  /** adopted from @link{RelOptUtil.pushPastProject} */
+  private List<RexNode> combineProjects(List<RexNode> upper, List<RexNode> lower) {
+    return new RexShuttle() {
+      @Override public RexNode visitInputRef(RexInputRef ref) {
+        return lower.get(ref.getIndex());
+      }
+    }.visitList(upper);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -108,6 +109,8 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     @Nullable final LogicalFilter filter;
     final LogicalJoin join;
 
+    List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>();
+
     switch (patternType) {
       case PROJECT_FILTER_JOIN:
         project = call.rel(0);
@@ -115,9 +118,15 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         join = call.rel(2);
 
         traitSet = join.getTraitSet();
+        // add filter to the set
         filterRex = filter.getCondition();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // add projection to the set
         projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // provide final output rowtype
         projectRowType = project.getRowType();
+
         projectVariableSet = project.getVariablesSet();
         break;
 
@@ -127,7 +136,10 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
 
         traitSet = join.getTraitSet();
         filterRex = null;
+        // add projection to the set
         projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // provide final output rowtype
         projectRowType = project.getRowType();
         projectVariableSet = project.getVariablesSet();
         break;
@@ -137,8 +149,10 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         join = call.rel(1);
 
         traitSet = join.getTraitSet();
+        // add filter to the set
         filterRex = filter.getCondition();
-        projects = null;
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // no projection, final output row type is same as join output
         projectRowType = null;
         projectVariableSet = null;
         break;
@@ -157,8 +171,9 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         traitSet,
         join.getHints(), join.getInput(0), join.getInput(1),
         join.getCondition(), join.getVariablesSet(), join.getJoinType(),
-        filterRex,
-        projects, projectRowType, projectVariableSet);
+        filterProjectRexNodes,
+        projectRowType,
+        projectVariableSet);
 
     call.transformTo(pinotLogicalEnrichedJoin);
   }
