@@ -139,12 +139,22 @@ public class LogicalTableConfigUtils {
           "Invalid logical table. Reason: 'physicalTableConfigMap' should not be null or empty");
     }
 
+    String databaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(logicalTableConfig.getTableName());
     Set<String> offlineTableNames = new HashSet<>();
     Set<String> realtimeTableNames = new HashSet<>();
 
     for (Map.Entry<String, PhysicalTableConfig> entry : logicalTableConfig.getPhysicalTableConfigMap().entrySet()) {
       String physicalTableName = entry.getKey();
       PhysicalTableConfig physicalTableConfig = entry.getValue();
+
+      // validate database name matches
+      String physicalTableDatabaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalTableName);
+      if (!StringUtils.equalsIgnoreCase(databaseName, physicalTableDatabaseName)) {
+        throw new IllegalArgumentException(
+            "Invalid logical table. Reason: '" + physicalTableName
+                + "' should have the same database name as logical table: " + databaseName + " != "
+                + physicalTableDatabaseName);
+      }
 
       // validate physical table exists
       if (!physicalTableExistsPredicate.test(physicalTableName)) {
