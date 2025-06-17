@@ -169,7 +169,7 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    if (options != null && !options.isEmpty()) {
+    if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (skipRuleSet != null && !skipRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
