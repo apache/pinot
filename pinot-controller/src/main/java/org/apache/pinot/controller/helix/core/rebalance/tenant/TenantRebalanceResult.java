@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -123,6 +122,8 @@ public class TenantRebalanceResult {
             case ERROR:
               erroredTablesByCheck.get(checkName).put(tableName, message);
               break;
+            default:
+              break; // Ignore unknown statuses
           }
         }
       }
@@ -270,8 +271,9 @@ public class TenantRebalanceResult {
 
     for (RebalanceSummaryResult summary : summaryResults) {
       if (summary.getServerInfo() != null && summary.getServerInfo().getServerSegmentChangeInfo() != null) {
-        for (Map.Entry<String, RebalanceSummaryResult.ServerSegmentChangeInfo> entry :
-            summary.getServerInfo().getServerSegmentChangeInfo().entrySet()) {
+        for (Map.Entry<String, RebalanceSummaryResult.ServerSegmentChangeInfo> entry : summary.getServerInfo()
+            .getServerSegmentChangeInfo()
+            .entrySet()) {
           String serverName = entry.getKey();
           RebalanceSummaryResult.ServerSegmentChangeInfo changeInfo = entry.getValue();
 
@@ -372,11 +374,11 @@ public class TenantRebalanceResult {
       // Set the computed values using reflection or by updating the parent constructor call
       _numServersGettingNewSegments = numServersGettingNewSegments;
       _numServers = aggregatedNumServers;
-      _serversAdded = serversAdded.isEmpty() ? null : serversAdded;
-      _serversRemoved = serversRemoved.isEmpty() ? null : serversRemoved;
-      _serversUnchanged = serversUnchanged.isEmpty() ? null : serversUnchanged;
-      _serversGettingNewSegments = serversGettingNewSegments.isEmpty() ? null : serversGettingNewSegments;
-      _serverSegmentChangeInfo = finalServerSegmentChangeInfo.isEmpty() ? null : finalServerSegmentChangeInfo;
+      _serversAdded = serversAdded;
+      _serversRemoved = serversRemoved;
+      _serversUnchanged = serversUnchanged;
+      _serversGettingNewSegments = serversGettingNewSegments;
+      _serverSegmentChangeInfo = finalServerSegmentChangeInfo;
     }
   }
 
@@ -450,8 +452,9 @@ public class TenantRebalanceResult {
       }
 
       // Calculate average segment size
-      long estimatedAverageSegmentSizeInBytes = totalEstimatedDataToBeMovedInBytes >= 0 && totalSegmentsToBeMoved > 0 ?
-          totalEstimatedDataToBeMovedInBytes / totalSegmentsToBeMoved : 0;
+      long estimatedAverageSegmentSizeInBytes =
+          totalEstimatedDataToBeMovedInBytes >= 0 && totalSegmentsToBeMoved > 0 ? totalEstimatedDataToBeMovedInBytes
+              / totalSegmentsToBeMoved : 0;
 
       // Create aggregated RebalanceChangeInfo objects
       RebalanceSummaryResult.RebalanceChangeInfo aggregatedNumSegmentsInSingleReplica =
@@ -525,8 +528,9 @@ public class TenantRebalanceResult {
       // Aggregate server consuming segment summaries by server name
       if (summary.getServerConsumingSegmentSummary() != null) {
         for (Map.Entry<String,
-            RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer> entry :
-            summary.getServerConsumingSegmentSummary().entrySet()) {
+            RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer> entry
+            : summary.getServerConsumingSegmentSummary()
+            .entrySet()) {
           String serverName = entry.getKey();
           RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer serverSummary =
               entry.getValue();
@@ -649,4 +653,3 @@ public class TenantRebalanceResult {
     }
   }
 }
-
