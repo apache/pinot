@@ -236,8 +236,11 @@ public class TableRebalancer {
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean forceCommitBeforeMoved =
-        tableConfig.getTableType() == TableType.REALTIME && rebalanceConfig.isForceCommitBeforeMoved();
+    boolean forceCommitBeforeMoved = rebalanceConfig.isForceCommitBeforeMoved();
+    if (tableConfig.getTableType() == TableType.OFFLINE && forceCommitBeforeMoved) {
+      tableRebalanceLogger.warn("forceCommitBeforeMoved is set to true for an OFFLINE table, resetting it to false");
+      forceCommitBeforeMoved = false;
+    }
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
