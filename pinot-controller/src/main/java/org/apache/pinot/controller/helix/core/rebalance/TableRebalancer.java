@@ -254,8 +254,9 @@ public class TableRebalancer {
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
-        forceCommitBeforeMoved, rebalanceConfig.getForceCommitBatchSize(), 
-        rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(), rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
+        forceCommitBeforeMoved, rebalanceConfig.getForceCommitBatchSize(),
+        rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
+        rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
 
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
@@ -399,7 +400,7 @@ public class TableRebalancer {
         if (!consumingSegmentsToMoveNext.isEmpty()) {
           currentIdealState =
               forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger,
-                  rebalanceConfig.getForceCommitBatchSize(), 
+                  rebalanceConfig.getForceCommitBatchSize(),
                   rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
                   rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
           currentAssignment = currentIdealState.getRecord().getMapFields();
