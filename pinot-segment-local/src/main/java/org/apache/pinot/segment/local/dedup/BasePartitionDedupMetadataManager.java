@@ -410,8 +410,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _logger.info("Closed the metadata manager");
   }
 
-  protected abstract long getNumPrimaryKeys();
-
   protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
         numPrimaryKeys);

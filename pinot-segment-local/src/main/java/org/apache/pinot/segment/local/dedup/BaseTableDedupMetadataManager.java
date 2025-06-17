@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,6 +123,15 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
    * Create PartitionDedupMetadataManager for given partition id.
    */
   protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    Map<Integer, Long> partitionToPrimaryKeyCount = new HashMap<>();
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, dedupMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
+            dedupMetadataManager.getNumPrimaryKeys()));
+    return partitionToPrimaryKeyCount;
+  }
 
   @Override
   public DedupContext getContext() {
