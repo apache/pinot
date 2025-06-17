@@ -123,7 +123,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
 
   // how many message are there in the server's message queue in helix
   HELIX_MESSAGES_COUNT("count", true),
-  STARTUP_STATUS_CHECK_IN_PROGRESS("state", true);
+  STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,
+      "Indicates whether the server startup status check is currently in progress");
 
   private final String _gaugeName;
   private final String _unit;
