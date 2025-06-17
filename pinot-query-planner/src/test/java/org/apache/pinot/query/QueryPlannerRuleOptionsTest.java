@@ -75,7 +75,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     // SUM should not be reduced
     String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 3 ELSE 0 END) FROM a";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_AGGREGATE_REDUCE_FUNCTIONS);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS);
     //@formatter:off
     assertEquals(explain,
       "Execution Plan\n"
@@ -176,7 +176,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String query = "EXPLAIN PLAN FOR \n"
         + "SELECT col1, ABS(-1) FROM b;\n";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_EVALUATE_LITERAL_PROJECT);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.EVALUATE_LITERAL_PROJECT);
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
@@ -191,7 +191,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String query = "EXPLAIN PLAN FOR \n"
         + "SELECT col1 FROM b WHERE col1=ABS(-1);\n";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_EVALUATE_LITERAL_FILTER);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.EVALUATE_LITERAL_FILTER);
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
@@ -207,7 +207,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String query = "EXPLAIN PLAN FOR \n"
         + "SELECT CASE WHEN a.col1=1 THEN 1 ELSE 0 END, b.col2 FROM a JOIN b ON a.col1=b.col1;\n";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_PROJECT_JOIN_TRANSPOSE);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PROJECT_JOIN_TRANSPOSE);
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
@@ -232,7 +232,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "ON a.col1 = b.col1\n"
         + "WHERE a.col1 = 1;\n";
 
-    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.PINOT_JOIN_PUSH_TRANSITIVE_PREDICATES);
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES);
     //@formatter:off
     assertEquals(explain,
     "Execution Plan\n"

@@ -66,7 +66,7 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
       // push project through join,
       PinotProjectJoinTransposeRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_PROJECT_JOIN_TRANSPOSE),
+          .instanceWithDescription(PlannerRuleNames.PROJECT_JOIN_TRANSPOSE),
       // push project through set operation
       ProjectSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_SET_OP_TRANSPOSE).toRule(),
@@ -76,7 +76,7 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.FILTER_PROJECT_TRANSPOSE).toRule(),
       // push parts of the join condition to its inputs
       PinotJoinConditionPushRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_JOIN_CONDITION_PUSH),
+          .instanceWithDescription(PlannerRuleNames.JOIN_CONDITION_PUSH),
       // remove identity project
       ProjectRemoveRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_REMOVE).toRule(),
@@ -93,9 +93,9 @@ public class PinotQueryRuleSets {
       //     CoreRules.PROJECT_REDUCE_EXPRESSIONS and
       //     CoreRules.FILTER_REDUCE_EXPRESSIONS
       PinotEvaluateLiteralRule.Project
-          .instanceWithDescription(PlannerRuleNames.PINOT_EVALUATE_LITERAL_PROJECT),
+          .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_PROJECT),
       PinotEvaluateLiteralRule.Filter
-          .instanceWithDescription(PlannerRuleNames.PINOT_EVALUATE_LITERAL_FILTER),
+          .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_FILTER),
 
       // sort join rules
       // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
@@ -108,12 +108,12 @@ public class PinotQueryRuleSets {
       SemiJoinRule.ProjectToSemiJoinRule.ProjectToSemiJoinRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_TO_SEMI_JOIN).toRule(),
       PinotSeminJoinDistinctProjectRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_SEMIN_JOIN_DISTINCT_PROJECT_RULE),
+          .instanceWithDescription(PlannerRuleNames.SEMIN_JOIN_DISTINCT_PROJECT_RULE),
 
       // Consider semijoin optimizations first before push transitive predicate
       // Pinot version doesn't push predicates to the right in case of lookup join
       PinotJoinPushTransitivePredicatesRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_JOIN_PUSH_TRANSITIVE_PREDICATES),
+          .instanceWithDescription(PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES),
 
       // convert non-all union into all-union + distinct
       UnionToDistinctRule.Config.DEFAULT
@@ -133,7 +133,7 @@ public class PinotQueryRuleSets {
       // TODO: Consider not reduce at all. This can now be controlled by specifying
       //    `plannerRule_skipAggregateReduceFunctions=true` in query option
       PinotAggregateReduceFunctionsRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_AGGREGATE_REDUCE_FUNCTIONS),
+          .instanceWithDescription(PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS),
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
@@ -160,7 +160,7 @@ public class PinotQueryRuleSets {
       ProjectFilterTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_FILTER_TRANSPOSE).toRule(),
       PinotProjectJoinTransposeRule
-          .instanceWithDescription(PlannerRuleNames.PINOT_PROJECT_JOIN_TRANSPOSE),
+          .instanceWithDescription(PlannerRuleNames.PROJECT_JOIN_TRANSPOSE),
       ProjectMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_MERGE).toRule()
   );
