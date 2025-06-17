@@ -55,7 +55,7 @@ public class TestThreadMXBean {
       ll[2] = 4;
       LOGGER.trace(String.valueOf(ll[2]));
       threadResourceSnapshot.takeSnapshot();
-      long result = threadResourceSnapshot.getCpuTimeNs();
+      long result = threadResourceSnapshot.getAllocatedBytes();
       Assert.assertTrue(result >= 80000 && result <= 85000);
     }
   }
