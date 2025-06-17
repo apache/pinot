@@ -1701,6 +1701,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
     updateTableConfig(tableConfig);
+
+    // Query the new added columns without reload
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery(TEST_STAR_TREE_QUERY_3);
+        return response.get("resultTable").get("rows").get(0).get(0).asInt() == 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to query new added columns without reload");
+    // Table size shouldn't change without reload
+    assertEquals(getTableSize(getTableName()), _tableSize);
+
     reloadAllSegments(TEST_STAR_TREE_QUERY_3, false, numTotalDocs);
     int thirdQueryResult =
         postQuery(TEST_STAR_TREE_QUERY_3_REFERENCE).get("resultTable").get("rows").get(0).get(0).asInt();
@@ -1868,6 +1881,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         new FieldConfig("NewAddedDerivedDivAirportSeqIDsString", FieldConfig.EncodingType.DICTIONARY, List.of(),
             CompressionCodec.MV_ENTRY_DICT, null));
     updateTableConfig(tableConfig);
+
+    // Query the new added columns without reload
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode response = postQuery(SELECT_STAR_QUERY);
+        return response.get("resultTable").get("dataSchema").get("columnNames").size() == 104;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to query new added columns without reload");
+    // Table size shouldn't change without reload
+    assertEquals(getTableSize(getTableName()), _tableSize);
 
     // Trigger reload and verify column count
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
