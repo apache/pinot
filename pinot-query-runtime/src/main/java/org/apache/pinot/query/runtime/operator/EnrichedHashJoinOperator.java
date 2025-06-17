@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -37,11 +38,8 @@ import org.apache.pinot.spi.utils.BooleanUtils;
 
 public class EnrichedHashJoinOperator extends HashJoinOperator {
   private static final String EXPLAIN_NAME = "ENRICHED_JOIN";
-  @Nullable
-  private final TransformOperand _filterOperand;
-  @Nullable
-  private final List<TransformOperand> _projectOperands;
   private final int _projectResultSize;
+  private final List<FilterProjectOperand> _filterProjectOperands;
   private final DataSchema _joinResultSchema;
   // _projectResultSchema is currently not used because sort operation
   //    does not care about input schema
@@ -54,27 +52,21 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     super(context, leftInput, leftSchema, rightInput, node, node.getJoinResultSchema());
 
     _joinResultSchema = node.getJoinResultSchema();
-    _projectResultSchema = node.getProjectResultSchema();
 
     _resultColumnSize = _joinResultSchema.size();
 
-    // input of filter is join result
-    _filterOperand = node.getFilterCondition() == null
-        ? null : TransformOperandFactory.getTransformOperand(node.getFilterCondition(), _joinResultSchema);
-
-    List<RexExpression> projectExpressions = node.getProjects();
-    if (projectExpressions == null) {
-      _projectOperands = null;
-      // if no projection is done, result size is same as join output
-      _projectResultSize = _resultColumnSize;
-    } else {
-      _projectOperands = new ArrayList<>();
-      // input of project is filter result, which has same schema as join result
-      projectExpressions.forEach((x) -> {
-        _projectOperands.add(TransformOperandFactory.getTransformOperand(x, _joinResultSchema));
-      });
-      _projectResultSize = projectExpressions.size();
+    // a chain of filter and project operands
+    _filterProjectOperands = new ArrayList<>();
+    DataSchema currentSchema = _joinResultSchema;
+    // iterate and convert filter and project rexes into operands with the correctly chained schema
+    for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
+      _filterProjectOperands.add(new FilterProjectOperand(rex, currentSchema));
+      currentSchema = rex.getProjectAndResultSchemas() == null
+          ? currentSchema : rex.getProjectAndResultSchemas().getSchema();
     }
+
+    _projectResultSchema = currentSchema;
+    _projectResultSize = _projectResultSchema.size();
   }
 
   @Override
@@ -82,27 +74,22 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return EXPLAIN_NAME;
   }
 
+  // TODO: support filter above project predicate
   // TODO: check null in advance and do code specialization
 
   /** filter a row by left and right child, return whether the row is kept */
-  private boolean filterRow(List<Object> rowView) {
-    if (_filterOperand == null) {
-      return true;
-    }
-    Object filterResult = _filterOperand.apply(rowView);
+  private boolean filterRow(List<Object> rowView, TransformOperand filter) {
+    Object filterResult = filter.apply(rowView);
     return BooleanUtils.isTrueInternalValue(filterResult);
   }
 
   /** return the projected rowView */
-  private Object[] projectRow(List<Object> rowView) {
-    if (_projectOperands == null) {
-      return rowView.toArray();
-    }
+  private List<Object> projectRow(List<Object> rowView, List<TransformOperand> project) {
     Object[] resultRow = new Object[_projectResultSize];
     for (int i = 0; i < _projectResultSize; i++) {
-      resultRow[i] = _projectOperands.get(i).apply(rowView);
+      resultRow[i] = project.get(i).apply(rowView);
     }
-    return resultRow;
+    return new ArrayList<>(List.of(resultRow));
   }
 
   /** read result from _priorityQueue if sort needed, else return rows */
@@ -114,25 +101,34 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   private void filterProject(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
     // TODO: this should handle different orders of filter, project
-    JoinedRowView rowView = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
-    // filter
-    if (!filterRow(rowView)) {
-      return;
+    List<Object> row = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
+
+    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
+      if (filterProjectOperand.getType() == FilterProjectOperand.FilterProjectOperandsType.FILTER) {
+        if (!filterRow(row, filterProjectOperand.getFilter())) {
+          return;
+        }
+      } else {
+        row = projectRow(row, filterProjectOperand.getProject());
+      }
     }
-    // project, this incurs one copy of the element
-    Object[] joinedRow = projectRow(rowView);
-    rows.add(joinedRow);
+
+    rows.add(row.toArray());
   }
 
   /** filter, project on a joined row view */
-  private void filterProject(List<Object> rowView, List<Object[]> rows) {
-    // filter
-    if (!filterRow(rowView)) {
-      return;
+  private void filterProject(List<Object> row, List<Object[]> rows) {
+    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
+      if (filterProjectOperand.getType() == FilterProjectOperand.FilterProjectOperandsType.FILTER) {
+        if (!filterRow(row, filterProjectOperand.getFilter())) {
+          return;
+        }
+      } else {
+        row = projectRow(row, filterProjectOperand.getProject());
+      }
     }
-    // project, this incurs one copy of the element
-    Object[] joinedRow = projectRow(rowView);
-    rows.add(joinedRow);
+
+    rows.add(row.toArray());
   }
 
   /**

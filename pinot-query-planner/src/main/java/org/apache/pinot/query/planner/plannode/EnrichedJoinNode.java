@@ -22,15 +22,13 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class EnrichedJoinNode extends JoinNode {
   // TODO: add filter, project, sort, limit info here
-  @Nullable
-  private final RexExpression _filterCondition;
-  @Nullable
-  private final List<RexExpression> _projects;
+  private final List<PlannerUtils.FilterProjectRex> _filterProjectRexes;
   // output schema of the join
   private final DataSchema _joinResultSchema;
   // output schema after projection, same as _joinResultSchema if no projection
@@ -40,14 +38,12 @@ public class EnrichedJoinNode extends JoinNode {
       NodeHint nodeHint, List<PlanNode> inputs,
       JoinRelType joinType, List<Integer> leftKeys, List<Integer> rightKeys,
       List<RexExpression> nonEquiConditions, JoinStrategy joinStrategy, RexExpression matchCondition,
-      RexExpression filterCondition, List<RexExpression> projects) {
+      List<PlannerUtils.FilterProjectRex> filterProjectRexes) {
     super(stageId, projectResultSchema, nodeHint, inputs, joinType, leftKeys, rightKeys,
         nonEquiConditions, joinStrategy, matchCondition);
     _joinResultSchema = joinResultSchema;
     _projectResultSchema = projectResultSchema;
-
-    _filterCondition = filterCondition;
-    _projects = projects;
+    _filterProjectRexes = filterProjectRexes;
   }
 
   public DataSchema getJoinResultSchema() {
@@ -64,14 +60,8 @@ public class EnrichedJoinNode extends JoinNode {
     return _projectResultSchema;
   }
 
-  @Nullable
-  public RexExpression getFilterCondition() {
-    return _filterCondition;
-  }
-
-  @Nullable
-  public List<RexExpression> getProjects() {
-    return _projects;
+  public List<PlannerUtils.FilterProjectRex> getFilterProjectRexes() {
+    return _filterProjectRexes;
   }
 
   @Override
@@ -81,15 +71,13 @@ public class EnrichedJoinNode extends JoinNode {
 
   @Override
   public String explain() {
-    return "ENRICHED_JOIN"
-        + (_filterCondition == null ? " WITH FILTER" : "")
-        + (_projects == null ? " WITH PROJECT" : "");
+    return "ENRICHED_JOIN";
   }
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new EnrichedJoinNode(_stageId, _joinResultSchema, _projectResultSchema, _nodeHint,
         inputs, getJoinType(), getLeftKeys(), getRightKeys(), getNonEquiConditions(),
-        getJoinStrategy(), getMatchCondition(), _filterCondition, _projects);
+        getJoinStrategy(), getMatchCondition(), getFilterProjectRexes());
   }
 }
