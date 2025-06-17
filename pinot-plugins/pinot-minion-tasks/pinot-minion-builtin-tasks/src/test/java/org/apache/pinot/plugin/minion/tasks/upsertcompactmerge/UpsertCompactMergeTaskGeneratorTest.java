@@ -240,7 +240,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
   }
 
   @Test
-  public void testGetMaxCreationTimeMillis() {
+  public void testGetMaxZKCreationTimeMillis() {
     // Set creation times for test segments
     long creationTime1 = System.currentTimeMillis() - 1000L;
     long creationTime2 = System.currentTimeMillis() - 500L;
@@ -249,18 +249,18 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     // empty list - should return -1
     List<UpsertCompactMergeTaskGenerator.SegmentMergerMetadata> segmentMergerMetadataList = Arrays.asList();
-    long result = _taskGenerator.getMaxCreationTimeMillis(segmentMergerMetadataList);
+    long result = _taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList);
     Assert.assertEquals(result, -1);
 
     // single segment
     segmentMergerMetadataList =
         List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000));
-    Assert.assertEquals(_taskGenerator.getMaxCreationTimeMillis(segmentMergerMetadataList), creationTime1);
+    Assert.assertEquals(_taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList), creationTime1);
 
     // multiple segments - should return the maximum creation time
     segmentMergerMetadataList =
         Arrays.asList(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
             new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000));
-    Assert.assertEquals(_taskGenerator.getMaxCreationTimeMillis(segmentMergerMetadataList), creationTime2);
+    Assert.assertEquals(_taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList), creationTime2);
   }
 }

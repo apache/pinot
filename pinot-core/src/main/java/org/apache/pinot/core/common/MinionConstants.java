@@ -294,6 +294,6 @@ public class MinionConstants {
 
     public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
 
-    public static final String MAX_CREATION_TIME_MILLIS_KEY = "maxCreationTimeMillis";
+    public static final String MAX_ZK_CREATION_TIME_MILLIS_KEY = "maxZKCreationTimeMillis";
   }
 }

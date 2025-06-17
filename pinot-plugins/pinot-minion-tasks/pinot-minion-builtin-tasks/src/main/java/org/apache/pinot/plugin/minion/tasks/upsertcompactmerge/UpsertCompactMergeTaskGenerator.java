@@ -219,8 +219,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
-        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY,
-            String.valueOf(getMaxCreationTimeMillis(groups.get(0))));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY,
+            String.valueOf(getMaxZKCreationTimeMillis(groups.get(0))));
         configs.put(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, String.valueOf(
             Long.parseLong(
                 taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
@@ -466,7 +466,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  protected long getMaxCreationTimeMillis(List<SegmentMergerMetadata> segmentMergerMetadataList) {
+  protected long getMaxZKCreationTimeMillis(List<SegmentMergerMetadata> segmentMergerMetadataList) {
     return segmentMergerMetadataList.stream().mapToLong(x -> x.getSegmentZKMetadata().getCreationTime()).max()
         .orElse(-1);
   }

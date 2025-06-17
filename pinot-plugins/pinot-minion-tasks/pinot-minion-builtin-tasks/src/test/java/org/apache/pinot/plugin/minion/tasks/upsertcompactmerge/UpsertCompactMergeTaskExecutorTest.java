@@ -98,12 +98,12 @@ public class UpsertCompactMergeTaskExecutorTest {
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Max creation time "
       + "configuration is missing from task config.*")
-  public void testGetMaxCreationTimeFromConfigWithNullValue() {
+  public void testGetMaxZKCreationTimeFromConfigWithNullValue() {
     // Test that the method handles null config gracefully with fallback to current time
     Map<String, String> configs = new HashMap<>();
-    // Intentionally not setting MAX_CREATION_TIME_MILLIS_KEY to simulate null config during rollout
+    // Intentionally not setting MAX_ZK_CREATION_TIME_MILLIS_KEY to simulate null config during rollout
 
-    long result = _taskExecutor.getMaxCreationTimeFromConfig(configs);
+    long result = _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
 
     // Should return current system time (within reasonable bounds)
     long currentTime = System.currentTimeMillis();
@@ -112,44 +112,44 @@ public class UpsertCompactMergeTaskExecutorTest {
   }
 
   @Test
-  public void testGetMaxCreationTimeFromConfigWithValidValue() {
+  public void testGetMaxZKCreationTimeFromConfigWithValidValue() {
     // Test that the method correctly parses valid config value
     Map<String, String> configs = new HashMap<>();
     long expectedTime = 1234567890L;
-    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY, String.valueOf(expectedTime));
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, String.valueOf(expectedTime));
 
-    long result = _taskExecutor.getMaxCreationTimeFromConfig(configs);
+    long result = _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
 
     Assert.assertEquals(result, expectedTime, "Should return the configured time");
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Invalid max creation time "
-      + "format.*")
-  public void testGetMaxCreationTimeFromConfigWithInvalidFormat() {
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Invalid max creation "
+      + "time format.*")
+  public void testGetMaxZKCreationTimeFromConfigWithInvalidFormat() {
     // Test that the method throws appropriate exception for invalid format
     Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY, "invalid_number");
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "invalid_number");
 
-    _taskExecutor.getMaxCreationTimeFromConfig(configs);
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*No valid creation time"
       + " found.*")
-  public void testGetMaxCreationTimeFromConfigWithZeroValue() {
+  public void testGetMaxZKCreationTimeFromConfigWithZeroValue() {
     // Test that the method throws appropriate exception for zero/negative values
     Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY, "0");
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "0");
 
-    _taskExecutor.getMaxCreationTimeFromConfig(configs);
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*No valid creation time"
       + " found.*")
-  public void testGetMaxCreationTimeFromConfigWithNegativeValue() {
+  public void testGetMaxZKCreationTimeFromConfigWithNegativeValue() {
     // Test that the method throws appropriate exception for negative values
     Map<String, String> configs = new HashMap<>();
-    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY, "-100");
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "-100");
 
-    _taskExecutor.getMaxCreationTimeFromConfig(configs);
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
   }
 }

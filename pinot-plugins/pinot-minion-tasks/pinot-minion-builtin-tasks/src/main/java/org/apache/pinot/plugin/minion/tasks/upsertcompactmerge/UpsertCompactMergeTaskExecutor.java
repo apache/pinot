@@ -99,7 +99,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     int partitionID = getCommonPartitionIDForSegments(segmentMetadataList);
 
     // get the max creation time from the task configuration passed by the generator
-    long maxCreationTimeOfMergingSegments = getMaxCreationTimeFromConfig(configs);
+    long maxCreationTimeOfMergingSegments = getMaxZKCreationTimeFromConfig(configs);
 
     // validate if crc of deepstore copies is same as that in ZK of segments
     List<String> originalSegmentCrcFromTaskGenerator =
@@ -200,18 +200,16 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
   }
 
   /**
-   * Retrieves the max creation time from task configuration with proper null handling.
+   * Retrieves the max ZK creation time from task configuration with proper null handling.
    *
    * @param configs Task configuration map
-   * @return Max creation time in milliseconds
+   * @return Max ZK creation time in milliseconds
    * @throws IllegalStateException if the configuration value is invalid
    */
-  long getMaxCreationTimeFromConfig(Map<String, String> configs) {
-    String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_CREATION_TIME_MILLIS_KEY);
+  long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
+    String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
     if (maxCreationTimeStr == null) {
       String message = "Max creation time configuration is missing from task config.";
-      LOGGER.warn(message);
-      // Fallback to current system time during rollouts
       throw new IllegalStateException(message);
     } else {
       try {
@@ -219,13 +217,11 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
         if (maxCreationTime <= 0) {
           String message = "No valid creation time found for the new merged segment. This might be due to "
               + "missing creation time for merging segments";
-          LOGGER.error(message);
           throw new IllegalStateException(message);
         }
         return maxCreationTime;
       } catch (NumberFormatException e) {
         String message = "Invalid max creation time format in task config: " + maxCreationTimeStr;
-        LOGGER.error(message, e);
         throw new IllegalStateException(message, e);
       }
     }
