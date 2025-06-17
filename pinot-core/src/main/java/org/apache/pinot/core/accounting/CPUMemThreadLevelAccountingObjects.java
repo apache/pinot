@@ -120,8 +120,13 @@ public class CPUMemThreadLevelAccountingObjects {
       _threadResourceSnapshot.reset();
     }
 
+    /**
+     * Note that the precision does not match the name of the variable.
+     * _currentThreadCPUTimeSampleMS is in nanoseconds, but the variable name suggests milliseconds.
+     * This is to maintain backward compatibility. It replaces code that set the value in nanoseconds.
+     */
     public void updateCpuSnapshot() {
-      _currentThreadCPUTimeSampleMS = _threadResourceSnapshot.getCpuTimeNs() / 1_000_000; // convert to ms
+      _currentThreadCPUTimeSampleMS = _threadResourceSnapshot.getCpuTimeNs();
     }
 
     public void updateMemorySnapshot() {
