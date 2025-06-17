@@ -443,7 +443,7 @@ public final class RelToPlanNodeConverter {
     List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNode = rel.getFilterProjectRexNodes();
     List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
     filterProjectRexNode.forEach((node) -> {
-      if(node.getType() == PinotLogicalEnrichedJoin.FilterProjectRexNodeType.FILTER) {
+      if (node.getType() == PinotLogicalEnrichedJoin.FilterProjectRexNodeType.FILTER) {
         filterProjectRexes.add(new PlannerUtils.FilterProjectRex(RexExpressionUtils.fromRexNode(node.getFilter())));
       } else {
         filterProjectRexes.add(

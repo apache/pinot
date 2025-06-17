@@ -25,12 +25,12 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
@@ -71,6 +71,13 @@ public class PinotLogicalEnrichedJoin extends Join {
     @Nullable
     private final ProjectAndResultRowType _projectAndResultRowType;
 
+    @Override
+    public String toString() {
+      return _type == FilterProjectRexNodeType.FILTER
+          ? "Filter: " + _filter.toString()
+          : "Project: " + _projectAndResultRowType.getProject().toString();
+    }
+
     public FilterProjectRexNode(RexNode filter) {
       _type = FilterProjectRexNodeType.FILTER;
       _filter = filter;
@@ -105,7 +112,8 @@ public class PinotLogicalEnrichedJoin extends Join {
   //   is created at the end of logical transformations.
   //   We don't support nested expressions in execution
   private final Set<CorrelationId> _projectVariableSet;
-  @Nullable private final List<RexNode> _squashedProjects;
+  @Nullable
+  private final List<RexNode> _squashedProjects;
 
   public PinotLogicalEnrichedJoin(RelOptCluster cluster, RelTraitSet traitSet,
       List<RelHint> hints, RelNode left, RelNode right, RexNode joinCondition,
@@ -151,9 +159,10 @@ public class PinotLogicalEnrichedJoin extends Join {
   }
 
   /** combine all projects in _filterProjectRexNodes into a single project */
-  @Nullable private List<RexNode> squashProjects() {
+  @Nullable
+  private List<RexNode> squashProjects() {
     List<RexNode> prevProject = null;
-    for (FilterProjectRexNode node: _filterProjectRexNodes) {
+    for (FilterProjectRexNode node : _filterProjectRexNodes) {
       if (node.getType() == FilterProjectRexNodeType.FILTER) {
         continue;
       }
@@ -171,9 +180,16 @@ public class PinotLogicalEnrichedJoin extends Join {
   /** adopted from @link{RelOptUtil.pushPastProject} */
   private List<RexNode> combineProjects(List<RexNode> upper, List<RexNode> lower) {
     return new RexShuttle() {
-      @Override public RexNode visitInputRef(RexInputRef ref) {
+      @Override
+      public RexNode visitInputRef(RexInputRef ref) {
         return lower.get(ref.getIndex());
       }
     }.visitList(upper);
+  }
+
+  @Override
+  public RelWriter explainTerms(RelWriter pw) {
+    return super.explainTerms(pw)
+        .item("filterProjectRex", _filterProjectRexNodes);
   }
 }

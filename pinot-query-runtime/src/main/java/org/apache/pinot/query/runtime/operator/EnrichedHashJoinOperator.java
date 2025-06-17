@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
@@ -27,11 +28,9 @@ import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.PlannerUtils;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
@@ -61,8 +60,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     // iterate and convert filter and project rexes into operands with the correctly chained schema
     for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
       _filterProjectOperands.add(new FilterProjectOperand(rex, currentSchema));
-      currentSchema = rex.getProjectAndResultSchemas() == null
-          ? currentSchema : rex.getProjectAndResultSchemas().getSchema();
+      currentSchema = rex.getProjectAndResultSchema() == null
+          ? currentSchema : rex.getProjectAndResultSchema().getSchema();
     }
 
     _projectResultSchema = currentSchema;
@@ -85,11 +84,11 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
   /** return the projected rowView */
   private List<Object> projectRow(List<Object> rowView, List<TransformOperand> project) {
-    Object[] resultRow = new Object[_projectResultSize];
-    for (int i = 0; i < _projectResultSize; i++) {
+    Object[] resultRow = new Object[project.size()];
+    for (int i = 0; i < project.size(); i++) {
       resultRow[i] = project.get(i).apply(rowView);
     }
-    return new ArrayList<>(List.of(resultRow));
+    return Arrays.asList(resultRow);
   }
 
   /** read result from _priorityQueue if sort needed, else return rows */

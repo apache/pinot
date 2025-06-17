@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -71,7 +70,7 @@ public class EnrichedJoinNode extends JoinNode {
 
   @Override
   public String explain() {
-    return "ENRICHED_JOIN";
+    return "ENRICHED_JOIN - " + _filterProjectRexes.toString();
   }
 
   @Override

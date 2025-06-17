@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
@@ -30,6 +29,7 @@ import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -140,13 +140,24 @@ public class PlanNodeSerializer {
           .addAllRightKeys(node.getRightKeys())
           .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
           .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
-          .addAllProjects(convertExpressions(node.getProjects() == null
-              ? Collections.emptyList() : node.getProjects()))
           .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
 
-      if (node.getFilterCondition() != null) {
-        enrichedJoinNode.setFilterCondition(
-            RexExpressionToProtoExpression.convertExpression(node.getFilterCondition()));
+      for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
+        Plan.FilterProjectRex.Builder rexBuilder = Plan.FilterProjectRex.newBuilder();
+        if (rex.getType() == PlannerUtils.FilterProjectRexType.FILTER) {
+          rexBuilder
+              .setFilter(RexExpressionToProtoExpression.convertExpression(rex.getFilter()))
+              .setType(Plan.FilterProjectRexType.FILTER);
+        } else {
+          rexBuilder
+              .setProjectAndResultSchema(
+                  Plan.ProjectAndResultSchema.newBuilder()
+                      .addAllProject(convertExpressions(rex.getProjectAndResultSchema().getProject()))
+                      .setSchema(convertDataSchema(rex.getProjectAndResultSchema().getSchema()))
+                      .build())
+              .setType(Plan.FilterProjectRexType.PROJECT);
+        }
+        enrichedJoinNode.addFilterProjectRex(rexBuilder.build());
       }
 
       if (node.getMatchCondition() != null) {

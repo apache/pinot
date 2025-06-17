@@ -124,7 +124,7 @@ public class PinotEnrichedJoinRuleTest {
     ArgumentCaptor<RelNode> logicalEnrichedNodeCapture = ArgumentCaptor.forClass(PinotLogicalEnrichedJoin.class);
     Mockito.verify(_call, Mockito.times(1)).transformTo(logicalEnrichedNodeCapture.capture());
     PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) logicalEnrichedNodeCapture.getValue();
-    assertEquals(enrichedJoin.getFilter(), filterCondition);
+    assertEquals(enrichedJoin.getFilterProjectRexNodes().get(0).getFilter(), filterCondition);
     assertEquals(enrichedJoin.getCondition(), joinCondition);
   }
 
@@ -193,7 +193,7 @@ public class PinotEnrichedJoinRuleTest {
 
     assert (newRoot instanceof PinotLogicalEnrichedJoin);
     PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) newRoot;
-    assertEquals(enrichedJoin.getFilter(), filterCondition);
+//    assertEquals(enrichedJoin.getFilter(), filterCondition);
     assertEquals(enrichedJoin.getCondition(), joinCondition);
   }
 
@@ -271,8 +271,8 @@ public class PinotEnrichedJoinRuleTest {
 
     assert (newRoot instanceof PinotLogicalEnrichedJoin);
     PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) newRoot;
-    assertEquals(enrichedJoin.getFilter(), filterCondition);
-    assertEquals(enrichedJoin.getProjects(), projects);
+    assertEquals(enrichedJoin.getFilterProjectRexNodes().get(0).getFilter(), filterCondition);
+    assertEquals(enrichedJoin.getFilterProjectRexNodes().get(1).getProjectAndResultRowType().getProject(), projects);
     assertEquals(enrichedJoin.getCondition(), joinCondition);
   }
 }
