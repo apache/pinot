@@ -140,6 +140,18 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _forceCommitBeforeMoved = false;
 
+  @JsonProperty("forceCommitBatchSize")
+  @ApiModelProperty(example = "2147483647")
+  private int _forceCommitBatchSize = Integer.MAX_VALUE;
+
+  @JsonProperty("forceCommitBatchStatusCheckIntervalMs")
+  @ApiModelProperty(example = "5000")
+  private int _forceCommitBatchStatusCheckIntervalMs = 5000;
+
+  @JsonProperty("forceCommitBatchStatusCheckTimeoutMs")
+  @ApiModelProperty(example = "180000")
+  private int _forceCommitBatchStatusCheckTimeoutMs = 180000;
+
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -284,6 +296,30 @@ public class RebalanceConfig {
     _forceCommitBeforeMoved = forceCommitBeforeMoved;
   }
 
+  public int getForceCommitBatchSize() {
+    return _forceCommitBatchSize;
+  }
+
+  public void setForceCommitBatchSize(int forceCommitBatchSize) {
+    _forceCommitBatchSize = forceCommitBatchSize;
+  }
+
+  public int getForceCommitBatchStatusCheckIntervalMs() {
+    return _forceCommitBatchStatusCheckIntervalMs;
+  }
+
+  public void setForceCommitBatchStatusCheckIntervalMs(int forceCommitBatchStatusCheckIntervalMs) {
+    _forceCommitBatchStatusCheckIntervalMs = forceCommitBatchStatusCheckIntervalMs;
+  }
+
+  public int getForceCommitBatchStatusCheckTimeoutMs() {
+    return _forceCommitBatchStatusCheckTimeoutMs;
+  }
+
+  public void setForceCommitBatchStatusCheckTimeoutMs(int forceCommitBatchStatusCheckTimeoutMs) {
+    _forceCommitBatchStatusCheckTimeoutMs = forceCommitBatchStatusCheckTimeoutMs;
+  }
+
   public Enablement getMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
@@ -305,7 +341,9 @@ public class RebalanceConfig {
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
         + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
-        + ", _forceCommitBeforeMoved=" + _forceCommitBeforeMoved + '}';
+        + ", _forceCommitBeforeMoved=" + _forceCommitBeforeMoved + ", _forceCommitBatchSize=" + _forceCommitBatchSize
+        + ", _forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
+        + ", _forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -328,6 +366,9 @@ public class RebalanceConfig {
     rc._maxAttempts = cfg._maxAttempts;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
     rc._forceCommitBeforeMoved = cfg._forceCommitBeforeMoved;
+    rc._forceCommitBatchSize = cfg._forceCommitBatchSize;
+    rc._forceCommitBatchStatusCheckIntervalMs = cfg._forceCommitBatchStatusCheckIntervalMs;
+    rc._forceCommitBatchStatusCheckTimeoutMs = cfg._forceCommitBatchStatusCheckTimeoutMs;
     return rc;
   }
 }

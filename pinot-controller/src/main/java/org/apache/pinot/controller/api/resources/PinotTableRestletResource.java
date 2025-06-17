@@ -675,6 +675,12 @@ public class PinotTableRestletResource {
       @QueryParam("updateTargetTier") boolean updateTargetTier,
       @ApiParam(value = "Do force commit on consuming segments before they are rebalanced") @DefaultValue("false")
       @QueryParam("forceCommitBeforeMoved") boolean forceCommitBeforeMoved,
+      @ApiParam(value = "Batch size for force commit operations") @DefaultValue("2147483647")
+      @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
+      @ApiParam(value = "Interval in milliseconds for checking force commit batch status") @DefaultValue("5000")
+      @QueryParam("forceCommitBatchStatusCheckIntervalMs") int forceCommitBatchStatusCheckIntervalMs,
+      @ApiParam(value = "Timeout in milliseconds for force commit batch status check") @DefaultValue("180000")
+      @QueryParam("forceCommitBatchStatusCheckTimeoutMs") int forceCommitBatchStatusCheckTimeoutMs,
       @Context HttpHeaders headers
       //@formatter:on
   ) {
@@ -693,6 +699,9 @@ public class PinotTableRestletResource {
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
     rebalanceConfig.setForceCommitBeforeMoved(forceCommitBeforeMoved);
+    rebalanceConfig.setForceCommitBatchSize(forceCommitBatchSize);
+    rebalanceConfig.setForceCommitBatchStatusCheckIntervalMs(forceCommitBatchStatusCheckIntervalMs);
+    rebalanceConfig.setForceCommitBatchStatusCheckTimeoutMs(forceCommitBatchStatusCheckTimeoutMs);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);

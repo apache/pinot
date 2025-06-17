@@ -95,6 +95,9 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptFailureException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -246,11 +249,13 @@ public class TableRebalancer {
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
             + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
             + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}, "
-            + "forceCommitBeforeMoved: {}",
+            + "forceCommitBeforeMoved: {}, forceCommitBatchSize: {}, forceCommitBatchStatusCheckIntervalMs: {}, "
+            + "forceCommitBatchStatusCheckTimeoutMs: {}",
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
-        forceCommitBeforeMoved);
+        forceCommitBeforeMoved, rebalanceConfig.getForceCommitBatchSize(), 
+        rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(), rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
 
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
@@ -393,7 +398,10 @@ public class TableRebalancer {
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
         if (!consumingSegmentsToMoveNext.isEmpty()) {
           currentIdealState =
-              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger);
+              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger,
+                  rebalanceConfig.getForceCommitBatchSize(), 
+                  rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
+                  rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
           currentAssignment = currentIdealState.getRecord().getMapFields();
           targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
               tierToInstancePartitionsMap, rebalanceConfig);
@@ -618,7 +626,9 @@ public class TableRebalancer {
                 null);
             idealState =
                 forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
-                    tableRebalanceLogger);
+                    tableRebalanceLogger, rebalanceConfig.getForceCommitBatchSize(),
+                    rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
+                    rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
             idealStateRecord = idealState.getRecord();
             _tableRebalanceObserver.onTrigger(
                 TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
@@ -2019,22 +2029,32 @@ public class TableRebalancer {
   }
 
   private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType, Set<String> segmentsToCommit,
-      Logger tableRebalanceLogger) {
+      Logger tableRebalanceLogger, int forceCommitBatchSize, int forceCommitBatchStatusCheckIntervalMs,
+      int forceCommitBatchStatusCheckTimeoutMs) {
     if (_pinotLLCRealtimeSegmentManager != null) {
       ForceCommitBatchConfig forceCommitBatchConfig =
-          ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
+          ForceCommitBatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs,
+              forceCommitBatchStatusCheckTimeoutMs);
       segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
           StringUtil.join(",", segmentsToCommit.toArray(String[]::new)), forceCommitBatchConfig);
+      // Wait until all committed segments have their status set to DONE.
+      // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
+      // guarantee there will be available peers for the new instance to download (e.g. the only available replica
+      // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
+      // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
+      // happens only after the committing segment status is set to DONE.
+      int maxAttempts = (forceCommitBatchStatusCheckTimeoutMs + forceCommitBatchStatusCheckIntervalMs - 1)
+          / forceCommitBatchStatusCheckIntervalMs;
+      RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, forceCommitBatchStatusCheckIntervalMs);
+      Set<?>[] segmentsYetToBeCommitted = new Set[1];
       try {
-        // Wait until all committed segments have their status set to DONE.
-        // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
-        // guarantee there will be available peers for the new instance to download (e.g. the only available replica
-        // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
-        // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
-        // happens only after the committing segment status is set to DONE.
-        _pinotLLCRealtimeSegmentManager.waitUntilPrevBatchIsComplete(tableNameWithType, segmentsToCommit,
-            forceCommitBatchConfig);
-      } catch (Exception e) {
+        Set<String> finalSegmentsToCommit = segmentsToCommit;
+        retryPolicy.attempt(() -> {
+          segmentsYetToBeCommitted[0] =
+              _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, finalSegmentsToCommit);
+          return segmentsYetToBeCommitted[0].isEmpty();
+        });
+      } catch (AttemptFailureException e) {
         tableRebalanceLogger.warn("Failed to wait for previous batch to complete", e);
       }
     } else {
