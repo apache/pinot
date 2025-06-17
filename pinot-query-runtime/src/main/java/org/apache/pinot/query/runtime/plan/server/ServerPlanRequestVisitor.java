@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -209,29 +210,34 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
             resultDataContainer, dataSchema);
 
-        // filter logic here
+        // TODO: check whether this, when multiple filter and projects are present, is correct
         PinotQuery pinotQuery = context.getPinotQuery();
-        if (node.getFilterCondition() != null) {
-          if (pinotQuery.getFilterExpression() == null) {
-            Expression expression = CalciteRexExpressionParser.toExpression(node.getFilterCondition(),
-                pinotQuery.getSelectList());
-            applyTimestampIndex(expression, pinotQuery);
-            pinotQuery.setFilterExpression(expression);
+        for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
+          if (rex.getType() == PlannerUtils.FilterProjectRexType.FILTER) {
+            // filter logic here
+            if (pinotQuery.getFilterExpression() == null) {
+              Expression expression = CalciteRexExpressionParser.toExpression(rex.getFilter(),
+                  pinotQuery.getSelectList());
+              applyTimestampIndex(expression, pinotQuery);
+              pinotQuery.setFilterExpression(expression);
+            } else {
+              // if filter is already applied then it cannot have another one on leaf.
+              context.setLeafStageBoundaryNode(node.getInputs().get(0));
+            }
           } else {
-            // if filter is already applied then it cannot have another one on leaf.
-            context.setLeafStageBoundaryNode(node.getInputs().get(0));
+            // project logic here
+            List<Expression> selectList =
+                CalciteRexExpressionParser.convertRexNodes(
+                    rex.getProjectAndResultSchema().getProject(),
+                    pinotQuery.getSelectList());
+            for (Expression expression : selectList) {
+              applyTimestampIndex(expression, pinotQuery);
+            }
+            pinotQuery.setSelectList(selectList);
           }
         }
 
         // project logic here
-        if (node.getProjects() != null) {
-          List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(),
-              pinotQuery.getSelectList());
-          for (Expression expression : selectList) {
-            applyTimestampIndex(expression, pinotQuery);
-          }
-          pinotQuery.setSelectList(selectList);
-        }
       }
     } else {
       // For lookup join, visit the right child and set it as the leaf boundary.

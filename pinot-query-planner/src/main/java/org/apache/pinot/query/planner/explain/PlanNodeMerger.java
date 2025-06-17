@@ -223,10 +223,7 @@ class PlanNodeMerger {
       if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
         return null;
       }
-      if (!Objects.equals(node.getFilterCondition(), otherNode.getFilterCondition())) {
-        return null;
-      }
-      if (!Objects.equals(node.getProjects(), otherNode.getProjects())) {
+      if (!Objects.equals(node.getFilterProjectRexes(), otherNode.getFilterProjectRexes())) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

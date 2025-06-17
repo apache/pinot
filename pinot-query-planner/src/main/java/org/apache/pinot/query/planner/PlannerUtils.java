@@ -92,7 +92,7 @@ public class PlannerUtils {
 
   public static class FilterProjectRex {
 
-    public class ProjectAndResultSchema {
+    public static class ProjectAndResultSchema {
       private List<RexExpression> _project;
       private DataSchema _schema;
 
@@ -110,21 +110,22 @@ public class PlannerUtils {
       }
     }
 
-
     private final FilterProjectRexType _type;
-    @Nullable private final RexExpression _filter;
-    @Nullable private final ProjectAndResultSchema _projectAndResultSchemas;
+    @Nullable
+    private final RexExpression _filter;
+    @Nullable
+    private final ProjectAndResultSchema _projectAndResultSchema;
 
     public FilterProjectRex(RexExpression filter) {
       _type = FilterProjectRexType.FILTER;
       _filter = filter;
-      _projectAndResultSchemas = null;
+      _projectAndResultSchema = null;
     }
 
     public FilterProjectRex(List<RexExpression> projects, DataSchema resultSchema) {
       _type = FilterProjectRexType.PROJECT;
       _filter = null;
-      _projectAndResultSchemas = new ProjectAndResultSchema(projects, resultSchema);
+      _projectAndResultSchema = new ProjectAndResultSchema(projects, resultSchema);
     }
 
     @Nullable
@@ -133,13 +134,19 @@ public class PlannerUtils {
     }
 
     @Nullable
-    public ProjectAndResultSchema getProjectAndResultSchemas() {
-      return _projectAndResultSchemas;
+    public ProjectAndResultSchema getProjectAndResultSchema() {
+      return _projectAndResultSchema;
     }
 
     public FilterProjectRexType getType() {
       return _type;
     }
-  }
 
+    @Override
+    public String toString() {
+      return _type == FilterProjectRexType.FILTER
+          ? "Filter: " + _filter.toString()
+          : "Project: " + _projectAndResultSchema.getProject().toString();
+    }
+  }
 }

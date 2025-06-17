@@ -31,6 +31,7 @@ import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -113,17 +114,27 @@ public class PlanNodeDeserializer {
 
   private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
     Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
+    // reconstruct filterProjectRex
+    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    for (Plan.FilterProjectRex rex : protoEnrichedJoinNode.getFilterProjectRexList()) {
+      if (rex.getType() == Plan.FilterProjectRexType.FILTER) {
+        filterProjectRexes.add(
+            new PlannerUtils.FilterProjectRex(ProtoExpressionToRexExpression.convertExpression(rex.getFilter())));
+      } else {
+        filterProjectRexes.add(
+            new PlannerUtils.FilterProjectRex(convertExpressions(rex.getProjectAndResultSchema().getProjectList()),
+                extractDataSchema(rex.getProjectAndResultSchema().getSchema())));
+      }
+    }
     return new EnrichedJoinNode(protoNode.getStageId(),
         extractDataSchema(protoEnrichedJoinNode.getJoinResultDataSchema()), extractDataSchema(protoNode),
         extractNodeHint(protoNode), extractInputs(protoNode), convertJoinType(protoEnrichedJoinNode.getJoinType()),
         protoEnrichedJoinNode.getLeftKeysList(),
         protoEnrichedJoinNode.getRightKeysList(), convertExpressions(protoEnrichedJoinNode.getNonEquiConditionsList()),
         convertJoinStrategy(protoEnrichedJoinNode.getJoinStrategy()),
-        protoEnrichedJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
-            protoEnrichedJoinNode.getMatchCondition()) : null,
-        protoEnrichedJoinNode.hasFilterCondition() ? ProtoExpressionToRexExpression.convertExpression(
-            protoEnrichedJoinNode.getFilterCondition()) : null,
-        convertExpressions(protoEnrichedJoinNode.getProjectsList()));
+        protoEnrichedJoinNode.hasMatchCondition()
+            ? ProtoExpressionToRexExpression.convertExpression(protoEnrichedJoinNode.getMatchCondition()) : null,
+        filterProjectRexes);
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
