@@ -163,7 +163,7 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
-    boolean usePhysicalOptimizer = PhysicalPlannerContext.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
@@ -552,6 +552,7 @@ public class QueryEnvironment {
 
   @Value.Immutable
   public interface Config {
+
     long getRequestId();
 
     String getDatabase();
@@ -592,6 +593,13 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseSpools() {
       return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    }
+
+    /// Whether to only use servers for leaf stages as the workers for the intermediate stages.
+    /// This is useful to control the fanout of the query and reduce data shuffling.
+    @Value.Default
+    default boolean defaultUseLeafServerForIntermediateStage() {
+      return CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE;
     }
 
 

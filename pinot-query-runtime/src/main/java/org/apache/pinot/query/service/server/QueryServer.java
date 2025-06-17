@@ -74,6 +74,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
+  private final String _instanceId;
   private final int _port;
   private final QueryRunner _queryRunner;
   @Nullable
@@ -100,10 +101,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this(port, queryRunner, tlsConfig, new PinotConfiguration());
+    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration());
   }
 
-  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig, PinotConfiguration config) {
+  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
+    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration());
+  }
+
+  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
+      PinotConfiguration config) {
+    _instanceId = instanceId;
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
@@ -210,7 +217,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           // (GRPC) thread in the improbable case all submission tasks finished before the caller thread reaches
           // this line
           if (error != null) { // if there was an error submitting the request, return an error response
-            try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+            try (QueryThreadContext.CloseableContext qCtx =
+                QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
                 QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
               long requestId = QueryThreadContext.getRequestId();
               LOGGER.error("Caught exception while submitting request: {}", requestId, error);
@@ -240,7 +248,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// running, the exception will be managed by the worker, which usually send the error downstream to the receiver
   /// mailboxes. Therefore these error won't be reported here.
   private void submitInternal(Worker.QueryRequest request, Map<String, String> reqMetadata) {
-    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+    try (QueryThreadContext.CloseableContext qTlClosable =
+        QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       QueryThreadContext.setQueryEngine("mse");
       List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
@@ -311,7 +320,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .handle((result, error) -> {
       if (error != null) {
-        try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+        try (QueryThreadContext.CloseableContext qCtx =
+            QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
             QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
           long requestId = QueryThreadContext.getRequestId();
           LOGGER.error("Caught exception while submitting request: {}", requestId, error);
@@ -345,7 +355,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// Remember that in case of error some stages may have been explained and some not.
   private void explainInternal(Worker.QueryRequest request, StreamObserver<Worker.ExplainResponse> responseObserver,
       Map<String, String> reqMetadata) {
-    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+    try (QueryThreadContext.CloseableContext qTlClosable
+        = QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // Explain the stage for each worker
       BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
@@ -397,7 +408,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.open();
+    try (QueryThreadContext.CloseableContext qCtx = QueryThreadContext.open(_instanceId);
         QueryThreadContext.CloseableContext mseCtx = MseWorkerThreadContext.open()) {
       // TODO: populate the thread context with TSE information
       QueryThreadContext.setQueryEngine("tse");
@@ -419,7 +430,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
     long requestId = request.getRequestId();
-    try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open(_instanceId)) {
       QueryThreadContext.setIds(requestId, request.getCid().isBlank() ? request.getCid() : Long.toString(requestId));
       Map<Integer, MultiStageQueryStats.StageStats.Closed> stats = _queryRunner.cancel(requestId);
 

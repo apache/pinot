@@ -16,19 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.common.exception;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Set;
-
-
-public class ControllerJobType {
-  private ControllerJobType() {
+/**
+ * Exception thrown when a rebalance operation is attempted while another rebalance is already in progress for the same
+ * table. This helps to prevent concurrent table rebalances.
+ */
+public class RebalanceInProgressException extends Exception {
+  public RebalanceInProgressException(String message) {
+    super(message);
   }
-  public static final String RELOAD_SEGMENT = "RELOAD_SEGMENT";
-  public static final String FORCE_COMMIT = "FORCE_COMMIT";
-  public static final String TABLE_REBALANCE = "TABLE_REBALANCE";
-  public static final String TENANT_REBALANCE = "TENANT_REBALANCE";
-  public static final Set<String>
-      VALID_CONTROLLER_JOB_TYPE = ImmutableSet.of(RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE);
+
+  public RebalanceInProgressException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

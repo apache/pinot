@@ -26,9 +26,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -74,7 +74,8 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
@@ -148,7 +149,7 @@ public class TenantRebalancerTest extends ControllerTest {
   private TenantRebalanceProgressStats getProgress(String jobId)
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata =
-        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TENANT_REBALANCE);
+        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TENANT_REBALANCE);
     if (controllerJobZKMetadata == null) {
       return null;
     }

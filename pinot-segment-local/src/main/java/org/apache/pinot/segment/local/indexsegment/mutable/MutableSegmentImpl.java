@@ -20,7 +20,10 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
+import it.unimi.dsi.fastutil.booleans.BooleanList;
 import it.unimi.dsi.fastutil.ints.IntArrays;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -49,21 +52,21 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.MultiColumnRealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
-import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.ComparisonColumns;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -84,17 +87,20 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -184,6 +190,12 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
+  // multi-column text index fields
+  private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
+  private final Object2IntOpenHashMap _multiColumnPos;
+  private final List<Object> _multiColumnValues;
+  private MultiColumnTextMetadata _multiColumnTextMetadata;
+
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
     _realtimeTableName = config.getTableNameWithType();
@@ -194,6 +206,7 @@ public class MutableSegmentImpl implements MutableSegment {
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
         segmentZKMetadata.getSegmentName(), _schema, segmentZKMetadata.getCreationTime()) {
+
       @Override
       public int getTotalDocs() {
         return _numDocsIndexed;
@@ -212,6 +225,12 @@ public class MutableSegmentImpl implements MutableSegment {
       @Override
       public boolean isMutableSegment() {
         return true;
+      }
+
+      @Nullable
+      @Override
+      public MultiColumnTextMetadata getMultiColumnTextMetadata() {
+        return _multiColumnTextMetadata;
       }
     };
 
@@ -289,8 +308,13 @@ public class MutableSegmentImpl implements MutableSegment {
           Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
       MutableIndexContext context =
-          MutableIndexContext.builder().withFieldSpec(fieldSpec).withMemoryManager(_memoryManager)
-              .withDictionary(isDictionary).withCapacity(_capacity).offHeap(_offHeap).withSegmentName(_segmentName)
+          MutableIndexContext.builder()
+              .withFieldSpec(fieldSpec)
+              .withMemoryManager(_memoryManager)
+              .withDictionary(isDictionary)
+              .withCapacity(_capacity)
+              .offHeap(_offHeap)
+              .withSegmentName(_segmentName)
               .withEstimatedCardinality(_statsHistory.getEstimatedCardinality(column))
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
@@ -418,6 +442,36 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertConsistencyMode = null;
       _validDocIds = null;
       _queryableDocIds = null;
+    }
+
+    MultiColumnTextIndexConfig textConfig = config.getMultiColIndexConfig();
+    if (textConfig != null) {
+      List<String> textColumns = textConfig.getColumns();
+      BooleanList columnsSV = new BooleanArrayList(textColumns.size());
+      Schema schema = config.getSchema();
+      for (String column : textColumns) {
+        DataType dataType = schema.getFieldSpecFor(column).getDataType();
+        if (dataType.getStoredType() != FieldSpec.DataType.STRING) {
+          throw new IllegalStateException(
+              "Multi-column text index is currently only supported on STRING type columns! Found column: " + column
+                  + " of type: " + dataType);
+        }
+        columnsSV.add(schema.getFieldSpecFor(column).isSingleValueField());
+      }
+      _multiColumnTextIndex =
+          new MultiColumnRealtimeLuceneTextIndex(textColumns, columnsSV, _consumerDir, config.getSegmentName(),
+              textConfig);
+      _multiColumnPos = _multiColumnTextIndex.getMapping();
+      _multiColumnValues = new ArrayList<>(_multiColumnPos.size());
+      for (int i = 0; i < _multiColumnPos.size(); i++) {
+        _multiColumnValues.add(null);
+      }
+      _multiColumnTextMetadata = new MultiColumnTextMetadata(MultiColumnTextMetadata.VERSION_1, textConfig.getColumns(),
+          textConfig.getProperties(), textConfig.getPerColumnProperties());
+    } else {
+      _multiColumnTextIndex = null;
+      _multiColumnPos = null;
+      _multiColumnValues = null;
     }
   }
 
@@ -866,6 +920,13 @@ public class MutableSegmentImpl implements MutableSegment {
             }
           }
         }
+
+        if (_multiColumnValues != null) {
+          int pos = _multiColumnPos.getInt(column);
+          if (pos > -1) {
+            _multiColumnValues.set(pos, (String) value);
+          }
+        }
       } else {
         // Multi-value column
 
@@ -882,7 +943,19 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
         indexContainer._valuesInfo.updateMVNumValues(values.length);
+
+        if (_multiColumnValues != null) {
+          int pos = _multiColumnPos.getInt(column);
+          if (pos > -1) {
+            _multiColumnValues.set(pos, value);
+          }
+        }
       }
+    }
+
+    if (_multiColumnValues != null) {
+      _multiColumnTextIndex.add(_multiColumnValues);
+      Collections.fill(_multiColumnValues, null);
     }
   }
 
@@ -1059,19 +1132,34 @@ public class MutableSegmentImpl implements MutableSegment {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     if (fieldSpec != null && fieldSpec.isVirtualColumn()) {
       // Virtual column
-      // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
-      return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
-          virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
+      return VirtualColumnProviderFactory.buildProvider(virtualColumnContext).buildDataSource(virtualColumnContext);
     }
     return null;
+  }
+
+  @Override
+  public DataSource getDataSource(String column, Schema schema) {
+    DataSource dataSource = getDataSourceNullable(column);
+    if (dataSource != null) {
+      return dataSource;
+    }
+    FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+    Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
+        schema.getSchemaName());
+    return IndexSegmentUtils.createVirtualDataSource(new VirtualColumnContext(fieldSpec, _numDocsIndexed));
   }
 
   @Nullable
   @Override
   public List<StarTreeV2> getStarTrees() {
     return null;
+  }
+
+  @Nullable
+  @Override
+  public TextIndexReader getMultiColumnTextIndex() {
+    return _multiColumnTextIndex;
   }
 
   @Nullable
@@ -1117,6 +1205,10 @@ public class MutableSegmentImpl implements MutableSegment {
       for (MutableIndex mutableIndex : indexContainer._mutableIndexes.values()) {
         mutableIndex.commit();
       }
+    }
+
+    if (_multiColumnTextIndex != null) {
+      _multiColumnTextIndex.commit();
     }
   }
 
@@ -1167,6 +1259,15 @@ public class MutableSegmentImpl implements MutableSegment {
     // Close the indexes
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
       indexContainer.close();
+    }
+
+    if (_multiColumnTextIndex != null) {
+      try {
+        _multiColumnTextIndex.close();
+      } catch (Exception e) {
+        _logger.error("Caught exception while closing multi-column text index for column: {}, continuing with error",
+            _multiColumnTextMetadata.getColumns(), e);
+      }
     }
 
     if (_recordIdMap != null) {

@@ -216,6 +216,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
   }
 
+  // This method also copies the multi-column lucene text index.
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods

@@ -125,7 +125,7 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         groupTrimSize = GroupByUtils.getTableCapacity(limit, minGroupTrimSize);
         if (groupTrimSize < Integer.MAX_VALUE) {
-          comparator = new SortUtils.SortComparator(_resultSchema, collations, true);
+          comparator = new SortUtils.SortComparator(collations, true);
         }
       }
     }

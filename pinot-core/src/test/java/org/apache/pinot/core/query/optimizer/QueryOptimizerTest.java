@@ -38,13 +38,19 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
+// test works with all TEXT_MATCH expressions (on single or multi-column text index)
 public class QueryOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("int", DataType.INT)
-          .addSingleValueDimension("long", DataType.LONG).addSingleValueDimension("float", DataType.FLOAT)
-          .addSingleValueDimension("double", DataType.DOUBLE).addSingleValueDimension("string", DataType.STRING)
-          .addSingleValueDimension("bytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT).build();
+      new Schema.SchemaBuilder()
+          .setSchemaName("testTable")
+          .addSingleValueDimension("int", DataType.INT)
+          .addSingleValueDimension("long", DataType.LONG)
+          .addSingleValueDimension("float", DataType.FLOAT)
+          .addSingleValueDimension("double", DataType.DOUBLE)
+          .addSingleValueDimension("string", DataType.STRING)
+          .addSingleValueDimension("bytes", DataType.BYTES)
+          .addMultiValueDimension("mvInt", DataType.INT).build();
 
   @Test
   public void testNoFilter() {

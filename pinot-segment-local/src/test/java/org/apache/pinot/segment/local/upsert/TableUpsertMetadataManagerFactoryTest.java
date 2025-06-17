@@ -65,11 +65,11 @@ public class TableUpsertMetadataManagerFactoryTest {
     when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), createTableConfig(upsertConfig), SCHEMA,
-            tableDataManager);
+            tableDataManager, null);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
-        0) instanceof ConcurrentMapPartitionUpsertMetadataManager);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0)
+        instanceof ConcurrentMapPartitionUpsertMetadataManager);
   }
 
   @Test
@@ -82,11 +82,11 @@ public class TableUpsertMetadataManagerFactoryTest {
     when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), createTableConfig(upsertConfig), SCHEMA,
-            tableDataManager);
+            tableDataManager, null);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(
-        0) instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0)
+        instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
   }
 
   @SuppressWarnings("deprecation")
@@ -139,7 +139,7 @@ public class TableUpsertMetadataManagerFactoryTest {
       TableDataManager tableDataManager, boolean expected)
       throws IOException {
     try (TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(
-        instanceUpsertConfig, tableConfig, SCHEMA, tableDataManager)) {
+        instanceUpsertConfig, tableConfig, SCHEMA, tableDataManager, null)) {
       assertEquals(tableUpsertMetadataManager.getContext().isPreloadEnabled(), expected);
     }
   }
