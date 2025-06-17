@@ -54,7 +54,6 @@ public class TestThreadMXBean {
       long[] ll = new long[10000];
       ll[2] = 4;
       LOGGER.trace(String.valueOf(ll[2]));
-      threadResourceSnapshot.takeSnapshot();
       long result = threadResourceSnapshot.getAllocatedBytes();
       Assert.assertTrue(result >= 80000 && result <= 85000);
     }
@@ -83,7 +82,6 @@ public class TestThreadMXBean {
         for (int i = 0; i < 100000; i++) {
           concurrentHashMap.put(i, i);
         }
-        threadResourceSnapshot.takeSnapshot();
         a.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -92,7 +90,6 @@ public class TestThreadMXBean {
         for (int i = 100000; i < 200000; i++) {
           concurrentHashMap.put(i, i);
         }
-        threadResourceSnapshot.takeSnapshot();
         b.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -101,7 +98,6 @@ public class TestThreadMXBean {
         for (int i = 0; i < 200000; i++) {
           concurrentHashMap2.put(i, i);
         }
-        threadResourceSnapshot.takeSnapshot();
         c.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -110,7 +106,6 @@ public class TestThreadMXBean {
       } catch (InterruptedException ignored) {
       }
 
-      threadResourceSnapshot0.takeSnapshot();
       long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
       float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
@@ -144,7 +139,6 @@ public class TestThreadMXBean {
         for (int i = 0; i < 100; i++) {
           concurrentHashMap.put(i, new NestedArray());
         }
-        threadResourceSnapshot.takeSnapshot();
         a.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -153,7 +147,6 @@ public class TestThreadMXBean {
         for (int i = 100; i < 200; i++) {
           concurrentHashMap.put(i, new NestedArray());
         }
-        threadResourceSnapshot.takeSnapshot();
         b.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -162,7 +155,6 @@ public class TestThreadMXBean {
         for (int i = 0; i < 200; i++) {
           concurrentHashMap2.put(i, new NestedArray());
         }
-        threadResourceSnapshot.takeSnapshot();
         c.set(threadResourceSnapshot.getAllocatedBytes());
       });
 
@@ -171,7 +163,6 @@ public class TestThreadMXBean {
       } catch (InterruptedException ignored) {
       }
 
-      threadResourceSnapshot0.takeSnapshot();
       long d = threadResourceSnapshot0.getAllocatedBytes();
       long threadAllocatedBytes = a.get() + b.get() + c.get() + d;
       float heapUsedBytes = (float) memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
@@ -198,7 +189,6 @@ public class TestThreadMXBean {
     }
     System.gc();
     long heapResult = memoryMXBean.getHeapMemoryUsage().getUsed() - heapPrev;
-    threadResourceSnapshot0.takeSnapshot();
     long result = threadResourceSnapshot0.getAllocatedBytes();
     LOGGER.info("Measured thread allocated bytes {}, heap used bytes {}",
         result, heapResult);

@@ -135,7 +135,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             Tracing.ThreadAccountantOps.clear();
           }
 
-          resourceSnapshot.takeSnapshot();
           _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
           _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceSnapshot.getAllocatedBytes());
         }

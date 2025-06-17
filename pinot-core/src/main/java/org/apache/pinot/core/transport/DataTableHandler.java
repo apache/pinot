@@ -72,7 +72,6 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-      resourceSnapshot.takeSnapshot();
       Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
           resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes());
     } catch (Exception e) {
