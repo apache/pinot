@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
  * This class is responsible for checking resource utilization for Pinot instances. To begin with, it checks
  * disk utilization for all server instances. The computed disk utilization is stored in the class
  * <code>org.apache.pinot.controller.validation.ResourceUtilizationInfo</code>.
+ * It then checks the primary key count for all server instances, and this is also stored in the above class.
  */
 public class ResourceUtilizationChecker extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtilizationChecker.class);
@@ -46,17 +47,20 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
   private final PoolingHttpClientConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
   private final DiskUtilizationChecker _diskUtilizationChecker;
+  private final NumberOfPrimaryKeysChecker _numberOfPrimaryKeysChecker;
   private final Executor _executor;
   private final PinotHelixResourceManager _helixResourceManager;
 
   public ResourceUtilizationChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, DiskUtilizationChecker diskUtilizationChecker, Executor executor,
+      ControllerMetrics controllerMetrics, DiskUtilizationChecker diskUtilizationChecker,
+      NumberOfPrimaryKeysChecker numberOfPrimaryKeysChecker, Executor executor,
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(TASK_NAME, config.getResourceUtilizationCheckerFrequency(),
         config.getResourceUtilizationCheckerInitialDelay());
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
     _diskUtilizationChecker = diskUtilizationChecker;
+    _numberOfPrimaryKeysChecker = numberOfPrimaryKeysChecker;
     _executor = executor;
     _helixResourceManager = pinotHelixResourceManager;
   }
@@ -78,6 +82,7 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
       _diskUtilizationChecker.computeDiskUtilization(endpointsToInstances, completionServiceHelper);
+      _numberOfPrimaryKeysChecker.computeNumberOfPrimaryKeys(endpointsToInstances, completionServiceHelper);
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
