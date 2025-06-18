@@ -673,6 +673,9 @@ public class PinotTableRestletResource {
       @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier,
+      @ApiParam(value = "Disk utilization threshold override (0.0 to 1.0, e.g., 0.85 for 85%). "
+          + "If not provided, uses the controller's default threshold") @DefaultValue("-1.0")
+      @QueryParam("diskUtilizationThreshold") double diskUtilizationThreshold,
       @ApiParam(value = "Whether to force commit consuming segments for a REALTIME table before they are rebalanced.")
       @DefaultValue("false")
       @QueryParam("forceCommit") boolean forceCommit,
@@ -715,6 +718,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMaxAttempts(maxAttempts);
     rebalanceConfig.setRetryInitialDelayInMs(retryInitialDelayInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
+    rebalanceConfig.setDiskUtilizationThreshold(diskUtilizationThreshold);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {

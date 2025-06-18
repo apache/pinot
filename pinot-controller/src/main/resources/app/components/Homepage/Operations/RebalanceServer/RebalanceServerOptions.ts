@@ -19,7 +19,7 @@
 export type RebalanceServerOption = {
     name: string;
     label: string;
-    type: "BOOL" | "INTEGER" | "SELECT";
+    type: "BOOL" | "INTEGER" | "SELECT" | "DOUBLE";
     description: string;
     defaultValue: string | boolean | number;
     isAdvancedConfig: boolean;
@@ -171,6 +171,16 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "type": "BOOL",
         "label": "Update Target Tier",
         "description": "If enabled, update segment target tier as part of the rebalance",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "diskUtilizationThreshold",
+        "defaultValue": -1.0,
+        "type": "DOUBLE",
+        "label": "Disk Utilization Threshold",
+        "description": "Override disk utilization threshold (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or -1.0), uses the controller's default threshold",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
