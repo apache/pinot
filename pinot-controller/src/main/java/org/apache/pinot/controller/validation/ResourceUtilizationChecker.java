@@ -47,20 +47,20 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
   private final PoolingHttpClientConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
   private final DiskUtilizationChecker _diskUtilizationChecker;
-  private final NumberOfPrimaryKeysChecker _numberOfPrimaryKeysChecker;
+  private final PrimaryKeyCountChecker _primaryKeyCountChecker;
   private final Executor _executor;
   private final PinotHelixResourceManager _helixResourceManager;
 
   public ResourceUtilizationChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
       ControllerMetrics controllerMetrics, DiskUtilizationChecker diskUtilizationChecker,
-      NumberOfPrimaryKeysChecker numberOfPrimaryKeysChecker, Executor executor,
+      PrimaryKeyCountChecker primaryKeyCountChecker, Executor executor,
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(TASK_NAME, config.getResourceUtilizationCheckerFrequency(),
         config.getResourceUtilizationCheckerInitialDelay());
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
     _diskUtilizationChecker = diskUtilizationChecker;
-    _numberOfPrimaryKeysChecker = numberOfPrimaryKeysChecker;
+    _primaryKeyCountChecker = primaryKeyCountChecker;
     _executor = executor;
     _helixResourceManager = pinotHelixResourceManager;
   }
@@ -82,7 +82,7 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
       _diskUtilizationChecker.computeDiskUtilization(endpointsToInstances, completionServiceHelper);
-      _numberOfPrimaryKeysChecker.computeNumberOfPrimaryKeys(endpointsToInstances, completionServiceHelper);
+      _primaryKeyCountChecker.computePrimaryKeyCount(endpointsToInstances, completionServiceHelper);
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

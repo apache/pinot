@@ -37,28 +37,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class NumberOfPrimaryKeysChecker {
-  private static final Logger LOGGER = LoggerFactory.getLogger(NumberOfPrimaryKeysChecker.class);
+public class PrimaryKeyCountChecker {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PrimaryKeyCountChecker.class);
   private static final long DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK = 0;
-  public static final String NUMBER_OF_PRIMARY_KEYS_API_PATH = "/instance/numberOfPrimaryKeys";
+  public static final String PRIMARY_KEY_COUNT_API_PATH = "/instance/primaryKeyCount";
 
   private final PinotHelixResourceManager _helixResourceManager;
   private final int _resourceUtilizationCheckTimeoutMs;
   private final long _resourceUtilizationCheckerFrequencyMs;
-  private final double _numberOfPrimaryKeysThreshold;
+  private final double _primaryKeyCountThreshold;
 
-  public NumberOfPrimaryKeysChecker(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
+  public PrimaryKeyCountChecker(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf) {
     _helixResourceManager = helixResourceManager;
-    _numberOfPrimaryKeysThreshold = controllerConf.getNumberOfPrimaryKeysThreshold();
-    _resourceUtilizationCheckTimeoutMs = controllerConf.getNumberOfPrimaryKeysCheckTimeoutMs();
+    _primaryKeyCountThreshold = controllerConf.getPrimaryKeyCountThreshold();
+    _resourceUtilizationCheckTimeoutMs = controllerConf.getPrimaryKeyCountCheckTimeoutMs();
     _resourceUtilizationCheckerFrequencyMs = controllerConf.getResourceUtilizationCheckerFrequency() * 1000;
   }
 
   /**
    * Check if the number of primary keys for the requested table is within the configured limits.
    */
-  public boolean isNumberOfPrimaryKeysWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
-    if (_numberOfPrimaryKeysThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
+  public boolean isPrimaryKeyCountWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
+    if (_primaryKeyCountThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled
       LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning true");
       return true;
@@ -86,12 +86,12 @@ public class NumberOfPrimaryKeysChecker {
       return true;
     }
     List<String> instances = _helixResourceManager.getServerInstancesForTable(tableNameWithType, TableType.REALTIME);
-    return isNumberOfPrimaryKeysWithinLimits(instances);
+    return isPrimaryKeyCountWithinLimits(instances);
   }
 
-  private boolean isNumberOfPrimaryKeysWithinLimits(List<String> instances) {
+  private boolean isPrimaryKeyCountWithinLimits(List<String> instances) {
     for (String instance : instances) {
-      assert _numberOfPrimaryKeysThreshold > DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK;
+      assert _primaryKeyCountThreshold > DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK;
       PrimaryKeyCountInfo primaryKeyCountInfo = ResourceUtilizationInfo.getPrimaryKeyCountInfo(instance);
       if (primaryKeyCountInfo == null) {
         LOGGER.warn("Primary key count info for server: {} is null", instance);
@@ -104,9 +104,9 @@ public class NumberOfPrimaryKeysChecker {
         LOGGER.warn("Primary key count info for server: {} is stale", instance);
         continue;
       }
-      if (primaryKeyCountInfo.getNumPrimaryKeys() > _numberOfPrimaryKeysThreshold) {
+      if (primaryKeyCountInfo.getNumPrimaryKeys() > _primaryKeyCountThreshold) {
         LOGGER.warn("Primary key count {} for server: {} is above threshold: {}",
-            primaryKeyCountInfo.getNumPrimaryKeys(), instance, _numberOfPrimaryKeysThreshold);
+            primaryKeyCountInfo.getNumPrimaryKeys(), instance, _primaryKeyCountThreshold);
         return false;
       }
     }
@@ -116,9 +116,9 @@ public class NumberOfPrimaryKeysChecker {
   /**
    * Compute disk utilization for the requested instances using the <code>CompletionServiceHelper</code>.
    */
-  public void computeNumberOfPrimaryKeys(BiMap<String, String> endpointsToInstances,
+  public void computePrimaryKeyCount(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper) {
-    if (_numberOfPrimaryKeysThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
+    if (_primaryKeyCountThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled
       LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning true");
       ResourceUtilizationInfo.setPrimaryKeyCountInfo(Collections.emptyMap());
@@ -126,7 +126,7 @@ public class NumberOfPrimaryKeysChecker {
     }
     List<String> numberOfPrimaryKeysUris = new ArrayList<>(endpointsToInstances.size());
     for (String endpoint : endpointsToInstances.keySet()) {
-      String numberOfPrimaryKeysUri = endpoint + NUMBER_OF_PRIMARY_KEYS_API_PATH;
+      String numberOfPrimaryKeysUri = endpoint + PRIMARY_KEY_COUNT_API_PATH;
       numberOfPrimaryKeysUris.add(numberOfPrimaryKeysUri);
     }
     Map<String, String> reqHeaders = new HashMap<>();

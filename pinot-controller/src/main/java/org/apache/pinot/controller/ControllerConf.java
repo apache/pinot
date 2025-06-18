@@ -321,9 +321,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
   public static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   public static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
-  public static final String NUMBER_OF_PRIMARY_KEYS_THRESHOLD = "controller.number.of.primary.keys.threshold";
-  public static final String NUMBER_OF_PRIMARY_KEYS_CHECK_TIMEOUT_MS =
-      "controller.number.of.primary.keys.check.timeoutMs";
+  public static final String PRIMARY_KEY_COUNT_THRESHOLD = "controller.primary.key.count.threshold";
+  public static final String PRIMARY_KEY_COUNT_CHECK_TIMEOUT_MS = "controller.primary.key.count.check.timeoutMs";
   public static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
@@ -358,8 +357,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
   public static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
   public static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
-  public static final long DEFAULT_NUMBER_OF_PRIMARY_KEYS_THRESHOLD = -1L; // disabled
-  public static final int DEFAULT_NUMBER_OF_PRIMARY_KEYS_CHECK_TIMEOUT_MS = 30_000;
+  public static final long DEFAULT_PRIMARY_KEY_COUNT_THRESHOLD = -1L; // disabled
+  public static final int DEFAULT_PRIMARY_KEY_COUNT_CHECK_TIMEOUT_MS = 30_000;
   public static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   public static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
@@ -1104,12 +1103,12 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(DISK_UTILIZATION_CHECK_TIMEOUT_MS, DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS);
   }
 
-  public long getNumberOfPrimaryKeysThreshold() {
-    return getProperty(NUMBER_OF_PRIMARY_KEYS_THRESHOLD, DEFAULT_NUMBER_OF_PRIMARY_KEYS_THRESHOLD);
+  public long getPrimaryKeyCountThreshold() {
+    return getProperty(PRIMARY_KEY_COUNT_THRESHOLD, DEFAULT_PRIMARY_KEY_COUNT_THRESHOLD);
   }
 
-  public int getNumberOfPrimaryKeysCheckTimeoutMs() {
-    return getProperty(NUMBER_OF_PRIMARY_KEYS_CHECK_TIMEOUT_MS, DEFAULT_NUMBER_OF_PRIMARY_KEYS_CHECK_TIMEOUT_MS);
+  public int getPrimaryKeyCountCheckTimeoutMs() {
+    return getProperty(PRIMARY_KEY_COUNT_CHECK_TIMEOUT_MS, DEFAULT_PRIMARY_KEY_COUNT_CHECK_TIMEOUT_MS);
   }
 
   public long getResourceUtilizationCheckerInitialDelay() {
