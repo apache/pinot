@@ -117,4 +117,24 @@ public class FunctionOperand implements TransformOperand {
     return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
   }
+
+  @Nullable
+  @Override
+  public Object apply(List<Object> row) {
+    for (int i = 0; i < _operands.size(); i++) {
+      TransformOperand operand = _operands.get(i);
+      Object value = operand.apply(row);
+      _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
+    }
+    // TODO: Optimize per record conversion
+    Object result;
+    if (_functionInvoker.getMethod().isVarArgs()) {
+      result = _functionInvoker.invoke(new Object[]{_reusableOperandHolder});
+    } else {
+      _functionInvoker.convertTypes(_reusableOperandHolder);
+      result = _functionInvoker.invoke(_reusableOperandHolder);
+    }
+    return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
+        _resultType.getStoredType()) : null;
+  }
 }
