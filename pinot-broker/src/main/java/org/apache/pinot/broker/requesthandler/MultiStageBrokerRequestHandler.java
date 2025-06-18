@@ -347,7 +347,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       for (String tableName : tables) {
         accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
             .ifPresent(rowFilters -> {
-              String combinedFilters = String.join(" AND ", rowFilters);
+              String combinedFilters =
+                  rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
               String key = String.format("%s-%s", CommonConstants.RLS_FILTERS, tableName);
               compiledQuery.getOptions().put(key, combinedFilters);
             });

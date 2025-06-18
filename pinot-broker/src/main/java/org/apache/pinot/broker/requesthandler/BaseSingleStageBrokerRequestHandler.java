@@ -443,7 +443,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
 
       rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
-        String combinedFilters = String.join(" AND ", rowFilters);
+        String combinedFilters =
+            rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
         queryOptions.put(tableName, combinedFilters);
         pinotQuery.setQueryOptions(queryOptions);
         CalciteSqlParser.queryRewrite(pinotQuery);
