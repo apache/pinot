@@ -64,6 +64,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -614,7 +615,11 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+    try (
+        QueryThreadContext.CloseableContext mseCloseableCtx = MseWorkerThreadContext.open();
+        OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+      MseWorkerThreadContext.setStageId(0);
+      MseWorkerThreadContext.setWorkerId(0);
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
@@ -648,21 +653,21 @@ public class QueryDispatcher {
       Map.Entry<QueryErrorCode, String> error;
       String from;
       if (errorBlock.getStageId() >= 0) {
-        from = "from stage " + errorBlock.getStageId();
+        from = " from stage " + errorBlock.getStageId();
         if (errorBlock.getServerId() != null) {
-          from += " on server " + errorBlock.getServerId();
+          from += " on " + errorBlock.getServerId();
         }
       } else {
-        from = "from servers";
+        from = "";
       }
       if (queryExceptions.size() == 1) {
         error = queryExceptions.entrySet().iterator().next();
-        errorMessage = "Received 1 error " + from + ": " + error.getValue();
+        errorMessage = "Received 1 error" + from + ": " + error.getValue();
       } else {
         error = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
-        errorMessage = "Received " + queryExceptions.size() + " errors " + from + ". "
+        errorMessage = "Received " + queryExceptions.size() + " errors" + from + ". "
                 + "The one with highest priority is: " + error.getValue();
       }
       QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);

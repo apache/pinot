@@ -54,6 +54,8 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
@@ -94,6 +96,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -117,6 +121,7 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
 
   static {
     // We set Calcite configuration as case-sensitive at all timesk, even when Pinot is configured as case-insensitive.
@@ -146,7 +151,8 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    _optProgram = getOptProgram();
+    // default optProgram with no skip rule options
+    _optProgram = getOptProgram(null);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -163,6 +169,15 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    HepProgram optProgram = _optProgram;
+    if (MapUtils.isNotEmpty(options)) {
+      Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
+      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
+        // dynamically create optProgram according to rule options
+        optProgram = getOptProgram(skipRuleSet);
+      }
+    }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
@@ -179,7 +194,7 @@ public class QueryEnvironment {
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
           workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
     }
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
+    return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
   }
 
@@ -468,34 +483,100 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  private static HepProgram getOptProgram() {
+  /**
+   * Creates and returns a HepProgram that performs mostly logical transformations.
+   * It performs several phases of rule application over the parsed decorrelated trimmed plan:
+   * - In the first phase, it prunes the applies BASIC_RULES that are almost always helpful to simplify logical plan
+   * - In the second phase, it performs predicate pushdown -> projection pushdown -> predicate pushdown.
+   * - In the third phase, the logical plan is prune with PRUNE_RULES.
+   *
+   * @param skipRuleSet parsed skipped rule name set from query options
+   * @return HepProgram that performs logical transformations
+   */
+  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
     hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
 
     // ----
+    // Rules are disabled if its corresponding value is set to false in ruleFlags
+    // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
+    List<RelOptRule> basicRules;
+    List<RelOptRule> filterPushdownRules;
+    List<RelOptRule> projectPushdownRules;
+    List<RelOptRule> pruneRules;
+    if (skipRuleSet == null) {
+      basicRules = PinotQueryRuleSets.BASIC_RULES;
+      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
+      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
+      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
+    } else {
+      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
+      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
+      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
+      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
+    }
+
+
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
+    for (RelOptRule relOptRule : basicRules) {
+        hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
     // Pushdown filters using a single HepInstruction.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // Pushdown projects after first filter pushdown to minimize projected columns.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(projectPushdownRules);
 
     // Pushdown filters again since filter should be pushed down at the lowest level, after project pushdown.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    hepProgramBuilder.addRuleCollection(filterPushdownRules);
 
     // ----
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+    hepProgramBuilder.addRuleCollection(pruneRules);
     return hepProgramBuilder.build();
+  }
+
+  // util func to check no rules are skipped
+  private static boolean noRulesSkipped(Set<String> set) {
+    return set.isEmpty();
+  }
+
+  /**
+   * Filter static RuleSet according to query options
+   * The filtering is done via checking query option with
+   * key returning from {@link CommonConstants.Broker}.skipRule(rule description).
+   *
+   * @param rules static list of rules
+   * @param skipRuleSet skip rule set from options
+   * @return filtered list of rules
+   */
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet) {
+    List<RelOptRule> filteredRules = new ArrayList<>();
+    for (RelOptRule relOptRule : rules) {
+      String ruleName = relOptRule.toString();
+      if (isRuleSkipped(ruleName, skipRuleSet)) {
+        continue;
+      }
+      filteredRules.add(relOptRule);
+    }
+    return filteredRules;
+  }
+
+  /**
+   * Whether a rule is skipped, rules not skipped by default
+   * @param ruleName description of the rule
+   * @param skipRuleSet query skipSet
+   * @return false if corresponding key is not in skipMap or the value is "false", else true
+   */
+  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet) {
+    // can put rule-specific default behavior here
+    return skipRuleSet.contains(ruleName);
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,

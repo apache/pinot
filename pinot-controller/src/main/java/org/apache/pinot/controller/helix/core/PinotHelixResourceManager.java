@@ -155,6 +155,7 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
+import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -199,10 +200,8 @@ public class PinotHelixResourceManager {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
   public static final String APPEND = "APPEND";
-  private static final int DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE = 500;
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
-  private static final int INFINITE_TIMEOUT = -1;
 
   private enum LineageUpdateType {
     START, END, REVERT
@@ -211,8 +210,6 @@ public class PinotHelixResourceManager {
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
-  public static final long SEGMENT_CLEANUP_TIMEOUT_MS = 20 * 60_000L; // 20 minutes
-  public static final long SEGMENT_CLEANUP_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private static final DateTimeFormatter SIMPLE_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
@@ -1569,11 +1566,9 @@ public class PinotHelixResourceManager {
           reloadAllSegments(tableNameWithType, false, null);
         }
       } else {
-        // Send schema refresh message to all tables that use this schema
+        LOGGER.info("Refreshing schema for tables with name: {}", schemaName);
         for (String tableNameWithType : tableNamesWithType) {
-          LOGGER.info("Sending updated schema message for table: {}", tableNameWithType);
-          sendTableConfigSchemaRefreshMessage(tableNameWithType, getServerInstancesForTable(tableNameWithType,
-              TableNameBuilder.getTableTypeFromTableName(tableNameWithType)));
+          sendTableConfigSchemaRefreshMessage(tableNameWithType);
         }
       }
     } catch (TableNotFoundException e) {
@@ -2761,24 +2756,10 @@ public class PinotHelixResourceManager {
    * Delete the table on servers by sending table deletion messages.
    */
   private void deleteTableOnServers(String tableNameWithType) {
-    // External view can be null for newly created table, skip sending messages
-    if (_helixDataAccessor.getProperty(_keyBuilder.externalView(tableNameWithType)) == null) {
-      LOGGER.warn("No delete table message sent for newly created table: {} without external view", tableNameWithType);
-      return;
-    }
-
     LOGGER.info("Sending delete table messages for table: {}", tableNameWithType);
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(tableNameWithType);
-    recipientCriteria.setSessionSpecific(true);
-    TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-
-    // Infinite timeout on the recipient
-    int timeoutMs = -1;
-    int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
+    TableDeletionMessage message = new TableDeletionMessage(tableNameWithType);
+    int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} delete table messages for table: {}", numMessagesSent, tableNameWithType);
     } else {
@@ -2823,27 +2804,21 @@ public class PinotHelixResourceManager {
       Preconditions.checkArgument(tt == TableType.OFFLINE,
           "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
     }
-    // Infinite timeout on the recipient
-    int timeoutMs = -1;
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
     for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
-      List<String> segments = entry.getValue();
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setInstanceName(targetInstance);
-      recipientCriteria.setResource(tableNameWithType);
-      recipientCriteria.setSessionSpecific(true);
-      SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segments, forceDownload);
-      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+      SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, entry.getValue(), forceDownload);
+      int numMessagesSent =
+          MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
       if (numMessagesSent > 0) {
         LOGGER.info("Sent {} reload messages to instance: {} for table: {}", numMessagesSent, targetInstance,
             tableNameWithType);
       } else {
         LOGGER.warn("No reload message sent to instance: {} for table: {}", targetInstance, tableNameWithType);
       }
-      instanceMsgInfoMap.put(targetInstance, Pair.of(numMessagesSent, segmentReloadMessage.getMsgId()));
+      instanceMsgInfoMap.put(targetInstance, Pair.of(numMessagesSent, message.getMsgId()));
     }
     return instanceMsgInfoMap;
   }
@@ -2860,24 +2835,17 @@ public class PinotHelixResourceManager {
           "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
     }
 
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
-    recipientCriteria.setResource(tableNameWithType);
-    recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-
-    // Infinite timeout on the recipient
-    int timeoutMs = -1;
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, forceDownload);
+    int numMessagesSent =
+        MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, targetInstance);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} reload messages for table: {}", numMessagesSent, tableNameWithType);
     } else {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
 
-    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
+    return Pair.of(numMessagesSent, message.getMsgId());
   }
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
@@ -2893,26 +2861,18 @@ public class PinotHelixResourceManager {
           segmentName);
     }
 
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
-    recipientCriteria.setResource(tableNameWithType);
-    recipientCriteria.setPartition(segmentName);
-    recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage =
-        new SegmentReloadMessage(tableNameWithType, Collections.singletonList(segmentName), forceDownload);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-
-    // Infinite timeout on the recipient
-    int timeoutMs = -1;
-    int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+    SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, List.of(segmentName), forceDownload);
+    int numMessagesSent =
+        MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, targetInstance);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} reload messages for segment: {} in table: {}", numMessagesSent, segmentName,
           tableNameWithType);
     } else {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
-    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
+
+    return Pair.of(numMessagesSent, message.getMsgId());
   }
 
   /**
@@ -3025,8 +2985,8 @@ public class PinotHelixResourceManager {
    */
   @VisibleForTesting
   void resetPartitionAllState(String instanceName, String resourceName, Set<String> resetPartitionNames) {
-    LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
-        resetPartitionNames == null ? "NULL" : resetPartitionNames, resourceName, instanceName, _helixClusterName);
+    LOGGER.info("Resetting partitions: {} for resource: {} on instance: {}", resetPartitionNames, resourceName,
+        instanceName);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
@@ -3062,7 +3022,7 @@ public class PinotHelixResourceManager {
           + message.getResourceName());
     }
 
-    String adminName = null;
+    String adminName;
     try {
       adminName = InetAddress.getLocalHost().getCanonicalHostName() + "-ADMIN";
     } catch (UnknownHostException e) {
@@ -3114,21 +3074,12 @@ public class PinotHelixResourceManager {
    */
   public void sendSegmentRefreshMessage(String tableNameWithType, String segmentName, boolean refreshServerSegment,
       boolean refreshBrokerRouting) {
-    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(tableNameWithType, segmentName);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    SegmentRefreshMessage message = new SegmentRefreshMessage(tableNameWithType, segmentName);
 
     // Send segment refresh message to servers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-
     if (refreshServerSegment) {
-      // Send segment refresh message to servers
-      recipientCriteria.setResource(tableNameWithType);
-      recipientCriteria.setPartition(segmentName);
-      // Send message with no callback and infinite timeout on the recipient
-      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType, segmentName, null);
       if (numMessagesSent > 0) {
         // TODO: Would be nice if we can get the name of the instances to which messages were sent
         LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
@@ -3139,11 +3090,11 @@ public class PinotHelixResourceManager {
       }
     }
 
+    // Send segment refresh message to brokers
     if (refreshBrokerRouting) {
-      // Send segment refresh message to brokers
-      recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-      recipientCriteria.setPartition(tableNameWithType);
-      int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
+      int numMessagesSent =
+          MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE, tableNameWithType,
+              null);
       if (numMessagesSent > 0) {
         // TODO: Would be nice if we can get the name of the instances to which messages were sent
         LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
@@ -3155,19 +3106,12 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /// Sends table config refresh message to brokers.
   private void sendTableConfigRefreshMessage(String tableNameWithType) {
-    TableConfigRefreshMessage tableConfigRefreshMessage = new TableConfigRefreshMessage(tableNameWithType);
-
-    // Send table config refresh message to brokers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setPartition(tableNameWithType);
-    // Send message with no callback and infinite timeout on the recipient
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    TableConfigRefreshMessage message = new TableConfigRefreshMessage(tableNameWithType);
     int numMessagesSent =
-        _helixZkManager.getMessagingService().send(recipientCriteria, tableConfigRefreshMessage, null, -1);
+        MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE, tableNameWithType, null);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
       LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
@@ -3176,19 +3120,23 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
-    LogicalTableConfigRefreshMessage refreshMessage = new LogicalTableConfigRefreshMessage(logicalTableName);
+  /// Sends table config and schema refresh message to servers.
+  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType) {
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    TableConfigSchemaRefreshMessage message = new TableConfigSchemaRefreshMessage(tableNameWithType);
+    int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} table config and schema refresh messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No table config and schema refresh message sent for table: {}", tableNameWithType);
+    }
+  }
 
-    // Send logical table config refresh message to brokers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setPartition(logicalTableName);
-    // Send message with no callback and infinite timeout on the recipient
+  private void sendLogicalTableConfigRefreshMessage(String logicalTableName) {
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LogicalTableConfigRefreshMessage message = new LogicalTableConfigRefreshMessage(logicalTableName);
     int numMessagesSent =
-        _helixZkManager.getMessagingService().send(recipientCriteria, refreshMessage, null, -1);
+        MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE, logicalTableName, null);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} logical table config refresh messages to brokers for table: {}", numMessagesSent,
           logicalTableName);
@@ -3198,18 +3146,11 @@ public class PinotHelixResourceManager {
   }
 
   private void sendApplicationQpsQuotaRefreshMessage(String appName) {
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     ApplicationQpsQuotaRefreshMessage message = new ApplicationQpsQuotaRefreshMessage(appName);
-
-    // Send database config refresh message to brokers
-    Criteria criteria = new Criteria();
-    criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    criteria.setInstanceName("%");
-    criteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    criteria.setSessionSpecific(true);
-
-    int numMessagesSent = _helixZkManager.getMessagingService().send(criteria, message, null, INFINITE_TIMEOUT);
+    int numMessagesSent = MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE);
     if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} applcation qps quota refresh messages to brokers for application: {}", numMessagesSent,
+      LOGGER.info("Sent {} application qps quota refresh messages to brokers for application: {}", numMessagesSent,
           appName);
     } else {
       LOGGER.warn("No application qps quota refresh message sent to brokers for application: {}", appName);
@@ -3217,17 +3158,9 @@ public class PinotHelixResourceManager {
   }
 
   private void sendDatabaseConfigRefreshMessage(String databaseName) {
-    DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseName);
-
-    // Send database config refresh message to brokers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setSessionSpecific(true);
-    // Send message with no callback and infinite timeout on the recipient
-    int numMessagesSent =
-        _helixZkManager.getMessagingService().send(recipientCriteria, databaseConfigRefreshMessage, null, -1);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    DatabaseConfigRefreshMessage message = new DatabaseConfigRefreshMessage(databaseName);
+    int numMessagesSent = MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent,
           databaseName);
@@ -3237,45 +3170,16 @@ public class PinotHelixResourceManager {
   }
 
   private void sendRoutingTableRebuildMessage(String tableNameWithType) {
-    RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
-
-    // Send table config refresh message to brokers
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setPartition(tableNameWithType);
-    // Send message with no callback and infinite timeout on the recipient
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    RoutingTableRebuildMessage message = new RoutingTableRebuildMessage(tableNameWithType);
     int numMessagesSent =
-        _helixZkManager.getMessagingService().send(recipientCriteria, routingTableRebuildMessage, null, -1);
+        MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE, tableNameWithType, null);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
       LOGGER.info("Sent {} routing table rebuild messages to brokers for table: {}", numMessagesSent,
           tableNameWithType);
     } else {
       LOGGER.warn("No routing table rebuild message sent to brokers for table: {}", tableNameWithType);
-    }
-  }
-
-  private void sendTableConfigSchemaRefreshMessage(String tableNameWithType, List<String> instances) {
-    TableConfigSchemaRefreshMessage refreshMessage = new TableConfigSchemaRefreshMessage(tableNameWithType);
-    for (String instance : instances) {
-      // Send refresh message to servers
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setInstanceName(instance);
-      recipientCriteria.setSessionSpecific(true);
-      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-      // Send message with no callback and infinite timeout on the recipient
-      int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
-      if (numMessagesSent > 0) {
-        LOGGER.info("Sent {} schema refresh messages to servers for table: {} for instance: {}", numMessagesSent,
-            tableNameWithType, instance);
-      } else {
-        LOGGER.warn("No schema refresh message sent to servers for table: {} for instance: {}", tableNameWithType,
-            instance);
-      }
     }
   }
 
@@ -4754,27 +4658,17 @@ public class PinotHelixResourceManager {
   public PeriodicTaskInvocationResponse invokeControllerPeriodicTask(String tableName, String periodicTaskName,
       Map<String, String> taskProperties) {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
-
     LOGGER.info("[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
             + " with properties {}.\"", periodicTaskRequestId, periodicTaskName,
         tableName != null ? " table '" + tableName + "'" : "all tables", taskProperties);
-
-    // Create and send message to send to all controllers (including this one)
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage =
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    RunPeriodicTaskMessage message =
         new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName, taskProperties);
-
-    ClusterMessagingService clusterMessagingService = getHelixZkManager().getMessagingService();
-    int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
-
+    int numMessagesSent =
+        MessagingServiceUtils.sendIncludingSelf(messagingService, message, Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
-        messageCount);
-    return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
+        numMessagesSent);
+    return new PeriodicTaskInvocationResponse(periodicTaskRequestId, numMessagesSent > 0);
   }
 
   /**
@@ -4820,13 +4714,13 @@ public class PinotHelixResourceManager {
   }
 
   public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     instanceToRefreshMessageMap.forEach((instance, message) -> {
       Criteria criteria = new Criteria();
       criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
       criteria.setInstanceName(instance);
       criteria.setSessionSpecific(true);
-
-      int numMessagesSent = _helixZkManager.getMessagingService().send(criteria, message, null, -1);
+      int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
       if (numMessagesSent > 0) {
         LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
       } else {

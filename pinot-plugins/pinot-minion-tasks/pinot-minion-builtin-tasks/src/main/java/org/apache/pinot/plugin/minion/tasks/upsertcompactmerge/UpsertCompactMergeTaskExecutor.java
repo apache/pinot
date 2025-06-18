@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -99,15 +98,8 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     // validate if partitionID is same for all small segments. Get partition id value for new segment.
     int partitionID = getCommonPartitionIDForSegments(segmentMetadataList);
 
-    // get the max creation time of the small segments. This will be the index creation time for the new segment.
-    Optional<Long> maxCreationTimeOfMergingSegments =
-        segmentMetadataList.stream().map(SegmentMetadataImpl::getIndexCreationTime).reduce(Long::max);
-    if (maxCreationTimeOfMergingSegments.isEmpty()) {
-      String message = "No valid creation time found for the new merged segment. This might be due to "
-          + "missing creation time for merging segments";
-      LOGGER.error(message);
-      throw new RuntimeException(message);
-    }
+    // get the max creation time from the task configuration passed by the generator
+    long maxCreationTimeOfMergingSegments = getMaxZKCreationTimeFromConfig(configs);
 
     // validate if crc of deepstore copies is same as that in ZK of segments
     List<String> originalSegmentCrcFromTaskGenerator =
@@ -138,16 +130,20 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
 
     // create new UploadedRealtimeSegment
-    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments.get());
+    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments);
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
         new UploadedRealtimeSegmentNameGenerator(TableNameBuilder.extractRawTableName(tableNameWithType), partitionID,
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-    outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
         recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
-        configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)))).process();
+        configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
+    outputSegmentDirs = framework.process();
+    _eventObserver.notifyProgress(_pinotTaskConfig,
+        "transformation stats - incomplete:" + framework.getIncompleteRowsFound() + ", dropped:" + framework
+            .getSkippedRowsFound() + ", sanitized:" + framework.getSanitizedRowsFound());
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
@@ -199,6 +195,32 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
             segmentMetadata.getCrc());
         LOGGER.error(message);
         throw new IllegalStateException(message);
+      }
+    }
+  }
+
+  /**
+   * Retrieves the max ZK creation time from task configuration with proper null handling.
+   *
+   * @param configs Task configuration map
+   * @return Max ZK creation time in milliseconds
+   * @throws IllegalStateException if the configuration value is invalid
+   */
+  long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
+    String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
+    if (maxCreationTimeStr == null) {
+      throw new IllegalStateException("Max creation time configuration is missing from task config.");
+    } else {
+      try {
+        long maxCreationTime = Long.parseLong(maxCreationTimeStr);
+        if (maxCreationTime <= 0) {
+          throw new IllegalStateException(
+              "No valid creation time found for the new merged segment. This might be due to "
+                  + "missing creation time for merging segments");
+        }
+        return maxCreationTime;
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException("Invalid max creation time format in task config: " + maxCreationTimeStr, e);
       }
     }
   }

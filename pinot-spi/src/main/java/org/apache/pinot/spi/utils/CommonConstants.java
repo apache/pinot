@@ -60,8 +60,6 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
-  public static final String APPLICATION = "application";
-
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -583,6 +581,9 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to skip a given set of rules
+        public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
+
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
@@ -693,6 +694,51 @@ public class CommonConstants {
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
+    }
+
+    /**
+     * Calcite and Pinot rule names / descriptions
+     * used for enable and disabling of rules, this will be iterated through in PlannerContext
+     * to check if rule is disabled.
+     */
+    public static class PlannerRuleNames {
+      public static final String FILTER_INTO_JOIN = "FilterIntoJoin";
+      public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTranspose";
+      public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTranspose";
+      public static final String PROJECT_JOIN_TRANSPOSE = "ProjectJoinTranspose";
+      public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTranspose";
+      public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTranspose";
+      public static final String JOIN_CONDITION_PUSH = "JoinConditionPush";
+      public static final String JOIN_PUSH_TRANSITIVE_PREDICATES = "JoinPushTransitivePredicates";
+      public static final String PROJECT_REMOVE = "ProjectRemove";
+      public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindow";
+      public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTranspose";
+      public static final String EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteral";
+      public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
+      public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
+      public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
+      public static final String SEMIN_JOIN_DISTINCT_PROJECT = "SeminJoinDistinctProject";
+      public static final String UNION_TO_DISTINCT = "UnionToDistinct";
+      public static final String AGGREGATE_REMOVE = "AggregateRemove";
+      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
+      public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
+      public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
+      public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
+      public static final String PROJECT_MERGE = "ProjectMerge";
+      public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
+      public static final String FILTER_MERGE = "FilterMerge";
+      public static final String SORT_REMOVE = "SortRemove";
+      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
+      public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
+      public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
+      public static final String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
+      public static final String PRUNE_EMPTY_SORT = "PruneEmptySort";
+      public static final String PRUNE_EMPTY_UNION = "PruneEmptyUnion";
+      public static final String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
+      public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
+      public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
+      public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
     }
 
     public static class FailureDetector {
@@ -1668,6 +1714,14 @@ public class CommonConstants {
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+
+    /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
+    ///
+    /// When an MSE query is executed, the stats are collected and logged.
+    /// By default, successful queries are logged in the DEBUG level, while errors are logged in the INFO level.
+    /// But if this property is set to true (upper or lower case), stats will be logged in the INFO level for both
+    /// successful queries and errors.
+    public static final String KEY_OF_LOG_STATS = "logStats";
 
     public enum JoinOverFlowMode {
       THROW, BREAK
