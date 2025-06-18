@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -255,6 +256,23 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            && node1.getJoinStrategy() == that.getJoinStrategy();
+      }
+
+      @Override
+      public Boolean visitEnrichedJoin(EnrichedJoinNode node1, PlanNode node2) {
+        if (!(node2 instanceof EnrichedJoinNode)) {
+          return false;
+        }
+        if (!visitJoin(node1, node2)) {
+          return false;
+        }
+        EnrichedJoinNode that = (EnrichedJoinNode) node2;
+        return Objects.equals(node1.getFilterCondition(), that.getFilterCondition())
+            && Objects.equals(node1.getProjects(), that.getProjects())
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && Objects.equals(node1.getFetch(), that.getFetch())
+            && Objects.equals(node1.getOffset(), that.getOffset())
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 

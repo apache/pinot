@@ -27,6 +27,7 @@ import java.util.function.IntFunction;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -152,6 +153,11 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
       assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
       return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
     }
+  }
+
+  @Override
+  public ObjectNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override

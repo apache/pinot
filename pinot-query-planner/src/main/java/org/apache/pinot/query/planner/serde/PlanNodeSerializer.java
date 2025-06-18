@@ -19,6 +19,8 @@
 package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
@@ -31,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -127,6 +130,27 @@ public class PlanNodeSerializer {
         joinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
       }
       builder.setJoinNode(joinNode.build());
+      return null;
+    }
+
+    @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
+      Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()
+          .setJoinType(convertJoinType(node.getJoinType()))
+          .addAllLeftKeys(node.getLeftKeys())
+          .addAllRightKeys(node.getRightKeys())
+          .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
+          .setFilterCondition(RexExpressionToProtoExpression.convertExpression(node.getFilterCondition()))
+          .addAllProjects(convertExpressions(node.getProjects() == null ? Collections.emptyList() : node.getProjects()))
+          .addAllCollations(convertCollations(node.getCollations() == null ? Collections.emptyList() : node.getCollations()))
+          .setFetch(node.getFetch())
+          .setOffset(node.getOffset());
+
+      if (node.getMatchCondition() != null) {
+        enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setEnrichedJoinNode(enrichedJoinNode.build());
       return null;
     }
 
