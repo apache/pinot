@@ -150,6 +150,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
         .forEach((key, value) -> defaultTierProperties.put(key, String.valueOf(value)));
     Map<String, String> unmodifiableDefaultTierProperties = Collections.unmodifiableMap(defaultTierProperties);
 
+    // If a tier is not found in this map, this map of default configs will be used.
     _tierConfigs = new DefaultedMap<>(unmodifiableDefaultTierProperties);
 
     // Load specific tier configurations and merge with defaults
