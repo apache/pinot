@@ -29,11 +29,14 @@ public class ResourceUtilizationManager {
 
   private final boolean _isResourceUtilizationCheckEnabled;
   private final DiskUtilizationChecker _diskUtilizationChecker;
+  private final NumberOfPrimaryKeysChecker _numberOfPrimaryKeysChecker;
 
-  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker) {
+  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker,
+      NumberOfPrimaryKeysChecker numberOfPrimaryKeysChecker) {
     _isResourceUtilizationCheckEnabled = controllerConf.isResourceUtilizationCheckEnabled();
     LOGGER.info("Resource utilization check is: {}", _isResourceUtilizationCheckEnabled ? "enabled" : "disabled");
     _diskUtilizationChecker = diskUtilizationChecker;
+    _numberOfPrimaryKeysChecker = numberOfPrimaryKeysChecker;
   }
 
   public boolean isResourceUtilizationWithinLimits(String tableNameWithType) {
@@ -44,6 +47,11 @@ public class ResourceUtilizationManager {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    return _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
+    boolean isDiskUtilizationWithinLimits = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
+    boolean isPrimaryKeyCountWithinLimits =
+        _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableNameWithType);
+    LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}", isDiskUtilizationWithinLimits,
+        isPrimaryKeyCountWithinLimits);
+    return isDiskUtilizationWithinLimits && isPrimaryKeyCountWithinLimits;
   }
 }
