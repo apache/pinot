@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -178,6 +179,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       }
     }
 
+    return null;
+  }
+
+  @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
+    visitJoin(node, context);
     return null;
   }
 

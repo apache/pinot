@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -90,6 +91,9 @@ public class PlanNodeSorter {
     public PlanNode visitJoin(JoinNode node, Comparator<PlanNode> comparator) {
       return defaultNode(node, comparator);
     }
+
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Comparator<PlanNode> comparator) { return visitJoin(node, comparator); }
 
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, Comparator<PlanNode> comparator) {
