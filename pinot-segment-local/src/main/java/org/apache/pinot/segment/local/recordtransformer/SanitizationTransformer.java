@@ -53,24 +53,18 @@ public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, SanitizedColumnInfo> _columnToColumnInfoMap = new HashMap<>();
 
   public SanitizationTransformer(Schema schema) {
-    FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy;
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        if (fieldSpec.getDataType().equals(FieldSpec.DataType.STRING)) {
-          maxLengthExceedStrategy =
-              fieldSpec.getMaxLengthExceedStrategy() == null ? FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH
-                  : fieldSpec.getMaxLengthExceedStrategy();
-          _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
-              fieldSpec.getMaxLength(), maxLengthExceedStrategy, fieldSpec.getDefaultNullValue()));
-        } else if (fieldSpec.getDataType().equals(FieldSpec.DataType.JSON) || fieldSpec.getDataType()
-            .equals(FieldSpec.DataType.BYTES)) {
-          maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy() == null
-              ? FieldSpec.MaxLengthExceedStrategy.NO_ACTION : fieldSpec.getMaxLengthExceedStrategy();
-          if (maxLengthExceedStrategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION)) {
-            continue;
+        FieldSpec.DataType dataType = fieldSpec.getDataType();
+        if (dataType.equals(FieldSpec.DataType.STRING) ||
+            dataType.equals(FieldSpec.DataType.JSON) ||
+            dataType.equals(FieldSpec.DataType.BYTES)) {
+
+          FieldSpec.MaxLengthExceedStrategy strategy = fieldSpec.getMaxLengthExceedStrategy();
+          if (!strategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION)) {
+            _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
+                fieldSpec.getMaxLength(), strategy, fieldSpec.getDefaultNullValue()));
           }
-          _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
-              fieldSpec.getMaxLength(), fieldSpec.getMaxLengthExceedStrategy(), fieldSpec.getDefaultNullValue()));
         }
       }
     }
