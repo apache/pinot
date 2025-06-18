@@ -26,6 +26,7 @@ import org.apache.calcite.runtime.ImmutablePairList;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -78,6 +79,9 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
   }
+
+  @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) { return visitJoin(node, context); }
 
   @Override
   public PlanNode visitMailboxReceive(MailboxReceiveNode node, Context context) {

@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -165,6 +166,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     node.getInputs().get(0).visit(this, context.next(true, context._host, context._workerId));
     node.getInputs().get(1).visit(this, context.next(false, context._host, context._workerId));
     return context._builder;
+  }
+
+  @Override
+  public StringBuilder visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override

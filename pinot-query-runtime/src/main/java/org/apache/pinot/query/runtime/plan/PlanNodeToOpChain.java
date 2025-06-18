@@ -25,6 +25,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,6 +42,7 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
+import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
@@ -237,6 +239,32 @@ public class PlanNodeToOpChain {
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), children);
+      }
+    }
+
+    @Override
+    public MultiStageOperator visitEnrichedJoin(EnrichedJoinNode node, OpChainExecutionContext context) {
+      List<PlanNode> inputs = node.getInputs();
+      PlanNode left = inputs.get(0);
+      MultiStageOperator leftOperator = visit(left, context);
+      PlanNode right = inputs.get(1);
+      MultiStageOperator rightOperator = visit(right, context);
+      JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
+      switch (joinStrategy) {
+        case HASH:
+          if (node.getLeftKeys().isEmpty()) {
+            // TODO: Consider adding non-equi as a separate join strategy.
+//            return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+            throw new UnsupportedOperationException("NonEquiJoin yet to be supported for EnrichedJoin");
+          } else {
+            return new EnrichedHashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+          }
+        case LOOKUP:
+          throw new UnsupportedOperationException("LookupJoin yet to be supported for EnrichedJoin");
+        case ASOF:
+          throw new UnsupportedOperationException("AsOfJoin yet to be supported for EnrichedJoin");
+        default:
+          throw new IllegalStateException("Unsupported JoinStrategy for EnrichedJoin: " + joinStrategy);
       }
     }
 

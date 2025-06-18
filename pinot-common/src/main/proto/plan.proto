@@ -40,6 +40,7 @@ message PlanNode {
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
     ExplainNode explainNode = 16;
+    EnrichedJoinNode enrichedJoinNode = 17;
   }
 }
 
@@ -101,6 +102,20 @@ message JoinNode {
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
   Expression matchCondition = 6;
+}
+
+message EnrichedJoinNode {
+  JoinType joinType = 1;
+  repeated int32 leftKeys = 2;
+  repeated int32 rightKeys = 3;
+  repeated Expression nonEquiConditions = 4;
+  JoinStrategy joinStrategy = 5;
+  Expression matchCondition = 6;
+  Expression filterCondition = 7;
+  repeated Expression projects = 8;
+  repeated Collation collations = 9;
+  int32 fetch = 10;
+  int32 offset = 11;
 }
 
 enum ExchangeType {
