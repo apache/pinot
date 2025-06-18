@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
@@ -75,6 +77,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  private boolean _allowOptions = true;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
@@ -93,6 +96,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
         _enablePrefixSuffixMatchingInPhraseQueries = true;
+      }
+      if (config.isAllowOptions()) {
+        _allowOptions = true;
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -161,13 +167,21 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
+    if (_allowOptions) {
+      java.util.Map.Entry<String, java.util.Map<String, String>> result =
+          LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
+      if (result != null) {
+        return getDocIdsWithOptions(result.getKey(), result.getValue());
+      }
+    }
+    return getDocIdsWithoutOptions(searchQuery);
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene query parsers are generally stateful and a new instance must be created per query.
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
-      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
-      // the query parser. To support the feature, we need to explicitly set the config to be true.
       if (_enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
@@ -187,6 +201,132 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException(msg, e);
     }
   }
+
+  private MutableRoaringBitmap getDocIdsWithOptions(String searchQuery, Map<String, String> options) {
+    try {
+      Object parser;
+      String parserType = options.get("parser");
+
+      // Initialize parser based on type
+      String parserClassName = _queryParserClass;
+      //Parser details at https://lucene.apache.org/core/9_0_0/queryparser/index.html
+      if (parserType != null) {
+        switch (parserType.toUpperCase()) {
+          case "CLASSIC":
+            parserClassName = "org.apache.lucene.queryparser.classic.QueryParser";
+            break;
+          case "STANDARD":
+            parserClassName = "org.apache.lucene.queryparser.flexible.standard.StandardQueryParser";
+            break;
+          case "COMPLEX":
+            parserClassName = "org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser";
+            break;
+          default:
+            LOGGER.warn("Unknown parser type: {}, using default parser", parserType);
+            break;
+        }
+      }
+
+      // Create parser instance
+      try {
+        Class<?> parserClass = Class.forName(parserClassName);
+
+        if (parserClassName.equals("org.apache.lucene.queryparser.flexible.standard.StandardQueryParser")) {
+          // StandardQueryParser uses no-arg constructor and setAnalyzer
+          Constructor<?> constructor = parserClass.getConstructor();
+          parser = constructor.newInstance();
+          // Set analyzer using reflection since StandardQueryParser doesn't extend QueryParserBase
+          try {
+            java.lang.reflect.Method setAnalyzerMethod = parserClass.getMethod("setAnalyzer", Analyzer.class);
+            setAnalyzerMethod.invoke(parser, _analyzer);
+          } catch (Exception e) {
+            LOGGER.warn("Failed to set analyzer on StandardQueryParser", e);
+          }
+        } else {
+          // CLASSIC and COMPLEX parsers use the standard (String, Analyzer) constructor
+          Constructor<?> constructor = parserClass.getConstructor(String.class, Analyzer.class);
+          parser = constructor.newInstance(_column, _analyzer);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to instantiate parser: {}, using default parser", parserClassName, e);
+        parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+      }
+
+      // Dynamically apply options using reflection
+      Class<?> clazz = parser.getClass();
+      List<String> notFoundOptions = new ArrayList<>();
+      for (java.util.Map.Entry<String, String> entry : options.entrySet()) {
+        String key = entry.getKey();
+        // Skip parser option as it's only used for initialization
+        if (key.equals("parser")) {
+          continue;
+        }
+        String value = entry.getValue();
+        String setterName = "set" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
+        boolean found = false;
+        for (java.lang.reflect.Method method : clazz.getMethods()) {
+          if (method.getName().equalsIgnoreCase(setterName) && method.getParameterCount() == 1) {
+            Class<?> paramType = method.getParameterTypes()[0];
+            try {
+              Object arg;
+              if (paramType == boolean.class || paramType == Boolean.class) {
+                arg = Boolean.parseBoolean(value);
+              } else if (paramType == int.class || paramType == Integer.class) {
+                arg = Integer.parseInt(value);
+              } else if (paramType.isEnum()) {
+                arg = java.lang.Enum.valueOf((Class<java.lang.Enum>) paramType, value.toUpperCase());
+              } else {
+                arg = value;
+              }
+              method.invoke(parser, arg);
+              found = true;
+            } catch (Exception e) {
+              LOGGER.warn("Failed to apply option: " + key + "=" + value, e);
+            }
+            break;
+          }
+        }
+        if (!found) {
+          notFoundOptions.add(key);
+        }
+      }
+      if (!notFoundOptions.isEmpty()) {
+        LOGGER.warn("Options not found on parser: {}", String.join(", ", notFoundOptions));
+      }
+      MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+      Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+
+      // Parse query using reflection since different parsers have different interfaces
+      Query query;
+      try {
+        if (parserClassName.equals("org.apache.lucene.queryparser.flexible.standard.StandardQueryParser")) {
+          // StandardQueryParser uses parse(String, String) where second parameter is default field
+          java.lang.reflect.Method parseMethod = clazz.getMethod("parse", String.class, String.class);
+          query = (Query) parseMethod.invoke(parser, searchQuery, _column);
+        } else {
+          // Other parsers use parse(String)
+          java.lang.reflect.Method parseMethod = clazz.getMethod("parse", String.class);
+          query = (Query) parseMethod.invoke(parser, searchQuery);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse query with parser: {}, falling back to default", parserClassName, e);
+        // Fall back to default parser
+        QueryParserBase defaultParser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+        defaultParser.setAllowLeadingWildcard(true);
+        if (_useANDForMultiTermQueries) {
+          defaultParser.setDefaultOperator(QueryParser.Operator.AND);
+        }
+        query = defaultParser.parse(searchQuery);
+      }
+      _indexSearcher.search(query, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      String msg =
+          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
+      throw new RuntimeException(msg, e);
+    }
+  }
+
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that

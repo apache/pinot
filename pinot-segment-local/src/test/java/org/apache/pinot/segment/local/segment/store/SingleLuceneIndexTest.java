@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.util.TestUtils;
@@ -86,8 +87,8 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
   @Test
   public void testMultipleSingleColumnIndexes()
       throws IOException {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
+        .withAllowOptions(true).build();
 
     List<LuceneTextIndexCreator> creators = new ArrayList<>();
     for (int i = 0; i < 200; i++) {

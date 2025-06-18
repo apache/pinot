@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
@@ -71,5 +76,47 @@ public class LuceneTextIndexUtils {
     SpanNearQuery spanNearQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
     LOGGER.debug("The phrase query {} is re-written as {}", query, spanNearQuery);
     return spanNearQuery;
+  }
+
+  /**
+   * Parses search options from a search query string.
+   * The options can be specified anywhere in the query using __PINOT_OPTIONS(...) syntax.
+   * For example: "term1 __PINOT_OPTIONS(parser=CLASSIC) AND term2 __PINOT_OPTIONS(analyzer=STANDARD)"
+   * Options from later occurrences will override earlier ones.
+   *
+   * @param searchQuery The search query string
+   * @return A Map.Entry containing the cleaned search term and options map, or null if no options found
+   */
+  public static Map.Entry<String, Map<String, String>> parseOptionsFromSearchString(String searchQuery) {
+    // Pattern to match __PINOT_OPTIONS(...) anywhere in the string, but not escaped
+    Pattern pattern = Pattern.compile("(?<!\\\\)__PINOT_OPTIONS\\(([^)]*)\\)");
+    Matcher matcher = pattern.matcher(searchQuery);
+    Map<String, String> mergedOptions = new HashMap<>();
+    String actualSearchTerm;
+    boolean foundOptions = false;
+    // Find all __PINOT_OPTIONS and merge them
+    while (matcher.find()) {
+      foundOptions = true;
+      String optionsStr = matcher.group(1).trim();
+      // Parse options
+      for (String option : optionsStr.split(",")) {
+        String[] parts = option.trim().split("=");
+        if (parts.length == 2) {
+          mergedOptions.put(parts[0].trim(), parts[1].trim());
+        }
+      }
+    }
+
+    // If no options found, return null
+    if (!foundOptions) {
+      return null;
+    }
+    // Remove all __PINOT_OPTIONS from the query (but not escaped ones)
+    actualSearchTerm = pattern.matcher(searchQuery).replaceAll("").trim();
+    // Clean up extra whitespace and fix multiple consecutive operators
+    actualSearchTerm = actualSearchTerm.replaceAll("\\s+", " ").trim();
+    actualSearchTerm = actualSearchTerm.replaceAll("\\b(AND|OR|NOT)\\s+\\1\\b", "$1");
+    actualSearchTerm = actualSearchTerm.replaceAll("\\s+", " ").trim();
+    return new AbstractMap.SimpleEntry<>(actualSearchTerm, mergedOptions);
   }
 }

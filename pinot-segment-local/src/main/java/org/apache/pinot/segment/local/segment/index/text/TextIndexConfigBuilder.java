@@ -99,6 +99,10 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
             Integer.parseInt(textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE));
       }
 
+      if (textIndexProperties.get("allowOptions") != null) {
+        _allowOptions = Boolean.parseBoolean(textIndexProperties.get("allowOptions"));
+      }
+
       for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
         if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
           _fstType = FSTType.NATIVE;
