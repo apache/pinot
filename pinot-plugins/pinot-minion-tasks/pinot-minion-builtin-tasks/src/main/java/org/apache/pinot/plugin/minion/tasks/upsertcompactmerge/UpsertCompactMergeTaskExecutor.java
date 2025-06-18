@@ -209,20 +209,18 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
   long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
     String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
     if (maxCreationTimeStr == null) {
-      String message = "Max creation time configuration is missing from task config.";
-      throw new IllegalStateException(message);
+      throw new IllegalStateException("Max creation time configuration is missing from task config.");
     } else {
       try {
         long maxCreationTime = Long.parseLong(maxCreationTimeStr);
         if (maxCreationTime <= 0) {
-          String message = "No valid creation time found for the new merged segment. This might be due to "
-              + "missing creation time for merging segments";
-          throw new IllegalStateException(message);
+          throw new IllegalStateException(
+              "No valid creation time found for the new merged segment. This might be due to "
+                  + "missing creation time for merging segments");
         }
         return maxCreationTime;
       } catch (NumberFormatException e) {
-        String message = "Invalid max creation time format in task config: " + maxCreationTimeStr;
-        throw new IllegalStateException(message, e);
+        throw new IllegalStateException("Invalid max creation time format in task config: " + maxCreationTimeStr, e);
       }
     }
   }
