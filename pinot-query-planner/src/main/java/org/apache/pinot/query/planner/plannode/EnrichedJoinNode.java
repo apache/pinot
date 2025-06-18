@@ -70,7 +70,7 @@ public class EnrichedJoinNode extends JoinNode {
 
   @Override
   public String explain() {
-    return "ENRICHED_JOIN - " + _filterProjectRexes.toString();
+    return "ENRICHED_JOIN";
   }
 
   @Override
