@@ -19,22 +19,26 @@
 package org.apache.pinot.controller.api.access;
 
 import java.io.IOException;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface AccessControlFactory {
+  Logger LOGGER = LoggerFactory.getLogger(AccessControlFactory.class);
+
   default void init(PinotConfiguration pinotConfiguration) {
     // left blank
   }
   /**
    * Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.
-   * Because ZKBasicAuthAccessControlFactory needs to acquire users' info from HelixPropertyStore.
-   * The reason why passed helixResourceManager param other than HelixPropertyStore is that
+   * Because ZKBasicAuthAccessControlFactory needs to acquire users' info from PinotHelixResourceManager.
+   * The reason why we have passed helixResourceManager param instead of ZkHelixPropertyStore is that
    * we need to init UserACLConfig via helixResourceManager.
    *
    * @param configuration pinot configuration
@@ -46,4 +50,30 @@ public interface AccessControlFactory {
   }
 
   AccessControl create();
+
+  /**
+   * Utility to load the desired AccessControlFactory, either from config or defaulting to
+   * AllowAllAccessControlFactory.
+   */
+  static AccessControlFactory loadFactory(PinotConfiguration configuration,
+      PinotHelixResourceManager helixResourceManager) {
+    AccessControlFactory accessControlFactory;
+    String accessControlFactoryClassName =
+        configuration.getProperty(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS);
+    if (accessControlFactoryClassName == null) {
+      accessControlFactoryClassName = AllowAllAccessFactory.class.getName();
+    }
+    LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClassName);
+    try {
+      LOGGER.info("Instantiating Access control factory class {}", accessControlFactoryClassName);
+      accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClassName).newInstance();
+      LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);
+      accessControlFactory.init(configuration, helixResourceManager);
+      return accessControlFactory;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance", e);
+    }
+  }
 }
