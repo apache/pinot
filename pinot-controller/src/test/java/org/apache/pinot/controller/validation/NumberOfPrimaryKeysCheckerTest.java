@@ -66,9 +66,16 @@ public class NumberOfPrimaryKeysCheckerTest {
   @Test
   public void testNumberOfPrimaryKeysCheckerWithNullOrEmptyTableName() {
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(null));
+        () -> _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(null, true));
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(""));
+        () -> _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits("", true));
+
+    // If skipRealtimeIngestion = false (i.e. code paths initiated by the Minion side) no exception should be thrown,
+    // and true should always be returned
+    boolean value = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(null, false);
+    Assert.assertTrue(value);
+    value = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits("", false);
+    Assert.assertTrue(value);
   }
 
 
@@ -77,7 +84,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     String tableName = "test_OFFLINE";
     when(_helixResourceManager.getTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -86,7 +96,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     String tableName = "test_REALTIME";
     when(_helixResourceManager.getTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -112,7 +125,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -140,7 +156,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -167,7 +186,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -194,7 +216,10 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
     Assert.assertTrue(result);
   }
 
@@ -221,8 +246,11 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
     Assert.assertFalse(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
+    Assert.assertTrue(result);
   }
 
   @Test
@@ -248,8 +276,49 @@ public class NumberOfPrimaryKeysCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName);
+    boolean result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
     Assert.assertFalse(result);
+
+    result = _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
+    Assert.assertTrue(result);
+  }
+
+  @Test
+  public void testNumberOfPrimaryKeysCheckerWithDisabledThresholdValue() {
+    NumberOfPrimaryKeysChecker numberOfPrimaryKeysChecker;
+    ControllerConf controllerConf = mock(ControllerConf.class);
+
+    when(controllerConf.getNumberOfPrimaryKeysThreshold()).thenReturn(-1L);
+    when(controllerConf.getNumberOfPrimaryKeysCheckTimeoutMs()).thenReturn(5000);
+    when(controllerConf.getResourceUtilizationCheckerFrequency()).thenReturn(120L);
+
+    numberOfPrimaryKeysChecker = new NumberOfPrimaryKeysChecker(_helixResourceManager, controllerConf);
+    String tableName = "test_REALTIME";
+
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.isUpsertEnabled()).thenReturn(false);
+    when(mockTableConfig.isDedupEnabled()).thenReturn(true);
+    when(_helixResourceManager.getTableConfig(tableName)).thenReturn(mockTableConfig);
+
+    List<String> mockInstances = Arrays.asList("server1", "server2");
+    when(_helixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME)).thenReturn(mockInstances);
+
+    // Mock primary key counts
+    Map<String, PrimaryKeyCountInfo> primaryKeyCountInfoMap = new HashMap<>();
+    PrimaryKeyCountInfo primaryKeyCountInfo1 =
+        new PrimaryKeyCountInfo("server1", 1000L, Set.of("test_REALTIME"), System.currentTimeMillis());
+    primaryKeyCountInfoMap.put("server1", primaryKeyCountInfo1);
+
+    PrimaryKeyCountInfo primaryKeyCountInfo2 =
+        new PrimaryKeyCountInfo("server2", 200L, Set.of("test_REALTIME"), System.currentTimeMillis());
+    primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
+    ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
+
+    boolean result = numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, true);
+    Assert.assertTrue(result);
+
+    result = numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableName, false);
+    Assert.assertTrue(result);
   }
 
   @Test

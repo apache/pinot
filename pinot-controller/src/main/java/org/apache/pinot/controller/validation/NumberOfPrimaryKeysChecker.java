@@ -57,10 +57,15 @@ public class NumberOfPrimaryKeysChecker {
   /**
    * Check if the number of primary keys for the requested table is within the configured limits.
    */
-  public boolean isNumberOfPrimaryKeysWithinLimits(String tableNameWithType) {
+  public boolean isNumberOfPrimaryKeysWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
     if (_numberOfPrimaryKeysThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled
       LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning true");
+      return true;
+    }
+    if (!skipRealtimeIngestion) {
+      // The primary key count check should be ignored for code paths that aren't do skip ingestion
+      LOGGER.debug("Called from a code path other than to skip realtime ingestion, returning true");
       return true;
     }
     if (StringUtils.isEmpty(tableNameWithType)) {
