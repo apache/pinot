@@ -97,7 +97,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         + "&heartbeatTimeoutInMs=" + rebalanceConfig.getHeartbeatTimeoutInMs()
         + "&maxAttempts=" + rebalanceConfig.getMaxAttempts()
         + "&retryInitialDelayInMs=" + rebalanceConfig.getRetryInitialDelayInMs()
-        + "&forceCommitBeforeMoved=" + rebalanceConfig.isForceCommitBeforeMoved();
+        + "&forceCommit=" + rebalanceConfig.isForceCommit();
   }
 
   private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
@@ -1389,7 +1389,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   }
 
   @Test
-  public void testForceCommitBeforeMoved()
+  public void testForceCommit()
       throws Exception {
     final String tenantA = "tenantA";
     final String tenantB = "tenantB";
@@ -1430,7 +1430,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
@@ -1460,7 +1460,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
     rebalanceConfig.setDowntime(true);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -1492,7 +1492,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(false);
 
@@ -1516,7 +1516,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
     tableConfig.getValidationConfig().setReplication("1");
     updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommitBeforeMoved(false);
+    rebalanceConfig.setForceCommit(false);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(true);
@@ -1531,7 +1531,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   }
 
   @Test
-  void testForceCommitBeforeMovedStrictReplicaGroup()
+  void testForceCommitStrictReplicaGroup()
       throws Exception {
     final String tenantA = "tenantA_strictRG";
     final String tenantB = "tenantB_strictRG";
@@ -1576,7 +1576,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
@@ -1606,7 +1606,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
     rebalanceConfig.setBatchSizePerServer(1);
 
     response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
@@ -1638,7 +1638,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
     updateTableConfig(tableConfig);
 
-    rebalanceConfig.setForceCommitBeforeMoved(true);
+    rebalanceConfig.setForceCommit(true);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(false);
 
@@ -1662,7 +1662,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
     tableConfig.getValidationConfig().setReplication("1");
     updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommitBeforeMoved(false);
+    rebalanceConfig.setForceCommit(false);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setIncludeConsuming(true);

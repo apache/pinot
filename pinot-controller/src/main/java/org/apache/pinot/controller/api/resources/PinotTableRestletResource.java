@@ -674,7 +674,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier,
       @ApiParam(value = "Do force commit on consuming segments before they are rebalanced") @DefaultValue("false")
-      @QueryParam("forceCommitBeforeMoved") boolean forceCommitBeforeMoved,
+      @QueryParam("forceCommit") boolean forceCommit,
       @ApiParam(value = "Batch size for force commit operations") @DefaultValue("2147483647")
       @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
       @ApiParam(value = "Interval in milliseconds for checking force commit batch status") @DefaultValue("5000")
@@ -698,7 +698,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
-    rebalanceConfig.setForceCommitBeforeMoved(forceCommitBeforeMoved);
+    rebalanceConfig.setForceCommit(forceCommit);
     rebalanceConfig.setForceCommitBatchSize(forceCommitBatchSize);
     rebalanceConfig.setForceCommitBatchStatusCheckIntervalMs(forceCommitBatchStatusCheckIntervalMs);
     rebalanceConfig.setForceCommitBatchStatusCheckTimeoutMs(forceCommitBatchStatusCheckTimeoutMs);

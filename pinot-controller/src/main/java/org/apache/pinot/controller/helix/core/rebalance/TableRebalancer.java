@@ -239,22 +239,22 @@ public class TableRebalancer {
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean forceCommitBeforeMoved = rebalanceConfig.isForceCommitBeforeMoved();
-    if (tableConfig.getTableType() == TableType.OFFLINE && forceCommitBeforeMoved) {
-      tableRebalanceLogger.warn("forceCommitBeforeMoved is set to true for an OFFLINE table, resetting it to false");
-      forceCommitBeforeMoved = false;
+    boolean forceCommit = rebalanceConfig.isForceCommit();
+    if (tableConfig.getTableType() == TableType.OFFLINE && forceCommit) {
+      tableRebalanceLogger.warn("forceCommit is set to true for an OFFLINE table, resetting it to false");
+      forceCommit = false;
     }
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
             + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
             + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}, "
-            + "forceCommitBeforeMoved: {}, forceCommitBatchSize: {}, forceCommitBatchStatusCheckIntervalMs: {}, "
+            + "forceCommit: {}, forceCommitBatchSize: {}, forceCommitBatchStatusCheckIntervalMs: {}, "
             + "forceCommitBatchStatusCheckTimeoutMs: {}",
         dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
-        forceCommitBeforeMoved, rebalanceConfig.getForceCommitBatchSize(),
+        forceCommit, rebalanceConfig.getForceCommitBatchSize(),
         rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
         rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
 
@@ -395,7 +395,7 @@ public class TableRebalancer {
 
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
-      if (forceCommitBeforeMoved) {
+      if (forceCommit) {
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
         if (!consumingSegmentsToMoveNext.isEmpty()) {
           try {
@@ -516,7 +516,7 @@ public class TableRebalancer {
     //    the timeout.
     // 2. When IdealState changes during step 1, re-calculate the target assignment based on the new IdealState (current
     //    assignment).
-    // 3. If forceCommitBeforeMoved is enabled, do:
+    // 3. If forceCommit is enabled, do:
     //  3.1 calculate the next assignment based on the current assignment, target
     //      assignment, batch size per server, and min available replicas.
     //  3.2 Force commit the consuming segments that would be moved in the next assignment, and wait for them to finish
@@ -554,7 +554,7 @@ public class TableRebalancer {
       ZNRecord idealStateRecord = idealState.getRecord();
       Map<String, Map<String, String>> nextAssignment;
       boolean needsRecalculation;
-      boolean shouldForceCommit = forceCommitBeforeMoved;
+      boolean shouldForceCommit = forceCommit;
 
       do {
         needsRecalculation = false;
@@ -629,11 +629,9 @@ public class TableRebalancer {
           Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
 
           if (!consumingSegmentsToMoveNext.isEmpty()) {
-            tableRebalanceLogger.info("Force committing {} consuming segments before moving them",
-                consumingSegmentsToMoveNext.size());
             needsRecalculation = true;
             _tableRebalanceObserver.onTrigger(
-                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_START_TRIGGER, null, null,
                 null);
             try {
               idealState =
@@ -651,7 +649,7 @@ public class TableRebalancer {
             }
             idealStateRecord = idealState.getRecord();
             _tableRebalanceObserver.onTrigger(
-                TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
+                TableRebalanceObserver.Trigger.FORCE_COMMIT_END_TRIGGER, null, null,
                 new TableRebalanceObserver.RebalanceContext(consumingSegmentsToMoveNext.size()));
           }
           shouldForceCommit = false; // Only attempt force commit once
@@ -2052,32 +2050,33 @@ public class TableRebalancer {
       Logger tableRebalanceLogger, int forceCommitBatchSize, int forceCommitBatchStatusCheckIntervalMs,
       int forceCommitBatchStatusCheckTimeoutMs)
       throws AttemptFailureException {
-    if (_pinotLLCRealtimeSegmentManager != null) {
-      ForceCommitBatchConfig forceCommitBatchConfig =
-          ForceCommitBatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs,
-              forceCommitBatchStatusCheckTimeoutMs);
-      segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
-          StringUtil.join(",", segmentsToCommit.toArray(String[]::new)), forceCommitBatchConfig);
-      // Wait until all committed segments have their status set to DONE.
-      // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
-      // guarantee there will be available peers for the new instance to download (e.g. the only available replica
-      // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
-      // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
-      // happens only after the committing segment status is set to DONE.
-      int maxAttempts = (forceCommitBatchStatusCheckTimeoutMs + forceCommitBatchStatusCheckIntervalMs - 1)
-          / forceCommitBatchStatusCheckIntervalMs;
-      RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, forceCommitBatchStatusCheckIntervalMs);
-      Set<?>[] segmentsYetToBeCommitted = new Set[1];
-      Set<String> finalSegmentsToCommit = segmentsToCommit;
-      retryPolicy.attempt(() -> {
-        segmentsYetToBeCommitted[0] =
-            _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, finalSegmentsToCommit);
-        return segmentsYetToBeCommitted[0].isEmpty();
-      });
-    } else {
-      tableRebalanceLogger.warn(
-          "PinotLLCRealtimeSegmentManager is not initialized, cannot force commit consuming segments");
-    }
+    tableRebalanceLogger.info("Force committing {} consuming segments before moving them",
+        segmentsToCommit.size());
+    Preconditions.checkState(_pinotLLCRealtimeSegmentManager != null,
+        "PinotLLCRealtimeSegmentManager is not initialized");
+    ForceCommitBatchConfig forceCommitBatchConfig =
+        ForceCommitBatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs,
+            forceCommitBatchStatusCheckTimeoutMs);
+    segmentsToCommit = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, null,
+        StringUtil.join(",", segmentsToCommit.toArray(String[]::new)), forceCommitBatchConfig);
+    // Wait until all committed segments have their status set to DONE.
+    // Even for pauseless table, we wait until the segment has been uploaded (status DONE). Because we cannot
+    // guarantee there will be available peers for the new instance to download (e.g. the only available replica
+    // during the rebalance be the one who's committing, which has CONSUMING in EV), which may lead to download
+    // timeout and essentially segment ERROR. Furthermore, we need to wait until EV-IS converge anyway, and that
+    // happens only after the committing segment status is set to DONE.
+    int maxAttempts = (forceCommitBatchStatusCheckTimeoutMs + forceCommitBatchStatusCheckIntervalMs - 1)
+        / forceCommitBatchStatusCheckIntervalMs;
+    RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, forceCommitBatchStatusCheckIntervalMs);
+    Set<?>[] segmentsYetToBeCommitted = new Set[1];
+    Set<String> finalSegmentsToCommit = segmentsToCommit;
+    retryPolicy.attempt(() -> {
+      segmentsYetToBeCommitted[0] =
+          _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, finalSegmentsToCommit);
+      return segmentsYetToBeCommitted[0].isEmpty();
+    });
+
+    tableRebalanceLogger.info("Successfully force committed {} consuming segments", segmentsToCommit.size());
     return _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
   }
 }

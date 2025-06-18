@@ -38,10 +38,10 @@ public interface TableRebalanceObserver {
     IDEAL_STATE_CHANGE_TRIGGER,
     // Next assignment calculation change trigger which calculates next assignment to act on
     NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
-    // When forceCommitBeforeMoved is set to true, this trigger is called when the commit starts
-    FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER,
-    // When forceCommitBeforeMoved is set to true, this trigger is called when the commit ends
-    FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit starts
+    FORCE_COMMIT_START_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit ends
+    FORCE_COMMIT_END_TRIGGER,
   }
 
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
