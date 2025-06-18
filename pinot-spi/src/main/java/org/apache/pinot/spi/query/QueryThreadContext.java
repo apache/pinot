@@ -181,9 +181,12 @@ public class QueryThreadContext {
     }
     QueryThreadContext.setIds(requestId, cid);
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long extraPassiveTimeoutMs = Long.parseLong(requestMetadata.getOrDefault(
+        CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, "0"));
     long startTimeMs = System.currentTimeMillis();
     QueryThreadContext.setStartTimeMs(startTimeMs);
-    QueryThreadContext.setDeadlineMs(startTimeMs + timeoutMs);
+    QueryThreadContext.setActiveDeadlineMs(startTimeMs + timeoutMs);
+    QueryThreadContext.setPassiveDeadlineMs(startTimeMs + timeoutMs + extraPassiveTimeoutMs);
 
     return open;
   }
@@ -217,7 +220,8 @@ public class QueryThreadContext {
     Instance context = new Instance();
     if (memento != null) {
       context.setStartTimeMs(memento._startTimeMs);
-      context.setDeadlineMs(memento._deadlineMs);
+      context.setActiveDeadlineMs(memento._activeDeadlineMs);
+      context.setPassiveDeadlineMs(memento._passiveDeadlineMs);
       context.setBrokerId(memento._brokerId);
       context.setRequestId(memento._requestId);
       context.setCid(memento._cid);
@@ -295,23 +299,60 @@ public class QueryThreadContext {
   }
 
   /**
-   * Returns the deadline time of the query in milliseconds since epoch.
+   * Use {@link #getActiveDeadlineMs()} instead.
+   */
+  @Deprecated
+  public static long getDeadlineMs() {
+    return get().getActiveDeadlineMs();
+  }
+
+  /**
+   * @deprecated Use {@link #setActiveDeadlineMs(long)} instead.
+   * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
+   */
+  @Deprecated
+  public static void setDeadlineMs(long deadlineMs) {
+    get().setActiveDeadlineMs(deadlineMs);
+  }
+
+  /**
+   * Returns the active deadline time of the query in milliseconds since epoch.
    *
    * The default value of 0 means the deadline is not set.
    * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
    */
-  public static long getDeadlineMs() {
-    return get().getDeadlineMs();
+  public static long getActiveDeadlineMs() {
+    return get().getActiveDeadlineMs();
   }
 
   /**
-   * Sets the deadline time of the query in milliseconds since epoch.
+   * Sets the active deadline time of the query in milliseconds since epoch.
    *
    * The deadline can only be set once.
    * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
    */
-  public static void setDeadlineMs(long deadlineMs) {
-    get().setDeadlineMs(deadlineMs);
+  public static void setActiveDeadlineMs(long activeDeadlineMs) {
+    get().setActiveDeadlineMs(activeDeadlineMs);
+  }
+
+  /**
+   * Returns the passive deadline time of the query in milliseconds since epoch.
+   *
+   * The default value of 0 means the deadline is not set.
+   * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
+   */
+  public static long getPassiveDeadlineMs() {
+    return get().getPassiveDeadlineMs();
+  }
+
+  /**
+   * Sets the passive deadline time of the query in milliseconds since epoch.
+   *
+   * The deadline can only be set once.
+   * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
+   */
+  public static void setPassiveDeadlineMs(long passiveDeadlineMs) {
+    get().setPassiveDeadlineMs(passiveDeadlineMs);
   }
 
   /**
@@ -456,7 +497,8 @@ public class QueryThreadContext {
    */
   private static class Instance implements CloseableContext {
     private long _startTimeMs;
-    private long _deadlineMs;
+    private long _activeDeadlineMs;
+    private long _passiveDeadlineMs;
     private String _brokerId;
     private long _requestId;
     private String _cid;
@@ -474,14 +516,34 @@ public class QueryThreadContext {
       _startTimeMs = startTimeMs;
     }
 
+    @Deprecated
     public long getDeadlineMs() {
-      return _deadlineMs;
+      return getActiveDeadlineMs();
     }
 
+    public long getActiveDeadlineMs() {
+      return _activeDeadlineMs;
+    }
+
+    @Deprecated
     public void setDeadlineMs(long deadlineMs) {
-      Preconditions.checkState(getDeadlineMs() == 0, "Deadline already set to %s, cannot set again",
-          getDeadlineMs());
-      _deadlineMs = deadlineMs;
+      setActiveDeadlineMs(deadlineMs);
+    }
+
+    public void setActiveDeadlineMs(long activeDeadlineMs) {
+      Preconditions.checkState(getActiveDeadlineMs() == 0, "Deadline already set to %s, cannot set again",
+          getActiveDeadlineMs());
+      _activeDeadlineMs = activeDeadlineMs;
+    }
+
+    public long getPassiveDeadlineMs() {
+      return _passiveDeadlineMs;
+    }
+
+    public void setPassiveDeadlineMs(long passiveDeadlineMs) {
+      Preconditions.checkState(getPassiveDeadlineMs() == 0, "Passive deadline already set to %s, cannot set again",
+          getPassiveDeadlineMs());
+      _passiveDeadlineMs = passiveDeadlineMs;
     }
 
     public String getBrokerId() {
@@ -576,8 +638,13 @@ public class QueryThreadContext {
     }
 
     @Override
-    public void setDeadlineMs(long deadlineMs) {
-      LOGGER.debug("Setting deadline to {} in a fake context", deadlineMs);
+    public void setActiveDeadlineMs(long activeDeadlineMs) {
+      LOGGER.debug("Setting active deadline to {} in a fake context", activeDeadlineMs);
+    }
+
+    @Override
+    public void setPassiveDeadlineMs(long passiveDeadlineMs) {
+      LOGGER.debug("Setting passive deadline to {} in a fake context", passiveDeadlineMs);
     }
 
     @Override
@@ -632,7 +699,8 @@ public class QueryThreadContext {
    */
   public static class Memento {
     private final long _startTimeMs;
-    private final long _deadlineMs;
+    private final long _activeDeadlineMs;
+    private final long _passiveDeadlineMs;
     private final String _brokerId;
     private final long _requestId;
     private final String _cid;
@@ -642,7 +710,8 @@ public class QueryThreadContext {
 
     private Memento(Instance instance) {
       _startTimeMs = instance.getStartTimeMs();
-      _deadlineMs = instance.getDeadlineMs();
+      _activeDeadlineMs = instance.getActiveDeadlineMs();
+      _passiveDeadlineMs = instance.getPassiveDeadlineMs();
       _brokerId = instance.getBrokerId();
       _requestId = instance.getRequestId();
       _cid = instance.getCid();

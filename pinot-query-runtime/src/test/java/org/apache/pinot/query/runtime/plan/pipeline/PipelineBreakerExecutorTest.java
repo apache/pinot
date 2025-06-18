@@ -108,7 +108,7 @@ public class PipelineBreakerExecutorTest {
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
     return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
-        opChainMetadata, requestId, deadlineMs, null, true);
+        opChainMetadata, requestId, deadlineMs, deadlineMs, null, true);
   }
 
   @AfterClass
