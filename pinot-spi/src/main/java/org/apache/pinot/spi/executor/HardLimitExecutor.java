@@ -50,26 +50,24 @@ public class HardLimitExecutor extends DecoratorExecutorService {
    */
   public static int getMultiStageExecutorHardLimit(PinotConfiguration serverConf) {
     try {
-      int serverConfigLimit = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
+      int fixedLimit = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS,
           CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS);
-      if (serverConfigLimit > 0) {
-        return serverConfigLimit;
+      if (fixedLimit > 0) {
+        return fixedLimit;
       }
-      int maxThreadsFromClusterConfig = Integer.parseInt(serverConf.getProperty(
-          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
-          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
-      ));
-      int hardLimitFactor = Integer.parseInt(serverConf.getProperty(
-          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
-          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
-      ));
-      if (maxThreadsFromClusterConfig <= 0 || hardLimitFactor <= 0) {
-        return 0;
+      int factorBasedLimit = Integer.parseInt(
+          serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
+              CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS));
+      int factor = Integer.parseInt(
+          serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
+              CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR));
+      if (factorBasedLimit <= 0 || factor <= 0) {
+        return -1;
       }
-      return maxThreadsFromClusterConfig * hardLimitFactor;
+      return factorBasedLimit * factor;
     } catch (NumberFormatException e) {
       LOGGER.warn("Failed to parse multi-stage executor hard limit from config. Hard limiting will be disabled.", e);
-      return 0;
+      return -1;
     }
   }
 
