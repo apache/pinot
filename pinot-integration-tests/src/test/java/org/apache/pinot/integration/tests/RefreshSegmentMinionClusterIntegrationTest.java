@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -57,7 +58,9 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-
+@Ignore(value = "At June 2025, this test is randomlyg failing with "
+    + "RefreshSegmentMinionClusterIntegrationTest.checkColumnAddition:386 expected "
+    + "[717.6666666666666] but found [107.33333333333333]")
 public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;
