@@ -67,7 +67,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -428,7 +427,7 @@ public final class RelToPlanNodeConverter {
     }
 
     // convert filter and project RexNode into RexExpression
-    List<PlannerUtils.FilterProjectRex> filterProjectRexes = getFilterProjectRexes(rel);
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = getFilterProjectRexes(rel);
 
     return new EnrichedJoinNode(DEFAULT_STAGE_ID, joinResultSchema, projectedSchema,
         NodeHint.fromRelHints(rel.getHints()), inputs, joinType,
@@ -439,15 +438,15 @@ public final class RelToPlanNodeConverter {
   }
 
   @NotNull
-  private static List<PlannerUtils.FilterProjectRex> getFilterProjectRexes(PinotLogicalEnrichedJoin rel) {
+  private static List<EnrichedJoinNode.FilterProjectRex> getFilterProjectRexes(PinotLogicalEnrichedJoin rel) {
     List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNode = rel.getFilterProjectRexNodes();
-    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = new ArrayList<>();
     filterProjectRexNode.forEach((node) -> {
       if (node.getType() == PinotLogicalEnrichedJoin.FilterProjectRexNodeType.FILTER) {
-        filterProjectRexes.add(new PlannerUtils.FilterProjectRex(RexExpressionUtils.fromRexNode(node.getFilter())));
+        filterProjectRexes.add(new EnrichedJoinNode.FilterProjectRex(RexExpressionUtils.fromRexNode(node.getFilter())));
       } else {
         filterProjectRexes.add(
-            new PlannerUtils.FilterProjectRex(
+            new EnrichedJoinNode.FilterProjectRex(
                 RexExpressionUtils.fromRexNodes(node.getProjectAndResultRowType().getProject()),
                 toDataSchema(node.getProjectAndResultRowType().getDataType())
             ));

@@ -20,8 +20,6 @@ package org.apache.pinot.query.planner;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -31,9 +29,7 @@ import org.apache.calcite.rel.externalize.RelWriterImpl;
 import org.apache.calcite.rel.externalize.RelXmlWriter;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.explain.PinotRelJsonWriter;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,70 +79,5 @@ public class PlannerUtils {
     relRoot.explain(planWriter);
     pw.flush();
     return sw.toString();
-  }
-
-  public enum FilterProjectRexType {
-    FILTER,
-    PROJECT
-  }
-
-  public static class FilterProjectRex {
-
-    public static class ProjectAndResultSchema {
-      private List<RexExpression> _project;
-      private DataSchema _schema;
-
-      private ProjectAndResultSchema(List<RexExpression> project, DataSchema resultSchema) {
-        _project = project;
-        _schema = resultSchema;
-      }
-
-      public List<RexExpression> getProject() {
-        return _project;
-      }
-
-      public DataSchema getSchema() {
-        return _schema;
-      }
-    }
-
-    private final FilterProjectRexType _type;
-    @Nullable
-    private final RexExpression _filter;
-    @Nullable
-    private final ProjectAndResultSchema _projectAndResultSchema;
-
-    public FilterProjectRex(RexExpression filter) {
-      _type = FilterProjectRexType.FILTER;
-      _filter = filter;
-      _projectAndResultSchema = null;
-    }
-
-    public FilterProjectRex(List<RexExpression> projects, DataSchema resultSchema) {
-      _type = FilterProjectRexType.PROJECT;
-      _filter = null;
-      _projectAndResultSchema = new ProjectAndResultSchema(projects, resultSchema);
-    }
-
-    @Nullable
-    public RexExpression getFilter() {
-      return _filter;
-    }
-
-    @Nullable
-    public ProjectAndResultSchema getProjectAndResultSchema() {
-      return _projectAndResultSchema;
-    }
-
-    public FilterProjectRexType getType() {
-      return _type;
-    }
-
-    @Override
-    public String toString() {
-      return _type == FilterProjectRexType.FILTER
-          ? "Filter: " + _filter.toString()
-          : "Project: " + _projectAndResultSchema.getProject().toString();
-    }
   }
 }

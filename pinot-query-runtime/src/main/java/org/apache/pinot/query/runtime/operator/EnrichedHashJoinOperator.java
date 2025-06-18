@@ -27,10 +27,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
@@ -58,7 +58,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     _filterProjectOperands = new ArrayList<>();
     DataSchema currentSchema = _joinResultSchema;
     // iterate and convert filter and project rexes into operands with the correctly chained schema
-    for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
+    for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
       _filterProjectOperands.add(new FilterProjectOperand(rex, currentSchema));
       currentSchema = rex.getProjectAndResultSchema() == null
           ? currentSchema : rex.getProjectAndResultSchema().getSchema();
@@ -103,7 +103,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     List<Object> row = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
 
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
-      if (filterProjectOperand.getType() == FilterProjectOperand.FilterProjectOperandsType.FILTER) {
+      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
         if (!filterRow(row, filterProjectOperand.getFilter())) {
           return;
         }
@@ -118,7 +118,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   /** filter, project on a joined row view */
   private void filterProject(List<Object> row, List<Object[]> rows) {
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
-      if (filterProjectOperand.getType() == FilterProjectOperand.FilterProjectOperandsType.FILTER) {
+      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
         if (!filterRow(row, filterProjectOperand.getFilter())) {
           return;
         }
@@ -357,6 +357,46 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
       }
       return resultRow;
+    }
+  }
+
+  public enum FilterProjectOperandsType {
+    FILTER,
+    PROJECT
+  }
+
+  public static class FilterProjectOperand {
+    private final FilterProjectOperandsType _type;
+    @Nullable
+    final TransformOperand _filter;
+    @Nullable
+    final List<TransformOperand> _project;
+
+    public FilterProjectOperand(EnrichedJoinNode.FilterProjectRex rex, DataSchema inputSchema) {
+      if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
+        _type = FilterProjectOperandsType.FILTER;
+        _filter = TransformOperandFactory.getTransformOperand(rex.getFilter(), inputSchema);
+        _project = null;
+      } else {
+        _type = FilterProjectOperandsType.PROJECT;
+        _filter = null;
+        List<TransformOperand> projects = new ArrayList<>();
+        rex.getProjectAndResultSchema().getProject().forEach((x) ->
+            projects.add(TransformOperandFactory.getTransformOperand(x, inputSchema)));
+        _project = projects;
+      }
+    }
+
+    public TransformOperand getFilter() {
+      return _filter;
+    }
+
+    public List<TransformOperand> getProject() {
+      return _project;
+    }
+
+    public FilterProjectOperandsType getType() {
+      return _type;
     }
   }
 }
