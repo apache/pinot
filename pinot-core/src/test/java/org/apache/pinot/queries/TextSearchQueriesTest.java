@@ -2028,7 +2028,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
+        + ", '*ealtime streaming system* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
         + "DefaultOperator=AND)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
@@ -2038,49 +2038,49 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         + "storage, concurrency, multi-threading"
     });
     String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava realtime streaming system* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
+        + ", '*ava realtime streaming system* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
         + "DefaultOperator=AND)') LIMIT " + "50000";
     testTextSearchSelectQueryHelper(query1, expected.size(), false, expected);
 
     // Test regex pattern with AND operator
     String query2 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava realtime streaming system* AND *chine learn* __PINOT_OPTIONS(parser=CLASSIC, "
+        + ", '*ava realtime streaming system* AND *chine learn* __OPTIONS(parser=CLASSIC, "
         + "allowLeadingWildcard=true, DefaultOperator=AND)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query2, expected.size(), false, expected);
 
     // Test regex pattern with AND operator (no match)
     String query3 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '\"*ava realtime streaming system*\" AND \"*chine learner*\" __PINOT_OPTIONS(parser=CLASSIC, "
+        + ", '\"*ava realtime streaming system*\" AND \"*chine learner*\" __OPTIONS(parser=CLASSIC, "
         + "allowLeadingWildcard=true)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
 
     // Test regex pattern with OR operator
     String query4 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '\"*ava realtime streaming system*\" OR \"*chine learner*\" __PINOT_OPTIONS(parser=COMPLEX, "
+        + ", '\"*ava realtime streaming system*\" OR \"*chine learner*\" __OPTIONS(parser=COMPLEX, "
         + "allowLeadingWildcard=true)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query4, expected1.size(), false, expected1);
 
     // Test regex pattern with multiple wildcards
     String query5 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava* AND *stream* AND *learn* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)') LIMIT 50000";
+        + ", '*ava* AND *stream* AND *learn* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query5, expected.size(), false, expected);
 
     // Test regex pattern with invalid parser type (should fall back to default)
     String query6 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system* __PINOT_OPTIONS(parser=INVALID, allowLeadingWildcard=true, "
+        + ", '*ealtime streaming system* __OPTIONS(parser=INVALID, allowLeadingWildcard=true, "
         + "DefaultOperator=AND)') LIMIT 50000";
     testTextSearchSelectQueryHelper(query6, expected.size(), false, expected);
 
-    // Test regex pattern with multiple __PINOT_OPTIONS (should merge options)
+    // Test regex pattern with multiple __OPTIONS (should merge options)
     String query7 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
-        + "DefaultOperator=AND) __PINOT_OPTIONS" + "(allowLeadingWildcard=true)') " + "LIMIT 50000";
+        + ", '*ealtime streaming system* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true, "
+        + "DefaultOperator=AND) __OPTIONS" + "(allowLeadingWildcard=true)') " + "LIMIT 50000";
     testTextSearchSelectQueryHelper(query7, expected.size(), false, expected);
 
-    // Test regex pattern with multiple __PINOT_OPTIONS (should merge options)
+    // Test regex pattern with multiple __OPTIONS (should merge options)
     String query8 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system* __PINOT_OPTIONS(parser=STANDARD, allowLeadingWildcard=true, "
-        + "DefaultOperator=AND) __PINOT_OPTIONS" + "(allowLeadingWildcard=true)') " + "LIMIT 50000";
+        + ", '*ealtime streaming system* __OPTIONS(parser=STANDARD, allowLeadingWildcard=true, "
+        + "DefaultOperator=AND) __OPTIONS" + "(allowLeadingWildcard=true)') " + "LIMIT 50000";
     testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
   }
 }

@@ -80,21 +80,21 @@ public class LuceneTextIndexUtils {
 
   /**
    * Parses search options from a search query string.
-   * The options can be specified anywhere in the query using __PINOT_OPTIONS(...) syntax.
-   * For example: "term1 __PINOT_OPTIONS(parser=CLASSIC) AND term2 __PINOT_OPTIONS(analyzer=STANDARD)"
+   * The options can be specified anywhere in the query using __OPTIONS(...) syntax.
+   * For example: "term1 __OPTIONS(parser=CLASSIC) AND term2 __OPTIONS(analyzer=STANDARD)"
    * Options from later occurrences will override earlier ones.
    *
    * @param searchQuery The search query string
    * @return A Map.Entry containing the cleaned search term and options map, or null if no options found
    */
   public static Map.Entry<String, Map<String, String>> parseOptionsFromSearchString(String searchQuery) {
-    // Pattern to match __PINOT_OPTIONS(...) anywhere in the string, but not escaped
-    Pattern pattern = Pattern.compile("(?<!\\\\)__PINOT_OPTIONS\\(([^)]*)\\)");
+    // Pattern to match __OPTIONS(...) anywhere in the string, but not escaped
+    Pattern pattern = Pattern.compile("(?<!\\\\)__OPTIONS\\(([^)]*)\\)");
     Matcher matcher = pattern.matcher(searchQuery);
     Map<String, String> mergedOptions = new HashMap<>();
     String actualSearchTerm;
     boolean foundOptions = false;
-    // Find all __PINOT_OPTIONS and merge them
+    // Find all __OPTIONS and merge them
     while (matcher.find()) {
       foundOptions = true;
       String optionsStr = matcher.group(1).trim();
@@ -111,7 +111,7 @@ public class LuceneTextIndexUtils {
     if (!foundOptions) {
       return null;
     }
-    // Remove all __PINOT_OPTIONS from the query (but not escaped ones)
+    // Remove all __OPTIONS from the query (but not escaped ones)
     actualSearchTerm = pattern.matcher(searchQuery).replaceAll("").trim();
     // Clean up extra whitespace and fix multiple consecutive operators
     actualSearchTerm = actualSearchTerm.replaceAll("\\s+", " ").trim();

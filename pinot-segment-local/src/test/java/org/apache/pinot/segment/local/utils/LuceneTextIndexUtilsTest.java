@@ -102,47 +102,46 @@ public class LuceneTextIndexUtilsTest {
   public void testParseOptionsFromSearchString() {
     // Test single term with options
     Map.Entry<String, Map<String, String>> result =
-        LuceneTextIndexUtils.parseOptionsFromSearchString("term1 __PINOT_OPTIONS(parser=CLASSIC)");
+        LuceneTextIndexUtils.parseOptionsFromSearchString("term1 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
 
     // Test multiple terms with AND
-    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND term2 __PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND term2 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
 
     // Test multiple terms with OR
-    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 OR term2 __PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 OR term2 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 OR term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
 
     // Test multiple terms with NOT
-    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 NOT term2 __PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 NOT term2 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 NOT term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
 
     // Test complex combinations
-    result =
-        LuceneTextIndexUtils.parseOptionsFromSearchString("term1 NOT term2 OR term3 __PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 NOT term2 OR term3 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 NOT term2 OR term3");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
 
-    // Test multiple options in single __PINOT_OPTIONS
+    // Test multiple options in single __OPTIONS
     result = LuceneTextIndexUtils.parseOptionsFromSearchString(
-        "term1 AND term2 __PINOT_OPTIONS(parser=CLASSIC,allowLeadingWildcard=true)");
+        "term1 AND term2 __OPTIONS(parser=CLASSIC,allowLeadingWildcard=true)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
     Assert.assertEquals(result.getValue().get("allowLeadingWildcard"), "true");
 
-    // Test multiple __PINOT_OPTIONS in query
+    // Test multiple __OPTIONS in query
     result = LuceneTextIndexUtils.parseOptionsFromSearchString(
-        "term1 __PINOT_OPTIONS(parser=CLASSIC) AND term2 __PINOT_OPTIONS(phraseSlop=2)");
+        "term1 __OPTIONS(parser=CLASSIC) AND term2 __OPTIONS(phraseSlop=2)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
@@ -150,15 +149,15 @@ public class LuceneTextIndexUtilsTest {
 
     // Test overriding options
     result = LuceneTextIndexUtils.parseOptionsFromSearchString(
-        "term1 __PINOT_OPTIONS(parser=CLASSIC) AND term2 __PINOT_OPTIONS(parser=STANDARD)");
+        "term1 __OPTIONS(parser=CLASSIC) AND term2 __OPTIONS(parser=STANDARD)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "STANDARD");
 
     // Test multiple options with overrides
     result = LuceneTextIndexUtils.parseOptionsFromSearchString(
-        "term1 __PINOT_OPTIONS(parser=CLASSIC,allowLeadingWildcard=true) AND "
-            + "term2 __PINOT_OPTIONS(parser=STANDARD,fuzzyMinSim=0.5)");
+        "term1 __OPTIONS(parser=CLASSIC,allowLeadingWildcard=true) AND "
+            + "term2 __OPTIONS(parser=STANDARD,fuzzyMinSim=0.5)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "STANDARD");
@@ -166,7 +165,7 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals(result.getValue().get("fuzzyMinSim"), "0.5");
 
     // Test redundant operators
-    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND AND term2 __PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND AND term2 __OPTIONS(parser=CLASSIC)");
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getKey(), "term1 AND term2");
     Assert.assertEquals(result.getValue().get("parser"), "CLASSIC");
@@ -176,7 +175,7 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertNull(result);
 
     // Test escaped options
-    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND term2 \\__PINOT_OPTIONS(parser=CLASSIC)");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("term1 AND term2 \\__OPTIONS(parser=CLASSIC)");
     Assert.assertNull(result);
   }
 
@@ -191,7 +190,7 @@ public class LuceneTextIndexUtilsTest {
   public void testParseOptionsWithOperators() {
     // Test with OR operator
     String query1 =
-        "*ava realtime streaming system* OR *chine learner* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
+        "*ava realtime streaming system* OR *chine learner* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
     Map.Entry<String, Map<String, String>> result1 = LuceneTextIndexUtils.parseOptionsFromSearchString(query1);
     Assert.assertNotNull(result1);
     Assert.assertEquals("*ava realtime streaming system* OR *chine learner*", result1.getKey());
@@ -201,7 +200,7 @@ public class LuceneTextIndexUtilsTest {
 
     // Test with AND operator
     String query2 =
-        "*ava realtime streaming system* AND *chine learn* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
+        "*ava realtime streaming system* AND *chine learn* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
     Map.Entry<String, Map<String, String>> result2 = LuceneTextIndexUtils.parseOptionsFromSearchString(query2);
     Assert.assertNotNull(result2);
     Assert.assertEquals("*ava realtime streaming system* AND *chine learn*", result2.getKey());
@@ -210,7 +209,7 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals("true", result2.getValue().get("allowLeadingWildcard"));
 
     // Test with multiple operators
-    String query3 = "*ava* AND *stream* OR *learn* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
+    String query3 = "*ava* AND *stream* OR *learn* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
     Map.Entry<String, Map<String, String>> result3 = LuceneTextIndexUtils.parseOptionsFromSearchString(query3);
     Assert.assertNotNull(result3);
     Assert.assertEquals("*ava* AND *stream* OR *learn*", result3.getKey());
@@ -219,7 +218,7 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals("true", result3.getValue().get("allowLeadingWildcard"));
 
     // Test with NOT operator
-    String query4 = "NOT *ava realtime streaming system* __PINOT_OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
+    String query4 = "NOT *ava realtime streaming system* __OPTIONS(parser=CLASSIC, allowLeadingWildcard=true)";
     Map.Entry<String, Map<String, String>> result4 = LuceneTextIndexUtils.parseOptionsFromSearchString(query4);
     Assert.assertNotNull(result4);
     Assert.assertEquals("NOT *ava realtime streaming system*", result4.getKey());
@@ -228,8 +227,7 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals("true", result4.getValue().get("allowLeadingWildcard"));
 
     // Test with complex query and multiple OPTIONS
-    String query5 =
-        "*ava* AND *stream* OR *learn* __PINOT_OPTIONS(parser=CLASSIC) __PINOT_OPTIONS(allowLeadingWildcard=true)";
+    String query5 = "*ava* AND *stream* OR *learn* __OPTIONS(parser=CLASSIC) __OPTIONS(allowLeadingWildcard=true)";
     Map.Entry<String, Map<String, String>> result5 = LuceneTextIndexUtils.parseOptionsFromSearchString(query5);
     Assert.assertNotNull(result5);
     Assert.assertEquals("*ava* AND *stream* OR *learn*", result5.getKey());
