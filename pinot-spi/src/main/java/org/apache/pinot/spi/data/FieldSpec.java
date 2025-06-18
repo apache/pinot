@@ -537,8 +537,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && _dataType == that._dataType
         && _singleValueField == that._singleValueField
         && _notNull == that._notNull
-        && Objects.equals(_maxLength, that._maxLength)
-        && _maxLengthExceedStrategy == that._maxLengthExceedStrategy
+        && Objects.equals(getMaxLength(), that.getMaxLength())
+        && getMaxLengthExceedStrategy() == that.getMaxLengthExceedStrategy()
         && _allowTrailingZeros == that._allowTrailingZeros
         && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
         && Objects.equals(_transformFunction, that._transformFunction)
@@ -547,7 +547,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
+    return Objects.hash(_name, _dataType, _singleValueField, _notNull, getMaxLength(), getMaxLengthExceedStrategy(),
         _allowTrailingZeros, getStringValue(_defaultNullValue), _transformFunction, _virtualColumnProvider);
   }
 
