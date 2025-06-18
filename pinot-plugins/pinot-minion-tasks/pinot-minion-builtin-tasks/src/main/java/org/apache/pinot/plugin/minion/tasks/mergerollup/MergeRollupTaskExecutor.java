@@ -116,9 +116,13 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<File> outputSegmentDirs;
     try {
       _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-      outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+      SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
           SegmentProcessorFramework.convertRecordReadersToRecordReaderFileConfig(recordReaders),
-          customRecordTransformers, null).process();
+          customRecordTransformers, null);
+      outputSegmentDirs = framework.process();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + framework.getIncompleteRowsFound() + ", dropped rows:"
+              + framework.getSkippedRowsFound() + ", sanitized rows:" + framework.getSanitizedRowsFound());
     } finally {
       for (RecordReader recordReader : recordReaders) {
         recordReader.close();
