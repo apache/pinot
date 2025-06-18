@@ -61,7 +61,8 @@ public class SanitizationTransformer implements RecordTransformer {
             dataType.equals(FieldSpec.DataType.BYTES)) {
 
           FieldSpec.MaxLengthExceedStrategy strategy = fieldSpec.getMaxLengthExceedStrategy();
-          if (!strategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION)) {
+          if (!strategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION) || dataType.equals(
+              FieldSpec.DataType.STRING)) {
             _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
                 fieldSpec.getMaxLength(), strategy, fieldSpec.getDefaultNullValue()));
           }
