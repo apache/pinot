@@ -19,15 +19,15 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class EnrichedJoinNode extends JoinNode {
   // TODO: add filter, project, sort, limit info here
-  private final List<PlannerUtils.FilterProjectRex> _filterProjectRexes;
+  private final List<FilterProjectRex> _filterProjectRexes;
   // output schema of the join
   private final DataSchema _joinResultSchema;
   // output schema after projection, same as _joinResultSchema if no projection
@@ -37,7 +37,7 @@ public class EnrichedJoinNode extends JoinNode {
       NodeHint nodeHint, List<PlanNode> inputs,
       JoinRelType joinType, List<Integer> leftKeys, List<Integer> rightKeys,
       List<RexExpression> nonEquiConditions, JoinStrategy joinStrategy, RexExpression matchCondition,
-      List<PlannerUtils.FilterProjectRex> filterProjectRexes) {
+      List<FilterProjectRex> filterProjectRexes) {
     super(stageId, projectResultSchema, nodeHint, inputs, joinType, leftKeys, rightKeys,
         nonEquiConditions, joinStrategy, matchCondition);
     _joinResultSchema = joinResultSchema;
@@ -59,7 +59,7 @@ public class EnrichedJoinNode extends JoinNode {
     return _projectResultSchema;
   }
 
-  public List<PlannerUtils.FilterProjectRex> getFilterProjectRexes() {
+  public List<FilterProjectRex> getFilterProjectRexes() {
     return _filterProjectRexes;
   }
 
@@ -78,5 +78,70 @@ public class EnrichedJoinNode extends JoinNode {
     return new EnrichedJoinNode(_stageId, _joinResultSchema, _projectResultSchema, _nodeHint,
         inputs, getJoinType(), getLeftKeys(), getRightKeys(), getNonEquiConditions(),
         getJoinStrategy(), getMatchCondition(), getFilterProjectRexes());
+  }
+
+  public enum FilterProjectRexType {
+    FILTER,
+    PROJECT
+  }
+
+  public static class FilterProjectRex {
+
+    public static class ProjectAndResultSchema {
+      private List<RexExpression> _project;
+      private DataSchema _schema;
+
+      private ProjectAndResultSchema(List<RexExpression> project, DataSchema resultSchema) {
+        _project = project;
+        _schema = resultSchema;
+      }
+
+      public List<RexExpression> getProject() {
+        return _project;
+      }
+
+      public DataSchema getSchema() {
+        return _schema;
+      }
+    }
+
+    private final FilterProjectRexType _type;
+    @Nullable
+    private final RexExpression _filter;
+    @Nullable
+    private final ProjectAndResultSchema _projectAndResultSchema;
+
+    public FilterProjectRex(RexExpression filter) {
+      _type = FilterProjectRexType.FILTER;
+      _filter = filter;
+      _projectAndResultSchema = null;
+    }
+
+    public FilterProjectRex(List<RexExpression> projects, DataSchema resultSchema) {
+      _type = FilterProjectRexType.PROJECT;
+      _filter = null;
+      _projectAndResultSchema = new ProjectAndResultSchema(projects, resultSchema);
+    }
+
+    @Nullable
+    public RexExpression getFilter() {
+      return _filter;
+    }
+
+    @Nullable
+    public ProjectAndResultSchema getProjectAndResultSchema() {
+      return _projectAndResultSchema;
+    }
+
+    public FilterProjectRexType getType() {
+      return _type;
+    }
+
+    @Override
+    public String toString() {
+      return _type == FilterProjectRexType.FILTER
+          ? "Filter: " + _filter.toString()
+          : "Project: " + _projectAndResultSchema.getProject().toString();
+    }
   }
 }

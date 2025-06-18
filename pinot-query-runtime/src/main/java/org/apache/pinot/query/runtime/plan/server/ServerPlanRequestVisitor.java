@@ -32,7 +32,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -212,8 +211,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
         // TODO: check whether this, when multiple filter and projects are present, is correct
         PinotQuery pinotQuery = context.getPinotQuery();
-        for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
-          if (rex.getType() == PlannerUtils.FilterProjectRexType.FILTER) {
+        for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
+          if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
             // filter logic here
             if (pinotQuery.getFilterExpression() == null) {
               Expression expression = CalciteRexExpressionParser.toExpression(rex.getFilter(),

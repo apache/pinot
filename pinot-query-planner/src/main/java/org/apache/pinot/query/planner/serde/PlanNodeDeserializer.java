@@ -31,7 +31,6 @@ import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -115,14 +114,14 @@ public class PlanNodeDeserializer {
   private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
     Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
     // reconstruct filterProjectRex
-    List<PlannerUtils.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = new ArrayList<>();
     for (Plan.FilterProjectRex rex : protoEnrichedJoinNode.getFilterProjectRexList()) {
       if (rex.getType() == Plan.FilterProjectRexType.FILTER) {
         filterProjectRexes.add(
-            new PlannerUtils.FilterProjectRex(ProtoExpressionToRexExpression.convertExpression(rex.getFilter())));
+            new EnrichedJoinNode.FilterProjectRex(ProtoExpressionToRexExpression.convertExpression(rex.getFilter())));
       } else {
         filterProjectRexes.add(
-            new PlannerUtils.FilterProjectRex(convertExpressions(rex.getProjectAndResultSchema().getProjectList()),
+            new EnrichedJoinNode.FilterProjectRex(convertExpressions(rex.getProjectAndResultSchema().getProjectList()),
                 extractDataSchema(rex.getProjectAndResultSchema().getSchema())));
       }
     }
