@@ -74,7 +74,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -94,6 +93,7 @@ public class ClusterIntegrationTestUtils {
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   private static final Random RANDOM = new Random();
 
@@ -179,7 +179,7 @@ public class ClusterIntegrationTestUtils {
                   arrayValue[i] = array.get(i);
                   if (arrayValue[i] instanceof Utf8) {
                     arrayValue[i] =
-                        StringUtil.sanitizeStringValue(arrayValue[i].toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+                        StringUtil.sanitizeStringValue(arrayValue[i].toString(), DEFAULT_MAX_LENGTH);
                   }
                 } else {
                   arrayValue[i] = null;
@@ -188,7 +188,7 @@ public class ClusterIntegrationTestUtils {
               h2Statement.setObject(h2Index++, arrayValue);
             } else {
               if (value instanceof Utf8) {
-                value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
+                value = StringUtil.sanitizeStringValue(value.toString(), DEFAULT_MAX_LENGTH);
               }
               h2Statement.setObject(h2Index++, value);
             }
