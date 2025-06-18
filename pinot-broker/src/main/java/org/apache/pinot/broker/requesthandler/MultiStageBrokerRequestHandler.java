@@ -20,12 +20,14 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -93,6 +95,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 
 /**
@@ -101,6 +105,19 @@ import org.slf4j.LoggerFactory;
  */
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+  /// Disabled by default, but can be enabled with
+  ///```xml
+  ///  <MarkerFilter marker="MSE_STATS_MARKER" onMatch="ACCEPT" onMismatch="NEUTRAL"/>
+  ///  ...
+  ///  <Loggers>
+  ///    <Logger name="org.apache.pinot" level="debug" additivity="false">
+  ///      <AppenderRef ref="console">
+  ///        <MarkerFilter marker="MSE_STATS_MARKER"/>
+  ///      </AppenderRef>
+  ///    </Logger>
+  ///  </Loggers>
+  /// ```
+  private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
@@ -170,9 +187,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext, httpHeaders);
       if (!brokerResponse.getExceptions().isEmpty()) {
         // a _green_ error (see handleRequestThrowing javadoc)
-        LOGGER.info("Request {} failed in a controlled manner: {}", requestId, brokerResponse.getExceptions());
         onFailedRequest(brokerResponse.getExceptions());
       }
+      summarizeQuery(brokerResponse, explicitSummarizeLogRequested(sqlNodeAndOptions));
       return brokerResponse;
     } catch (WebApplicationException e) {
       // a _yellow_ error (see handleRequestThrowing javadoc)
@@ -197,6 +214,28 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           QueryErrorCode.UNKNOWN, ExceptionUtils.consolidateExceptionMessages(e));
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
+    }
+  }
+
+  private static boolean explicitSummarizeLogRequested(SqlNodeAndOptions sqlNodeAndOptions) {
+    return Boolean.parseBoolean(
+        sqlNodeAndOptions.getOptions()
+            .getOrDefault(CommonConstants.MultiStageQueryRunner.KEY_OF_LOG_STATS, "false")
+            .toLowerCase(Locale.US));
+  }
+
+  private void summarizeQuery(BrokerResponse brokerResponse, boolean explicitSummarizeLogRequested) {
+    ObjectNode stats = brokerResponse instanceof BrokerResponseNativeV2
+        ? ((BrokerResponseNativeV2) brokerResponse).getStageStats()
+        : JsonNodeFactory.instance.objectNode();
+    String completionStatus = brokerResponse.getExceptions().isEmpty()
+        ? "successfully"
+        : "with errors " + brokerResponse.getExceptions();
+    String logTemplate = "Request finished {} in {}ms. Stats: {}";
+    if (brokerResponse.getExceptions().isEmpty() && !explicitSummarizeLogRequested) {
+      LOGGER.debug(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
+    } else {
+      LOGGER.info(MSE_STATS_MARKER, logTemplate, completionStatus, brokerResponse.getTimeUsedMs(), stats);
     }
   }
 

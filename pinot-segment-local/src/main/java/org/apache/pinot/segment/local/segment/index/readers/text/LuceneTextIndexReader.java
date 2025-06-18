@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -86,7 +85,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexSearcher = new IndexSearcher(_indexReader);
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
-        // repeated queries, on the downside it cause heap issues.
+        // repeated queries, on the downside it can cause heap issues.
         _indexSearcher.setQueryCache(null);
       }
       if (config.isUseANDForMultiTermQueries()) {
@@ -169,11 +168,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser") && _useANDForMultiTermQueries) {
+      if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
@@ -305,58 +303,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       throw new RuntimeException(
           "Caught exception while building doc id mapping for text index column: " + column, e);
-    }
-  }
-
-  public interface DocIdTranslator extends Closeable {
-    int getPinotDocId(int luceneDocId);
-  }
-
-  /**
-   * Doc id translator that does no actual translation and just returns given lucene id.
-   * Used when doc ids are the same and translation is not necessary.
-   */
-  static class NoOpDocIdTranslator implements DocIdTranslator {
-    static final NoOpDocIdTranslator INSTANCE = new NoOpDocIdTranslator();
-
-    private NoOpDocIdTranslator() {
-    }
-
-    @Override
-    public int getPinotDocId(int luceneDocId) {
-      return luceneDocId;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      // do nothing
-    }
-  }
-
-  /**
-   * Lucene docIDs are not same as pinot docIDs. The internal implementation
-   * of Lucene can change the docIds and they are not guaranteed to be the
-   * same as how we expect -- strictly increasing docIDs as the documents
-   * are ingested during segment/index creation.
-   * This class is used to map the luceneDocId (returned by the search query
-   * to the collector) to corresponding pinotDocId.
-   */
-  static class DefaultDocIdTranslator implements DocIdTranslator {
-    final PinotDataBuffer _buffer;
-
-    DefaultDocIdTranslator(PinotDataBuffer buffer) {
-      _buffer = buffer;
-    }
-
-    public int getPinotDocId(int luceneDocId) {
-      return _buffer.getInt(luceneDocId * Integer.BYTES);
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      _buffer.close();
     }
   }
 }

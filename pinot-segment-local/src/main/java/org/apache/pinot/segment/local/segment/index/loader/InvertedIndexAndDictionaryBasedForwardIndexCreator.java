@@ -270,6 +270,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .build();
 
+      // note: this method closes buffers and removes files
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update

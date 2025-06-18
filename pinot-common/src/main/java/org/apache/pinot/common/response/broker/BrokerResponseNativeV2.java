@@ -50,7 +50,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "pools"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -81,7 +82,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private long _brokerReduceTimeMs;
   private Set<String> _tablesQueried = Set.of();
 
-  private Set<Integer> _replicaGroups = Set.of();
+  private Set<Integer> _pools = Set.of();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -394,14 +395,14 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public void setReplicaGroups(@NotNull Set<Integer> replicaGroups) {
-    _replicaGroups = replicaGroups;
+  public void setPools(@NotNull Set<Integer> pools) {
+    _pools = pools;
   }
 
   @Override
   @NotNull
-  public Set<Integer> getReplicaGroups() {
-    return _replicaGroups;
+  public Set<Integer> getPools() {
+    return _pools;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {

@@ -24,7 +24,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface TextIndexReader extends IndexReader {
-
   /**
    * Returns the matching dictionary ids for the given search query (optional).
    */
@@ -34,4 +33,11 @@ public interface TextIndexReader extends IndexReader {
    * Returns the matching document ids for the given search query.
    */
   MutableRoaringBitmap getDocIds(String searchQuery);
+
+  /**
+   * Marker method that allows to differentiate between single-column and multi-column text index reader .
+   */
+  default boolean isMultiColumn() {
+    return false;
+  }
 }

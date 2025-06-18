@@ -556,7 +556,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _diskUtilizationChecker);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
-    _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getDiskUtilizationThreshold());
+    _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
     _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
         "rebalance-thread-%d");
     _tableRebalanceManager =

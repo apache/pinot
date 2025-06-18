@@ -29,25 +29,27 @@ netstat -i
 #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
 #     due to the -am flag (include dependency modules)
 if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test \
+  mvn test -T 16 \
+      -am \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
-      -pl ':pinot-yammer' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
       -P github-actions,codecoverage,no-integration-tests || exit 1
+
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
+  # These tests, if run multi-threaded, causes Develocity errors in CI
   mvn test \
+    -am \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
-    -pl '!:pinot-yammer' \
     -P github-actions,codecoverage,no-integration-tests || exit 1
 fi
 
