@@ -513,6 +513,7 @@ public class QueryEnvironment {
     List<RelOptRule> projectPushdownRules =
         filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
     List<RelOptRule> pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet, useRuleSet);
+    List<RelOptRule> enrichedJoinRules = filterRuleList(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES, skipRuleSet);
 
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
@@ -535,7 +536,9 @@ public class QueryEnvironment {
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
 
-    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    // fuse project and filter above join into join
+    hepProgramBuilder.addRuleCollection(enrichedJoinRules);
+
     return hepProgramBuilder.build();
   }
 
