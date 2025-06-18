@@ -933,7 +933,8 @@ public class RecordTransformerTest {
 
       Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
       schemaBuilder.addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON);
-      DimensionFieldSpec explicitJsonSpec = new DimensionFieldSpec("explicitJsonCol", FieldSpec.DataType.JSON, true, 2048, "");
+      DimensionFieldSpec explicitJsonSpec =
+          new DimensionFieldSpec("explicitJsonCol", FieldSpec.DataType.JSON, true, 2048, "");
       explicitJsonSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
       schemaBuilder.addField(explicitJsonSpec);
 
@@ -971,7 +972,6 @@ public class RecordTransformerTest {
       ServiceStartableUtils.initFieldSpecConfig(config);
       assertEquals(FieldSpec.getDefaultJsonMaxLength(), 2048);
       assertEquals(FieldSpec.getDefaultJsonSanitizationStrategy(), FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
-
     } finally {
       // Restore original defaults
       FieldSpec.setDefaultJsonSanitizationStrategy(originalStrategy);
