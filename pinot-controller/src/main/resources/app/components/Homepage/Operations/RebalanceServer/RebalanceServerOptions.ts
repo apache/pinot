@@ -176,10 +176,10 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "markWithWarningIcon": false
     },
     {
-        "name": "forceCommitBeforeMoved",
+        "name": "forceCommit",
         "defaultValue": false,
         "type": "BOOL",
-        "label": "Force Commit Before Moved",
+        "label": "Force Commit",
         "description": "Do force commit on consuming segments before they are rebalanced",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
@@ -190,7 +190,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": 2147483647,
         "type": "INTEGER",
         "label": "Force Commit Batch Size",
-        "description": "If forceCommitBeforeMoved is set, this is the batch size for force commit operations. Controls how many segments are force committed in each batch. (Default to Integer.MAX to disable batching)",
+        "description": "If forceCommit is set, this is the batch size for force commit operations. Controls how many segments are force committed in each batch. (Default to Integer.MAX to disable batching)",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
@@ -200,7 +200,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": 180000,
         "type": "INTEGER",
         "label": "Force Commit Status Check Timeout (ms)",
-        "description": "If forceCommitBeforeMoved is set, this is the timeout in milliseconds for force commit batch status checks. Maximum time to wait for force commit operations to complete",
+        "description": "If forceCommit is set, this is the timeout in milliseconds for force commit batch status checks. Maximum time to wait for force commit operations to complete",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
