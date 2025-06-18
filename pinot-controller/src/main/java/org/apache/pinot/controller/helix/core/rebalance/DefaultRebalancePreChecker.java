@@ -411,11 +411,6 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
     }
 
-    if (tableConfig.getTableType() == TableType.OFFLINE && rebalanceConfig.isForceCommitBeforeMoved()) {
-      pass = false;
-      warnings.add("forceCommitBeforeMoved is set for OFFLINE table, which will be ignored.");
-    }
-
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
         : RebalancePreCheckerResult.warn(StringUtil.join("\n", warnings.toArray(String[]::new)));
   }
