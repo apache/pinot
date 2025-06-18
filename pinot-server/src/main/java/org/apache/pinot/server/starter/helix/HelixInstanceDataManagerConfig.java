@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.collections4.map.DefaultedMap;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -57,6 +57,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String TIER_CONFIGS_PREFIX = "tierConfigs";
   // Key of tier names
   public static final String TIER_NAMES = "tierNames";
+  // Prefix for default tier configs
+  public static final String DEFAULT_TIER_CONFIG_KEY_PREFIX = "defaultTierConfigs";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -122,7 +124,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private final PinotConfiguration _upsertConfig;
   private final PinotConfiguration _dedupConfig;
   private final PinotConfiguration _authConfig;
-  private final Map<String, Map<String, String>> _tierConfigs;
+  private final DefaultedMap<String, Map<String, String>> _tierConfigs;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
       throws ConfigurationException {
@@ -138,17 +140,29 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     _upsertConfig = serverConfig.subset(UPSERT_CONFIG_PREFIX);
     _dedupConfig = serverConfig.subset(DEDUP_CONFIG_PREFIX);
 
+    // Load default tier configurations
+    // Properties are prefixed with pinot.server.instance.defaultTierConfigs.
+    // e.g. pinot.server.instance.defaultTierConfigs.myKey = myValue
+    // The resulting defaultTierProperties map will be { "myKey": "myValue" }
+    Map<String, String> defaultTierProperties = new HashMap<>();
+    serverConfig.subset(DEFAULT_TIER_CONFIG_KEY_PREFIX)
+        .toMap()
+        .forEach((key, value) -> defaultTierProperties.put(key, String.valueOf(value)));
+    Map<String, String> unmodifiableDefaultTierProperties = Collections.unmodifiableMap(defaultTierProperties);
+
+    // If a tier is not found in this map, this map of default configs will be used.
+    _tierConfigs = new DefaultedMap<>(unmodifiableDefaultTierProperties);
+
+    // Load specific tier configurations and merge with defaults
+    // Tier configs are prefixed with pinot.server.instance.tierConfigs.
+    // Tier names are defined by pinot.server.instance.tierConfigs.tierNames = tierA,tierB
+    // Specific configs for a tier are like pinot.server.instance.tierConfigs.tierA.someKey = someValue
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
     List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
-    if (tierNames.isEmpty()) {
-      _tierConfigs = Collections.emptyMap();
-    } else {
-      _tierConfigs = Maps.newHashMapWithExpectedSize(tierNames.size());
-      for (String tierName : tierNames) {
-        Map<String, String> tierConfigMap = new HashMap<>();
-        tierConfigs.subset(tierName).toMap().forEach((k, v) -> tierConfigMap.put(k, String.valueOf(v)));
-        _tierConfigs.put(tierName, tierConfigMap);
-      }
+    for (String tierName : tierNames) {
+      Map<String, String> mergedProps = new HashMap<>(unmodifiableDefaultTierProperties);
+      tierConfigs.subset(tierName).toMap().forEach((k, v) -> mergedProps.put(k, String.valueOf(v)));
+      _tierConfigs.put(tierName, Collections.unmodifiableMap(mergedProps));
     }
   }
 
