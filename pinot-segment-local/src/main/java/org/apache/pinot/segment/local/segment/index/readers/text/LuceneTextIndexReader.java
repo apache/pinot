@@ -77,7 +77,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
-  private boolean _allowOptions = true;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
@@ -96,9 +95,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
         _enablePrefixSuffixMatchingInPhraseQueries = true;
-      }
-      if (config.isAllowOptions()) {
-        _allowOptions = true;
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -167,12 +163,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    if (_allowOptions) {
-      java.util.Map.Entry<String, java.util.Map<String, String>> result =
-          LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
-      if (result != null) {
-        return getDocIdsWithOptions(result.getKey(), result.getValue());
-      }
+    java.util.Map.Entry<String, java.util.Map<String, String>> result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
+    if (result != null) {
+      return getDocIdsWithOptions(result.getKey(), result.getValue());
     }
     return getDocIdsWithoutOptions(searchQuery);
   }

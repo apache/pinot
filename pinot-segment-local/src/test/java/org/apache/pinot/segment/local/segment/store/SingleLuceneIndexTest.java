@@ -88,7 +88,7 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
   public void testMultipleSingleColumnIndexes()
       throws IOException {
     TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .withAllowOptions(true).build();
+        .build();
 
     List<LuceneTextIndexCreator> creators = new ArrayList<>();
     for (int i = 0; i < 200; i++) {

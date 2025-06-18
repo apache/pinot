@@ -240,7 +240,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
     TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .withAllowOptions(true).build();
+        .build();
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -356,7 +356,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   public void testGetColumnIndices()
       throws Exception {
     TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .withAllowOptions(true).build();
+        .build();
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);

@@ -205,7 +205,7 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   public void testRemoveTextIndices()
       throws IOException {
     TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .withAllowOptions(true).build();
+        .build();
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -273,7 +273,7 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   public void testGetColumnIndices()
       throws IOException {
     TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .withAllowOptions(true).build();
+        .build();
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
