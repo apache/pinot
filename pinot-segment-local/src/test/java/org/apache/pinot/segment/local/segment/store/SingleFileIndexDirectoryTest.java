@@ -37,7 +37,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -239,8 +238,8 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   @Test
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
-    TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .build();
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
+        null, null, false, false, 0, false, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -355,8 +354,8 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   @Test
   public void testGetColumnIndices()
       throws Exception {
-    TextIndexConfig config = new TextIndexConfigBuilder().withLuceneMaxBufferSizeMB(500).withLuceneUseCompoundFile(true)
-        .build();
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
+        null, null, false, false, 0, false, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);

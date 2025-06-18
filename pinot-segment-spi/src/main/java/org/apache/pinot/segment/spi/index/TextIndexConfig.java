@@ -55,8 +55,8 @@ public class TextIndexConfig extends IndexConfig {
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false, null,
-          LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX);
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false,
+          null, LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX);
 
   private final FSTType _fstType;
   @Nullable
@@ -98,6 +98,21 @@ public class TextIndexConfig extends IndexConfig {
 
       return null;
     }
+  }
+
+  public TextIndexConfig(Boolean disabled, FSTType fstType, Object rawValueForTextIndex, boolean enableQueryCache,
+      boolean useANDForMultiTermQueries, List<String> stopWordsInclude, List<String> stopWordsExclude,
+      Boolean luceneUseCompoundFile, Integer luceneMaxBufferSizeMB, String luceneAnalyzerClass,
+      String luceneAnalyzerClassArgs, String luceneAnalyzerClassArgTypes, String luceneQueryParserClass,
+      Boolean enablePrefixSuffixMatchingInPhraseQueries, Boolean reuseMutableIndex,
+      Integer luceneNRTCachingDirectoryMaxBufferSizeMB, Boolean useLogByteSizeMergePolicy,
+      DocIdTranslatorMode docIdTranslatorMode) {
+    this(disabled, fstType, rawValueForTextIndex, enableQueryCache, useANDForMultiTermQueries,
+        stopWordsInclude, stopWordsExclude, luceneUseCompoundFile, luceneMaxBufferSizeMB, luceneAnalyzerClass,
+        luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneQueryParserClass,
+        enablePrefixSuffixMatchingInPhraseQueries, reuseMutableIndex,
+        luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
+        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX);
   }
 
   @JsonCreator
@@ -314,7 +329,8 @@ public class TextIndexConfig extends IndexConfig {
           CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive);
+          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy,
+          _docIdTranslatorMode, _caseSensitive);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -449,7 +465,8 @@ public class TextIndexConfig extends IndexConfig {
         _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive);
+        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode,
+        _caseSensitive);
   }
 
   public static boolean isProperty(String prop) {
