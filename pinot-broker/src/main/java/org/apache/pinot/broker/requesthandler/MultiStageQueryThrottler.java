@@ -184,10 +184,10 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       }
 
       if (maxServerQueryThreads > 0) {
+        _maxServerQueryThreads = maxServerQueryThreads;
         int semaphoreLimit = calculateSemaphoreLimit();
         _semaphore.setPermits(semaphoreLimit);
       }
-      _maxServerQueryThreads = maxServerQueryThreads;
     }
   }
 

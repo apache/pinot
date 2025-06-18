@@ -338,7 +338,7 @@ public class MultiStageQueryThrottlerTest {
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
 
     Map<String, Object> brokerConfigMap = new HashMap<>();
-    brokerConfigMap.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "20");
+    brokerConfigMap.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "20");
     PinotConfiguration brokerConfig = new PinotConfiguration(brokerConfigMap);
 
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig);
@@ -352,7 +352,7 @@ public class MultiStageQueryThrottlerTest {
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "15"));
 
     Map<String, Object> brokerConfigMap2 = new HashMap<>();
-    brokerConfigMap2.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "25");
+    brokerConfigMap2.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "25");
     PinotConfiguration brokerConfig2 = new PinotConfiguration(brokerConfigMap2);
 
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig2);
@@ -366,7 +366,7 @@ public class MultiStageQueryThrottlerTest {
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "30"));
 
     Map<String, Object> brokerConfigMap3 = new HashMap<>();
-    brokerConfigMap3.put(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "5");
+    brokerConfigMap3.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "5");
     PinotConfiguration brokerConfig3 = new PinotConfiguration(brokerConfigMap3);
 
     _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig3);
