@@ -183,19 +183,16 @@ public class QueryRunner {
         serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    String maxRowsInWindowStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
+    String maxRowsInWindowStr = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
     _maxRowsInWindow = maxRowsInWindowStr != null ? Integer.parseInt(maxRowsInWindowStr) : null;
 
     String windowOverflowModeStr =
-        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
+        serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
 
-    ExecutorService baseExecutorService = ExecutorServiceUtils.create(
-        config,
-        Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
-        "query-runner-on-" + port,
-        Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE
-    );
+    ExecutorService baseExecutorService =
+        ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
+            Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
 
     ServerMetrics serverMetrics = ServerMetrics.get();
     MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
