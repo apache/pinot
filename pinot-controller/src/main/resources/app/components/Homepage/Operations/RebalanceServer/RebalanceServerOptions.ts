@@ -180,7 +180,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": -1.0,
         "type": "DOUBLE",
         "label": "Disk Utilization Threshold",
-        "description": "Override disk utilization threshold (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or -1.0), uses the controller's default threshold",
+        "description": "Override disk utilization threshold used in pre-check (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or -1.0), uses the controller's default threshold",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
