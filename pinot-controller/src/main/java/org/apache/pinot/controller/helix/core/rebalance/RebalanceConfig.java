@@ -306,7 +306,8 @@ public class RebalanceConfig {
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold=" + _diskUtilizationThreshold + '}';
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold="
+        + _diskUtilizationThreshold + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {

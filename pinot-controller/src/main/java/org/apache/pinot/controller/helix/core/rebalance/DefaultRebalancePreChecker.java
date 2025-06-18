@@ -93,9 +93,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
         checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
     // Determine the disk utilization threshold to use - either from rebalance config override or default
-    double diskUtilizationThreshold = rebalanceConfig.getDiskUtilizationThreshold() >= 0.0 
+    double diskUtilizationThreshold = rebalanceConfig.getDiskUtilizationThreshold() >= 0.0
         ? rebalanceConfig.getDiskUtilizationThreshold() : _defaultDiskUtilizationThreshold;
-    
+
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
