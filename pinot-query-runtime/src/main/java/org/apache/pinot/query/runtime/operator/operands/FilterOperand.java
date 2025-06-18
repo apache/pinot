@@ -86,7 +86,6 @@ public abstract class FilterOperand implements TransformOperand {
       }
       return hasNull ? null : 1;
     }
-
   }
 
   public static class Or extends FilterOperand {

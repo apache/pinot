@@ -143,12 +143,13 @@ public class HashJoinOperator extends BaseJoinOperator {
       if (rightRow == null) {
         handleUnmatchedLeftRow(leftRow, rows);
       } else {
-        Object[] resultRow = joinRow(leftRow, rightRow);
-        if (matchNonEquiConditions(resultRow)) {
+        List<Object> resultRowView = joinRowView(leftRow, rightRow);
+        if (matchNonEquiConditions(resultRowView)) {
           if (isMaxRowsLimitReached(rows.size())) {
             break;
           }
-          rows.add(resultRow);
+          // defer copying of the content until row matches
+          rows.add(resultRowView.toArray());
           if (_matchedRightRows != null) {
             _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
           }
@@ -176,13 +177,13 @@ public class HashJoinOperator extends BaseJoinOperator {
         boolean hasMatchForLeftRow = false;
         int numRightRows = rightRows.size();
         for (int i = 0; i < numRightRows; i++) {
-          Object[] resultRow = joinRow(leftRow, rightRows.get(i));
-          if (matchNonEquiConditions(resultRow)) {
+          List<Object> resultRowView = joinRowView(leftRow, rightRows.get(i));
+          if (matchNonEquiConditions(resultRowView)) {
             if (isMaxRowsLimitReached(rows.size())) {
               maxRowsLimitReached = true;
               break;
             }
-            rows.add(resultRow);
+            rows.add(resultRowView.toArray());
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
               _matchedRightRows.computeIfAbsent(key, k -> new BitSet(numRightRows)).set(i);
