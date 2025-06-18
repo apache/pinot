@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -39,8 +38,6 @@ import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
-import org.apache.pinot.spi.auth.TableRowColAuthResult;
-import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -121,12 +118,6 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
-    }
-
-    @Override
-    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, @NotNull String table) {
-      //TODO: Add support for row-col filters
-      return TableRowColAuthResultImpl.unrestricted();
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
