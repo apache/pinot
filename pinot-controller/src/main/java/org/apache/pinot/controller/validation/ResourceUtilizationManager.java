@@ -39,7 +39,7 @@ public class ResourceUtilizationManager {
     _numberOfPrimaryKeysChecker = numberOfPrimaryKeysChecker;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
     if (!_isResourceUtilizationCheckEnabled) {
       return true;
     }
@@ -49,9 +49,9 @@ public class ResourceUtilizationManager {
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
     boolean isDiskUtilizationWithinLimits = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
     boolean isPrimaryKeyCountWithinLimits =
-        _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableNameWithType);
-    LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}", isDiskUtilizationWithinLimits,
-        isPrimaryKeyCountWithinLimits);
+        _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableNameWithType, skipRealtimeIngestion);
+    LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}, skipRealtimeIngestion: {}",
+        isDiskUtilizationWithinLimits, isPrimaryKeyCountWithinLimits, skipRealtimeIngestion);
     return isDiskUtilizationWithinLimits && isPrimaryKeyCountWithinLimits;
   }
 }

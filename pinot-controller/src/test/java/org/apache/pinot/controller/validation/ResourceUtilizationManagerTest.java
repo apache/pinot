@@ -46,7 +46,10 @@ public class ResourceUtilizationManagerTest {
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable);
+    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, true);
+    Assert.assertTrue(result, "Resource utilization should be within limits when the check is disabled");
+
+    result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertTrue(result, "Resource utilization should be within limits when the check is disabled");
   }
 
@@ -56,7 +59,16 @@ public class ResourceUtilizationManagerTest {
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    _resourceUtilizationManager.isResourceUtilizationWithinLimits(null);
+    _resourceUtilizationManager.isResourceUtilizationWithinLimits(null, true);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testIsResourceUtilizationWithinLimitsWithNullTableNameSkipRealtimeIngestionFalse() {
+    Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
+        _numberOfPrimaryKeysChecker);
+
+    _resourceUtilizationManager.isResourceUtilizationWithinLimits(null, false);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -65,18 +77,32 @@ public class ResourceUtilizationManagerTest {
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    _resourceUtilizationManager.isResourceUtilizationWithinLimits("");
+    _resourceUtilizationManager.isResourceUtilizationWithinLimits("", true);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testIsResourceUtilizationWithinLimitsWithEmptyTableNameSkipRealtimeIngestionFalse() {
+    Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
+        _numberOfPrimaryKeysChecker);
+
+    _resourceUtilizationManager.isResourceUtilizationWithinLimits("", false);
   }
 
   @Test
   public void testIsResourceUtilizationWithinLimitsWhenCheckIsEnabled() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
     Mockito.when(_diskUtilizationChecker.isDiskUtilizationWithinLimits(_testTable)).thenReturn(true);
-    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable)).thenReturn(true);
+    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable, true)).thenReturn(true);
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable);
+    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, true);
+    Assert.assertTrue(result, "Resource utilization should be within limits when disk check and primary key count "
+        + "check returns true");
+
+    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable, false)).thenReturn(true);
+    result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertTrue(result, "Resource utilization should be within limits when disk check and primary key count "
         + "check returns true");
   }
@@ -88,19 +114,29 @@ public class ResourceUtilizationManagerTest {
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable);
+    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, true);
+    Assert.assertFalse(result, "Resource utilization should not be within limits when disk check returns false");
+
+    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable, false)).thenReturn(true);
+    result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertFalse(result, "Resource utilization should not be within limits when disk check returns false");
   }
 
   @Test
   public void testIsResourceUtilizationWithinLimitsWhenCheckFailsPrimaryKey() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
-    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable)).thenReturn(false);
+    Mockito.when(_diskUtilizationChecker.isDiskUtilizationWithinLimits(_testTable)).thenReturn(true);
+    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable, true)).thenReturn(false);
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _diskUtilizationChecker,
         _numberOfPrimaryKeysChecker);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable);
+    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, true);
     Assert.assertFalse(result, "Resource utilization should not be within limits when primary key count check returns "
         + "false");
+
+    Mockito.when(_numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(_testTable, false)).thenReturn(true);
+    result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
+    Assert.assertTrue(result, "Resource utilization should be within limits when primary key count check returns "
+        + "true for skipRealtimeIngestion = false");
   }
 }
