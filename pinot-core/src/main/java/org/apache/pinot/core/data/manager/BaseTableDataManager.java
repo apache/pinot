@@ -1382,10 +1382,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     for (String columnName : segmentPhysicalColumns) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
-      FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
       DataSource source = segment.getDataSource(columnName);
-      Preconditions.checkNotNull(columnMetadata);
-      Preconditions.checkNotNull(source);
+      assert columnMetadata != null && source != null;
+      FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
 
       // Column is deleted
       if (fieldSpecInSchema == null) {

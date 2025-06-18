@@ -324,7 +324,11 @@ public class StarTreeUtils {
       return null;
     }
     String column = lhs.getIdentifier();
-    DataSource dataSource = indexSegment.getDataSource(column);
+    DataSource dataSource = indexSegment.getDataSourceNullable(column);
+    if (dataSource == null) {
+      // Star-tree does not support non-existent column
+      return null;
+    }
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary == null) {
       // Star-tree does not support non-dictionary encoded dimension
@@ -388,7 +392,11 @@ public class StarTreeUtils {
         }
 
         String column = aggregationFunctionColumnPair.getColumn();
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSourceNullable(column);
+        if (dataSource == null) {
+          LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' does not exist", column);
+          return null;
+        }
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
           return null;
@@ -396,7 +404,11 @@ public class StarTreeUtils {
       }
 
       for (String column : predicateEvaluatorsMap.keySet()) {
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSourceNullable(column);
+        if (dataSource == null) {
+          LOGGER.debug("Cannot use star-tree index because filter column: '{}' does not exist", column);
+          return null;
+        }
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because filter column: '{}' has null values", column);
           return null;
@@ -410,7 +422,11 @@ public class StarTreeUtils {
         }
       }
       for (String column : groupByColumns) {
-        DataSource dataSource = indexSegment.getDataSource(column);
+        DataSource dataSource = indexSegment.getDataSourceNullable(column);
+        if (dataSource == null) {
+          LOGGER.debug("Cannot use star-tree index because group-by column: '{}' does not exist", column);
+          return null;
+        }
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because group-by column: '{}' has null values", column);
           return null;

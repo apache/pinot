@@ -98,7 +98,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
             preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, true));
     // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
-    // TODO: give this check a separate threshold other than the disk utilization threshold
+    // TODO: Add the option to take disk utilization threshold as a RebalanceConfig option and use that to override
+    //       the default config
     preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
         checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
             preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));

@@ -1661,6 +1661,14 @@ public class CommonConstants {
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
 
+    /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
+    ///
+    /// When an MSE query is executed, the stats are collected and logged.
+    /// By default, successful queries are logged in the DEBUG level, while errors are logged in the INFO level.
+    /// But if this property is set to true (upper or lower case), stats will be logged in the INFO level for both
+    /// successful queries and errors.
+    public static final String KEY_OF_LOG_STATS = "logStats";
+
     public enum JoinOverFlowMode {
       THROW, BREAK
     }

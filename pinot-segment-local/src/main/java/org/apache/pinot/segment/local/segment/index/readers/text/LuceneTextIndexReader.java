@@ -168,11 +168,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser") && _useANDForMultiTermQueries) {
+      if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
