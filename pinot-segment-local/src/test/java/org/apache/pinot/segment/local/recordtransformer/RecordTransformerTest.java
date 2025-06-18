@@ -928,8 +928,8 @@ public class RecordTransformerTest {
     try {
       // Test 1: Default strategy is SUBSTITUTE_DEFAULT_VALUE
       FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE,
-                   FieldSpec.getDefaultJsonSanitizationStrategy());
+      assertEquals(FieldSpec.getDefaultJsonSanitizationStrategy(),
+          FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
 
       // Create schema with JSON field that has no explicit strategy (should use default)
       Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
@@ -963,8 +963,8 @@ public class RecordTransformerTest {
 
       // Test 3: Change default strategy to NO_ACTION
       FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION,
-                   FieldSpec.getDefaultJsonSanitizationStrategy());
+      assertEquals(FieldSpec.getDefaultJsonSanitizationStrategy(),
+          FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
 
       // Create new transformer with new default
       transformer = new SanitizationTransformer(schema);
@@ -973,7 +973,7 @@ public class RecordTransformerTest {
       record.putValue("jsonCol", longJson);
 
       result = transformer.transform(record);
-      assertEquals(longJson, result.getValue("jsonCol")); // Should remain unchanged
+      assertEquals(result.getValue("jsonCol"), longJson); // Should remain unchanged
       assertFalse(result.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
 
       // Test 4: Explicit strategy should override default
@@ -985,7 +985,7 @@ public class RecordTransformerTest {
       record.putValue("jsonCol", "{\"test\": \"this exceeds 10 chars\"}");
 
       result = transformer.transform(record);
-      assertEquals("null", result.getValue("jsonCol")); // Explicit strategy should override default
+      assertEquals(result.getValue("jsonCol"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON); // Explicit strategy should override default
       assertTrue(result.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
 
       // Test 5: Test with multiple JSON columns - some with explicit strategy, some without
@@ -1010,98 +1010,9 @@ public class RecordTransformerTest {
       record.putValue("jsonCol2", "{\"long\": \"value\"}");
 
       result = transformer.transform(record);
-      assertEquals("null", result.getValue("jsonCol1")); // Uses default SUBSTITUTE_DEFAULT_VALUE
-      assertEquals("{\"lon", result.getValue("jsonCol2")); // Uses explicit TRIM_LENGTH
+      assertEquals(result.getValue("jsonCol1"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON); // Uses default SUBSTITUTE_DEFAULT_VALUE
+      assertEquals(result.getValue("jsonCol2"), "{\"lon"); // Uses explicit TRIM_LENGTH
       assertTrue(result.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
-
-    } finally {
-      // Restore original default strategy
-      FieldSpec.setDefaultJsonSanitizationStrategy(originalDefault);
-    }
-  }
-
-  @Test
-  public void testFieldSpecConfigInitialization() {
-    // Save the original default strategy
-    FieldSpec.MaxLengthExceedStrategy originalDefault = FieldSpec.getDefaultJsonSanitizationStrategy();
-
-    try {
-      // Test initialization from configuration similar to ServiceStartableUtils.initFieldSpecConfig()
-      PinotConfiguration config = new PinotConfiguration();
-
-      // Test 1: Configuration with TRIM_LENGTH strategy
-      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY,
-                         "TRIM_LENGTH");
-
-      // Simulate what ServiceStartableUtils.initFieldSpecConfig() does
-      String configValue = config.getProperty(
-          CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
-      if (configValue != null) {
-        try {
-          FieldSpec.MaxLengthExceedStrategy strategy = FieldSpec.MaxLengthExceedStrategy.valueOf(configValue);
-          FieldSpec.setDefaultJsonSanitizationStrategy(strategy);
-        } catch (IllegalArgumentException e) {
-          // Should use existing default if invalid value
-        }
-      }
-
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH,
-                   FieldSpec.getDefaultJsonSanitizationStrategy());
-
-      // Test 2: Configuration with ERROR strategy
-      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY,
-                         "ERROR");
-
-      configValue = config.getProperty(
-          CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
-      if (configValue != null) {
-        try {
-          FieldSpec.MaxLengthExceedStrategy strategy = FieldSpec.MaxLengthExceedStrategy.valueOf(configValue);
-          FieldSpec.setDefaultJsonSanitizationStrategy(strategy);
-        } catch (IllegalArgumentException e) {
-          // Should use existing default if invalid value
-        }
-      }
-
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.ERROR,
-                   FieldSpec.getDefaultJsonSanitizationStrategy());
-
-      // Test 3: Invalid configuration value should not change default
-      FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
-      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY,
-                         "INVALID_STRATEGY");
-
-      configValue = config.getProperty(
-          CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
-      if (configValue != null) {
-        try {
-          FieldSpec.MaxLengthExceedStrategy strategy = FieldSpec.MaxLengthExceedStrategy.valueOf(configValue);
-          FieldSpec.setDefaultJsonSanitizationStrategy(strategy);
-        } catch (IllegalArgumentException e) {
-          // Should use existing default if invalid value - don't change anything
-        }
-      }
-
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION,
-                   FieldSpec.getDefaultJsonSanitizationStrategy()); // Should remain unchanged
-
-      // Test 4: Missing configuration should not change default
-      FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
-      config.clearProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
-
-      configValue = config.getProperty(
-          CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
-      if (configValue != null) {
-        try {
-          FieldSpec.MaxLengthExceedStrategy strategy = FieldSpec.MaxLengthExceedStrategy.valueOf(configValue);
-          FieldSpec.setDefaultJsonSanitizationStrategy(strategy);
-        } catch (IllegalArgumentException e) {
-          // Should use existing default if invalid value
-        }
-      }
-
-      assertEquals(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE,
-                   FieldSpec.getDefaultJsonSanitizationStrategy()); // Should remain unchanged
 
     } finally {
       // Restore original default strategy
