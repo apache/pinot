@@ -132,7 +132,7 @@ public class InstanceResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/numberOfPrimaryKeys")
+  @Path("/primaryKeyCount")
   @ApiOperation(value = "Show number of primary keys", notes = "Total number of upsert / dedup primary keys")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")

@@ -29,14 +29,14 @@ public class ResourceUtilizationManager {
 
   private final boolean _isResourceUtilizationCheckEnabled;
   private final DiskUtilizationChecker _diskUtilizationChecker;
-  private final NumberOfPrimaryKeysChecker _numberOfPrimaryKeysChecker;
+  private final PrimaryKeyCountChecker _primaryKeyCountChecker;
 
   public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker,
-      NumberOfPrimaryKeysChecker numberOfPrimaryKeysChecker) {
+      PrimaryKeyCountChecker primaryKeyCountChecker) {
     _isResourceUtilizationCheckEnabled = controllerConf.isResourceUtilizationCheckEnabled();
     LOGGER.info("Resource utilization check is: {}", _isResourceUtilizationCheckEnabled ? "enabled" : "disabled");
     _diskUtilizationChecker = diskUtilizationChecker;
-    _numberOfPrimaryKeysChecker = numberOfPrimaryKeysChecker;
+    _primaryKeyCountChecker = primaryKeyCountChecker;
   }
 
   public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
@@ -49,7 +49,7 @@ public class ResourceUtilizationManager {
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
     boolean isDiskUtilizationWithinLimits = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
     boolean isPrimaryKeyCountWithinLimits =
-        _numberOfPrimaryKeysChecker.isNumberOfPrimaryKeysWithinLimits(tableNameWithType, skipRealtimeIngestion);
+        _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableNameWithType, skipRealtimeIngestion);
     LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}, skipRealtimeIngestion: {}",
         isDiskUtilizationWithinLimits, isPrimaryKeyCountWithinLimits, skipRealtimeIngestion);
     return isDiskUtilizationWithinLimits && isPrimaryKeyCountWithinLimits;
