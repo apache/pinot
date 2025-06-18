@@ -99,6 +99,7 @@ import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.server.starter.ServerCancelManager;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -680,6 +681,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
           Tracing.getThreadAccountant().getClusterConfigChangeListener());
     }
 
+    ServerCancelManager serverCancelManager =
+        new ServerCancelManager(_serverInstance.getInstanceRequestHandler(), _serverInstance.getQueryRunner());
+    Tracing.getThreadAccountant().setQueryCancelManager(serverCancelManager);
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);

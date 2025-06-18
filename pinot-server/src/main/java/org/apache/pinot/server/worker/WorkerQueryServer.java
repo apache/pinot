@@ -32,6 +32,7 @@ import org.apache.pinot.spi.utils.NetUtils;
 public class WorkerQueryServer {
   private final int _queryServicePort;
   private final QueryServer _queryWorkerService;
+  private final QueryRunner _queryRunner;
 
   public WorkerQueryServer(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
       @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats) {
@@ -39,9 +40,9 @@ public class WorkerQueryServer {
     String instanceId = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
     _queryServicePort = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
-    QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
-    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, serverConf);
+    _queryRunner = new QueryRunner();
+    _queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
+    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, _queryRunner, tlsConfig, serverConf);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {
@@ -73,6 +74,10 @@ public class WorkerQueryServer {
 
   public int getPort() {
     return _queryServicePort;
+  }
+
+  public QueryRunner getQueryRunner() {
+    return _queryRunner;
   }
 
   public void start() {

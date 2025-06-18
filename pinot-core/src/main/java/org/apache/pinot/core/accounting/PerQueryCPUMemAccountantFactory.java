@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.QueryCancelManager;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
@@ -134,6 +135,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     protected final String _instanceId;
 
     protected final InstanceType _instanceType;
+    protected QueryCancelManager _queryCancelManager;
 
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
@@ -209,7 +211,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             boolean isAnchorThread = currentTaskStatus.isAnchorThread();
             ret.compute(queryId,
                 (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
-                    isAnchorThread, threadEntry._errorStatus, queryId)
+                    isAnchorThread, threadEntry._errorStatus, queryId, currentTaskStatus.getTaskType())
                     : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
           }
         }
@@ -363,6 +365,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _watcherTask;
     }
 
+    public void setQueryCancelManager(QueryCancelManager queryCancelManager) {
+      _queryCancelManager = queryCancelManager;
+    }
+
     /**
      * remove in active queries from _finishedTaskStatAggregator
      */
@@ -453,7 +459,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             boolean isAnchorThread = currentTaskStatus.isAnchorThread();
             ret.compute(queryId, (k, v) -> v == null
                 ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
-                isAnchorThread, threadEntry._errorStatus, queryId)
+                isAnchorThread, threadEntry._errorStatus, queryId, currentTaskStatus.getTaskType())
                 : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
           }
         }
@@ -519,15 +525,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       AtomicReference<Exception> _exceptionAtomicReference;
       long _allocatedBytes;
       long _cpuNS;
+      ThreadExecutionContext.TaskType _taskType;
 
       public AggregatedStats(long cpuNS, long allocatedBytes, Thread anchorThread, boolean isAnchorThread,
-          AtomicReference<Exception> exceptionAtomicReference, String queryId) {
+          AtomicReference<Exception> exceptionAtomicReference, String queryId, ThreadExecutionContext.TaskType taskType) {
         _cpuNS = cpuNS;
         _allocatedBytes = allocatedBytes;
         _anchorThread = anchorThread;
         _isAnchorThread = isAnchorThread;
         _exceptionAtomicReference = exceptionAtomicReference;
         _queryId = queryId;
+        _taskType = taskType;
       }
 
       @Override
@@ -539,6 +547,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             + ", _exceptionAtomicReference=" + _exceptionAtomicReference
             + ", _allocatedBytes=" + _allocatedBytes
             + ", _cpuNS=" + _cpuNS
+            + ", _taskType=" + _taskType
             + '}';
       }
 
@@ -560,6 +569,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       @JsonIgnore
       public Thread getAnchorThread() {
         return _anchorThread;
+      }
+
+      public ThreadExecutionContext.TaskType getTaskType() {
+        return _taskType;
       }
 
       public AggregatedStats merge(long cpuNS, long memoryBytes, boolean isAnchorThread,
@@ -805,13 +818,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
         if (config.isOomKillQueryEnabled()) {
           int killedCount = 0;
+          Set<String> terminatedQueryIds = new HashSet<>();
           for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
             CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
             CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
             if (taskEntry != null && taskEntry.isAnchorThread()) {
               threadEntry._errorStatus
                   .set(new RuntimeException(String.format("Query killed due to %s out of memory!", _instanceType)));
-              taskEntry.getAnchorThread().interrupt();
+              _queryCancelManager.cancelQuery(threadEntry.getQueryId(), taskEntry.getTaskType());
               killedCount += 1;
             }
           }
@@ -871,6 +885,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                     " Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                     maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
+            _queryCancelManager.cancelQuery(maxUsageTuple._queryId, maxUsageTuple._taskType);
             logTerminatedQuery(maxUsageTuple, _usedBytes);
           } else if (!config.isOomKillQueryEnabled()) {
             LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
@@ -897,6 +912,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
             interruptRunnerThread(value.getAnchorThread());
+            _queryCancelManager.cancelQuery(value._queryId, value._taskType);
             logTerminatedQuery(value, _usedBytes);
           }
         }

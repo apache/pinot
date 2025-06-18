@@ -44,6 +44,7 @@ import org.apache.pinot.core.transport.ChannelHandlerFactory;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
+import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -306,5 +307,8 @@ public class ServerInstance {
 
   public QueryScheduler getQueryScheduler() {
     return _queryScheduler;
+  }
+  public QueryRunner getQueryRunner() {
+    return _workerQueryServer.getQueryRunner();
   }
 }

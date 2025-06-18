@@ -104,6 +104,9 @@ public interface ThreadResourceUsageAccountant {
     return null;
   }
 
+  default void setQueryCancelManager(QueryCancelManager queryCancelManager) {
+  }
+
   /**
    * get error status if the query is preempted
    * @return empty string if N/A
