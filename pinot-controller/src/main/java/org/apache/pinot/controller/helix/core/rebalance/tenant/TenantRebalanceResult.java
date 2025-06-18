@@ -36,8 +36,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-    "jobId", "overallStatus", "totalTables", "statusSummary", "description",
-    "aggregatedPreChecksResult", "aggregatedSegmentCounts", "aggregatedInstanceCounts",
+    "jobId", "totalTables", "statusSummary", "aggregatedPreChecksResult",
     "aggregatedRebalanceSummary", "rebalanceTableResults"
 })
 public class TenantRebalanceResult {
@@ -47,8 +46,17 @@ public class TenantRebalanceResult {
   @JsonCreator
   public TenantRebalanceResult(
       @JsonProperty("jobId") String jobId,
-      @JsonProperty("rebalanceTableResults") Map<String, RebalanceResult> rebalanceTableResults) {
-    this(jobId, rebalanceTableResults, true);
+      @JsonProperty("rebalanceTableResults") Map<String, RebalanceResult> rebalanceTableResults,
+      @JsonProperty("totalTables") int totalTables,
+      @JsonProperty("statusSummary") Map<RebalanceResult.Status, Integer> statusSummary,
+      @JsonProperty("aggregatedPreChecksResult") Map<String, AggregatedPrecheckResult> aggregatedPreChecksResult,
+      @JsonProperty("aggregatedRebalanceSummary") RebalanceSummaryResult aggregatedRebalanceSummary) {
+    _jobId = jobId;
+    _rebalanceTableResults = rebalanceTableResults;
+    _totalTables = totalTables;
+    _statusSummary = statusSummary;
+    _aggregatedPreChecksResult = aggregatedPreChecksResult;
+    _aggregatedRebalanceSummary = aggregatedRebalanceSummary;
   }
 
   // Aggregated view fields
