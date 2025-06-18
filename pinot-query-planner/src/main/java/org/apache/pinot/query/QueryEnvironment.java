@@ -507,16 +507,19 @@ public class QueryEnvironment {
     List<RelOptRule> filterPushdownRules;
     List<RelOptRule> projectPushdownRules;
     List<RelOptRule> pruneRules;
+    List<RelOptRule> enrichedJoinRules;
     if (skipRuleSet == null) {
       basicRules = PinotQueryRuleSets.BASIC_RULES;
       filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
       projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
       pruneRules = PinotQueryRuleSets.PRUNE_RULES;
+      enrichedJoinRules = PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES;
     } else {
       basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
       filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
       projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
       pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
+      enrichedJoinRules = filterRuleList(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES, skipRuleSet);
     }
 
 
@@ -541,7 +544,9 @@ public class QueryEnvironment {
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
 
-    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    // fuse project and filter above join into join
+    hepProgramBuilder.addRuleCollection(enrichedJoinRules);
+
     return hepProgramBuilder.build();
   }
 
