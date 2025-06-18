@@ -33,6 +33,7 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.immutables.value.Value;
 
@@ -159,6 +160,11 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
 
       default:
         throw new IllegalStateException("unknown patternType for PinotEnrichedJoinRule");
+    }
+
+    // Disable lookup join for now
+    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
+      return;
     }
 
     // Disable non-equijoin for now
