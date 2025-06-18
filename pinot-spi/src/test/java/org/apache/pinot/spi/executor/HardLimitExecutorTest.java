@@ -98,6 +98,6 @@ public class HardLimitExecutorTest {
     // No configs set, should return non-positive
     Map<String, Object> configMap5 = new HashMap<>();
     PinotConfiguration config5 = new PinotConfiguration(configMap5);
-    assertEquals(HardLimitExecutor.getMultiStageExecutorHardLimit(config5), 0);
+    assertEquals(HardLimitExecutor.getMultiStageExecutorHardLimit(config5), -1);
   }
 }
