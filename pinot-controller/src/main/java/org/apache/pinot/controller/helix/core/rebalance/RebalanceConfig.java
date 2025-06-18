@@ -138,10 +138,12 @@ public class RebalanceConfig {
   private long _retryInitialDelayInMs = 300000L;
 
   // Disk utilization threshold override. If set, this will override the default disk utilization threshold
-  // configured at the controller level. Value should be between 0.0 and 1.0 (e.g., 0.85 for 85%)
+  // configured at the controller level. Value should be between 0.0 and 1.0 (e.g., 0.85 for 85%) or -1.0, which means
+  // no override. In the latter case the pre-checker will use the default disk utilization threshold from the controller
+  // config.
   @JsonProperty("diskUtilizationThreshold")
   @ApiModelProperty(example = "0.85")
-  private double _diskUtilizationThreshold = -1.0; // -1.0 means not set, use default
+  private double _diskUtilizationThreshold = -1.0;
 
   @JsonProperty("forceCommit")
   @ApiModelProperty(example = "false")
