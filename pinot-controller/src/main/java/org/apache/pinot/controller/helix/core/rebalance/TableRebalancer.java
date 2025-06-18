@@ -398,11 +398,21 @@ public class TableRebalancer {
       if (forceCommitBeforeMoved) {
         Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, targetAssignment);
         if (!consumingSegmentsToMoveNext.isEmpty()) {
-          currentIdealState =
-              forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext, tableRebalanceLogger,
-                  rebalanceConfig.getForceCommitBatchSize(),
-                  rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
-                  rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
+          try {
+            currentIdealState =
+                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
+                    tableRebalanceLogger,
+                    rebalanceConfig.getForceCommitBatchSize(),
+                    rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
+                    rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
+          } catch (AttemptFailureException e) {
+            onReturnFailure(
+                "Caught exception while waiting for consuming segments to force commit, aborting the rebalance", e,
+                tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                "Caught exception while waiting for consuming segments to force commit: " + e, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          }
           currentAssignment = currentIdealState.getRecord().getMapFields();
           targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
               tierToInstancePartitionsMap, rebalanceConfig);
@@ -625,11 +635,20 @@ public class TableRebalancer {
             _tableRebalanceObserver.onTrigger(
                 TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_START_TRIGGER, null, null,
                 null);
-            idealState =
-                forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
-                    tableRebalanceLogger, rebalanceConfig.getForceCommitBatchSize(),
-                    rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
-                    rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
+            try {
+              idealState =
+                  forceCommitConsumingSegmentsAndWait(tableNameWithType, consumingSegmentsToMoveNext,
+                      tableRebalanceLogger, rebalanceConfig.getForceCommitBatchSize(),
+                      rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
+                      rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
+            } catch (AttemptFailureException e) {
+              onReturnFailure(
+                  "Caught exception while waiting for consuming segments to force commit, aborting the rebalance", e,
+                  tableRebalanceLogger);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+                  "Caught exception while waiting for consuming segments to force commit: " + e, instancePartitionsMap,
+                  tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+            }
             idealStateRecord = idealState.getRecord();
             _tableRebalanceObserver.onTrigger(
                 TableRebalanceObserver.Trigger.FORCE_COMMIT_BEFORE_MOVED_END_TRIGGER, null, null,
@@ -2031,7 +2050,8 @@ public class TableRebalancer {
 
   private IdealState forceCommitConsumingSegmentsAndWait(String tableNameWithType, Set<String> segmentsToCommit,
       Logger tableRebalanceLogger, int forceCommitBatchSize, int forceCommitBatchStatusCheckIntervalMs,
-      int forceCommitBatchStatusCheckTimeoutMs) {
+      int forceCommitBatchStatusCheckTimeoutMs)
+      throws AttemptFailureException {
     if (_pinotLLCRealtimeSegmentManager != null) {
       ForceCommitBatchConfig forceCommitBatchConfig =
           ForceCommitBatchConfig.of(forceCommitBatchSize, forceCommitBatchStatusCheckIntervalMs,
@@ -2048,16 +2068,12 @@ public class TableRebalancer {
           / forceCommitBatchStatusCheckIntervalMs;
       RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, forceCommitBatchStatusCheckIntervalMs);
       Set<?>[] segmentsYetToBeCommitted = new Set[1];
-      try {
-        Set<String> finalSegmentsToCommit = segmentsToCommit;
-        retryPolicy.attempt(() -> {
-          segmentsYetToBeCommitted[0] =
-              _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, finalSegmentsToCommit);
-          return segmentsYetToBeCommitted[0].isEmpty();
-        });
-      } catch (AttemptFailureException e) {
-        tableRebalanceLogger.warn("Failed to wait for previous batch to complete", e);
-      }
+      Set<String> finalSegmentsToCommit = segmentsToCommit;
+      retryPolicy.attempt(() -> {
+        segmentsYetToBeCommitted[0] =
+            _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, finalSegmentsToCommit);
+        return segmentsYetToBeCommitted[0].isEmpty();
+      });
     } else {
       tableRebalanceLogger.warn(
           "PinotLLCRealtimeSegmentManager is not initialized, cannot force commit consuming segments");
