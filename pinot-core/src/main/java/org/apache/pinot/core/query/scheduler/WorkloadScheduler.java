@@ -36,6 +36,17 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/**
+ * Scheduler implementation that supports query admission control based on workload-specific budgets.
+ *
+ * <p>This class integrates with the {@link WorkloadBudgetManager} to apply CPU and memory budget enforcement
+ * for different workloads, including primary and secondary workloads.</p>
+ *
+ * <p>Secondary workload configuration is used for queries tagged as "secondary". Queries that exceed their budget
+ * will be rejected.</p>
+ *
+ */
 public class WorkloadScheduler extends QueryScheduler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadScheduler.class);
@@ -64,7 +75,6 @@ public class WorkloadScheduler extends QueryScheduler {
     // Long.MAX_VALUE for now, since we do not have a specific memory budget for secondary queries.
     long secondaryCpuBudget =
         (long) (secondaryCpuPercentage * _workloadBudgetManager.getEnforcementWindowMs() * 100_000L);
-
     // TODO: Add memory budget for secondary workload queries
     _workloadBudgetManager.addOrUpdateWorkload(_secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
   }

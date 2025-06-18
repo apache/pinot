@@ -130,42 +130,23 @@ public class WorkloadBudgetManagerTest {
   @Test
   void testCanAdmitQuery() {
     WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    // Scenario 1: No budget configured -> should admit
+    assertTrue(manager.canAdmitQuery("unconfigured-workload"), "Workload without budget should be admitted");
 
-    // Scenario 1: Nonexistent workload should be admitted
-    assertTrue(manager.canAdmitQuery("nonexistent-workload"), "Nonexistent workload should be admitted");
+    // Scenario 2: Budget configured with non-zero remaining -> should admit
+    String activeWorkload = "active-workload";
+    manager.addOrUpdateWorkload(activeWorkload, 100L, 200L);
+    assertTrue(manager.canAdmitQuery(activeWorkload), "Workload with available budget should be admitted");
 
-    // Scenario 2: No other workloads charged (remaining > threshold)
-    String workload1 = "workload1";
-    String workload2 = "workload2";
-    String workload3 = "workload3";
-    List<String> workloads = List.of(workload1, workload2, workload3);
-    long initialCpu = 100L;
-    long initialMem = 100L;
-    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
-    manager.tryCharge(workload1, initialCpu, initialMem); // deplete workload1
-    assertTrue(manager.canAdmitQuery(workload1), "Scenario2: workload1 should be admitted remaining > threshold");
-    WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload(workload1);
-    assertTrue(stats._cpuRemaining > 0, "Scenario2: CPU allocation should be > 0");
-    assertTrue(stats._memoryRemaining > 0, "Scenario2: Memory allocation should be > 0");
+    // Scenario 3: Budget depleted -> should reject
+    String depletedWorkload = "depleted-workload";
+    manager.addOrUpdateWorkload(depletedWorkload, 50L, 50L);
+    manager.tryCharge(depletedWorkload, 50L, 50L); // deplete
+    assertFalse(manager.canAdmitQuery(depletedWorkload), "Workload with depleted budget should be rejected");
 
-    // Scenario 3: One other workload charged (remaining <= threshold)
-    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
-    manager.tryCharge(workload1, initialCpu, initialMem);    // deplete workload1
-    manager.tryCharge(workload2, initialCpu, initialMem);   // deplete workload2
-    assertFalse(manager.canAdmitQuery(workload1), "Scenario3: workload1 should NOT be admitted remaining <= threshold");
-
-    // Scenario 4: Two other workloads charged (remaining = 0)
-    resetWorkloadBudgetManager(manager, workloads, initialCpu, initialMem);
-    manager.tryCharge(workload1, initialCpu, initialMem);    // deplete workload1
-    manager.tryCharge(workload2, initialCpu, initialMem);   // deplete workload2
-    manager.tryCharge(workload3, initialCpu, initialMem);   // deplete workload3
-    assertFalse(manager.canAdmitQuery(workload1), "Scenario4: workload1 should NOT be admitted no remaining capacity");
-  }
-
-  private void resetWorkloadBudgetManager(WorkloadBudgetManager workloadBudgetManager, List<String> workloads,
-                                          long cpuBudget, long memoryBudget) {
-    for (String workload : workloads) {
-      workloadBudgetManager.addOrUpdateWorkload(workload, cpuBudget, memoryBudget);
-    }
+    // Scenario 4: Budget configured with zero cpu remaining -> should reject
+    String zeroCpuWorkload = "zero-cpu-workload";
+    manager.addOrUpdateWorkload(zeroCpuWorkload, 0L, 100L);
+    assertFalse(manager.canAdmitQuery(zeroCpuWorkload), "Workload with zero CPU budget should be rejected");
   }
 }

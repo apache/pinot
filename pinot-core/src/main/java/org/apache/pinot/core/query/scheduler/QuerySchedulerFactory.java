@@ -48,6 +48,7 @@ public class QuerySchedulerFactory {
   public static final String BINARY_WORKLOAD_ALGORITHM = "binary_workload";
   public static final String ALGORITHM_NAME_CONFIG_KEY = "name";
   public static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
+  public static final String WORKLOAD_SCHEDULER_ALGORITHM = "workload";
 
   /**
    * Static factory to instantiate query scheduler based on scheduler configuration.
@@ -76,6 +77,9 @@ public class QuerySchedulerFactory {
         break;
       case BINARY_WORKLOAD_ALGORITHM:
         scheduler = new BinaryWorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
+      case WORKLOAD_SCHEDULER_ALGORITHM:
+        scheduler = new WorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
         break;
       default:
         scheduler =
