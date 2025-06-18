@@ -29,7 +29,6 @@ import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -142,9 +141,9 @@ public class PlanNodeSerializer {
           .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
           .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
 
-      for (PlannerUtils.FilterProjectRex rex : node.getFilterProjectRexes()) {
+      for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
         Plan.FilterProjectRex.Builder rexBuilder = Plan.FilterProjectRex.newBuilder();
-        if (rex.getType() == PlannerUtils.FilterProjectRexType.FILTER) {
+        if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
           rexBuilder
               .setFilter(RexExpressionToProtoExpression.convertExpression(rex.getFilter()))
               .setType(Plan.FilterProjectRexType.FILTER);
