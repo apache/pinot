@@ -1541,6 +1541,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
     public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
 
+<<<<<<< HEAD
     /**
      * QUERY WORKLOAD ISOLATION Configs
      *
@@ -1589,6 +1590,14 @@ public class CommonConstants {
     public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
+=======
+    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE = "accounting.cancel.callback.cache.max.size";
+    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE = 500;
+
+    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS =
+        "accounting.cancel.callback.cache.expiry.seconds";
+    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS = 1200;
+>>>>>>> 92b216daca (Test code.)
   }
 
   public static class ExecutorService {

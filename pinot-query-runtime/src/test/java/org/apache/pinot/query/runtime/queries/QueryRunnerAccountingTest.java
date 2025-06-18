@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
@@ -221,7 +220,6 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
 
   private static HashMap<String, Object> getAccountingConfig() {
     HashMap<String, Object> configs = new HashMap<>();
-    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     return configs;
   }
