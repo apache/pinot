@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
@@ -28,4 +29,7 @@ public interface TransformOperand {
 
   @Nullable
   Object apply(Object[] row);
+
+  @Nullable
+  Object apply(List<Object> row);
 }

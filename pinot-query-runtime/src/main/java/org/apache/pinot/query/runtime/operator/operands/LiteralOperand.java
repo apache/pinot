@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
@@ -38,6 +39,11 @@ public class LiteralOperand implements TransformOperand {
 
   @Override
   public Object apply(Object[] row) {
+    return _value;
+  }
+
+  @Override
+  public Object apply(List<Object> row) {
     return _value;
   }
 }
