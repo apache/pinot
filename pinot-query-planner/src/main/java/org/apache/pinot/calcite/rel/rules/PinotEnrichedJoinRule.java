@@ -35,7 +35,9 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.immutables.value.Value;
+
 
 @Value.Enclosing
 public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
@@ -53,6 +55,7 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     }
 
     PatternType patternType();
+
     Config withPatternType(PatternType patternType);
 
     Config PROJECT_FILTER_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
@@ -84,11 +87,14 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
   }
 
   public static final PinotEnrichedJoinRule PROJECT_FILTER_JOIN =
-      Config.PROJECT_FILTER_JOIN.toRule();
+      (PinotEnrichedJoinRule) Config.PROJECT_FILTER_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule PROJECT_JOIN =
-      Config.PROJECT_JOIN.toRule();
+      (PinotEnrichedJoinRule) Config.PROJECT_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule FILTER_JOIN =
-      Config.FILTER_JOIN.toRule();
+      (PinotEnrichedJoinRule) Config.FILTER_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
 
   public static final List<RelOptRule> PINOT_ENRICHED_JOIN_RULES = List.of(
       PROJECT_FILTER_JOIN,
@@ -102,12 +108,18 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     PatternType patternType = ((RelRule<Config>) call.getRule()).config.patternType();
 
     RelTraitSet traitSet;
-    @Nullable final RexNode filterRex;
-    @Nullable final List<RexNode> projects;
-    @Nullable final RelDataType projectRowType;
-    @Nullable final Set<CorrelationId> projectVariableSet;
-    @Nullable final LogicalProject project;
-    @Nullable final LogicalFilter filter;
+    @Nullable
+    final RexNode filterRex;
+    @Nullable
+    final List<RexNode> projects;
+    @Nullable
+    final RelDataType projectRowType;
+    @Nullable
+    final Set<CorrelationId> projectVariableSet;
+    @Nullable
+    final LogicalProject project;
+    @Nullable
+    final LogicalFilter filter;
     final LogicalJoin join;
 
     List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>();
