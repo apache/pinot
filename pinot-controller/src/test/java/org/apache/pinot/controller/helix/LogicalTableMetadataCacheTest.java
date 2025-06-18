@@ -187,12 +187,12 @@ public class LogicalTableMetadataCacheTest {
     assertNotEquals(CACHE.getLogicalTableConfig(logicalTableName), logicalTableConfig);
 
     INSTANCE.updateLogicalTableConfig(logicalTableConfig);
-
+    // wait on the new realtime table config in the cache
     TestUtils.waitForCondition(
-        aVoid -> CACHE.getLogicalTableConfig(logicalTableName).equals(logicalTableConfig),
-        10_000L, "Logical table config not updated in cache");
+        aVoid -> CACHE.getTableConfig(_extraRealtimeTableConfig.getTableName()) != null,
+        10_000L, "Realtime table config not updated in cache");
+    assertEquals(CACHE.getLogicalTableConfig(logicalTableName), logicalTableConfig);
     assertNotNull(CACHE.getTableConfig(_extraOfflineTableConfig.getTableName()));
-    assertNotNull(CACHE.getTableConfig(_extraRealtimeTableConfig.getTableName()));
     assertNull(CACHE.getTableConfig(_offlineTableConfig.getTableName()));
     assertNull(CACHE.getTableConfig(_realtimeTableConfig.getTableName()));
     assertNotNull(CACHE.getSchema(logicalTableName));
