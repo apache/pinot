@@ -40,12 +40,6 @@ public class ReferenceOperand implements TransformOperand {
 
   @Nullable
   @Override
-  public Object apply(Object[] row) {
-    return row[_index];
-  }
-
-  @Nullable
-  @Override
   public Object apply(List<Object> row) {
     return row.get(_index);
   }

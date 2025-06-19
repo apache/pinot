@@ -30,7 +30,7 @@ public interface TransformOperand {
 
   default Object apply(Object[] row) {
     return apply(Arrays.asList(row));
-  };
+  }
 
   @Nullable
   Object apply(List<Object> row);
