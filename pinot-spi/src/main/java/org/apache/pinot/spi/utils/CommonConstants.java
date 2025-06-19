@@ -1805,6 +1805,13 @@ public class CommonConstants {
         "pinot.forward.index.default.target.docs.per.chunk";
   }
 
+  public static class FieldSpecConfigs {
+    public static final String CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY =
+        "pinot.fieldspec.default.json.sanitization.strategy";
+    public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
+        "pinot.fieldspec.default.json.max.length";
+  }
+
   /**
    * Configuration for setting up groovy static analyzer.
    * User can config different configuration for query and ingestion (table creation and update) static analyzer.
