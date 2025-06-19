@@ -2012,6 +2012,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     return true;
   }
 
+  // tests to test text search with options
   @Test
   public void testTextSearchWithOptions()
       throws Exception {
