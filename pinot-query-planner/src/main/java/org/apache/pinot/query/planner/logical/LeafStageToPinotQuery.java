@@ -29,8 +29,8 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 /**
@@ -82,7 +82,7 @@ public class LeafStageToPinotQuery {
     pinotQuery.setDataSource(new DataSource());
     pinotQuery.getDataSource().setTableName(tableName);
     pinotQuery.setSelectList(tableScan.getRowType().getFieldNames().stream().map(
-        CalciteSqlParser::compileToExpression).collect(Collectors.toList()));
+        RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
     return pinotQuery;
   }
 

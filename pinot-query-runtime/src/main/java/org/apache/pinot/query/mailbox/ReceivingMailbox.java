@@ -61,8 +61,8 @@ public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReceivingMailbox.class);
-  private static final MseBlockWithStats CANCELLED_ERROR_BLOCK = new MseBlockWithStats(
-      ErrorMseBlock.fromException(new RuntimeException("Cancelled by receiver")), Collections.emptyList());
+  // This was previously a static final attribute, but now that includes server and stage, we cannot use constants
+  private volatile MseBlockWithStats _cancelledErrorBlock;
 
   private final String _id;
   // TODO: Make the queue size configurable
@@ -121,8 +121,11 @@ public class ReceivingMailbox {
       if (exceptions.isEmpty()) {
         block = SuccessMseBlock.INSTANCE;
       } else {
+        MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
         Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
-        setErrorBlock(new ErrorMseBlock(exceptionsByQueryError), dataBlock.getStatsByStage());
+        ErrorMseBlock errorBlock = new ErrorMseBlock(metadataBlock.getStageId(), metadataBlock.getWorkerId(),
+            metadataBlock.getServerId(), exceptionsByQueryError);
+        setErrorBlock(errorBlock, dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;
       }
     } else {
@@ -149,7 +152,7 @@ public class ReceivingMailbox {
     MseBlockWithStats errorBlock = _errorBlock.get();
     if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED : ReceivingMailboxStatus.ERROR;
+      return errorBlock == _cancelledErrorBlock ? ReceivingMailboxStatus.CANCELLED : ReceivingMailboxStatus.ERROR;
     }
     if (timeoutMs <= 0) {
       LOGGER.debug("Mailbox: {} is already timed out", _id);
@@ -174,7 +177,7 @@ public class ReceivingMailbox {
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED : ReceivingMailboxStatus.ERROR;
+          return errorBlock == _cancelledErrorBlock ? ReceivingMailboxStatus.CANCELLED : ReceivingMailboxStatus.ERROR;
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
@@ -230,8 +233,14 @@ public class ReceivingMailbox {
    */
   public void cancel() {
     LOGGER.debug("Cancelling mailbox: {}", _id);
-    if (_errorBlock.compareAndSet(null, CANCELLED_ERROR_BLOCK)) {
-      _blocks.clear();
+    if (_errorBlock.get() == null) {
+      MseBlockWithStats errorBlock = new MseBlockWithStats(
+          ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT, "Cancelled by receiver"),
+          Collections.emptyList());
+      if (_errorBlock.compareAndSet(null, errorBlock)) {
+        _cancelledErrorBlock = errorBlock;
+        _blocks.clear();
+      }
     }
   }
 

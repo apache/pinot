@@ -38,6 +38,7 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
 
   private final SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
   private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
+  private final SegmentMultiColTextIndexPreprocessThrottler _segmentMultiColTextIndexPreprocessThrottler;
   private final SegmentDownloadThrottler _segmentDownloadThrottler;
 
   /**
@@ -48,10 +49,12 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
    */
   public SegmentOperationsThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
       SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler,
-      SegmentDownloadThrottler segmentDownloadThrottler) {
+      SegmentDownloadThrottler segmentDownloadThrottler,
+      SegmentMultiColTextIndexPreprocessThrottler segmentMultiColTextIndexPreprocessThrottler) {
     _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
     _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
     _segmentDownloadThrottler = segmentDownloadThrottler;
+    _segmentMultiColTextIndexPreprocessThrottler = segmentMultiColTextIndexPreprocessThrottler;
   }
 
   public SegmentAllIndexPreprocessThrottler getSegmentAllIndexPreprocessThrottler() {
@@ -60,6 +63,10 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
 
   public SegmentStarTreePreprocessThrottler getSegmentStarTreePreprocessThrottler() {
     return _segmentStarTreePreprocessThrottler;
+  }
+
+  public SegmentMultiColTextIndexPreprocessThrottler getSegmentMultiColTextIndexPreprocessThrottler() {
+    return _segmentMultiColTextIndexPreprocessThrottler;
   }
 
   public SegmentDownloadThrottler getSegmentDownloadThrottler() {
@@ -75,12 +82,14 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
     _segmentAllIndexPreprocessThrottler.initializeMetrics();
     _segmentStarTreePreprocessThrottler.initializeMetrics();
     _segmentDownloadThrottler.initializeMetrics();
+    _segmentMultiColTextIndexPreprocessThrottler.initializeMetrics();
   }
 
   public synchronized void startServingQueries() {
     _segmentAllIndexPreprocessThrottler.startServingQueries();
     _segmentStarTreePreprocessThrottler.startServingQueries();
     _segmentDownloadThrottler.startServingQueries();
+    _segmentMultiColTextIndexPreprocessThrottler.startServingQueries();
   }
 
   @Override
@@ -88,5 +97,6 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
     _segmentAllIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
     _segmentStarTreePreprocessThrottler.onChange(changedConfigs, clusterConfigs);
     _segmentDownloadThrottler.onChange(changedConfigs, clusterConfigs);
+    _segmentMultiColTextIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
   }
 }

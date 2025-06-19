@@ -185,6 +185,10 @@ public abstract class SegmentDirectory implements Closeable {
       return false;
     }
 
+    public boolean hasMultiColumnTextIndex() {
+      return false;
+    }
+
     /**
      * The StarTree index is a multi-column index but modelled like those single-column indices kept in columns.psf and
      * index_map files, so access to its index data can be abstracted with SegmentDirectory.Reader interface too. In the

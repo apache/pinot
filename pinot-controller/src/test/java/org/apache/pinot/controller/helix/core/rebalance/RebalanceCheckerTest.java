@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -35,11 +36,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -49,14 +50,8 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class RebalanceCheckerTest {
@@ -89,7 +84,7 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
@@ -106,7 +101,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
     jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
@@ -118,7 +113,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
@@ -154,11 +149,37 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.DONE);
     stats.setStartTimeMs(5000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job5", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job5", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job5", stats, jobCtx);
     allJobMetadata.put("job5", jobMetadata);
     jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
     assertEquals(jobs.size(), 0);
+
+    // Add job6 that doesn't support retries as per its rebalance context (used by system initiated rebalances in
+    // practice).
+    jobCfg = new RebalanceConfig();
+    jobCfg.setMaxAttempts(4);
+    stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.FAILED);
+    stats.setStartTimeMs(5000);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job6", jobCfg, false);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job6", stats, jobCtx);
+    allJobMetadata.put("job6", jobMetadata);
+    jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
+    assertEquals(jobs.size(), 0);
+
+    // Ensure that a job serialized using an older version of TableRebalanceContext without the allowRetries field is
+    // retriable by default.
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT,
+        "{\"jobId\":\"job6\",\"attemptId\":1,\"config\":{\"maxAttempts\":4,\"dryRun\":false,\"preChecks\":false,"
+            + "\"bootstrap\":false,\"downtime\":false,\"lowDiskMode\":false,\"bestEfforts\":false,"
+            + "\"reassignInstances\":false,\"includeConsuming\":false,\"batchSizePerServer\":-1,"
+            + "\"updateTargetTier\":false,\"externalViewCheckIntervalInMs\":1000,\"minAvailableReplicas\":1,"
+            + "\"heartbeatIntervalInMs\":300000,\"heartbeatTimeoutInMs\":3600000,\"retryInitialDelayInMs\":300000,"
+            + "\"minimizeDataMovement\":\"ENABLE\",\"externalViewStabilizationTimeoutInMs\":3600000},"
+            + "\"originalJobId\":\"job6\"}, tableName=table01}");
+    jobs = RebalanceChecker.getCandidateJobs(tableName, Map.of("job6", jobMetadata));
+    assertEquals(jobs.size(), 1);
   }
 
   @Test
@@ -195,6 +216,28 @@ public class RebalanceCheckerTest {
   }
 
   @Test
+  public void testStuckInProgressJobs()
+      throws Exception {
+    String tableName = "table01";
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+
+    assertFalse(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
+
+    RebalanceConfig jobCfg = new RebalanceConfig();
+    jobCfg.setHeartbeatTimeoutInMs(10_000);
+    TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+    // Even though allowRetries is false, we still abort stuck jobs (heartbeat timeout exceeded).
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, false);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() - 20_000));
+    allJobMetadata.put("job1", jobMetadata);
+
+    assertTrue(RebalanceChecker.hasStuckInProgressJobs(tableName, allJobMetadata));
+  }
+
+  @Test
   public void testRetryRebalance()
       throws Exception {
     String tableName = "table01";
@@ -210,7 +253,7 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
@@ -227,7 +270,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
     jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
@@ -239,7 +282,7 @@ public class RebalanceCheckerTest {
     stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job3", jobCfg, true);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
@@ -248,14 +291,21 @@ public class RebalanceCheckerTest {
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
     when(helixManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(helixManager.getAllJobs(any(), any())).thenReturn(allJobMetadata);
-    RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getPropertyStore()).thenReturn(propertyStore);
+    TableRebalanceManager tableRebalanceManager = mock(TableRebalanceManager.class);
+    when(tableRebalanceManager.rebalanceTableAsync(anyString(), any(TableConfig.class), anyString(),
+        any(RebalanceConfig.class), any(ZkBasedTableRebalanceObserver.class))).thenReturn(
+        CompletableFuture.completedFuture(null));
+    RebalanceChecker checker = new RebalanceChecker(tableRebalanceManager, helixManager, leadController, cfg, metrics);
     // Although job1_3 was submitted most recently but job1 had exceeded maxAttempts. Chose job3 to retry, which got
     // stuck at in progress status.
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // The new retry job is for job3 and attemptId is increased to 2.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, times(1)).rebalanceTableAsync(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
     ZkBasedTableRebalanceObserver observer = observerCaptor.getValue();
     jobCtx = observer.getTableRebalanceContext();
     assertEquals(jobCtx.getOriginalJobId(), "job3");
@@ -279,19 +329,26 @@ public class RebalanceCheckerTest {
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(nowMs);
-    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg, true);
     Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
 
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
     TableConfig tableConfig = mock(TableConfig.class);
     when(helixManager.getTableConfig(tableName)).thenReturn(tableConfig);
-    RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixManager.getPropertyStore()).thenReturn(propertyStore);
+    TableRebalanceManager tableRebalanceManager = mock(TableRebalanceManager.class);
+    when(tableRebalanceManager.rebalanceTableAsync(anyString(), any(TableConfig.class), anyString(),
+        any(RebalanceConfig.class), any(ZkBasedTableRebalanceObserver.class))).thenReturn(
+        CompletableFuture.completedFuture(null));
+    RebalanceChecker checker = new RebalanceChecker(tableRebalanceManager, helixManager, leadController, cfg, metrics);
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // Retry for job1 is delayed with 5min backoff.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(0)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, never()).rebalanceTable(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
 
     // Set initial delay to 0 to disable retry backoff.
     jobCfg.setRetryInitialDelayInMs(0);
@@ -300,7 +357,8 @@ public class RebalanceCheckerTest {
     checker.retryRebalanceTable(tableName, allJobMetadata);
     // Retry for job1 is delayed with 0 backoff.
     observerCaptor = ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
-    verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+    verify(tableRebalanceManager, times(1)).rebalanceTableAsync(eq(tableName), any(), anyString(), any(),
+        observerCaptor.capture());
   }
 
   @Test
@@ -311,7 +369,8 @@ public class RebalanceCheckerTest {
     PinotHelixResourceManager pinotHelixManager = new PinotHelixResourceManager(cfg);
     HelixManager helixZkManager = mock(HelixManager.class);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
-    String zkPath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE);
+    String zkPath =
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobTypes.TABLE_REBALANCE.name());
     ZNRecord jobsZnRecord = new ZNRecord("jobs");
     when(propertyStore.get(eq(zkPath), any(), eq(AccessOption.PERSISTENT))).thenReturn(jobsZnRecord);
     when(helixZkManager.getClusterManagmentTool()).thenReturn(mock(HelixAdmin.class));
@@ -321,16 +380,16 @@ public class RebalanceCheckerTest {
 
     pinotHelixManager.addControllerJobToZK("job1",
         ImmutableMap.of("jobId", "job1", "submissionTimeMs", "1000", "tableName", "table01"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job2",
         ImmutableMap.of("jobId", "job2", "submissionTimeMs", "2000", "tableName", "table01"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> false);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> false);
     pinotHelixManager.addControllerJobToZK("job3",
         ImmutableMap.of("jobId", "job3", "submissionTimeMs", "3000", "tableName", "table02"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     pinotHelixManager.addControllerJobToZK("job4",
         ImmutableMap.of("jobId", "job4", "submissionTimeMs", "4000", "tableName", "table02"),
-        ControllerJobType.TABLE_REBALANCE, jmd -> true);
+        ControllerJobTypes.TABLE_REBALANCE, jmd -> true);
     Map<String, Map<String, String>> jmds = jobsZnRecord.getMapFields();
     assertEquals(jmds.size(), 3);
     assertTrue(jmds.containsKey("job1"));
@@ -338,13 +397,13 @@ public class RebalanceCheckerTest {
     assertTrue(jmds.containsKey("job4"));
 
     Set<String> expectedJobs01 = new HashSet<>();
-    pinotHelixManager.updateJobsForTable("table01", ControllerJobType.TABLE_REBALANCE,
+    pinotHelixManager.updateJobsForTable("table01", ControllerJobTypes.TABLE_REBALANCE,
         jmd -> expectedJobs01.add(jmd.get("jobId")));
     assertEquals(expectedJobs01.size(), 1);
     assertTrue(expectedJobs01.contains("job1"));
 
     Set<String> expectedJobs02 = new HashSet<>();
-    pinotHelixManager.updateJobsForTable("table02", ControllerJobType.TABLE_REBALANCE,
+    pinotHelixManager.updateJobsForTable("table02", ControllerJobTypes.TABLE_REBALANCE,
         jmd -> expectedJobs02.add(jmd.get("jobId")));
     assertEquals(expectedJobs02.size(), 2);
     assertTrue(expectedJobs02.contains("job3"));

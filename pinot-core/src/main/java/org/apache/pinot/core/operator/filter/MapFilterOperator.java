@@ -65,10 +65,14 @@ public class MapFilterOperator extends BaseFilterOperator {
     _columnName = arguments.get(0).getIdentifier();
     _keyName = arguments.get(1).getLiteral().getStringValue();
 
-    // Get JSON index and create operator
-    DataSource dataSource = indexSegment.getDataSource(_columnName);
-    JsonIndexReader jsonIndex = dataSource.getJsonIndex();
-    if (jsonIndex != null && useJsonIndex(_predicate.getType())) {
+    JsonIndexReader jsonIndex = null;
+    if (canUseJsonIndex(_predicate.getType())) {
+      DataSource dataSource = indexSegment.getDataSourceNullable(_columnName);
+      if (dataSource != null) {
+        jsonIndex = dataSource.getJsonIndex();
+      }
+    }
+    if (jsonIndex != null) {
       FilterContext filterContext = createFilterContext();
       _jsonMatchOperator = new JsonMatchFilterOperator(jsonIndex, filterContext, numDocs);
       _expressionFilterOperator = null;
@@ -201,7 +205,7 @@ public class MapFilterOperator extends BaseFilterOperator {
    * @param predicateType The type of predicate
    * @return true if the predicate type is supported for JSON index, false otherwise
    */
-  private boolean useJsonIndex(Predicate.Type predicateType) {
+  private static boolean canUseJsonIndex(Predicate.Type predicateType) {
     switch (predicateType) {
       case EQ:
       case NOT_EQ:

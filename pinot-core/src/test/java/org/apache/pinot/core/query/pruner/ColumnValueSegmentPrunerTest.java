@@ -31,10 +31,13 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
@@ -58,8 +61,7 @@ public class ColumnValueSegmentPrunerTest {
     IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
-
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
     when(dataSourceMetadata.getMinValue()).thenReturn(10);
@@ -115,7 +117,7 @@ public class ColumnValueSegmentPrunerTest {
     IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource("column")).thenReturn(dataSource);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
 
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
@@ -190,6 +192,7 @@ public class ColumnValueSegmentPrunerTest {
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    queryContext.setSchema(mock(Schema.class));
     return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
   }
 }

@@ -20,9 +20,8 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
  * This configuration is used to control the behavior of the page cache warmup process.
@@ -30,11 +29,11 @@ import javax.annotation.Nullable;
 public class PageCacheWarmupConfig extends BaseJsonConfig {
 
   // Whether page cache warmup be enabled on restart
-  private final boolean _restartEnabled;
+  private final boolean _enableOnRestart;
   // Whether page cache warmup be enabled on refresh
-  private final boolean _refreshEnabled;
+  private final boolean _enableOnRefresh;
   // Duration in seconds for which the page cache warmup should run
-  private final int _maxWarmupDurationSeconds;
+  private final Integer _maxWarmupDurationSeconds;
   // Query Selection Policy for page cache warmup, can be null
   // This is used to define a strategy for how queries should be selected for warmup
   @Nullable
@@ -43,12 +42,12 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   private static final int DEFAULT_WARMUP_DURATION_SECONDS = 180;
 
   @JsonCreator
-  public PageCacheWarmupConfig(@JsonProperty("restartEnabled") boolean restartEnabled,
-                               @JsonProperty("refreshEnabled") boolean refreshEnabled,
-                               @JsonProperty("maxWarmupDurationSeconds") Integer maxWarmupDurationSeconds,
+  public PageCacheWarmupConfig(@JsonProperty("enableOnRestart") boolean enableOnRestart,
+                               @JsonProperty("enableOnRefresh") boolean enableOnRefresh,
+                               @JsonProperty("maxWarmupDurationSeconds") @Nullable Integer maxWarmupDurationSeconds,
                                @Nullable @JsonProperty("policy") String policy) {
-    _restartEnabled = restartEnabled;
-    _refreshEnabled = refreshEnabled;
+    _enableOnRestart = enableOnRestart;
+    _enableOnRefresh = enableOnRefresh;
     _maxWarmupDurationSeconds = (maxWarmupDurationSeconds != null)
         ? maxWarmupDurationSeconds
         : DEFAULT_WARMUP_DURATION_SECONDS;
@@ -56,14 +55,14 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   }
 
   // Getters
-  @JsonProperty("restartEnabled")
-  public boolean isRestartEnabled() {
-    return _restartEnabled;
+  @JsonProperty("enableOnRestart")
+  public boolean enableOnRestart() {
+    return _enableOnRestart;
   }
 
-  @JsonProperty("refreshEnabled")
-  public boolean isRefreshEnabled() {
-    return _refreshEnabled;
+  @JsonProperty("enableOnRefresh")
+  public boolean enableOnRefresh() {
+    return _enableOnRefresh;
   }
 
   @JsonProperty("maxWarmupDurationSeconds")
@@ -76,5 +75,4 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   public String getPolicy() {
     return _policy;
   }
-
 }
