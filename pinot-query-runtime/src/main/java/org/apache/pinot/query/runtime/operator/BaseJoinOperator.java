@@ -42,7 +42,6 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
-import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -399,28 +398,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       _size = resultColumnSize;
     }
 
-    private static final class NullNullView extends JoinedRowView {
-      public NullNullView(int resultColumnSize, int leftSize) {
-        super(resultColumnSize, leftSize);
-      }
-
-      @Override
-      public Object get(int i) {
-        return null;
-      }
-
-      @Override
-      @NotNull
-      public Object[] toArray() {
-        return new Object[_size];
-      }
-    }
-
-    private static final class LeftRightView extends JoinedRowView {
+    private static final class BothNotNullView extends JoinedRowView {
       private final Object[] _leftRow;
       private final Object[] _rightRow;
 
-      private LeftRightView(Object[] leftRow, Object[] rightRow, int resultColumnSize, int leftSize) {
+      private BothNotNullView(Object[] leftRow, Object[] rightRow, int resultColumnSize, int leftSize) {
         super(resultColumnSize, leftSize);
         _leftRow = leftRow;
         _rightRow = rightRow;
@@ -432,7 +414,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
 
       @Override
-      @NotNull
       public Object[] toArray() {
         Object[] resultRow = new Object[_size];
         System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
@@ -441,10 +422,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
     }
 
-    private static final class NullRightView extends JoinedRowView {
+    private static final class RightNotNullView extends JoinedRowView {
       private final Object[] _rightRow;
 
-      public NullRightView(Object[] rightRow, int resultColumnSize, int leftSize) {
+      public RightNotNullView(Object[] rightRow, int resultColumnSize, int leftSize) {
         super(resultColumnSize, leftSize);
         _rightRow = rightRow;
       }
@@ -455,7 +436,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
 
       @Override
-      @NotNull
       public Object[] toArray() {
         Object[] resultRow = new Object[_size];
         System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
@@ -463,10 +443,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
     }
 
-    private static final class LeftNullView extends JoinedRowView {
+    private static final class LeftNotNullView extends JoinedRowView {
       private final Object[] _leftRow;
 
-      public LeftNullView(@NotNull Object[] leftRow, int resultColumnSize, int leftSize) {
+      public LeftNotNullView(Object[] leftRow, int resultColumnSize, int leftSize) {
         super(resultColumnSize, leftSize);
         _leftRow = leftRow;
       }
@@ -477,7 +457,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       }
 
       @Override
-      @NotNull
       public Object[] toArray() {
         Object[] resultRow = new Object[_size];
         System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
@@ -488,15 +467,15 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     public static JoinedRowView of(@Nullable Object[] leftRow, @Nullable Object[] rightRow, int resultColumnSize,
         int leftSize) {
       if (leftRow == null && rightRow == null) {
-        return new NullNullView(resultColumnSize, leftSize);
+        throw new IllegalStateException("both left and right side of join are null");
       }
       if (leftRow == null) {
-        return new NullRightView(rightRow, resultColumnSize, leftSize);
+        return new RightNotNullView(rightRow, resultColumnSize, leftSize);
       }
       if (rightRow == null) {
-        return new LeftNullView(leftRow, resultColumnSize, leftSize);
+        return new LeftNotNullView(leftRow, resultColumnSize, leftSize);
       }
-      return new LeftRightView(leftRow, rightRow, resultColumnSize, leftSize);
+      return new BothNotNullView(leftRow, rightRow, resultColumnSize, leftSize);
     }
 
     @Override
