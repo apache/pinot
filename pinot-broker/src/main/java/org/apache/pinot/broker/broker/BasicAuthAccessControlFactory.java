@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
-import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.grpc.GrpcRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -35,8 +34,10 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.request.BrokerRequest;
 
 
 /**

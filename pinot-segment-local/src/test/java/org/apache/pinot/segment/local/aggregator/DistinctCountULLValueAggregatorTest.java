@@ -21,9 +21,9 @@ package org.apache.pinot.segment.local.aggregator;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.util.Collections;
 import java.util.stream.IntStream;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
+import org.apache.pinot.spi.request.Literal;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

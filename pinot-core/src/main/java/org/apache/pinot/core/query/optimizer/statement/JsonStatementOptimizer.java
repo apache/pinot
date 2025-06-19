@@ -28,12 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Identifier;
-import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -42,6 +36,12 @@ import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.ExpressionType;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.Identifier;
+import org.apache.pinot.spi.request.Literal;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.FilterKind;
 
 

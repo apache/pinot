@@ -32,7 +32,6 @@ import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
@@ -45,6 +44,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.BrokerRequest;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;

@@ -27,6 +27,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
