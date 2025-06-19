@@ -396,6 +396,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_ENABLE_GROUP_TRIM = "pinot.broker.mse.enable.group.trim";
     public static final boolean DEFAULT_MSE_ENABLE_GROUP_TRIM = false;
 
+    public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS = "pinot.broker.mse.max.server.query.threads";
+    public static final int DEFAULT_MSE_MAX_SERVER_QUERY_THREADS = -1;
+
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
     public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
@@ -578,6 +581,9 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to skip a given set of rules
+        public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
+
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
@@ -688,6 +694,51 @@ public class CommonConstants {
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
+    }
+
+    /**
+     * Calcite and Pinot rule names / descriptions
+     * used for enable and disabling of rules, this will be iterated through in PlannerContext
+     * to check if rule is disabled.
+     */
+    public static class PlannerRuleNames {
+      public static final String FILTER_INTO_JOIN = "FilterIntoJoin";
+      public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTranspose";
+      public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTranspose";
+      public static final String PROJECT_JOIN_TRANSPOSE = "ProjectJoinTranspose";
+      public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTranspose";
+      public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTranspose";
+      public static final String JOIN_CONDITION_PUSH = "JoinConditionPush";
+      public static final String JOIN_PUSH_TRANSITIVE_PREDICATES = "JoinPushTransitivePredicates";
+      public static final String PROJECT_REMOVE = "ProjectRemove";
+      public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindow";
+      public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTranspose";
+      public static final String EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteral";
+      public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
+      public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
+      public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
+      public static final String SEMIN_JOIN_DISTINCT_PROJECT = "SeminJoinDistinctProject";
+      public static final String UNION_TO_DISTINCT = "UnionToDistinct";
+      public static final String AGGREGATE_REMOVE = "AggregateRemove";
+      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
+      public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
+      public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
+      public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
+      public static final String PROJECT_MERGE = "ProjectMerge";
+      public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
+      public static final String FILTER_MERGE = "FilterMerge";
+      public static final String SORT_REMOVE = "SortRemove";
+      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
+      public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
+      public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
+      public static final String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
+      public static final String PRUNE_EMPTY_SORT = "PruneEmptySort";
+      public static final String PRUNE_EMPTY_UNION = "PruneEmptyUnion";
+      public static final String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
+      public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
+      public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
+      public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
     }
 
     public static class FailureDetector {
@@ -936,6 +987,9 @@ public class CommonConstants {
     public static final String MSE_CONFIG_PREFIX = QUERY_EXECUTOR_CONFIG_PREFIX + "." + MSE;
     public static final String CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         MSE_CONFIG_PREFIX + "." + MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+    public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS =
+        MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
+    public static final int DEFAULT_MSE_MAX_EXECUTION_THREADS = -1;
 
     // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
     // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When

@@ -24,14 +24,12 @@ import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -140,25 +138,72 @@ public class SegmentAssignmentUtils {
     return instancesAssigned;
   }
 
-  /**
-   * Rebalances the table with Helix AutoRebalanceStrategy.
-   */
-  public static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
-      Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {
-    // Use Helix AutoRebalanceStrategy to rebalance the table
-    LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-    states.put(SegmentStateModel.ONLINE, replication);
-    AutoRebalanceStrategy autoRebalanceStrategy =
-        new AutoRebalanceStrategy(null, new ArrayList<>(currentAssignment.keySet()), states);
-    // Make a copy of the current assignment because this step might change the passed in assignment
-    Map<String, Map<String, String>> currentAssignmentCopy = new TreeMap<>();
+  /// Rebalances the table with non-replica-group based segment assignment strategy by uniformly spraying segment
+  /// replicas to the servers.
+  /// 1. Calculate the target number of segments on each server
+  /// 2. Loop over all the segments and keep the assignment if target number of segments for the server has not been
+  /// reached and track the not assigned segments
+  /// 3. Assign the left-over segments to the servers with the least segments, or the smallest index if there is a tie
+  public static Map<String, Map<String, String>> rebalanceNonReplicaGroupBasedTable(
+      Map<String, Map<String, String>> currentAssignment, List<String> servers, int replication) {
+    Map<String, Integer> serverIds = getInstanceNameToIdMap(servers);
+
+    // Calculate target number of segments per server
+    // NOTE: in order to minimize the segment movements, use the ceiling of the quotient
+    int numServers = servers.size();
+    int numSegments = currentAssignment.size();
+    int targetNumSegmentsPerServer = (numSegments * replication + numServers - 1) / numServers;
+
+    // Do not move segment if target number of segments is not reached, track the segments need to be moved
+    Map<String, Map<String, String>> newAssignment = new TreeMap<>();
+    int[] numSegmentsAssignedPerServer = new int[numServers];
+    List<String> segmentsNotAssigned = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      currentAssignmentCopy.put(segmentName, new TreeMap<>(instanceStateMap));
+      String segment = entry.getKey();
+      Set<String> currentServers = entry.getValue().keySet();
+      int remainingReplicas = replication;
+      for (String server : currentServers) {
+        Integer serverId = serverIds.get(server);
+        if (serverId != null && numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
+          newAssignment.computeIfAbsent(segment, k -> new TreeMap<>()).put(server, SegmentStateModel.ONLINE);
+          numSegmentsAssignedPerServer[serverId]++;
+          remainingReplicas--;
+          if (remainingReplicas == 0) {
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < remainingReplicas; i++) {
+        segmentsNotAssigned.add(segment);
+      }
     }
-    return autoRebalanceStrategy.computePartitionAssignment(instances, instances, currentAssignmentCopy, null)
-        .getMapFields();
+
+    // Assign each not assigned segment to the server with the least segments, or the smallest id if there is a tie
+    PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numServers, Pairs.intPairComparator());
+    for (int serverId = 0; serverId < numServers; serverId++) {
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerServer[serverId], serverId));
+    }
+    List<Pairs.IntPair> skippedPairs = new ArrayList<>();
+    for (String segment : segmentsNotAssigned) {
+      Map<String, String> instanceStateMap = newAssignment.computeIfAbsent(segment, k -> new TreeMap<>());
+      while (true) {
+        Pairs.IntPair intPair = heap.remove();
+        int serverId = intPair.getRight();
+        String server = servers.get(serverId);
+        // Skip the server if it already has the segment
+        if (instanceStateMap.put(server, SegmentStateModel.ONLINE) == null) {
+          intPair.setLeft(intPair.getLeft() + 1);
+          heap.add(intPair);
+          break;
+        } else {
+          skippedPairs.add(intPair);
+        }
+      }
+      heap.addAll(skippedPairs);
+      skippedPairs.clear();
+    }
+
+    return newAssignment;
   }
 
   /**

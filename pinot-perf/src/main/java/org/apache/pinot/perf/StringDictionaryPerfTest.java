@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import com.google.common.base.Joiner;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -101,23 +100,16 @@ public class StringDictionaryPerfTest {
 
     int i = 0;
     while (i < dictLength) {
-      HashMap<String, Object> map = new HashMap<>();
-      String randomString = RandomStringUtils
-          .randomAlphanumeric(USE_FIXED_SIZE_STRING ? MAX_STRING_LENGTH : (1 + random.nextInt(MAX_STRING_LENGTH)));
-
-      if (uniqueStrings.contains(randomString)) {
+      String randomString = RandomStringUtils.randomAlphanumeric(
+          USE_FIXED_SIZE_STRING ? MAX_STRING_LENGTH : (1 + random.nextInt(MAX_STRING_LENGTH)));
+      if (!uniqueStrings.add(randomString)) {
         continue;
       }
-
-      _inputStrings[i] = randomString;
-      if (uniqueStrings.add(randomString)) {
-        _statistics.addValue(randomString.length());
-      }
-      map.put("test", _inputStrings[i++]);
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      _inputStrings[i++] = randomString;
+      _statistics.addValue(randomString.length());
+      GenericRow row = new GenericRow();
+      row.putValue(COLUMN_NAME, randomString);
+      rows.add(row);
     }
 
     long start = System.currentTimeMillis();

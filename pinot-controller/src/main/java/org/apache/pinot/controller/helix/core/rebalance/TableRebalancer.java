@@ -361,16 +361,10 @@ public class TableRebalancer {
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       } else {
-        if (dryRun) {
-          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
-              "Instance reassigned in dry-run mode, table is already balanced",
-              instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
-        } else {
-          _tableRebalanceObserver.onSuccess("Instance reassigned but table is already balanced");
-          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
-              "Instance reassigned, table is already balanced", instancePartitionsMap,
-              tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
-        }
+        tableRebalanceLogger.info("Instance reassigned but table is already balanced");
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
+            "Instance reassigned, table is already balanced", instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
     }
 
