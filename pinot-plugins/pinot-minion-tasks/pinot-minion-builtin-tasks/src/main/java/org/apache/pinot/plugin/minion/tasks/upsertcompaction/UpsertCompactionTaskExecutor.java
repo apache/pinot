@@ -104,6 +104,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
+              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
       totalDocsAfterCompaction = driver.getSegmentStats().getTotalDocCount();
     }
 

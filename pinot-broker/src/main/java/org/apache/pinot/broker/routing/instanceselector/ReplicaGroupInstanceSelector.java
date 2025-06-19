@@ -81,7 +81,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-      List<String> serverRankList = _priorityGroupInstanceSelector.rank(ctx, candidateServers);
+      List<String> serverRankList = _priorityPoolInstanceSelector.rank(ctx, candidateServers);
       Map<String, Integer> serverRankMap = new HashMap<>();
       for (int idx = 0; idx < serverRankList.size(); idx++) {
         serverRankMap.put(serverRankList.get(idx), idx);
@@ -98,7 +98,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Map<Integer, Integer> replicaGroupToSegmentCount = new HashMap<>();
+    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
     boolean useFixedReplica = isUseFixedReplica(ctx.getQueryOptions());
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(ctx.getQueryOptions());
     int numReplicaGroups = numReplicaGroupsToQuery != null ? numReplicaGroupsToQuery : 1;
@@ -122,7 +122,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
 
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
-      replicaGroupToSegmentCount.merge(selectedInstance.getReplicaGroup(), 1, Integer::sum);
+      poolToSegmentCount.merge(selectedInstance.getPool(), 1, Integer::sum);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -135,9 +135,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    for (Map.Entry<Integer, Integer> entry : replicaGroupToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredGroup(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
+    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
+          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
@@ -148,7 +148,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    Map<Integer, Integer> replicaGroupToSegmentCount = new HashMap<>();
+    Map<Integer, Integer> poolToSegmentCount = new HashMap<>();
     for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
@@ -171,7 +171,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
                 .min(Comparator.comparingInt(candidate -> serverRankMap.get(candidate.getInstance())))
                 .orElse(candidates.get(roundRobinInstanceIdx));
       }
-      replicaGroupToSegmentCount.merge(selectedInstance.getReplicaGroup(), 1, Integer::sum);
+      poolToSegmentCount.merge(selectedInstance.getPool(), 1, Integer::sum);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -180,9 +180,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
     }
-    for (Map.Entry<Integer, Integer> entry : replicaGroupToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredGroup(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
+    for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
+          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

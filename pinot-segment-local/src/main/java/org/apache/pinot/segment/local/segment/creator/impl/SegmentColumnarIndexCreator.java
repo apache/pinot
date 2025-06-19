@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -360,7 +361,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (numDocs == 0) {
       return;
     }
-
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
@@ -741,7 +741,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    List<IndexCreator> creators =
+    List<Closeable> creators =
         _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
     creators.addAll(_nullValueVectorCreatorMap.values());
     creators.addAll(_dictionaryCreatorMap.values());

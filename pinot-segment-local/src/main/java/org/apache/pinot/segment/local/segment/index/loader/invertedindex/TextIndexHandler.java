@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Helper class for text indexes used by {@link SegmentPreProcessor}.
- * to create text index for column during segment load time. Currently text index is always
+ * to create text index for column during segment load time. Currently, text index is always
  * created (if enabled on a column) during segment generation
  *
  * (1) A new segment with text index is created/refreshed. Server loads the segment. The handler

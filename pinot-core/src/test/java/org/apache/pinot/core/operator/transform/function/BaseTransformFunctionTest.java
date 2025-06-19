@@ -272,7 +272,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_MV_COLUMN_2, ArrayUtils.toObject(_doubleMV2Values[i]));
       map.put(JSON_STRING_SV_COLUMN, _jsonSVValues[i]);
       GenericRow row = new GenericRow();
-      row.init(map);
+      row.putValues(map);
       rows.add(row);
     }
 

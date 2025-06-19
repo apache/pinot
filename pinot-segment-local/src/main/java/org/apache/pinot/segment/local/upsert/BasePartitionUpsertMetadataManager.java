@@ -56,7 +56,9 @@ import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1145,5 +1147,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return _newlyAddedSegments.keySet();
     }
     return Collections.emptySet();
+  }
+
+  /**
+   * Returns the ZooKeeper creation time for upsert consistency.
+   * This refers to the time set by the controller when creating new consuming segment.
+   * This is used to ensure consistent creation time across replicas for upsert
+   * operations.
+   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  protected long getAuthoritativeCreationTime(IndexSegment segment) {
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    if (segmentMetadata instanceof SegmentMetadataImpl) {
+      SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+      long zkCreationTime = segmentMetadataImpl.getZkCreationTime();
+      if (zkCreationTime != Long.MIN_VALUE) {
+        return zkCreationTime;
+      }
+    }
+    // Fall back to local creation time if ZK creation time is not set
+    return segmentMetadata.getIndexCreationTime();
   }
 }

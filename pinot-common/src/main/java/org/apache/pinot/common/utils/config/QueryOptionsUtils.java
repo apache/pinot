@@ -182,6 +182,19 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
+    // Example config:  skipPlannerRules='FilterIntoJoinRule,FilterAggregateTransposeRule'
+    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipIndexesStr == null) {
+      return null;
+    }
+
+    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+
+    return new HashSet<>(List.of(skippedRules));
+  }
+
+  @Nullable
   public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
     String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
     return useFixedReplica != null ? Boolean.parseBoolean(useFixedReplica) : null;
@@ -193,19 +206,23 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
   }
 
-  public static List<Integer> getOrderedPreferredReplicas(Map<String, String> queryOptions) {
-    String orderedPreferredReplicas = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
-    if (orderedPreferredReplicas == null) {
+  public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
+    String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
+      // backward compatibility
+      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    }
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
       return Collections.emptyList();
     }
-    // cannot use comma as the delimiter of replica group list
+    // cannot use comma as the delimiter of pool list
     // because query option use comma as the delimiter of different options
-    String[] replicas = orderedPreferredReplicas.split("\\|");
-    List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
-    for (String replica : replicas) {
-      preferredReplicas.add(Integer.parseInt(replica.trim()));
+    String[] pools = orderedPreferredPools.split("\\|");
+    List<Integer> preferredPools = new ArrayList<>(pools.length);
+    for (String pool : pools) {
+      preferredPools.add(Integer.parseInt(pool.trim()));
     }
-    return preferredReplicas;
+    return preferredPools;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
@@ -393,17 +410,41 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(
-        queryOptions.getOrDefault(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY));
   }
 
-  public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+  public static boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
     String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION));
+  }
+
+  public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION));
+  }
+
+  public static boolean isUseLeafServerForIntermediateStage(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
+  }
+
+  public static boolean isUseLiteMode(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
+  }
+
+  public static boolean isUseBrokerPruning(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
+  }
+
+  public static boolean isRunInBroker(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "false"));
   }
 
   @Nullable

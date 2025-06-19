@@ -21,11 +21,9 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
@@ -93,10 +91,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Generate random values for the segment
     for (int i = 0; i < UNIQUE_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
-      map.put(FILTER_COLUMN, i);
+      GenericRow row = new GenericRow();
+      row.putValue(FILTER_COLUMN, i);
       for (String svColumn : SV_COLUMNS) {
-        map.put(svColumn, value);
+        row.putValue(svColumn, value);
         value += 1 + _random.nextInt(MAX_STEP_LENGTH);
       }
       for (String mvColumn : MV_COLUMNS) {
@@ -106,10 +104,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
           values[k] = value;
           value += 1 + _random.nextInt(MAX_STEP_LENGTH);
         }
-        map.put(mvColumn, values);
+        row.putValue(mvColumn, values);
       }
-      GenericRow row = new GenericRow();
-      row.init(map);
       rows.add(row);
     }
     for (int i = UNIQUE_ROWS; i < NUM_ROWS; i++) {

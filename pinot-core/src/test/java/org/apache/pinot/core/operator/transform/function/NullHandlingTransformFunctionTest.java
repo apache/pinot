@@ -113,26 +113,24 @@ public class NullHandlingTransformFunctionTest {
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
-      if (!_nullValues[i]) {
-        map.put(INT_SV_COLUMN, _intSVValues[i]);
-        map.put(LONG_SV_COLUMN, _longSVValues[i]);
-        map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
-        map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
-        map.put(STRING_SV_COLUMN, _stringSVValues[i]);
-        map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
-      } else {
-        map.put(INT_SV_COLUMN, null);
-        map.put(LONG_SV_COLUMN, null);
-        map.put(FLOAT_SV_COLUMN, null);
-        map.put(DOUBLE_SV_COLUMN, null);
-        map.put(STRING_SV_COLUMN, null);
-        map.put(BYTES_SV_COLUMN, null);
-      }
-      map.put(TIMESTAMP_COLUMN, _timeValues[i]);
-      map.put(TIME_COLUMN, _timeValues[i]);
       GenericRow row = new GenericRow();
-      row.init(map);
+      if (!_nullValues[i]) {
+        row.putValue(INT_SV_COLUMN, _intSVValues[i]);
+        row.putValue(LONG_SV_COLUMN, _longSVValues[i]);
+        row.putValue(FLOAT_SV_COLUMN, _floatSVValues[i]);
+        row.putValue(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
+        row.putValue(STRING_SV_COLUMN, _stringSVValues[i]);
+        row.putValue(BYTES_SV_COLUMN, _bytesSVValues[i]);
+      } else {
+        row.putValue(INT_SV_COLUMN, null);
+        row.putValue(LONG_SV_COLUMN, null);
+        row.putValue(FLOAT_SV_COLUMN, null);
+        row.putValue(DOUBLE_SV_COLUMN, null);
+        row.putValue(STRING_SV_COLUMN, null);
+        row.putValue(BYTES_SV_COLUMN, null);
+      }
+      row.putValue(TIMESTAMP_COLUMN, _timeValues[i]);
+      row.putValue(TIME_COLUMN, _timeValues[i]);
       rows.add(row);
     }
 

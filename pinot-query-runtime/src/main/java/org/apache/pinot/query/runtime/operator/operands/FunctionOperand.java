@@ -100,7 +100,7 @@ public class FunctionOperand implements TransformOperand {
 
   @Nullable
   @Override
-  public Object apply(Object[] row) {
+  public Object apply(List<Object> row) {
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
       Object value = operand.apply(row);

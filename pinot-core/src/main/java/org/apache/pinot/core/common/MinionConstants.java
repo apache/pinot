@@ -293,5 +293,7 @@ public class MinionConstants {
     public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
 
     public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
+
+    public static final String MAX_ZK_CREATION_TIME_MILLIS_KEY = "maxZKCreationTimeMillis";
   }
 }

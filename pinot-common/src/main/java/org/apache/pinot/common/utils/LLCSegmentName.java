@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -117,6 +118,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return dateTime.getMillis();
   }
 
+  @JsonValue
   public String getSegmentName() {
     return _segmentName;
   }

@@ -131,10 +131,10 @@ public class BenchmarkNativeAndLuceneBasedLike {
       String domain = domainNames[i % domainNames.length];
       String url = domain + urlSuffixes[i % urlSuffixes.length];
       GenericRow row = new GenericRow();
-      row.putField(INT_COL_NAME, _intBaseValue + i);
-      row.putField(NO_INDEX_STRING_COL_NAME, noIndexData[i % noIndexData.length]);
-      row.putField(DOMAIN_NAMES_COL, domain);
-      row.putField(URL_COL, url);
+      row.putValue(INT_COL_NAME, _intBaseValue + i);
+      row.putValue(NO_INDEX_STRING_COL_NAME, noIndexData[i % noIndexData.length]);
+      row.putValue(DOMAIN_NAMES_COL, domain);
+      row.putValue(URL_COL, url);
       rows.add(row);
     }
     return rows;

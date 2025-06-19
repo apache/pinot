@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -28,14 +26,13 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -48,11 +45,14 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.List;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -73,7 +73,6 @@ public class PageCacheWarmupRestletResource {
   private final PinotFS _pinotFS;
   private final String _pageCacheWarmupDataDir;
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_QUERY_FILE_NAME = "queries.txt";
 
   @Inject
@@ -112,15 +111,14 @@ public class PageCacheWarmupRestletResource {
       }
 
       try (InputStream inputStream = _pinotFS.open(queryFile.toURI())) {
-        // Deserialize JSON content into a List<String>
-        List<String> queries = OBJECT_MAPPER.readValue(inputStream, new TypeReference<>() {
-        });
+        String json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        List<String> queries = JsonUtils.stringToObject(json, new TypeReference<>() { });
         LOGGER.info("Fetched {} queries for tableName: {}, tableType: {}", queries.size(), tableName, tableType);
         return Response.ok(queries, MediaType.APPLICATION_JSON).build();
       }
     } catch (ControllerApplicationException e) {
       throw e;
-    } catch (JsonProcessingException e) {
+    } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to serialize response", 500);
     } catch (Exception e) {
       LOGGER.error("Unexpected error occurred while fetching warmup queries for tableName: {}, tableType: {}",
@@ -169,8 +167,7 @@ public class PageCacheWarmupRestletResource {
           : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
 
-      List<String> queries = OBJECT_MAPPER.readValue(requestString, new TypeReference<>() {
-      });
+      List<String> queries = JsonUtils.stringToObject(requestString, new TypeReference<>() { });
       if (queries == null || queries.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "Queries list cannot be empty", 400);
       }
@@ -182,7 +179,7 @@ public class PageCacheWarmupRestletResource {
       return Response.ok(resp, MediaType.APPLICATION_JSON).build();
     } catch (ControllerApplicationException e) {
       throw e;
-    } catch (JsonProcessingException e) {
+    } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to parse queries list", 400);
     } catch (Exception e) {
       LOGGER.error("Unexpected error while storing warmup queries", e);
@@ -205,8 +202,9 @@ public class PageCacheWarmupRestletResource {
       tempFile = File.createTempFile(queryFileName, null);
       tempFile.deleteOnExit();
       // Write queries to the temporary file in JSON format
+      String json = JsonUtils.objectToString(queries);
       try (OutputStream outputStream = new FileOutputStream(tempFile)) {
-        OBJECT_MAPPER.writeValue(outputStream, queries);
+        outputStream.write(json.getBytes(StandardCharsets.UTF_8));
       }
       _pinotFS.move(tempFile.toURI(), queryFile.toURI(), true);
     } catch (Exception e) {
@@ -253,8 +251,8 @@ public class PageCacheWarmupRestletResource {
         ).build();
       }
       _pinotFS.delete(queryFile.toURI(), true);
-      String responseString = String.format("Successfully deleted warmup queries for table: %s of type: %s" +
-          " and file: %s", tableName, tableType, queryFileName);
+      String responseString = String.format("Successfully deleted warmup queries for table: %s of type: %s"
+          + " and file: %s", tableName, tableType, queryFileName);
       LOGGER.info(responseString);
       return Response.ok(responseString, MediaType.APPLICATION_JSON).build();
     } catch (Exception e) {

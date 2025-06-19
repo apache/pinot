@@ -93,9 +93,10 @@ public class CPUMemThreadLevelAccountingObjects {
       return _currentThreadMemoryAllocationSampleBytes;
     }
 
+    @Nullable
     public String getQueryId() {
       TaskEntry taskEntry = _currentThreadTaskStatus.get();
-      return taskEntry == null ? "" : taskEntry.getQueryId();
+      return taskEntry == null ? null : taskEntry.getQueryId();
     }
 
     public int getTaskId() {
@@ -109,7 +110,7 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? ThreadExecutionContext.TaskType.UNKNOWN : taskEntry.getTaskType();
     }
 
-    public void setThreadTaskStatus(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+    public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nonnull Thread anchorThread) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread));
     }

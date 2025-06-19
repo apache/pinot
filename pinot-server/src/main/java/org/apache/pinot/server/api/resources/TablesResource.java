@@ -19,8 +19,6 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -44,10 +42,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -145,8 +145,7 @@ public class TablesResource {
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private final Set<String> tablesWithWarmupInProgress = new HashSet<>();
+  private final Set<String> _tablesWithWarmupInProgress = new HashSet<>();
 
   @GET
   @Path("/tables")
@@ -1202,11 +1201,51 @@ public class TablesResource {
     }
   }
 
+  @DELETE
+  @Path("/tables/{tableName}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
+      + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will be "
+      + "removed.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public String removeIngestionMetrics(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @Nullable @ApiParam(value = "List of partition Ids (optional)") @QueryParam("partitionId")
+      Set<Integer> partitionIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    try {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+        Set<Integer> removedPartitionIds = realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionIds);
+        return "Successfully removed ingestion metrics for partitions: " + removedPartitionIds + " in table: "
+            + tableNameWithType;
+      } else {
+        throw new WebApplicationException(
+            "TableDataManager is not RealtimeTableDataManager for table: " + tableNameWithType,
+            Response.Status.BAD_REQUEST);
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   @POST
   @Path("/tables/{tableNameWithType}/triggerWarmup")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Trigger page cache warmup ", notes = "Initiates a page cache warmup process for provided table and segments")
+  @ApiOperation(value = "Trigger page cache warmup",
+      notes = "Initiates page cache warmup process for provided table and segments by executing the provided queries.")
   /**
    * Triggers the page cache warmup process for the provided table and segments.
    * Example:
@@ -1221,20 +1260,26 @@ public class TablesResource {
     try {
       LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
       // Prevent concurrent warmup requests
-      if (tablesWithWarmupInProgress.contains(tableNameWithType)) {
+      if (_tablesWithWarmupInProgress.contains(tableNameWithType)) {
         String message = "Warmup is already in progress. Ignoring the request.";
         LOGGER.warn(message);
         return Response.status(Response.Status.CONFLICT).entity(message).build();
       }
       // Parse the input request
-      TablePageCacheWarmupRequest warmupRequest = OBJECT_MAPPER.readValue(requestString, TablePageCacheWarmupRequest.class);
+      TablePageCacheWarmupRequest warmupRequest = JsonUtils.stringToObject(requestString,
+          TablePageCacheWarmupRequest.class);
       // Validate the parsed request
-      ServerResourceUtils.validateRequest(warmupRequest);
+      if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
+        throw new BadRequestException("Queries cannot be null or empty.");
+      } else if (warmupRequest.getSegments() == null || warmupRequest.getSegments().isEmpty()) {
+        throw new BadRequestException("Segments cannot be null or empty.");
+      }
       // Trigger the warmup
-      tablesWithWarmupInProgress.add(tableNameWithType);
-      _serverInstance.getPageCacheWarmupQueryExecutor().startWarmupOnRefresh(tableNameWithType,
+      _tablesWithWarmupInProgress.add(tableNameWithType);
+      _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRefresh(tableNameWithType,
           warmupRequest.getQueries(), warmupRequest.getSegments());
-      String responseString = String.format("Successfully triggered page cache warmup for table: %s", tableNameWithType);
+      String responseString = String.format("Successfully triggered page cache warmup for table: %s",
+          tableNameWithType);
       LOGGER.info(responseString);
       return Response.ok(responseString).build();
     } catch (BadRequestException | JsonProcessingException e) {
@@ -1246,8 +1291,7 @@ public class TablesResource {
       LOGGER.error(errorMessage, e);
       return Response.serverError().entity(errorMessage).build();
     } finally {
-      // Release the lock to allow future warmups
-      tablesWithWarmupInProgress.remove(tableNameWithType);
+      _tablesWithWarmupInProgress.remove(tableNameWithType);
     }
   }
 }

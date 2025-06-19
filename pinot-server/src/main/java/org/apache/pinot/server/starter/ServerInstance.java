@@ -50,7 +50,7 @@ import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
-import org.apache.pinot.server.warmup.PageCacheWarmupQueryExecutor;
+import org.apache.pinot.server.warmup.PageCacheWarmupServerQueryExecutor;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -81,7 +81,7 @@ public class ServerInstance {
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
-  private PageCacheWarmupQueryExecutor _pageCacheWarmupQueryExecutor;
+  private PageCacheWarmupServerQueryExecutor _pageCacheWarmupServerQueryExecutor;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
@@ -166,9 +166,13 @@ public class ServerInstance {
     if (serverConf.isEnableGrpcServer()) {
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
+      String instanceName = _helixManager.getInstanceName();
+      TlsConfig actualTslConfig = serverConf.isGrpcTlsServerEnabled()
+          ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX)
+          : null;
+      _grpcQueryServer = new GrpcQueryServer(instanceName, grpcPort,
+          GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
+          actualTslConfig, _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }
@@ -184,7 +188,7 @@ public class ServerInstance {
       }
     }
     TransformFunctionFactory.init(transformFunctionClasses);
-    _pageCacheWarmupQueryExecutor = new PageCacheWarmupQueryExecutor(_instanceDataManager, _queryScheduler,
+    _pageCacheWarmupServerQueryExecutor = new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
         serverConf.getPinotConfig());
 
     LOGGER.info("Finish initializing server instance");
@@ -308,7 +312,7 @@ public class ServerInstance {
     return _queryScheduler;
   }
 
-  public PageCacheWarmupQueryExecutor getPageCacheWarmupQueryExecutor() {
-    return _pageCacheWarmupQueryExecutor;
+  public PageCacheWarmupServerQueryExecutor getPageCacheWarmupServerQueryExecutor() {
+    return _pageCacheWarmupServerQueryExecutor;
   }
 }

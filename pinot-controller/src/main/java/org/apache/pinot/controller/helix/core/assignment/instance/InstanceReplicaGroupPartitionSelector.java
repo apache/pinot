@@ -248,7 +248,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     return numInstancesPerReplicaGroup;
   }
 
-  private int getNumPartitions() {
+  protected int getNumPartitions() {
     // Assign instances within a replica-group to one partition if not configured
     int numPartitions = _replicaGroupPartitionConfig.getNumPartitions();
     if (numPartitions <= 0) {
@@ -257,7 +257,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
     return numPartitions;
   }
 
-  private int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
+  protected int getNumInstancesPerPartition(int numInstancesPerReplicaGroup) {
     // Assign all instances within a replica-group to each partition if not configured
     int numInstancesPerPartition = _replicaGroupPartitionConfig.getNumInstancesPerPartition();
     if (numInstancesPerPartition > 0) {

@@ -29,8 +29,11 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -110,9 +113,11 @@ public class SelectionQuerySegmentPrunerTest {
         getIndexSegment(5L, 10L, 10),     // 6
         getIndexSegment(15L, 30L, 15));   // 7
 
+    Schema schema = mock(Schema.class);
     // Should keep segments: [null, null], [-5, 5], [0, 10]
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 5");
+    queryContext.setSchema(schema);
     List<IndexSegment> result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -122,6 +127,7 @@ public class SelectionQuerySegmentPrunerTest {
     // Should keep segments: [null, null], [-5, 5], [0, 10], [5, 10], [5, 15]
     queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 15, 20");
+    queryContext.setSchema(schema);
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 5);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -134,6 +140,7 @@ public class SelectionQuerySegmentPrunerTest {
     // Should keep segments: [null, null], [-5, 5], [0, 10], [5, 10], [5, 15], [15, 30], [15, 50]
     queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn, foo LIMIT 40");
+    queryContext.setSchema(schema);
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 7);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -148,6 +155,7 @@ public class SelectionQuerySegmentPrunerTest {
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30]
     queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5");
+    queryContext.setSchema(schema);
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 4);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -159,6 +167,7 @@ public class SelectionQuerySegmentPrunerTest {
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30]
     queryContext = QueryContextConverterUtils
         .getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5, 30");
+    queryContext.setSchema(schema);
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 4);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -170,6 +179,7 @@ public class SelectionQuerySegmentPrunerTest {
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30], [5, 15], [5, 10], [0, 10], [-5, 5]
     queryContext = QueryContextConverterUtils
         .getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC, foo LIMIT 60");
+    queryContext.setSchema(schema);
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 8);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -210,7 +220,7 @@ public class SelectionQuerySegmentPrunerTest {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("foo", "testColumn"));
     DataSource dataSource = mock(DataSource.class);
-    when(indexSegment.getDataSource(ORDER_BY_COLUMN)).thenReturn(dataSource);
+    when(indexSegment.getDataSource(eq(ORDER_BY_COLUMN), any(Schema.class))).thenReturn(dataSource);
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSourceMetadata.getMinValue()).thenReturn(minValue);

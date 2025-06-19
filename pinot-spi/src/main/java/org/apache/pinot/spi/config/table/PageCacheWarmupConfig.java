@@ -20,9 +20,8 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
  * This configuration is used to control the behavior of the page cache warmup process.
@@ -76,5 +75,4 @@ public class PageCacheWarmupConfig extends BaseJsonConfig {
   public String getPolicy() {
     return _policy;
   }
-
 }

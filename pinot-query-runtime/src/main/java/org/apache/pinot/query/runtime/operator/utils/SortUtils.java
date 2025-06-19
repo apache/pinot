@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
-import org.apache.pinot.common.utils.DataSchema;
 
 
 public class SortUtils {
@@ -35,22 +34,18 @@ public class SortUtils {
     private final int[] _valueIndices;
     private final int[] _multipliers;
     private final int[] _nullsMultipliers;
-    private final boolean[] _useDoubleComparison;
 
     /**
      * Sort comparator for use with priority queues.
      *
-     * @param dataSchema data schema to use
      * @param collations collations to sort on
      * @param reverse 'true' if the opposite sort direction should be used as what is specified
      */
-    public SortComparator(DataSchema dataSchema, List<RelFieldCollation> collations, boolean reverse) {
-      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    public SortComparator(List<RelFieldCollation> collations, boolean reverse) {
       _numFields = collations.size();
       _valueIndices = new int[_numFields];
       _multipliers = new int[_numFields];
       _nullsMultipliers = new int[_numFields];
-      _useDoubleComparison = new boolean[_numFields];
       for (int i = 0; i < _numFields; i++) {
         RelFieldCollation collation = collations.get(i);
         _valueIndices[i] = collation.getFieldIndex();
@@ -61,7 +56,6 @@ public class SortUtils {
                 && collation.direction == Direction.ASCENDING);
         int nullsMultiplier = nullsLast ? 1 : -1;
         _nullsMultipliers[i] = reverse ? -nullsMultiplier : nullsMultiplier;
-        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
       }
     }
 
@@ -80,13 +74,8 @@ public class SortUtils {
         if (v2 == null) {
           return -_nullsMultipliers[i];
         }
-        int result;
-        if (_useDoubleComparison[i]) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-        } else {
-          //noinspection rawtypes,unchecked
-          result = ((Comparable) v1).compareTo(v2);
-        }
+        //noinspection rawtypes,unchecked
+        int result = ((Comparable) v1).compareTo(v2);
         if (result != 0) {
           return result * _multipliers[i];
         }

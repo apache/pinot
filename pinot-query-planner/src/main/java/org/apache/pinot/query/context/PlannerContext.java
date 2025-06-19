@@ -52,6 +52,7 @@ public class PlannerContext implements AutoCloseable {
   private final LogicalPlanner _relTraitPlanner;
 
   private final Map<String, String> _options;
+  private final QueryEnvironment.Config _envConfig;
   private final Map<String, String> _plannerOutput;
   private final SqlExplainFormat _sqlExplainFormat;
   @Nullable
@@ -66,6 +67,7 @@ public class PlannerContext implements AutoCloseable {
     _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.of(envConfig),
         Collections.singletonList(RelDistributionTraitDef.INSTANCE));
     _options = options;
+    _envConfig = envConfig;
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;
@@ -89,6 +91,10 @@ public class PlannerContext implements AutoCloseable {
 
   public Map<String, String> getOptions() {
     return _options;
+  }
+
+  public QueryEnvironment.Config getEnvConfig() {
+    return _envConfig;
   }
 
   @Override

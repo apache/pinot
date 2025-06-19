@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -69,6 +70,9 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   private static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
   private static final String MS_SINCE_EPOCH_COLUMN_NAME = "MilliSecondsSinceEpoch";
+  //multi-column text index
+  private static final String MC_TEXT_INDEX_COLUMN_1 = "MCtextColumn1";
+  private static final String MC_TEXT_INDEX_COLUMN_2 = "MCtextColumn2";
   private static final String TEXT_INDEX_COLUMN = "textColumn";
   private static final String TEXT_INDEX_COLUMN_MV = "textColumnMV";
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
@@ -106,7 +110,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME)
         .setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN));
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_1));
   }
 
   protected static Schema getSchema()
@@ -115,6 +119,8 @@ public class BaseTableDataManagerNeedRefreshTest {
             "1:DAYS")
         .addDateTime(MS_SINCE_EPOCH_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addSingleValueDimension(PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT)
+        .addSingleValueDimension(MC_TEXT_INDEX_COLUMN_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(MC_TEXT_INDEX_COLUMN_2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
@@ -129,6 +135,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     GenericRow row0 = new GenericRow();
     row0.putValue(DEFAULT_TIME_COLUMN_NAME, 20000);
     row0.putValue(MS_SINCE_EPOCH_COLUMN_NAME, 20000L * 86400 * 1000);
+    row0.putValue(MC_TEXT_INDEX_COLUMN_1, "mc_text_index_column_1");
+    row0.putValue(MC_TEXT_INDEX_COLUMN_2, "mc_text_index_column_2");
     row0.putValue(TEXT_INDEX_COLUMN, "text_index_column_0");
     row0.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_0");
     row0.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
@@ -140,6 +148,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     GenericRow row1 = new GenericRow();
     row1.putValue(DEFAULT_TIME_COLUMN_NAME, 20001);
     row1.putValue(MS_SINCE_EPOCH_COLUMN_NAME, 20001L * 86400 * 1000);
+    row1.putValue(MC_TEXT_INDEX_COLUMN_1, "mc_text_index_column_1");
+    row1.putValue(MC_TEXT_INDEX_COLUMN_2, "mc_text_index_column_2");
     row1.putValue(TEXT_INDEX_COLUMN, "text_index_column_0");
     row1.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_1");
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
@@ -151,6 +161,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     GenericRow row2 = new GenericRow();
     row2.putValue(DEFAULT_TIME_COLUMN_NAME, 20002);
     row2.putValue(MS_SINCE_EPOCH_COLUMN_NAME, 20002L * 86400 * 1000);
+    row2.putValue(MC_TEXT_INDEX_COLUMN_1, "mc_text_index_column_1");
+    row2.putValue(MC_TEXT_INDEX_COLUMN_2, "mc_text_index_column_2");
     row2.putValue(TEXT_INDEX_COLUMN, "text_index_column_0");
     row2.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_2");
     row2.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
@@ -199,15 +211,20 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN))
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2))
         .build();
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(MC_TEXT_INDEX_COLUMN_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(MC_TEXT_INDEX_COLUMN_2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
         .build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
 
     GenericRow row = new GenericRow();
+    row.putValue(MC_TEXT_INDEX_COLUMN_1, "mc_text_index_column_1");
+    row.putValue(MC_TEXT_INDEX_COLUMN_2, "mc_text_index_column_2");
     row.putValue(TEXT_INDEX_COLUMN, "text_index_column");
     row.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row.putValue(FST_TEST_COLUMN, "fst_test_column");
@@ -402,6 +419,80 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     // if NVV is added to table config AND segment does not have NVV, then it cannot be added. needRefresh = false
     assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithoutNullHandling).isStale());
+  }
+
+  @Test
+  public void testAddMultiColumnTextIndex() {
+    MultiColumnTextIndexConfig newIndex =
+        new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2));
+    TableConfig tableConfig =
+        getTableConfigBuilder().setMultiColumnTextIndexConfig(newIndex).build();
+    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(tableConfig, SCHEMA),
+        IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
+  }
+
+  @Test
+  public void testMultiColumnTextIndexWithDifferentColumns()
+      throws Exception {
+    TableConfig tableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1))).build();
+
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
+
+    TableConfig newTableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2)))
+        .build();
+
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
+  }
+
+  @Test
+  public void testMultiColumnTextIndexWithDifferentSharedProperties()
+      throws Exception {
+    TableConfig tableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2), null, null))
+        .build();
+
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
+
+    TableConfig newTableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2),
+                Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"), null))
+        .build();
+
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
+  }
+
+  @Test
+  public void testMultiColumnTextIndexWithDifferentColumnProperties()
+      throws Exception {
+    TableConfig tableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2), null, null))
+        .build();
+
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
+
+    TableConfig newTableConfig = getTableConfigBuilder()
+        .setMultiColumnTextIndexConfig(
+            new MultiColumnTextIndexConfig(List.of(MC_TEXT_INDEX_COLUMN_1, MC_TEXT_INDEX_COLUMN_2),
+                null, Map.of(MC_TEXT_INDEX_COLUMN_1, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"))))
+        .build();
+
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test

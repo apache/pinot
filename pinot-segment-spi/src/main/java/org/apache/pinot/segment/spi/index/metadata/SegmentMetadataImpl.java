@@ -51,6 +51,8 @@ import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
@@ -78,6 +80,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
+  private long _zkCreationTime = Long.MIN_VALUE;  // ZooKeeper creation time for upsert consistency
   private String _timeColumn;
   private TimeUnit _timeUnit;
   private Duration _timeGranularity;
@@ -97,6 +100,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Deprecated
   private String _rawTableName;
+
+  private MultiColumnTextMetadata _multiColumnTextMetadata;
 
   /**
    * For segments that can only provide the inputstream to the metadata
@@ -149,6 +154,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentName;
     _schema = schema;
     _creationTime = creationTime;
+    _zkCreationTime = creationTime;
   }
 
   /**
@@ -199,14 +205,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void init(PropertiesConfiguration segmentMetadataPropertiesConfiguration)
+  private void init(PropertiesConfiguration segmentMetadata)
       throws ConfigurationException {
-    if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
-      _creatorName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
+    if (segmentMetadata.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
+      _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION);
     }
 
     String versionString =
-        segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
+        segmentMetadata.getString(Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
@@ -214,25 +220,25 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // - If key does not exist, it will return an empty list
     // - If key exists but value is missing, it will return a singleton list with an empty string
     Set<String> physicalColumns = new HashSet<>();
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.DIMENSIONS), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.METRICS), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.TIME_COLUMN_NAME), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.DATETIME_COLUMNS), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.COMPLEX_COLUMNS), physicalColumns);
+    addPhysicalColumns(segmentMetadata.getList(Segment.DIMENSIONS), physicalColumns);
+    addPhysicalColumns(segmentMetadata.getList(Segment.METRICS), physicalColumns);
+    addPhysicalColumns(segmentMetadata.getList(Segment.TIME_COLUMN_NAME), physicalColumns);
+    addPhysicalColumns(segmentMetadata.getList(Segment.DATETIME_COLUMNS), physicalColumns);
+    addPhysicalColumns(segmentMetadata.getList(Segment.COMPLEX_COLUMNS), physicalColumns);
 
     // Set the table name (for backward compatibility)
-    String tableName = segmentMetadataPropertiesConfiguration.getString(Segment.TABLE_NAME);
+    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
     if (tableName != null) {
       _rawTableName = TableNameBuilder.extractRawTableName(tableName);
     }
 
     // Set segment name.
-    _segmentName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
+    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
 
     // Build column metadata map and schema.
     for (String column : physicalColumns) {
       ColumnMetadata columnMetadata =
-          ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
+          ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadata);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
     }
@@ -259,21 +265,29 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build star-tree v2 metadata
     int starTreeV2Count =
-        segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT, 0);
+        segmentMetadata.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT, 0);
     if (starTreeV2Count > 0) {
       _starTreeV2MetadataList = new ArrayList<>(starTreeV2Count);
       for (int i = 0; i < starTreeV2Count; i++) {
         _starTreeV2MetadataList.add(new StarTreeV2Metadata(
-            segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
+            segmentMetadata.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
       }
     }
 
+    // build multi-column text index metadata
+    String[] textIdxColumns =
+        segmentMetadata.getStringArray(MultiColumnTextIndexConstants.MetadataKey.ROOT_COLUMNS);
+    if (textIdxColumns != null && textIdxColumns.length > 0) {
+      _multiColumnTextMetadata =
+          new MultiColumnTextMetadata(segmentMetadata.subset(MultiColumnTextIndexConstants.MetadataKey.ROOT_SUBSET));
+    }
+
     // Set start/end offset if available
-    _startOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.START_OFFSET, null);
-    _endOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.END_OFFSET, null);
+    _startOffset = segmentMetadata.getString(Segment.Realtime.START_OFFSET, null);
+    _endOffset = segmentMetadata.getString(Segment.Realtime.END_OFFSET, null);
 
     // Set custom configs from metadata properties
-    setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
+    setCustomConfigs(segmentMetadata, _customMap);
   }
 
   private static void setCustomConfigs(Configuration segmentMetadataPropertiesConfiguration,
@@ -380,6 +394,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _creationTime;
   }
 
+  /**
+   * Returns the ZooKeeper creation time for upsert consistency.
+   * This refers to the time set by controller while creating the consuming segment. It is used to ensure consistent
+   * creation time across replicas for upsert operations.
+   * @return ZK creation time in milliseconds, or Long.MIN_VALUE if not set
+   */
+  public long getZkCreationTime() {
+    return _zkCreationTime;
+  }
+
+  /**
+   * Sets the ZooKeeper creation time for upsert consistency.
+   * @param zkCreationTime ZK creation time in milliseconds
+   */
+  public void setZkCreationTime(long zkCreationTime) {
+    _zkCreationTime = zkCreationTime;
+  }
+
   @Override
   public long getLastIndexedTimestamp() {
     return Long.MIN_VALUE;
@@ -394,6 +426,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
     return _starTreeV2MetadataList;
+  }
+
+  @Nullable
+  @Override
+  public MultiColumnTextMetadata getMultiColumnTextMetadata() {
+    return _multiColumnTextMetadata;
   }
 
   @Override

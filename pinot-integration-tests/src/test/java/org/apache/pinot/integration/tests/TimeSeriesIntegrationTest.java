@@ -21,6 +21,8 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -164,8 +166,12 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     );
   }
 
+  protected Map<String, String> getHeaders() {
+    return Collections.emptyMap();
+  }
+
   private void runGroupedTimeSeriesQuery(String query, int expectedGroups, TimeSeriesValidator validator) {
-    JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC);
+    JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC, getHeaders());
     System.out.println(result);
     assertEquals(result.get("status").asText(), "success");
 

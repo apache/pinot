@@ -22,9 +22,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
 /**
@@ -81,7 +81,7 @@ public class PhysicalPlannerContext {
     _requestId = requestId;
     _instanceId = instanceId;
     _queryOptions = queryOptions == null ? Map.of() : queryOptions;
-    _useLiteMode = PhysicalPlannerContext.useLiteMode(queryOptions);
+    _useLiteMode = QueryOptionsUtils.isUseLiteMode(_queryOptions);
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
@@ -124,26 +124,5 @@ public class PhysicalPlannerContext {
 
   private QueryServerInstance getBrokerQueryServerInstance() {
     return new QueryServerInstance(_instanceId, _hostName, _port, _port);
-  }
-
-  public static boolean isUsePhysicalOptimizer(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return false;
-    }
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
-  }
-
-  public static boolean isUseBrokerPruning(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return false;
-    }
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
-  }
-
-  private static boolean useLiteMode(@Nullable Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return false;
-    }
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
   }
 }

@@ -104,15 +104,15 @@ public class MutableSegmentImplAggregateMetricsTest {
       int hoursSinceEpoch = random.nextInt(10);
       int daysSinceEpoch = random.nextInt(5);
       GenericRow row = new GenericRow();
-      row.putField(DIMENSION_1, random.nextInt(10));
-      row.putField(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
-      row.putField(TIME_COLUMN1, daysSinceEpoch);
-      row.putField(TIME_COLUMN2, hoursSinceEpoch);
+      row.putValue(DIMENSION_1, random.nextInt(10));
+      row.putValue(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
+      row.putValue(TIME_COLUMN1, daysSinceEpoch);
+      row.putValue(TIME_COLUMN2, hoursSinceEpoch);
       // Generate random int to prevent overflow
       long metricValue = random.nextInt();
-      row.putField(METRIC, metricValue);
+      row.putValue(METRIC, metricValue);
       float metricValueFloat = floatValues[random.nextInt(floatValues.length)];
-      row.putField(METRIC_2, metricValueFloat);
+      row.putValue(METRIC_2, metricValueFloat);
 
       mutableSegmentImpl.index(row, defaultMetadata);
 

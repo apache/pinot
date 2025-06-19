@@ -126,7 +126,8 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     List<MinMaxValue> minMaxValues = new ArrayList<>(numSegments);
     for (int i = 0; i < numSegments; i++) {
       IndexSegment segment = segments.get(i);
-      DataSourceMetadata dataSourceMetadata = segment.getDataSource(firstOrderByColumn).getDataSourceMetadata();
+      DataSourceMetadata dataSourceMetadata =
+          segment.getDataSource(firstOrderByColumn, query.getSchema()).getDataSourceMetadata();
       Comparable minValue = dataSourceMetadata.getMinValue();
       Comparable maxValue = dataSourceMetadata.getMaxValue();
       // Always keep the segment if it does not have column min/max value in the metadata

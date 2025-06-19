@@ -98,8 +98,45 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - name: Verify with binary-compatibility-check profile
-        run: mvn verify -DskipTests -Pbinary-compat-check -T1C
+      # Build the PR branch's module to get a new JAR to compare
+      - name: Build SPI on PR branch
+        run: |
+          for mod in pinot-spi pinot-segment-spi; do
+            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
+          done
+      - name: Checkout master into a subfolder
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: master-head
+      # Build the same module on master to produce the baseline JAR
+      - name: Build SPI on master
+        working-directory: master-head
+        run: |
+          for mod in pinot-spi pinot-segment-spi; do
+            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
+          done
+      # Download the japicmp standalone JAR which will be used to compare APIs
+      - name: Download japicmp CLI
+        run: |
+          JAPICMP_VER=0.23.1
+          curl -fSL \
+          -o japicmp.jar \
+          "https://repo1.maven.org/maven2/com/github/siom79/japicmp/japicmp/${JAPICMP_VER}/japicmp-${JAPICMP_VER}-jar-with-dependencies.jar"
+      # Locate the old JAR (from master) and the new JAR (PR) and run japicmp to compare
+      - name: Compare API
+        run: |
+          for mod in pinot-spi pinot-segment-spi; do
+            OLD=$(ls master-head/$mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
+            NEW=$(ls $mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
+            
+            java -jar japicmp.jar \
+              --old "$OLD" \
+              --new "$NEW" \
+              --error-on-binary-incompatibility \
+              --only-incompatible \
+              --ignore-missing-classes
+          done
   unit-test:
     if: github.repository == 'apache/pinot'
     runs-on: ubuntu-latest

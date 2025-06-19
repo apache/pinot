@@ -19,7 +19,10 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -91,5 +94,62 @@ public class UpsertCompactMergeTaskExecutorTest {
     List<SegmentMetadataImpl> segmentMetadataList = Arrays.asList(segment1, segment2);
 
     _taskExecutor.getCommonPartitionIDForSegments(segmentMetadataList);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Max creation time "
+      + "configuration is missing from task config.*")
+  public void testGetMaxZKCreationTimeFromConfigWithNullValue() {
+    // Test that the method handles null config gracefully with fallback to current time
+    Map<String, String> configs = new HashMap<>();
+    // Intentionally not setting MAX_ZK_CREATION_TIME_MILLIS_KEY to simulate null config during rollout
+
+    long result = _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
+
+    // Should return current system time (within reasonable bounds)
+    long currentTime = System.currentTimeMillis();
+    Assert.assertTrue(result > 0, "Result should be positive");
+    Assert.assertTrue(Math.abs(result - currentTime) < 1000, "Result should be close to current time");
+  }
+
+  @Test
+  public void testGetMaxZKCreationTimeFromConfigWithValidValue() {
+    // Test that the method correctly parses valid config value
+    Map<String, String> configs = new HashMap<>();
+    long expectedTime = 1234567890L;
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, String.valueOf(expectedTime));
+
+    long result = _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
+
+    Assert.assertEquals(result, expectedTime, "Should return the configured time");
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Invalid max creation "
+      + "time format.*")
+  public void testGetMaxZKCreationTimeFromConfigWithInvalidFormat() {
+    // Test that the method throws appropriate exception for invalid format
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "invalid_number");
+
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*No valid creation time"
+      + " found.*")
+  public void testGetMaxZKCreationTimeFromConfigWithZeroValue() {
+    // Test that the method throws appropriate exception for zero/negative values
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "0");
+
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*No valid creation time"
+      + " found.*")
+  public void testGetMaxZKCreationTimeFromConfigWithNegativeValue() {
+    // Test that the method throws appropriate exception for negative values
+    Map<String, String> configs = new HashMap<>();
+    configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY, "-100");
+
+    _taskExecutor.getMaxZKCreationTimeFromConfig(configs);
   }
 }

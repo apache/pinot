@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.io.Closeable;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -30,7 +32,7 @@ public interface TableDedupMetadataManager extends Closeable {
    * Initialize TableDedupMetadataManager.
    */
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   /**
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.

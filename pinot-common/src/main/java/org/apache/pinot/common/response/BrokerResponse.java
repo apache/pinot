@@ -396,14 +396,14 @@ public interface BrokerResponse {
   Set<String> getTablesQueried();
 
   /**
-   * Set the replica groups queried in the request
-   * @param replicaGroups
+   * Set the pools queried in the request
+   * @param pools
    */
-  void setReplicaGroups(Set<Integer> replicaGroups);
+  void setPools(Set<Integer> pools);
 
   /**
-   * Get the replica groups queried in the request
+   * Get the pools queried in the request
    * @return
    */
-  Set<Integer> getReplicaGroups();
+  Set<Integer> getPools();
 }

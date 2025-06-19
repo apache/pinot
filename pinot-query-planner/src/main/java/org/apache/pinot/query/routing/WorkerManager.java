@@ -21,10 +21,11 @@ package org.apache.pinot.query.routing;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -191,6 +192,25 @@ public class WorkerManager {
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
+    if (context.getTableNames().isEmpty()) {
+      // For constant expression query (no table is accessed), assign it to a random enabled server.
+      // TODO: Consider short-circuiting it and directly calculating the result on broker.
+
+      Collection<ServerInstance> serverInstances = _routingManager.getEnabledServerInstanceMap().values();
+      int numServers = serverInstances.size();
+      if (numServers == 0) {
+        LOGGER.error("[RequestId: {}] No server instance found for constant expression query", context.getRequestId());
+        throw new IllegalStateException("No server instance found for constant expression query");
+      }
+      int index = RANDOM.nextInt(numServers);
+      Iterator<ServerInstance> iterator = serverInstances.iterator();
+      for (int i = 0; i < index; i++) {
+        iterator.next();
+      }
+      metadata.setWorkerIdToServerInstanceMap(Map.of(0, new QueryServerInstance(iterator.next())));
+      return;
+    }
+
     if (isPrePartitionAssignment(children, metadataMap)) {
       // If all the children are pre-partitioned the same way, use local exchange.
       DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
@@ -200,10 +220,9 @@ public class WorkerManager {
     }
 
     if (metadata.isRequiresSingletonInstance()) {
-      // When singleton instance is required, return a single worker with ID 0.
-      List<ServerInstance> serverInstances = assignServerInstances(context);
-      metadata.setWorkerIdToServerInstanceMap(
-          Map.of(0, new QueryServerInstance(serverInstances.get(RANDOM.nextInt(serverInstances.size())))));
+      // When singleton instance is required, assign it to a random candidate server.
+      List<QueryServerInstance> candidateServers = getCandidateServers(context);
+      metadata.setWorkerIdToServerInstanceMap(Map.of(0, candidateServers.get(RANDOM.nextInt(candidateServers.size()))));
       return;
     }
 
@@ -219,22 +238,21 @@ public class WorkerManager {
     }
 
     // If there is no local exchange, assign workers to the servers hosting the tables
-    List<ServerInstance> serverInstances = null;
+    List<QueryServerInstance> candidateServers = null;
     if (workerIdToServerInstanceMap == null) {
-      serverInstances = assignServerInstances(context);
+      candidateServers = getCandidateServers(context);
       int stageParallelism = Integer.parseInt(
           context.getPlannerContext().getOptions().getOrDefault(QueryOptionKey.STAGE_PARALLELISM, "1"));
-      workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(serverInstances.size() * stageParallelism);
+      workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(candidateServers.size() * stageParallelism);
       int workerId = 0;
       if (stageParallelism == 1) {
-        for (ServerInstance serverInstance : serverInstances) {
-          workerIdToServerInstanceMap.put(workerId++, new QueryServerInstance(serverInstance));
+        for (QueryServerInstance serverInstance : candidateServers) {
+          workerIdToServerInstanceMap.put(workerId++, serverInstance);
         }
       } else {
-        for (ServerInstance serverInstance : serverInstances) {
-          QueryServerInstance queryServerInstance = new QueryServerInstance(serverInstance);
+        for (QueryServerInstance serverInstance : candidateServers) {
           for (int i = 0; i < stageParallelism; i++) {
-            workerIdToServerInstanceMap.put(workerId++, queryServerInstance);
+            workerIdToServerInstanceMap.put(workerId++, serverInstance);
           }
         }
       }
@@ -260,11 +278,11 @@ public class WorkerManager {
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         } else {
-          int numWorkers = serverInstances.size();
+          int numWorkers = candidateServers.size();
           childWorkerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
           for (int workerId = 0; workerId < numWorkers; workerId++) {
-            childWorkerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstances.get(workerId)));
+            childWorkerIdToServerInstanceMap.put(workerId, candidateServers.get(workerId));
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         }
@@ -319,92 +337,111 @@ public class WorkerManager {
   /**
    * Returns the servers serving any segment of the tables in the query.
    */
-  private List<ServerInstance> assignServerInstances(DispatchablePlanContext context) {
-    List<ServerInstance> serverInstances;
-    Set<String> tableNames = context.getTableNames();
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-    if (tableNames.isEmpty()) {
-      // TODO: Short circuit it when no table needs to be scanned
-      // This could be the case from queries that don't actually fetch values from the tables. In such cases the
-      // routing need not be tenant aware.
-      // Eg: SELECT 1 AS one FROM select_having_expression_test_test_having HAVING 1 > 2;
-      serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
+  private List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
+    List<QueryServerInstance> candidateServers;
+    if (context.isUseLeafServerForIntermediateStage()) {
+      Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
+      assert !leafServerInstances.isEmpty();
+      candidateServers = new ArrayList<>(leafServerInstances);
     } else {
-      Set<String> servers = new HashSet<>();
-      for (String tableName : tableNames) {
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-        if (tableType == null) {
-          Set<String> offlineTableServers = _routingManager.getServingInstances(
-              TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
-          if (offlineTableServers != null) {
-            servers.addAll(offlineTableServers);
-          }
-          Set<String> realtimeTableServers = _routingManager.getServingInstances(
-              TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
-          if (realtimeTableServers != null) {
-            servers.addAll(realtimeTableServers);
-          }
-        } else {
-          Set<String> tableServers = _routingManager.getServingInstances(tableName);
-          if (tableServers != null) {
-            servers.addAll(tableServers);
-          }
+      candidateServers = getCandidateServersPerTables(context);
+    }
+    return candidateServers;
+  }
+
+  private List<QueryServerInstance> getCandidateServersPerTables(DispatchablePlanContext context) {
+    Set<String> nonLookupTables = context.getNonLookupTables();
+    assert !nonLookupTables.isEmpty();
+    Set<String> servers = new HashSet<>();
+    for (String tableName : nonLookupTables) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      if (tableType == null) {
+        Set<String> offlineTableServers = _routingManager.getServingInstances(
+            TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
+        if (offlineTableServers != null) {
+          servers.addAll(offlineTableServers);
         }
-      }
-      if (servers.isEmpty()) {
-        // fall back to use all enabled servers if no server is found for the tables
-        serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
+        Set<String> realtimeTableServers = _routingManager.getServingInstances(
+            TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
+        if (realtimeTableServers != null) {
+          servers.addAll(realtimeTableServers);
+        }
       } else {
-        serverInstances = new ArrayList<>(servers.size());
-        for (String server : servers) {
-          ServerInstance serverInstance = enabledServerInstanceMap.get(server);
-          if (serverInstance != null) {
-            serverInstances.add(serverInstance);
-          }
+        Set<String> tableServers = _routingManager.getServingInstances(tableName);
+        if (tableServers != null) {
+          servers.addAll(tableServers);
         }
       }
     }
-    if (serverInstances.isEmpty()) {
-      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
-          context.getRequestId(), tableNames);
-      throw new IllegalStateException(
-          "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
+    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+    List<QueryServerInstance> candidateServers;
+    if (servers.isEmpty()) {
+      // Fall back to use all enabled servers if no server is found for the tables.
+      // TODO: Revisit if we should throw an exception instead.
+      LOGGER.warn("[RequestId: {}] No server instance found for intermediate stage for tables: {}, "
+          + "falling back to all enabled servers", context.getRequestId(), nonLookupTables);
+      candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
+      for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+        candidateServers.add(new QueryServerInstance(serverInstance));
+      }
+    } else {
+      candidateServers = new ArrayList<>(servers.size());
+      for (String server : servers) {
+        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+        if (serverInstance != null) {
+          candidateServers.add(new QueryServerInstance(serverInstance));
+        }
+      }
     }
-    return serverInstances;
+    if (candidateServers.isEmpty()) {
+      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
+          context.getRequestId(), nonLookupTables);
+      throw new IllegalStateException("No server instance found for intermediate stage for tables: " + nonLookupTables);
+    }
+    return candidateServers;
   }
 
   private void assignWorkersToLeafFragment(PlanFragment fragment, DispatchablePlanContext context) {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
+
+    if (!context.isUseLeafServerForIntermediateStage()) {
+      context.getNonLookupTables().add(metadata.getScannedTables().get(0));
+    }
+
     Map<String, String> tableOptions = metadata.getTableOptions();
-    if (tableOptions == null) {
-      if (metadata.getLogicalTableRouteInfo() != null) {
-        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
-      } else {
-        assignWorkersToNonPartitionedLeafFragment(metadata, context);
+    if (tableOptions != null) {
+      if (Boolean.parseBoolean(tableOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
+        setSegmentsForReplicatedLeafFragment(metadata);
+        return;
       }
-      return;
+
+      String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
+      int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
+      Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
+          PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
+      metadata.setPartitionParallelism(partitionParallelism);
+
+      String partitionKey = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
+      if (partitionKey != null) {
+        assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
+        addLeafServersToContext(metadata, context);
+        return;
+      }
     }
 
-    String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
-    int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
-    Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
-        PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
-    metadata.setPartitionParallelism(partitionParallelism);
-
-    String partitionKey = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
-    if (partitionKey != null) {
-      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
-      return;
-    }
-
-    if (Boolean.parseBoolean(tableOptions.get(PinotHintOptions.TableHintOptions.IS_REPLICATED))) {
-      setSegmentsForReplicatedLeafFragment(metadata);
+    if (metadata.getLogicalTableRouteInfo() != null) {
+      assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
     } else {
-      if (metadata.getLogicalTableRouteInfo() != null) {
-        assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
-      } else {
-        assignWorkersToNonPartitionedLeafFragment(metadata, context);
-      }
+      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+    }
+    addLeafServersToContext(metadata, context);
+  }
+
+  private void addLeafServersToContext(DispatchablePlanMetadata metadata, DispatchablePlanContext context) {
+    if (context.isUseLeafServerForIntermediateStage()) {
+      Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = metadata.getWorkerIdToServerInstanceMap();
+      assert workerIdToServerInstanceMap != null;
+      context.getLeafServerInstances().addAll(workerIdToServerInstanceMap.values());
     }
   }
 

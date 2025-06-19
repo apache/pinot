@@ -204,11 +204,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       MseBlock block = _input.nextBlock();
       if (block.isEos()) {
-        if (_context.isSendStats()) {
-          sendEos((MseBlock.Eos) block);
-        } else {
-          sendEos(SuccessMseBlock.INSTANCE);
-        }
+        sendEos((MseBlock.Eos) block);
       } else {
         if (sendMseBlock(((MseBlock.Data) block))) {
           earlyTerminate();
@@ -236,22 +232,26 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
       throws Exception {
-    MultiStageQueryStats stats = calculateStats();
 
+    MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
-    try {
-      serializedStats = stats.serialize();
-    } catch (Exception e) {
-      LOGGER.warn("Failed to serialize stats", e);
+    if (_context.isSendStats()) {
+      stats = calculateStats();
+      try {
+        serializedStats = stats.serialize();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to serialize stats", e);
+        serializedStats = Collections.emptyList();
+      }
+    } else {
       serializedStats = Collections.emptyList();
     }
-
     // no need to check early terminate signal b/c the current block is already EOS
     sendMseBlock(eosBlockWithoutStats, serializedStats);
     // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
     // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
     if (_context.getStageId() == 1) {
-      updateMetrics(stats);
+      updateMetrics(stats == null ? calculateStats() : stats);
     }
   }
 

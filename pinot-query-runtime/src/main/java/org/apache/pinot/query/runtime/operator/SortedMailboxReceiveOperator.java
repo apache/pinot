@@ -91,7 +91,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
         if (!_rows.isEmpty()) {
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
-          _rows.sort(new SortUtils.SortComparator(_dataSchema, _collations, false));
+          _rows.sort(new SortUtils.SortComparator(_collations, false));
           return new RowHeapDataBlock(_rows, _dataSchema);
         } else {
           return block;

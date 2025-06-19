@@ -301,6 +301,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize) {
     List<String> segmentsToDelete = new ArrayList<>();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    boolean isHybridTable = _pinotHelixResourceManager.hasOfflineTable(rawTableName)
+        && _pinotHelixResourceManager.hasRealtimeTable(rawTableName);
+    if (isHybridTable && TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      // If it is a hybrid table, we don't need to scan deep store for untracked segments when processing the
+      // realtime table.
+      // This is because realtime tables are expected to have short retention periods, so scanning deep store for
+      // untracked segments is not necessary.
+      LOGGER.info("Skipping deep store scan for untracked segments for realtime table: {} as it's a hybrid table",
+          tableNameWithType);
+      return segmentsToDelete;
+    }
 
     if (!_untrackedSegmentDeletionEnabled) {
       LOGGER.info(
@@ -317,8 +329,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    List<String> segmentsPresentInZK =
-        segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    List<String> segmentsPresentInZK;
+    if (isHybridTable) {
+      segmentsPresentInZK = new ArrayList<>();
+      // This must be the OFFLINE table
+      segmentsPresentInZK.addAll(
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList()));
+      // Add segments from the REALTIME table as well
+      segmentsPresentInZK.addAll(
+          _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
+    } else {
+      segmentsPresentInZK =
+          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    }
+
     try {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           tableNameWithType);
@@ -339,7 +363,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     return segmentsToDelete;
   }
-
 
   /**
    * Identifies segments in deepstore that are ready for deletion based on the retention strategy.

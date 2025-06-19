@@ -41,7 +41,7 @@ public abstract class FilterOperand implements TransformOperand {
 
   @Nullable
   @Override
-  public abstract Integer apply(Object[] row);
+  public abstract Integer apply(List<Object> row);
 
   public static class And extends FilterOperand {
     List<TransformOperand> _childOperands;
@@ -55,7 +55,7 @@ public abstract class FilterOperand implements TransformOperand {
 
     @Nullable
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       boolean hasNull = false;
       for (TransformOperand child : _childOperands) {
         Object result = child.apply(row);
@@ -81,7 +81,7 @@ public abstract class FilterOperand implements TransformOperand {
 
     @Nullable
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       boolean hasNull = false;
       for (TransformOperand child : _childOperands) {
         Object result = child.apply(row);
@@ -104,7 +104,7 @@ public abstract class FilterOperand implements TransformOperand {
 
     @Nullable
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       Object result = _childOperand.apply(row);
       return result != null ? 1 - (int) result : null;
     }
@@ -124,7 +124,7 @@ public abstract class FilterOperand implements TransformOperand {
 
     @Nullable
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       Object firstResult = _childOperands.get(0).apply(row);
       if (firstResult == null) {
         return null;
@@ -150,7 +150,7 @@ public abstract class FilterOperand implements TransformOperand {
     }
 
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       Object result = _childOperand.apply(row);
       return result != null ? (Integer) result : 0;
     }
@@ -164,7 +164,7 @@ public abstract class FilterOperand implements TransformOperand {
     }
 
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       Object result = _childOperand.apply(row);
       return result != null ? 1 - (int) result : 1;
     }
@@ -216,7 +216,7 @@ public abstract class FilterOperand implements TransformOperand {
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Nullable
     @Override
-    public Integer apply(Object[] row) {
+    public Integer apply(List<Object> row) {
       Comparable v1 = (Comparable) _lhs.apply(row);
       if (v1 == null) {
         return null;

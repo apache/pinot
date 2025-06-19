@@ -84,14 +84,13 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
       boolean maxRowsLimitReached = false;
       for (int i = 0; i < numRightRows; i++) {
         Object[] rightRow = _rightTable.get(i);
-        // TODO: Optimize this to avoid unnecessary object copy.
-        Object[] resultRow = joinRow(leftRow, rightRow);
-        if (matchNonEquiConditions(resultRow)) {
+        List<Object> joinRowView = joinRowView(leftRow, rightRow);
+        if (matchNonEquiConditions(joinRowView)) {
           if (isMaxRowsLimitReached(rows.size())) {
             maxRowsLimitReached = true;
             break;
           }
-          rows.add(resultRow);
+          rows.add(joinRowView.toArray());
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
             _matchedRightRows.set(i);
