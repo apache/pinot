@@ -175,7 +175,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
+      // Lucene query parsers are generally stateful and a new instance must be created per query.
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
+      // the query parser. To support the feature, we need to explicitly set the config to be true.
       if (_enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
@@ -306,7 +309,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
         LOGGER.warn("Failed to parse query with parser: {}, falling back to default", parserClassName, e);
         // Fall back to default parser
         QueryParserBase defaultParser = _queryParserClassConstructor.newInstance(_column, _analyzer);
-        defaultParser.setAllowLeadingWildcard(true);
+        if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          defaultParser.setAllowLeadingWildcard(true);
+        }
         if (_useANDForMultiTermQueries) {
           defaultParser.setDefaultOperator(QueryParser.Operator.AND);
         }
