@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -305,6 +306,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
+    // Sample to track usage of query planning
+    Tracing.ThreadAccountantOps.sample();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
