@@ -23,7 +23,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.HttpRequesterIdentity;
 import org.apache.pinot.server.starter.ServerInstance;

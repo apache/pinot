@@ -36,7 +36,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
-import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.BasicAuthAccessFactory;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;

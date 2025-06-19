@@ -38,14 +38,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.auth.core.TargetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

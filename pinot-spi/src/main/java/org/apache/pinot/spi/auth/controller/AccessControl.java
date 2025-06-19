@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.access;
+package org.apache.pinot.spi.auth.controller;
 
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
-import org.apache.pinot.core.auth.FineGrainedAccessControl;
+import org.apache.pinot.spi.auth.core.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 

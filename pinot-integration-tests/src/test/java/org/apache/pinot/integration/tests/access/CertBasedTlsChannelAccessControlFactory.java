@@ -29,7 +29,7 @@ import java.security.cert.X509Certificate;
 import java.util.HashSet;
 import java.util.Set;
 import javax.net.ssl.SSLPeerUnverifiedException;
-import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.slf4j.Logger;
