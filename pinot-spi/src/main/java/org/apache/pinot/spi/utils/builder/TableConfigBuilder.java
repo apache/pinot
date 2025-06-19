@@ -224,6 +224,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
     return this;
