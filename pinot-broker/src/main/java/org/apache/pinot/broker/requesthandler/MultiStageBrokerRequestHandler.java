@@ -470,7 +470,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     onQueryStart(requestId, clientRequestId, query.getTextQuery());
 
     try {
-      Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
+      Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
