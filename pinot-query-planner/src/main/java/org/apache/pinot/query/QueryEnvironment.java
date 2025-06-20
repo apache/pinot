@@ -153,7 +153,7 @@ public class QueryEnvironment {
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options
-    _optProgram = getOptProgram(null, false);
+    _optProgram = getOptProgram(null);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -172,14 +172,14 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
-    if (MapUtils.isNotEmpty(options) || usePhysicalOptimizer) {
+    if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (CollectionUtils.isNotEmpty(skipRuleSet) || usePhysicalOptimizer) {
+      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet, usePhysicalOptimizer);
+        optProgram = getOptProgram(skipRuleSet);
       }
     }
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
@@ -492,10 +492,9 @@ public class QueryEnvironment {
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
    * @param skipRuleSet parsed skipped rule name set from query options
-   * @param usePhysicalOptimizer if physical optimizer used, enrichedJoinRules are disabled
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet, boolean usePhysicalOptimizer) {
+  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -523,11 +522,10 @@ public class QueryEnvironment {
       enrichedJoinRules = PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES;
     }
 
-
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
-        hepProgramBuilder.addRuleInstance(relOptRule);
+      hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
@@ -544,12 +542,6 @@ public class QueryEnvironment {
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
-
-    // fuse project and filter above join into enriched join
-    // enriched join is not supported in PRel
-    if (!usePhysicalOptimizer) {
-      hepProgramBuilder.addRuleCollection(enrichedJoinRules);
-    }
 
     return hepProgramBuilder.build();
   }
@@ -606,6 +598,8 @@ public class QueryEnvironment {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
+      // push filter and project above join to enrichedJoin, does not work with physical optimizer
+      hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
     } else {
       for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
@@ -694,7 +688,6 @@ public class QueryEnvironment {
     default boolean defaultUseLeafServerForIntermediateStage() {
       return CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE;
     }
-
 
     @Value.Default
     default boolean defaultEnableGroupTrim() {
