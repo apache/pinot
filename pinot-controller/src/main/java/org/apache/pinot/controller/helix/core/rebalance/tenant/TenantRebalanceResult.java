@@ -379,7 +379,6 @@ public class TenantRebalanceResult {
       RebalanceSummaryResult.RebalanceChangeInfo
           aggregatedNumServers = new RebalanceSummaryResult.RebalanceChangeInfo(totalServersBefore, totalServersAfter);
 
-      // Set the computed values using reflection or by updating the parent constructor call
       _numServersGettingNewSegments = numServersGettingNewSegments;
       _numServers = aggregatedNumServers;
       _serversAdded = serversAdded;
@@ -406,8 +405,6 @@ public class TenantRebalanceResult {
       int totalSegmentsToBeDeleted = 0;
       long totalEstimatedDataToBeMovedInBytes = 0;
 
-      int beforeRebalanceReplicationFactor = 0;
-      int afterRebalanceReplicationFactor = 0;
       int beforeRebalanceSegmentsInSingleReplica = 0;
       int afterRebalanceSegmentsInSingleReplica = 0;
       int beforeRebalanceSegmentsAcrossAllReplicas = 0;
