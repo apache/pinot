@@ -742,6 +742,10 @@ public class QueryEnvironment {
       return _sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN);
     }
 
+    public PlannerContext getPlannerContext() {
+      return _plannerContext;
+    }
+
     /// Explain the query plan.
     /// The original query must be an EXPLAIN query and way it will be explained depends on the options of the EXPLAIN
     /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
