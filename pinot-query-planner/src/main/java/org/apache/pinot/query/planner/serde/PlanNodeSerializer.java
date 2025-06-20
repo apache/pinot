@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -131,6 +132,41 @@ public class PlanNodeSerializer {
     }
 
     @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Plan.PlanNode.Builder builder) {
+      Plan.EnrichedJoinNode.Builder enrichedJoinNode = Plan.EnrichedJoinNode.newBuilder()
+          .setJoinType(convertJoinType(node.getJoinType()))
+          .addAllLeftKeys(node.getLeftKeys())
+          .addAllRightKeys(node.getRightKeys())
+          .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
+          .setJoinResultDataSchema(convertDataSchema(node.getJoinResultSchema()));
+
+      for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
+        Plan.FilterProjectRex.Builder rexBuilder = Plan.FilterProjectRex.newBuilder();
+        if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
+          rexBuilder
+              .setFilter(RexExpressionToProtoExpression.convertExpression(rex.getFilter()))
+              .setType(Plan.FilterProjectRexType.FILTER);
+        } else {
+          rexBuilder
+              .setProjectAndResultSchema(
+                  Plan.ProjectAndResultSchema.newBuilder()
+                      .addAllProject(convertExpressions(rex.getProjectAndResultSchema().getProject()))
+                      .setSchema(convertDataSchema(rex.getProjectAndResultSchema().getSchema()))
+                      .build())
+              .setType(Plan.FilterProjectRexType.PROJECT);
+        }
+        enrichedJoinNode.addFilterProjectRex(rexBuilder.build());
+      }
+
+      if (node.getMatchCondition() != null) {
+        enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
+      }
+      builder.setEnrichedJoinNode(enrichedJoinNode.build());
+      return null;
+    }
+
+    @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, Plan.PlanNode.Builder builder) {
       Plan.MailboxReceiveNode mailboxReceiveNode = Plan.MailboxReceiveNode.newBuilder()
           .setSenderStageId(node.getSenderStageId())
@@ -157,13 +193,13 @@ public class PlanNodeSerializer {
           Plan.MailboxSendNode.newBuilder()
               .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
               .addAllReceiverStageIds(receiverStageIds)
-          .setExchangeType(convertExchangeType(node.getExchangeType()))
-          .setDistributionType(convertDistributionType(node.getDistributionType()))
-          .addAllKeys(node.getKeys())
-          .setPrePartitioned(node.isPrePartitioned())
-          .addAllCollations(convertCollations(node.getCollations()))
-          .setSort(node.isSort())
-          .build();
+              .setExchangeType(convertExchangeType(node.getExchangeType()))
+              .setDistributionType(convertDistributionType(node.getDistributionType()))
+              .addAllKeys(node.getKeys())
+              .setPrePartitioned(node.isPrePartitioned())
+              .addAllCollations(convertCollations(node.getCollations()))
+              .setSort(node.isSort())
+              .build();
       builder.setMailboxSendNode(mailboxSendNode);
       return null;
     }

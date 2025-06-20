@@ -44,6 +44,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitJoin(JoinNode node, C context);
 
+  T visitEnrichedJoin(EnrichedJoinNode node, C context);
+
   T visitMailboxReceive(MailboxReceiveNode node, C context);
 
   T visitMailboxSend(MailboxSendNode node, C context);
@@ -155,6 +157,13 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitJoin(JoinNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitEnrichedJoin(EnrichedJoinNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       return postChildren(node, context);
