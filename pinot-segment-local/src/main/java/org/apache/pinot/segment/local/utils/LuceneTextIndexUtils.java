@@ -39,6 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Utility class for Lucene text index operations.
+ * Contains common methods for parsing __OPTIONS and creating query parsers.
+ */
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
@@ -118,5 +122,119 @@ public class LuceneTextIndexUtils {
     actualSearchTerm = actualSearchTerm.replaceAll("\\b(AND|OR|NOT)\\s+\\1\\b", "$1");
     actualSearchTerm = actualSearchTerm.replaceAll("\\s+", " ").trim();
     return new AbstractMap.SimpleEntry<>(actualSearchTerm, mergedOptions);
+  }
+
+  /**
+   * Creates a configured Lucene query with the specified options.
+   * This method can be used by both single-column and multi-column text index readers.
+   *
+   * @param actualQuery The cleaned query string without __OPTIONS
+   * @param options The parsed options map
+   * @param column The column name for the search
+   * @param analyzer The Lucene analyzer to use
+   * @return The parsed Lucene Query object
+   * @throws RuntimeException if parser creation or query parsing fails
+   */
+  public static Query createQueryParserWithOptions(String actualQuery, Map<String, String> options, String column,
+      org.apache.lucene.analysis.Analyzer analyzer) {
+    // Get parser type from options
+    String parserType = options.getOrDefault("parser", "CLASSIC");
+    String parserClassName;
+
+    switch (parserType.toUpperCase()) {
+      case "STANDARD":
+        parserClassName = "org.apache.lucene.queryparser.flexible.standard.StandardQueryParser";
+        break;
+      case "COMPLEX":
+        parserClassName = "org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser";
+        break;
+      default:
+        parserClassName = "org.apache.lucene.queryparser.classic.QueryParser";
+    }
+
+    // Create parser instance and apply options
+    try {
+      Class<?> parserClass = Class.forName(parserClassName);
+      Object parser;
+
+      if (parserClassName.equals("org.apache.lucene.queryparser.flexible.standard.StandardQueryParser")) {
+        java.lang.reflect.Constructor<?> constructor = parserClass.getConstructor();
+        parser = constructor.newInstance();
+        try {
+          java.lang.reflect.Method setAnalyzerMethod =
+              parserClass.getMethod("setAnalyzer", org.apache.lucene.analysis.Analyzer.class);
+          setAnalyzerMethod.invoke(parser, analyzer);
+        } catch (Exception e) {
+          LOGGER.warn("Failed to set analyzer on StandardQueryParser: {}", e.getMessage());
+        }
+      } else {
+        // CLASSIC and COMPLEX parsers use the standard (String, Analyzer) constructor
+        java.lang.reflect.Constructor<?> constructor =
+            parserClass.getConstructor(String.class, org.apache.lucene.analysis.Analyzer.class);
+        parser = constructor.newInstance(column, analyzer);
+      }
+
+      // Dynamically apply options using reflection
+      Class<?> clazz = parser.getClass();
+      for (Map.Entry<String, String> entry : options.entrySet()) {
+        String key = entry.getKey();
+        if (key.equals("parser")) {
+          continue; // Skip parser option as it's only used for initialization
+        }
+        String value = entry.getValue();
+        String setterName = "set" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
+
+        boolean found = false;
+        for (java.lang.reflect.Method method : clazz.getMethods()) {
+          if (method.getName().equalsIgnoreCase(setterName) && method.getParameterCount() == 1) {
+            try {
+              Class<?> paramType = method.getParameterTypes()[0];
+              Object paramValue;
+
+              if (paramType == boolean.class || paramType == Boolean.class) {
+                paramValue = Boolean.valueOf(value);
+              } else if (paramType == int.class || paramType == Integer.class) {
+                paramValue = Integer.valueOf(value);
+              } else if (paramType == float.class || paramType == Float.class) {
+                paramValue = Float.valueOf(value);
+              } else if (paramType == double.class || paramType == Double.class) {
+                paramValue = Double.valueOf(value);
+              } else if (paramType.isEnum()) {
+                paramValue = java.lang.Enum.valueOf((Class<java.lang.Enum>) paramType, value);
+              } else {
+                paramValue = value;
+              }
+
+              method.invoke(parser, paramValue);
+              found = true;
+              break;
+            } catch (Exception e) {
+              LOGGER.warn("Failed to apply option {}={}: {}", key, value, e.getMessage());
+            }
+          }
+        }
+
+        if (!found) {
+          LOGGER.warn("Failed to apply option: {}={} (setter not found)", key, value);
+        }
+      }
+
+      // Parse the query using the configured parser
+      Query query;
+      if (parser.getClass().getName().equals("org.apache.lucene.queryparser.flexible.standard.StandardQueryParser")) {
+        // StandardQueryParser uses parse(String, String) where second parameter is default field
+        java.lang.reflect.Method parseMethod = parser.getClass().getMethod("parse", String.class, String.class);
+        query = (Query) parseMethod.invoke(parser, actualQuery, column);
+      } else {
+        // Other parsers use parse(String)
+        java.lang.reflect.Method parseMethod = parser.getClass().getMethod("parse", String.class);
+        query = (Query) parseMethod.invoke(parser, actualQuery);
+      }
+
+      return query;
+    } catch (Exception e) {
+      String msg = "Failed to create or parse query: " + e.getMessage();
+      throw new RuntimeException(msg, e);
+    }
   }
 }
