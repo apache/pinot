@@ -580,6 +580,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     InstanceResponseBlock instanceResponse;
     Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
     instanceResponse = queryPlan.execute();
     planExecTimer.stopAndRecord();
