@@ -171,16 +171,16 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
-        _envConfig.defaultUsePhysicalOptimizer());
-    if (MapUtils.isNotEmpty(options) || usePhysicalOptimizer) {
+    if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
-      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty() || usePhysicalOptimizer) {
+      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet, useRuleSet, usePhysicalOptimizer);
+        optProgram = getOptProgram(skipRuleSet, useRuleSet);
       }
     }
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
+        _envConfig.defaultUsePhysicalOptimizer());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
@@ -496,10 +496,9 @@ public class QueryEnvironment {
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
    * @param skipRuleSet parsed skipped rule name set from query options
-   * @param usePhysicalOptimizer if physical optimizer used, enrichedJoinRules are disabled
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(Set<String> skipRuleSet, Set<String> useRuleSet, boolean usePhysicalOptimizer) {
+  private static HepProgram getOptProgram(Set<String> skipRuleSet, Set<String> useRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -514,7 +513,6 @@ public class QueryEnvironment {
     List<RelOptRule> projectPushdownRules =
         filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
     List<RelOptRule> pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet, useRuleSet);
-    List<RelOptRule> enrichedJoinRules = filterRuleList(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES, skipRuleSet);
 
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
@@ -536,12 +534,6 @@ public class QueryEnvironment {
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
-
-    // fuse project and filter above join into enriched join
-    // enriched join is not supported in PRel
-    if (!usePhysicalOptimizer) {
-      hepProgramBuilder.addRuleCollection(enrichedJoinRules);
-    }
 
     return hepProgramBuilder.build();
   }
@@ -601,6 +593,8 @@ public class QueryEnvironment {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
+      // push filter and project above join to enrichedJoin, does not work with physical optimizer
+      hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
     } else {
       for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
