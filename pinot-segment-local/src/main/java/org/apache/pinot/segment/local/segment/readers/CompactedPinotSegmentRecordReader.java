@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -57,11 +59,41 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     _deleteRecordColumn = deleteRecordColumn;
   }
 
+  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds) {
+    this(validDocIds, null);
+  }
+
+  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable String deleteRecordColumn) {
+    _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    _validDocIdsBitmap = validDocIds.getMutableRoaringBitmap().toRoaringBitmap();
+    _validDocIdsIterator = _validDocIdsBitmap.getIntIterator();
+    _deleteRecordColumn = deleteRecordColumn;
+  }
+
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     // lazy init the record reader
     _pinotSegmentRecordReader.init(dataFile, null, null);
+  }
+
+  /**
+   * Initializes the record reader from a mutable segment with valid document ids and optional sorted document ids.
+   *
+   * @param mutableSegment Mutable segment
+   * @param sortedDocIds Array of sorted document ids (can be null)
+   */
+  public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
+    _pinotSegmentRecordReader.init(mutableSegment, sortedDocIds);
+  }
+
+  /**
+   * Returns the sorted document ids from the underlying PinotSegmentRecordReader.
+   */
+  @Nullable
+  public int[] getSortedDocIds() {
+    return _pinotSegmentRecordReader.getSortedDocIds();
   }
 
   @Override

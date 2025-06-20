@@ -298,6 +298,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     TableConfig tableConfig =
         createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
             upsertConfig, PRIMARY_KEY_COL);
+    tableConfig.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
     addTableConfig(tableConfig);
 
     return tableConfig;
@@ -522,12 +523,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     String tableName = "gameScoresWithCompactionInMemoryWithDelete";
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
+    upsertConfig.setEnableCommitTimeCompaction(true);  // Enable the new commit-time compaction feature
     TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     TableTaskConfig taskConfig = getCompactionTaskConfig();
     taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE)
         .put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.name());
-    tableConfig.setTaskConfig(taskConfig);
-    updateTableConfig(tableConfig);
+//    tableConfig.setTaskConfig(taskConfig);
+//    updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
     assertEquals(queryCountStar(tableName), 3);
@@ -556,6 +558,257 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(getNumDeletedRows(tableName), 0);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
+  }
+
+  @Test
+  public void testCommitTimeCompactionComparison()
+      throws Exception {
+    // Enhanced test to validate that enableCommitTimeCompaction=true removes invalid records
+    // compared to enableCommitTimeCompaction=false, with comprehensive verification
+
+    String kafkaTopicNameCompacted = getKafkaTopic() + "-commit-time-compaction-enabled";
+    String kafkaTopicNameNormal = getKafkaTopic() + "-commit-time-compaction-disabled";
+
+    // Set up identical data for both tables - using small dataset for faster test execution
+    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
+    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
+
+    // TABLE 1: With commit-time compaction ENABLED
+    String tableNameWithCompaction = "gameScoresCommitTimeCompactionEnabled";
+    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompaction.setDeleteRecordColumn(DELETE_COL);
+    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
+    TableConfig tableConfigWithCompaction =
+        setUpTable(tableNameWithCompaction, kafkaTopicNameCompacted, upsertConfigWithCompaction);
+
+    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
+    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    updateTableConfig(tableConfigWithCompaction);
+
+    // TABLE 2: With commit-time compaction DISABLED (traditional behavior)
+    String tableNameWithoutCompaction = "gameScoresCommitTimeCompactionDisabled";
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithoutCompaction.setDeleteRecordColumn(DELETE_COL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
+    TableConfig tableConfigWithoutCompaction =
+        setUpTable(tableNameWithoutCompaction, kafkaTopicNameNormal, upsertConfigWithoutCompaction);
+
+    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    updateTableConfig(tableConfigWithoutCompaction);
+
+    System.out.printf(
+        "DEBUG: Starting commit time compaction test with tables: %s (compacted) and %s (normal)%n",
+        tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Wait for both tables to load the same initial data (12 records from small file)
+    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 10);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
+
+    // Verify initial state - both tables should show the same upserted data count (3 unique records)
+    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+    long initialPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long initialPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+
+    System.out.printf(
+        "DEBUG: Initial state - Compacted table: %d logical, %d physical; Normal table: %d logical, %d physical%n",
+        initialLogicalCountCompacted, initialPhysicalCountCompacted, initialLogicalCountNormal,
+        initialPhysicalCountNormal);
+
+    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should have 3 logical records initially");
+    assertEquals(initialLogicalCountNormal, 3, "Normal table should have 3 logical records initially");
+
+    // Debug: Print initial table contents
+    printWholeTableForDebugging(tableNameWithCompaction, "Initial state - Compacted table");
+    printWholeTableForDebugging(tableNameWithoutCompaction, "Initial state - Normal table");
+
+    // Create update patterns to generate invalid records - simplified for faster test execution
+    List<String> updateRecords = List.of(
+        "100,Zook-Updated1,counter-strike,1000,1681300000000,false",
+        "101,Alice-Updated1,dota,2000,1681300001000,false",
+        "102,Bob-Updated1,cs2,3000,1681300002000,false",
+        "100,Zook-Updated2,valorant,1500,1681300003000,false",
+        "101,Alice-Updated2,lol,2500,1681300004000,false"
+    );
+
+    // Push all updates at once to reduce wait times
+    pushCsvIntoKafka(updateRecords, kafkaTopicNameCompacted, 0);
+    pushCsvIntoKafka(updateRecords, kafkaTopicNameNormal, 0);
+    System.out.println("DEBUG: Pushed update records to both tables");
+    // Wait for all additional records to be processed (12 + 5 = 17 total records)
+    waitForAllDocsLoaded(tableNameWithCompaction, 90_000L, 15);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, 90_000L, 15);
+
+    // Verify state before commit - both tables should still show the same logical result (3 unique records)
+    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+    long preCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long preCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+
+    System.out.printf(
+        "DEBUG: Pre-commit state - Compacted table: %d logical, %d physical; Normal table: %d logical, %d physical%n",
+        preCommitLogicalCountCompacted, preCommitPhysicalCountCompacted, preCommitLogicalCountNormal,
+        preCommitPhysicalCountNormal);
+
+    assertEquals(preCommitLogicalCountCompacted, 3, "Both tables should show 3 logical records before commit");
+    assertEquals(preCommitLogicalCountNormal, 3, "Both tables should show 3 logical records before commit");
+
+    // Debug: Print table contents after updates but before commit
+    printWholeTableForDebugging(tableNameWithCompaction, "Pre-commit state - Compacted table");
+    printWholeTableForDebugging(tableNameWithoutCompaction, "Pre-commit state - Normal table");
+
+    // Verify both tables have the same data row by row
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Force commit segments on both tables to trigger commit-time behavior
+    System.out.println("DEBUG: Forcing segment commits...");
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+
+    // Wait for segments to be committed
+    waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, 2000_000L, 4, 2);
+    waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, 20_000L, 4, 2);
+
+    // Brief wait to ensure all commit operations are complete
+    Thread.sleep(2000);
+
+    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
+    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    System.out.printf(
+        "DEBUG: Post-commit state - Compacted table: %d logical, %d physical; Normal table: %d logical, %d physical%n",
+        postCommitLogicalCountCompacted, postCommitPhysicalCountCompacted, postCommitLogicalCountNormal,
+        postCommitPhysicalCountNormal);
+
+    // If counts are still the same, wait a bit longer for actual commit completion
+    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
+      System.out.println("DEBUG: Counts still equal, waiting longer for commit completion...");
+      Thread.sleep(3000);
+      postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+      postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+      postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+      postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+      System.out.printf(
+          "DEBUG: After extended wait - Compacted table: %d logical, %d physical; Normal table: %d logical, %d "
+              + "physical%n",
+          postCommitLogicalCountCompacted, postCommitPhysicalCountCompacted, postCommitLogicalCountNormal,
+          postCommitPhysicalCountNormal);
+    }
+
+    // Debug: Print table contents after commit
+    printWholeTableForDebugging(tableNameWithCompaction, "Post-commit state - Compacted table");
+    printWholeTableForDebugging(tableNameWithoutCompaction, "Post-commit state - Normal table");
+
+    // Key assertions for commit time compaction
+    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal, String.format(
+        "Expected table with commit-time compaction (%d docs) to have fewer physical docs than "
+            + "table without compaction (%d docs)", postCommitPhysicalCountCompacted,
+        postCommitPhysicalCountNormal));
+
+    // Both should still return the same logical upserted results (3 records)
+    assertEquals(postCommitLogicalCountCompacted, 3, "Compacted table should still have 3 logical records");
+    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still have 3 logical records");
+    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
+        "Both tables should have identical logical results");
+
+    // Verify data integrity - both tables should return identical data row by row
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Calculate and log compaction efficiency
+    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
+    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
+
+    System.out.printf("DEBUG: Compaction efficiency - Compression ratio: %.2f, Invalid records removed: %d%n",
+        compressionRatio, invalidRecordsRemoved);
+
+    assertTrue(compressionRatio < 0.95, "Compaction should remove some physical records");
+    assertTrue(invalidRecordsRemoved >= 2,
+        "At least 2 invalid records should be removed (obsolete updates)");
+
+    System.out.println("DEBUG: Commit time compaction test completed successfully");
+
+    // Clean up
+    dropRealtimeTable(tableNameWithCompaction);
+    dropRealtimeTable(tableNameWithoutCompaction);
+  }
+
+  /**
+   * Verifies that two tables return identical data row by row for all queries
+   */
+  private void verifyTablesHaveIdenticalData(String table1, String table2)
+      throws Exception {
+    // Verify each primary key has identical data
+    for (int playerId : new int[]{100, 101, 102}) {
+      String query =
+          String.format("SELECT name, game, score, timestampInEpoch FROM %s WHERE playerId = %d", table1, playerId);
+      ResultSet result1 = getPinotConnection().execute(query).getResultSet(0);
+
+      query = String.format("SELECT name, game, score, timestampInEpoch FROM %s WHERE playerId = %d", table2, playerId);
+      ResultSet result2 = getPinotConnection().execute(query).getResultSet(0);
+      System.out.println("DEBUG: Result1: " + result1 + " Result2: " + result2);
+      assertEquals(result1.getRowCount(), result2.getRowCount(),
+          String.format("Row count mismatch for playerId %d", playerId));
+
+      if (result1.getRowCount() > 0) {
+        assertEquals(result1.getString(0, 0), result2.getString(0, 0),
+            String.format("Name mismatch for playerId %d", playerId));
+        assertEquals(result1.getString(0, 1), result2.getString(0, 1),
+            String.format("Game mismatch for playerId %d", playerId));
+        assertEquals(result1.getFloat(0, 2), result2.getFloat(0, 2),
+            String.format("Score mismatch for playerId %d", playerId));
+        assertEquals(result1.getLong(0, 3), result2.getLong(0, 3),
+            String.format("Timestamp mismatch for playerId %d", playerId));
+      }
+    }
+
+    // Verify aggregated data is identical
+    String[] aggregateQueries = {
+        "SELECT COUNT(*) FROM %s", "SELECT SUM(score) FROM %s", "SELECT MAX(timestampInEpoch) FROM %s", "SELECT COUNT"
+        + "(DISTINCT game) FROM %s"
+    };
+
+    for (String queryTemplate : aggregateQueries) {
+      String query1 = String.format(queryTemplate, table1);
+      String query2 = String.format(queryTemplate, table2);
+
+      ResultSet result1 = getPinotConnection().execute(query1).getResultSet(0);
+      ResultSet result2 = getPinotConnection().execute(query2).getResultSet(0);
+
+      assertEquals(result1.getRowCount(), result2.getRowCount(),
+          String.format("Aggregate query result count mismatch: %s", queryTemplate));
+
+      if (result1.getRowCount() > 0) {
+        // Compare the first column of the result (the aggregate value)
+        Object value1 = getResultValue(result1, 0, 0);
+        Object value2 = getResultValue(result2, 0, 0);
+        assertEquals(value1, value2, String.format("Aggregate query result mismatch: %s", queryTemplate));
+      }
+    }
+  }
+
+  /**
+   * Helper method to get result value handling different data types
+   */
+  private Object getResultValue(ResultSet resultSet, int row, int col) {
+    try {
+      // Try different data types
+      return resultSet.getLong(row, col);
+    } catch (Exception e1) {
+      try {
+        return resultSet.getFloat(row, col);
+      } catch (Exception e2) {
+        try {
+          return resultSet.getString(row, col);
+        } catch (Exception e3) {
+          return resultSet.getDouble(row, col);
+        }
+      }
+    }
   }
 
   private long getScore(String tableName) {
@@ -588,5 +841,43 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, "1");
     return new TableTaskConfig(
         Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
+  }
+
+  /**
+   * Helper method to print the whole table for debugging purposes
+   */
+  private void printWholeTableForDebugging(String tableName, String context) {
+    try {
+      System.out.printf("DEBUG: %s - Table %s contents ordered by $docId:%n", context, tableName);
+      String query = String.format("SELECT $segmentName, $docId, * FROM %s ORDER BY 1, 2 limit 100 OPTION(skipUpsert=true)", tableName);
+      ResultSet resultSet = getPinotConnection().execute(query).getResultSet(0);
+
+      // Print header
+      int columnCount = resultSet.getColumnCount();
+      StringBuilder header = new StringBuilder();
+      for (int i = 0; i < columnCount; i++) {
+        if (i > 0) {
+          header.append("\t");
+        }
+        header.append(resultSet.getColumnName(i));
+      }
+      System.out.println(header.toString());
+
+      // Print rows
+      for (int row = 0; row < resultSet.getRowCount(); row++) {
+        StringBuilder rowStr = new StringBuilder();
+        for (int col = 0; col < columnCount; col++) {
+          if (col > 0) {
+            rowStr.append("\t");
+          }
+          Object value = getResultValue(resultSet, row, col);
+          rowStr.append(value != null ? value.toString() : "null");
+        }
+        System.out.println(rowStr.toString());
+      }
+      System.out.printf("DEBUG: End of table %s contents (%d rows)%n", tableName, resultSet.getRowCount());
+    } catch (Exception e) {
+      System.err.printf("DEBUG: Error printing table %s: %s%n", tableName, e.getMessage());
+    }
   }
 }

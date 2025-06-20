@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.converter;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -29,6 +28,7 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -96,23 +96,54 @@ public class RealtimeSegmentConverter {
     _realtimeSegmentImpl.commit();
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      String sortedColumn = null;
-      List<String> columnSortOrder = genConfig.getColumnSortOrder();
-      if (CollectionUtils.isNotEmpty(columnSortOrder)) {
-        sortedColumn = columnSortOrder.get(0);
-      }
-      int[] sortedDocIds =
-          sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
-      recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-      RealtimeSegmentSegmentCreationDataSource dataSource =
-          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
 
-      if (!_enableColumnMajor) {
-        driver.build();
-      } else {
-        driver.buildByColumn(_realtimeSegmentImpl);
+    // Check if commit-time compaction is enabled for upsert tables
+    boolean useCompactedReader = isCommitTimeCompactionEnabled();
+
+    if (useCompactedReader) {
+      // Use CompactedPinotSegmentRecordReader to remove obsolete records
+      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
+          _realtimeSegmentImpl.getValidDocIds(), _realtimeSegmentImpl.getDeleteRecordColumn())) {
+        String sortedColumn = null;
+        List<String> columnSortOrder = genConfig.getColumnSortOrder();
+        if (columnSortOrder != null && !columnSortOrder.isEmpty()) {
+          sortedColumn = columnSortOrder.get(0);
+        }
+        int[] sortedDocIds =
+            sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn)
+                : null;
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        RealtimeSegmentSegmentCreationDataSource dataSource =
+            new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds);
+        driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
+
+        if (!_enableColumnMajor) {
+          driver.build();
+        } else {
+          driver.buildByColumn(_realtimeSegmentImpl);
+        }
+      }
+    } else {
+      // Use regular PinotSegmentRecordReader (existing behavior)
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        String sortedColumn = null;
+        List<String> columnSortOrder = genConfig.getColumnSortOrder();
+        if (CollectionUtils.isNotEmpty(columnSortOrder)) {
+          sortedColumn = columnSortOrder.get(0);
+        }
+        int[] sortedDocIds =
+            sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn)
+                : null;
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        RealtimeSegmentSegmentCreationDataSource dataSource =
+            new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
+        driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
+
+        if (!_enableColumnMajor) {
+          driver.build();
+        } else {
+          driver.buildByColumn(_realtimeSegmentImpl);
+        }
       }
     }
 
@@ -126,9 +157,18 @@ public class RealtimeSegmentConverter {
   }
 
   /**
+   * Checks if commit-time compaction is enabled for upsert tables
+   */
+  private boolean isCommitTimeCompactionEnabled() {
+    if (_tableConfig.getUpsertConfig() == null) {
+      return false;
+    }
+    return _tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+  }
+
+  /**
    * Returns a new schema containing only physical columns
    */
-  @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
     return original.withoutVirtualColumns();
   }
