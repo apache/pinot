@@ -42,6 +42,7 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
   enum PatternType {
+    FILTER_PROJECT_JOIN,
     PROJECT_FILTER_JOIN,
     PROJECT_JOIN,
     FILTER_JOIN
@@ -57,6 +58,15 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     PatternType patternType();
 
     Config withPatternType(PatternType patternType);
+
+    Config FILTER_PROJECT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b0 ->
+            b0.operand(LogicalFilter.class).oneInput(b1 ->
+                b1.operand(LogicalProject.class).oneInput(b2 ->
+                    b2.operand(LogicalJoin.class).anyInputs()
+                )
+            )
+        ).patternType(PatternType.FILTER_PROJECT_JOIN).build();
 
     Config PROJECT_FILTER_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
         .operandSupplier(b0 ->
@@ -86,6 +96,9 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     super(config);
   }
 
+  public static final PinotEnrichedJoinRule FILTER_PROJECT_JOIN =
+      (PinotEnrichedJoinRule) Config.FILTER_PROJECT_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule PROJECT_FILTER_JOIN =
       (PinotEnrichedJoinRule) Config.PROJECT_FILTER_JOIN.withDescription(
           CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
@@ -97,6 +110,7 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
           CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
 
   public static final List<RelOptRule> PINOT_ENRICHED_JOIN_RULES = List.of(
+      FILTER_PROJECT_JOIN,
       PROJECT_FILTER_JOIN,
       PROJECT_JOIN,
       FILTER_JOIN
@@ -125,6 +139,24 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>();
 
     switch (patternType) {
+      case FILTER_PROJECT_JOIN:
+        filter = call.rel(0);
+        project = call.rel(1);
+        join = call.rel(2);
+
+        traitSet = join.getTraitSet();
+        // add projection to the set
+        projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // add filter to the set
+        filterRex = filter.getCondition();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // provide final output rowtype
+        projectRowType = project.getRowType();
+
+        projectVariableSet = project.getVariablesSet();
+        break;
+
       case PROJECT_FILTER_JOIN:
         project = call.rel(0);
         filter = call.rel(1);

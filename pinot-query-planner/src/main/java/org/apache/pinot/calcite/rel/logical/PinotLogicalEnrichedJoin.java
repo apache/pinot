@@ -41,70 +41,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class PinotLogicalEnrichedJoin extends Join {
 
-  public enum FilterProjectRexNodeType {
-    FILTER,
-    PROJECT
-  }
-
-  public static class ProjectAndResultRowType {
-    private final List<RexNode> _project;
-    private final RelDataType _dataType;
-
-    public ProjectAndResultRowType(List<RexNode> project, RelDataType resultRowType) {
-      _project = project;
-      _dataType = resultRowType;
-    }
-
-    public List<RexNode> getProject() {
-      return _project;
-    }
-
-    public RelDataType getDataType() {
-      return _dataType;
-    }
-  }
-
-  public static class FilterProjectRexNode {
-    private final FilterProjectRexNodeType _type;
-    @Nullable
-    private final RexNode _filter;
-    @Nullable
-    private final ProjectAndResultRowType _projectAndResultRowType;
-
-    @Override
-    public String toString() {
-      return _type == FilterProjectRexNodeType.FILTER
-          ? "Filter: " + _filter.toString()
-          : "Project: " + _projectAndResultRowType.getProject().toString();
-    }
-
-    public FilterProjectRexNode(RexNode filter) {
-      _type = FilterProjectRexNodeType.FILTER;
-      _filter = filter;
-      _projectAndResultRowType = null;
-    }
-
-    public FilterProjectRexNode(List<RexNode> project, RelDataType resultDataType) {
-      _type = FilterProjectRexNodeType.PROJECT;
-      _filter = null;
-      _projectAndResultRowType = new ProjectAndResultRowType(project, resultDataType);
-    }
-
-    public FilterProjectRexNodeType getType() {
-      return _type;
-    }
-
-    @Nullable
-    public RexNode getFilter() {
-      return _filter;
-    }
-
-    @Nullable
-    public ProjectAndResultRowType getProjectAndResultRowType() {
-      return _projectAndResultRowType;
-    }
-  }
-
   private final RelDataType _joinRowType;
   private final RelDataType _outputRowType;
   private final List<FilterProjectRexNode> _filterProjectRexNodes;
@@ -191,5 +127,69 @@ public class PinotLogicalEnrichedJoin extends Join {
   public RelWriter explainTerms(RelWriter pw) {
     return super.explainTerms(pw)
         .item("filterProjectRex", _filterProjectRexNodes);
+  }
+
+  public enum FilterProjectRexNodeType {
+    FILTER,
+    PROJECT
+  }
+
+  public static class ProjectAndResultRowType {
+    private final List<RexNode> _project;
+    private final RelDataType _dataType;
+
+    public ProjectAndResultRowType(List<RexNode> project, RelDataType resultRowType) {
+      _project = project;
+      _dataType = resultRowType;
+    }
+
+    public List<RexNode> getProject() {
+      return _project;
+    }
+
+    public RelDataType getDataType() {
+      return _dataType;
+    }
+  }
+
+  public static class FilterProjectRexNode {
+    private final FilterProjectRexNodeType _type;
+    @Nullable
+    private final RexNode _filter;
+    @Nullable
+    private final ProjectAndResultRowType _projectAndResultRowType;
+
+    @Override
+    public String toString() {
+      return _type == FilterProjectRexNodeType.FILTER
+          ? "Filter: " + _filter.toString()
+          : "Project: " + _projectAndResultRowType.getProject().toString();
+    }
+
+    public FilterProjectRexNode(RexNode filter) {
+      _type = FilterProjectRexNodeType.FILTER;
+      _filter = filter;
+      _projectAndResultRowType = null;
+    }
+
+    public FilterProjectRexNode(List<RexNode> project, RelDataType resultDataType) {
+      _type = FilterProjectRexNodeType.PROJECT;
+      _filter = null;
+      _projectAndResultRowType = new ProjectAndResultRowType(project, resultDataType);
+    }
+
+    public FilterProjectRexNodeType getType() {
+      return _type;
+    }
+
+    @Nullable
+    public RexNode getFilter() {
+      return _filter;
+    }
+
+    @Nullable
+    public ProjectAndResultRowType getProjectAndResultRowType() {
+      return _projectAndResultRowType;
+    }
   }
 }

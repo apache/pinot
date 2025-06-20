@@ -275,4 +275,50 @@ public class PinotEnrichedJoinRuleTest {
     assertEquals(enrichedJoin.getFilterProjectRexNodes().get(1).getProjectAndResultRowType().getProject(), projects);
     assertEquals(enrichedJoin.getCondition(), joinCondition);
   }
+
+  @Test
+  public void testRuleWithPlannerFilterProjectJoinCase() {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+    RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
+    cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .add("col3", SqlTypeName.INTEGER)
+        .build();
+
+    when(_input.getCluster()).thenReturn(cluster);
+    // Create a RelOptRuleCall for a filter above join
+    when(_input.getRowType()).thenReturn(intType);
+    // join condition col0 = col1
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
+        REX_BUILDER.makeInputRef(intType, 3));
+    LogicalJoin originalJoin =
+        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+            JoinRelType.INNER);
+    // project above filter with width of 5
+    List<RexNode> projects = List.of(REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1),
+        REX_BUILDER.makeInputRef(intType, 2), REX_BUILDER.makeInputRef(intType, 3),
+        REX_BUILDER.makeInputRef(intType, 4), REX_BUILDER.makeInputRef(intType, 4),
+        REX_BUILDER.makeInputRef(intType, 0));
+    LogicalProject project =
+        LogicalProject.create(originalJoin, Collections.emptyList(), projects, (List<? extends String>) null);
+    // filter condition col2 = 1
+    RexNode filterCondition =
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(project.getRowType(), 6),
+            REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)));
+    LogicalFilter originalFilter = LogicalFilter.create(project, filterCondition);
+
+    planner.setRoot(originalFilter);
+    RelNode newRoot = planner.findBestExp();
+
+    assert (newRoot instanceof PinotLogicalEnrichedJoin);
+    PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) newRoot;
+    assertEquals(enrichedJoin.getFilterProjectRexNodes().get(0).getProjectAndResultRowType().getProject(), projects);
+    assertEquals(enrichedJoin.getFilterProjectRexNodes().get(1).getFilter(), filterCondition);
+    assertEquals(enrichedJoin.getCondition(), joinCondition);
+  }
 }
