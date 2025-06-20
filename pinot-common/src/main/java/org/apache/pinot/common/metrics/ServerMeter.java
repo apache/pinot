@@ -142,6 +142,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
+  // PageCacheWarmup related metrics
+  PAGE_CACHE_WARMUP_QUERIES("pageCacheWarmupQueries", true),
+  PAGE_CACHE_WARMUP_TIMEOUT_ERRORS("pageCacheWarmupTimeoutErrors", true),
+  PAGE_CACHE_WARMUP_SERVER_ERRORS("pageCacheWarmupServerErrors", true),
+
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.

@@ -379,6 +379,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
+  public static final String DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR = "/home/pinot/data/pageCacheWarmupQueries";
 
   public static final String CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK = "controller.table.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
@@ -1332,5 +1333,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMaxForceCommitZkJobs() {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+  }
+
+  public String getPageCacheWarmupDataDir() {
+    return getProperty(CommonConstants.Controller.PAGE_CACHE_WARMUP_QUERIES_DATA_DIR,
+        DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR);
   }
 }
