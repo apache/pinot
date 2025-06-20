@@ -673,13 +673,13 @@ public class PinotTableRestletResource {
       @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier,
-      @ApiParam(value = "Do force commit on consuming segments before they are rebalanced") @DefaultValue("false")
+      @ApiParam(value = "Whether to force commit consuming segments for a REALTIME table before they are rebalanced.") @DefaultValue("false")
       @QueryParam("forceCommit") boolean forceCommit,
-      @ApiParam(value = "Batch size for force commit operations") @DefaultValue("2147483647")
+      @ApiParam(value = "Batch size for force commit operations") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
       @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
-      @ApiParam(value = "Interval in milliseconds for checking force commit batch status") @DefaultValue("5000")
+      @ApiParam(value = "Interval in milliseconds for checking force commit batch status") @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckIntervalMs") int forceCommitBatchStatusCheckIntervalMs,
-      @ApiParam(value = "Timeout in milliseconds for force commit batch status check") @DefaultValue("180000")
+      @ApiParam(value = "Timeout in milliseconds for force commit batch status check") @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
       @QueryParam("forceCommitBatchStatusCheckTimeoutMs") int forceCommitBatchStatusCheckTimeoutMs,
       @Context HttpHeaders headers
       //@formatter:on

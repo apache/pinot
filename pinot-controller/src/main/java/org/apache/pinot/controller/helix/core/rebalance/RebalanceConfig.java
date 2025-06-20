@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
@@ -141,16 +142,16 @@ public class RebalanceConfig {
   private boolean _forceCommit = false;
 
   @JsonProperty("forceCommitBatchSize")
-  @ApiModelProperty(example = "2147483647")
-  private int _forceCommitBatchSize = Integer.MAX_VALUE;
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
+  private int _forceCommitBatchSize = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE;
 
   @JsonProperty("forceCommitBatchStatusCheckIntervalMs")
-  @ApiModelProperty(example = "5000")
-  private int _forceCommitBatchStatusCheckIntervalMs = 5000;
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckIntervalMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000;
 
   @JsonProperty("forceCommitBatchStatusCheckTimeoutMs")
-  @ApiModelProperty(example = "180000")
-  private int _forceCommitBatchStatusCheckTimeoutMs = 180000;
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckTimeoutMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000;
 
   public boolean isDryRun() {
     return _dryRun;

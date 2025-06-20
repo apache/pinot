@@ -174,14 +174,14 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
-      @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
-      @QueryParam("batchSize") @DefaultValue(Integer.MAX_VALUE + "") int batchSize,
+      @ApiParam(value = "Max number of consuming segments to commit at once")
+      @QueryParam("batchSize") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
-          + " not (default = 5)")
-      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue("5") int batchStatusCheckIntervalSec,
+          + " not")
+      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
-          + " of segments and throw an exception. (default = 180)")
-      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue("180") int batchStatusCheckTimeoutSec,
+          + " of segments and throw an exception")
+      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
