@@ -36,11 +36,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.spi.auth.controller.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.spi.auth.controller.AccessType;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.spi.auth.controller.AccessControl;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.apache.pinot.spi.auth.core.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;

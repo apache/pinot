@@ -42,8 +42,8 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.spi.auth.core.TargetType;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.spi.auth.core.TargetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -31,6 +31,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <thrift.bin.path>/usr/local/bin/thrift</thrift.bin.path>
   </properties>
 
   <build>
@@ -236,6 +237,10 @@
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.thrift</groupId>
+      <artifactId>libthrift</artifactId>
+    </dependency>
     <!-- Netty dependencies -->
     <dependency>
       <groupId>io.netty</groupId>
@@ -297,6 +302,65 @@
       <properties>
         <shade.phase.prop>none</shade.phase.prop>
       </properties>
+    </profile>
+    <profile>
+      <id>profile-buildthrift</id>
+      <activation>
+        <file>
+          <exists>${thrift.bin.path}</exists>
+        </file>
+        <property>
+          <name>buildThrift</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>generate-sources</id>
+                <phase>generate-sources</phase>
+                <configuration>
+                  <target>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                    <mkdir dir="target/generated-sources" />
+                    <exec executable="${thrift.bin.path}">
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/query.thrift" />
+                    </exec>
+                    <exec executable="${thrift.bin.path}">
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/request.thrift" />
+                    </exec>
+                    <exec executable="${thrift.bin.path}">
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/response.thrift" />
+                    </exec>
+                    <move todir="src/main/java/">
+                      <fileset dir="target/generated-sources/gen-javabean" />
+                    </move>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>
