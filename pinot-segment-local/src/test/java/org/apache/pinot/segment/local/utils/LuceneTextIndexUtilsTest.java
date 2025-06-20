@@ -235,4 +235,228 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals("CLASSIC", result5.getValue().get("parser"));
     Assert.assertEquals("true", result5.getValue().get("allowLeadingWildcard"));
   }
+
+  @Test
+  public void testParseOptionsEarlyReturnOptimization() {
+    // Test null input - should return null early
+    Map.Entry<String, Map<String, String>> result = LuceneTextIndexUtils.parseOptionsFromSearchString(null);
+    Assert.assertNull(result);
+
+    // Test empty string - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("");
+    Assert.assertNull(result);
+
+    // Test string without __OPTIONS - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("simple search term");
+    Assert.assertNull(result);
+
+    // Test string with partial __OPTIONS - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTION");
+    Assert.assertNull(result);
+
+    // Test string with partial __OPTIONS - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTION(parser=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test string with __OPTIONS but not in correct format - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS");
+    Assert.assertNull(result);
+
+    // Test string with __OPTIONS in different case - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __options(parser=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test string with __OPTIONS as part of another word - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search my__OPTIONS(parser=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test string with __OPTIONS at the end without parentheses - should return null early
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __oPTIONS");
+    Assert.assertNull(result);
+  }
+
+  @Test
+  public void testParseOptionsExceptionHandling() {
+    // Test malformed options that could cause parsing exceptions
+    // These should not throw exceptions but return null instead
+
+    // Test unclosed parentheses
+    Map.Entry<String, Map<String, String>> result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC");
+    Assert.assertNull(result);
+
+    // Test empty parentheses
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS()");
+    Assert.assertNull(result);
+
+    // Test malformed option format
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser)");
+    Assert.assertNull(result);
+
+    // Test option with empty value
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=)");
+    Assert.assertNull(result);
+
+    // Test option with empty key
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test multiple equals signs
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC=EXTRA)");
+    Assert.assertNull(result);
+
+    // Test nested parentheses
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=(CLASSIC))");
+    Assert.assertNull(result);
+
+    // Test nested parentheses in option value
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=(value))");
+    Assert.assertNull(result);
+
+    // Test nested parentheses in option key
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS((parser)=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test special characters that might cause regex issues
+    result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=value with spaces)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value with spaces", result.getValue().get("test"));
+
+    // Test unicode characters
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=测试)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+
+    // Test very long option values that might cause stack overflow
+    StringBuilder longValue = new StringBuilder("search __OPTIONS(parser=CLASSIC, test=");
+    for (int i = 0; i < 10000; i++) {
+      longValue.append("a");
+    }
+    longValue.append(")");
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString(longValue.toString());
+    Assert.assertNull(result);
+  }
+
+  @Test
+  public void testParseOptionsValidation() {
+    // Test nested parentheses validation
+    Map.Entry<String, Map<String, String>> result;
+
+    // Test simple nested parentheses
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=(CLASSIC))");
+    Assert.assertNull(result);
+
+    // Test complex nested parentheses
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=(A(B)C))");
+    Assert.assertNull(result);
+
+    // Test parentheses in option value
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString(
+        "search __OPTIONS(parser=CLASSIC, test=value(with)parentheses)");
+    Assert.assertNull(result);
+
+    // Test parentheses in option key
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, (test)=value)");
+    Assert.assertNull(result);
+
+    // Test empty key validation
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(=CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test empty value validation
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=)");
+    Assert.assertNull(result);
+
+    // Test empty key and value
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(=)");
+    Assert.assertNull(result);
+
+    // Test whitespace-only key
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(  =CLASSIC)");
+    Assert.assertNull(result);
+
+    // Test whitespace-only value
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=  )");
+    Assert.assertNull(result);
+
+    // Test invalid option format (no equals sign)
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser)");
+    Assert.assertNull(result);
+
+    // Test invalid option format (multiple equals signs)
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC=EXTRA)");
+    Assert.assertNull(result);
+
+    // Test mixed valid and invalid options
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, invalid, test=true)");
+    Assert.assertNull(result);
+
+    // Test valid options (should work)
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=true)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("true", result.getValue().get("test"));
+  }
+
+  @Test
+  public void testParseOptionsEdgeCases() {
+    // Test whitespace variations
+    Map.Entry<String, Map<String, String>> result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("  search  __OPTIONS(  parser=CLASSIC  )  ");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey().trim());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+
+    // Test multiple spaces in option parsing
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString(
+        "search __OPTIONS(parser=CLASSIC,   allowLeadingWildcard=true)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("true", result.getValue().get("allowLeadingWildcard"));
+
+    // Test options with special characters in values (but valid format)
+    result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=value-with-dashes)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value-with-dashes", result.getValue().get("test"));
+
+    // Test options with underscores in values
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString(
+        "search __OPTIONS(parser=CLASSIC, test=value_with_underscores)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value_with_underscores", result.getValue().get("test"));
+
+    // Test options with dots in values
+    result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=value.with.dots)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value.with.dots", result.getValue().get("test"));
+
+    // Test options with numbers in values
+    result = LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=value123)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value123", result.getValue().get("test"));
+
+    // Test options with mixed alphanumeric values
+    result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString("search __OPTIONS(parser=CLASSIC, test=value-123_with.dots)");
+    Assert.assertNotNull(result);
+    Assert.assertEquals("search", result.getKey());
+    Assert.assertEquals("CLASSIC", result.getValue().get("parser"));
+    Assert.assertEquals("value-123_with.dots", result.getValue().get("test"));
+  }
 }
