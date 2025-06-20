@@ -22,6 +22,9 @@ import com.google.common.base.Preconditions;
 
 
 public class ForceCommitBatchConfig {
+  public static final int DEFAULT_BATCH_SIZE = Integer.MAX_VALUE;
+  public static final int DEFAULT_STATUS_CHECK_INTERVAL_SEC = 5;
+  public static final int DEFAULT_STATUS_CHECK_TIMEOUT_SEC = 180;
   private final int _batchSize;
   private final int _batchStatusCheckIntervalMs;
   private final int _batchStatusCheckTimeoutMs;

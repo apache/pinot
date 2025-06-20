@@ -38,6 +38,10 @@ public interface TableRebalanceObserver {
     IDEAL_STATE_CHANGE_TRIGGER,
     // Next assignment calculation change trigger which calculates next assignment to act on
     NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit starts
+    FORCE_COMMIT_START_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit ends
+    FORCE_COMMIT_END_TRIGGER,
   }
 
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
@@ -59,12 +63,26 @@ public interface TableRebalanceObserver {
     private final long _estimatedAverageSegmentSizeInBytes;
     private final Set<String> _uniqueSegments;
     private final Set<String> _segmentsToMonitor;
+    private final int _numSegmentsForceCommitted;
 
     public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
         @Nullable Set<String> segmentsToMonitor) {
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
       _uniqueSegments = uniqueSegments;
       _segmentsToMonitor = segmentsToMonitor;
+      _numSegmentsForceCommitted = 0;
+    }
+
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
+        @Nullable Set<String> segmentsToMonitor, int numSegmentsForceCommitted) {
+      _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
+      _uniqueSegments = uniqueSegments;
+      _segmentsToMonitor = segmentsToMonitor;
+      _numSegmentsForceCommitted = numSegmentsForceCommitted;
+    }
+
+    public RebalanceContext(int numSegmentsForceCommitted) {
+      this(0L, Set.of(), null, numSegmentsForceCommitted);
     }
 
     public long getEstimatedAverageSegmentSizeInBytes() {
@@ -77,6 +95,10 @@ public interface TableRebalanceObserver {
 
     public Set<String> getSegmentsToMonitor() {
       return _segmentsToMonitor;
+    }
+
+    public int getNumSegmentsForceCommitted() {
+      return _numSegmentsForceCommitted;
     }
   }
 }

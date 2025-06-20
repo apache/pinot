@@ -149,7 +149,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "name": "externalViewStabilizationTimeoutInMs",
         "defaultValue": 3600000,
         "type": "INTEGER",
-        "label": "External View Stabilization Timeout In Milliseconds",
+        "label": "External View Stabilization Timeout (ms)",
         "description": "Maximum time (in milliseconds) to wait for external view to converge with ideal states. It automatically extends the time if progress has been made",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
@@ -171,6 +171,36 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "type": "BOOL",
         "label": "Update Target Tier",
         "description": "If enabled, update segment target tier as part of the rebalance",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "forceCommit",
+        "defaultValue": false,
+        "type": "BOOL",
+        "label": "Force Commit",
+        "description": "Do force commit on consuming segments before they are rebalanced",
+        "isAdvancedConfig": false,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "forceCommitBatchSize",
+        "defaultValue": 2147483647,
+        "type": "INTEGER",
+        "label": "Force Commit Batch Size",
+        "description": "If forceCommit is set, this is the batch size for force commit operations. Controls how many segments are force committed in each batch. (Default to Integer.MAX to disable batching)",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "forceCommitBatchStatusCheckTimeoutMs",
+        "defaultValue": 180000,
+        "type": "INTEGER",
+        "label": "Force Commit Status Check Timeout (ms)",
+        "description": "If forceCommit is set, this is the timeout in milliseconds for force commit batch status checks. Maximum time to wait for force commit operations to complete",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
