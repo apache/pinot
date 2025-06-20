@@ -43,10 +43,6 @@ public abstract class FilterOperand implements TransformOperand {
   @Override
   public abstract Integer apply(List<Object> row);
 
-  @Nullable
-  @Override
-  public abstract Integer apply(List<Object> row);
-
   public static class And extends FilterOperand {
     List<TransformOperand> _childOperands;
 
@@ -55,21 +51,6 @@ public abstract class FilterOperand implements TransformOperand {
       for (RexExpression child : children) {
         _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
       }
-    }
-
-    @Nullable
-    @Override
-    public Integer apply(List<Object> row) {
-      boolean hasNull = false;
-      for (TransformOperand child : _childOperands) {
-        Object result = child.apply(row);
-        if (result == null) {
-          hasNull = true;
-        } else if ((int) result == 0) {
-          return 0;
-        }
-      }
-      return hasNull ? null : 1;
     }
 
     @Nullable
@@ -112,21 +93,6 @@ public abstract class FilterOperand implements TransformOperand {
       }
       return hasNull ? null : 0;
     }
-
-    @Nullable
-    @Override
-    public Integer apply(List<Object> row) {
-      boolean hasNull = false;
-      for (TransformOperand child : _childOperands) {
-        Object result = child.apply(row);
-        if (result == null) {
-          hasNull = true;
-        } else if ((int) result == 1) {
-          return 1;
-        }
-      }
-      return hasNull ? null : 0;
-    }
   }
 
   public static class Not extends FilterOperand {
@@ -134,13 +100,6 @@ public abstract class FilterOperand implements TransformOperand {
 
     public Not(RexExpression child, DataSchema dataSchema) {
       _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema);
-    }
-
-    @Nullable
-    @Override
-    public Integer apply(List<Object> row) {
-      Object result = _childOperand.apply(row);
-      return result != null ? 1 - (int) result : null;
     }
 
     @Nullable
@@ -181,25 +140,6 @@ public abstract class FilterOperand implements TransformOperand {
       }
       return _isNotIn ? 1 : 0;
     }
-
-    @Nullable
-    @Override
-    public Integer apply(List<Object> row) {
-      Object firstResult = _childOperands.get(0).apply(row);
-      if (firstResult == null) {
-        return null;
-      }
-      for (int i = 1; i < _childOperands.size(); i++) {
-        Object result = _childOperands.get(i).apply(row);
-        if (result == null) {
-          return null;
-        }
-        if (firstResult.equals(result)) {
-          return _isNotIn ? 0 : 1;
-        }
-      }
-      return _isNotIn ? 1 : 0;
-    }
   }
 
   public static class IsTrue extends FilterOperand {
@@ -214,12 +154,6 @@ public abstract class FilterOperand implements TransformOperand {
       Object result = _childOperand.apply(row);
       return result != null ? (Integer) result : 0;
     }
-
-    @Override
-    public Integer apply(List<Object> row) {
-      Object result = _childOperand.apply(row);
-      return result != null ? (Integer) result : 0;
-    }
   }
 
   public static class IsNotTrue extends FilterOperand {
@@ -227,12 +161,6 @@ public abstract class FilterOperand implements TransformOperand {
 
     public IsNotTrue(RexExpression child, DataSchema dataSchema) {
       _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema);
-    }
-
-    @Override
-    public Integer apply(List<Object> row) {
-      Object result = _childOperand.apply(row);
-      return result != null ? 1 - (int) result : 1;
     }
 
     @Override
@@ -283,25 +211,6 @@ public abstract class FilterOperand implements TransformOperand {
               String.format("Cannot compare incompatible type: %s and: %s", lhsType, rhsType));
         }
       }
-    }
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    @Nullable
-    @Override
-    public Integer apply(List<Object> row) {
-      Comparable v1 = (Comparable) _lhs.apply(row);
-      if (v1 == null) {
-        return null;
-      }
-      Comparable v2 = (Comparable) _rhs.apply(row);
-      if (v2 == null) {
-        return null;
-      }
-      if (_requireCasting) {
-        v1 = cast(v1, _commonCastType);
-        v2 = cast(v2, _commonCastType);
-      }
-      return _comparisonResultPredicate.test(v1.compareTo(v2)) ? 1 : 0;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

@@ -41,9 +41,4 @@ public class LiteralOperand implements TransformOperand {
   public Object apply(List<Object> row) {
     return _value;
   }
-
-  @Override
-  public Object apply(List<Object> row) {
-    return _value;
-  }
 }
