@@ -153,7 +153,7 @@ public class QueryEnvironment {
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options
-    _optProgram = getOptProgram(null);
+    _optProgram = getOptProgram(null, false);
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -172,14 +172,14 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
-    if (MapUtils.isNotEmpty(options)) {
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
+    if (MapUtils.isNotEmpty(options) || usePhysicalOptimizer) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
+      if (CollectionUtils.isNotEmpty(skipRuleSet) || usePhysicalOptimizer) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet);
+        optProgram = getOptProgram(skipRuleSet, usePhysicalOptimizer);
       }
     }
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
@@ -492,9 +492,10 @@ public class QueryEnvironment {
    * - In the third phase, the logical plan is prune with PRUNE_RULES.
    *
    * @param skipRuleSet parsed skipped rule name set from query options
+   * @param usePhysicalOptimizer if physical optimizer used, enrichedJoinRules are disabled
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
+  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet, boolean usePhysicalOptimizer) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -508,18 +509,18 @@ public class QueryEnvironment {
     List<RelOptRule> projectPushdownRules;
     List<RelOptRule> pruneRules;
     List<RelOptRule> enrichedJoinRules;
-    if (skipRuleSet == null) {
-      basicRules = PinotQueryRuleSets.BASIC_RULES;
-      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
-      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
-      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
-      enrichedJoinRules = PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES;
-    } else {
+    if (CollectionUtils.isNotEmpty(skipRuleSet)) {
       basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
       filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
       projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
       pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
       enrichedJoinRules = filterRuleList(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES, skipRuleSet);
+    } else {
+      basicRules = PinotQueryRuleSets.BASIC_RULES;
+      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
+      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
+      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
+      enrichedJoinRules = PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES;
     }
 
 
@@ -544,8 +545,11 @@ public class QueryEnvironment {
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
 
-    // fuse project and filter above join into join
-    hepProgramBuilder.addRuleCollection(enrichedJoinRules);
+    // fuse project and filter above join into enriched join
+    // enriched join is not supported in PRel
+    if (!usePhysicalOptimizer) {
+      hepProgramBuilder.addRuleCollection(enrichedJoinRules);
+    }
 
     return hepProgramBuilder.build();
   }
