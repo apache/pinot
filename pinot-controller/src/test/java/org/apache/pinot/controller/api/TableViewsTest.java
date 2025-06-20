@@ -23,7 +23,7 @@ import java.net.URL;
 import java.util.Map;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.common.utils.tables.TableViewsUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -81,11 +81,11 @@ public class TableViewsTest extends ControllerTest {
     // Wait for external view get updated
     TestUtils.waitForCondition(aVoid -> {
       try {
-        TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+        TableViewsUtils.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViewsUtils.EXTERNALVIEW, null);
         if (tableView._offline == null || tableView._offline.size() != 1) {
           return false;
         }
-        tableView = getTableView(HYBRID_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+        tableView = getTableView(HYBRID_TABLE_NAME, TableViewsUtils.EXTERNALVIEW, null);
         return tableView._offline != null && tableView._realtime != null
             && tableView._realtime.size() == DEFAULT_NUM_SERVER_INSTANCES;
       } catch (Exception e) {
@@ -97,7 +97,7 @@ public class TableViewsTest extends ControllerTest {
 
   @DataProvider(name = "viewProvider")
   public Object[][] viewProvider() {
-    return new Object[][]{{TableViews.IDEALSTATE}, {TableViews.EXTERNALVIEW}};
+    return new Object[][]{{TableViewsUtils.IDEALSTATE}, {TableViewsUtils.EXTERNALVIEW}};
   }
 
   @Test(dataProvider = "viewProvider")
@@ -120,7 +120,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testOfflineTableState(String view)
       throws Exception {
-    TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
+    TableViewsUtils.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
     assertNotNull(tableView._offline);
     assertEquals(tableView._offline.size(), 1);
     assertNull(tableView._realtime);
@@ -137,7 +137,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "viewProvider")
   public void testHybridTableState(String state)
       throws Exception {
-    TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
+    TableViewsUtils.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
     assertNull(tableView._offline);
     assertNotNull(tableView._realtime);
     assertEquals(tableView._realtime.size(), DEFAULT_NUM_SERVER_INSTANCES);
@@ -164,11 +164,11 @@ public class TableViewsTest extends ControllerTest {
     assertEquals(tableView._realtime.size(), DEFAULT_NUM_SERVER_INSTANCES);
   }
 
-  private TableViews.TableView getTableView(String tableName, String view, String tableType)
+  private TableViewsUtils.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
     return JsonUtils.stringToObject(
         sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
-        TableViews.TableView.class);
+        TableViewsUtils.TableView.class);
   }
 
   private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {

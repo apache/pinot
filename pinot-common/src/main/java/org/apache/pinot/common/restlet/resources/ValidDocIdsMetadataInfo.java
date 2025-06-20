@@ -32,13 +32,16 @@ public class ValidDocIdsMetadataInfo {
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
   private final long _segmentCreationTimeMillis;
+  private final String _segmentStatus;
+  private final String _serverStatus;
 
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
-      @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis) {
+      @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
+      @JsonProperty("segmentStatus") String segmentStatus, String serverStatus) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -47,6 +50,8 @@ public class ValidDocIdsMetadataInfo {
     _validDocIdsType = validDocIdsType;
     _segmentSizeInBytes = segmentSizeInBytes;
     _segmentCreationTimeMillis = segmentCreationTimeMillis;
+    _segmentStatus = segmentStatus;
+    _serverStatus = serverStatus;
   }
 
   public String getSegmentName() {
@@ -80,4 +85,8 @@ public class ValidDocIdsMetadataInfo {
   public long getSegmentCreationTimeMillis() {
     return _segmentCreationTimeMillis;
   }
+
+  public String getSegmentStatus() { return _segmentStatus; }
+
+  public String getServerStatus() { return _serverStatus; }
 }

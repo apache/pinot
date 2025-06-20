@@ -31,7 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SqlResultComparator;
 import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.common.utils.tables.TableViewsUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -333,11 +333,11 @@ public class SegmentOp extends BaseOp {
    * Retrieve external view for the given table name.
    * @return TableViews.TableView of OFFLINE and REALTIME segments.
    */
-  private TableViews.TableView getExternalViewForTable()
+  private TableViewsUtils.TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-            .forTableExternalView(_tableName)), TableViews.TableView.class);
+            .forTableExternalView(_tableName)), TableViewsUtils.TableView.class);
   }
 
   /**

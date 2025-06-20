@@ -40,9 +40,10 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.tables.TableViewsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.api.resources.SegmentStatusInfo;
+import org.apache.pinot.common.utils.tables.SegmentStatusInfo;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -765,8 +766,8 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void testAllSegmentsGoodOnlineOfflineTable() {
-    TableViews.TableView tableViewExternal = new TableViews.TableView();
-    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    TableViewsUtils.TableView tableViewExternal = new TableViewsUtils.TableView();
+    TableViewsUtils.TableView tableViewIdeal = new TableViewsUtils.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
@@ -780,8 +781,8 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(
-        tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
+    List<SegmentStatusInfo> segmentStatusInfos = TableViewsUtils.getSegmentStatuses(
+        TableViewsUtils.getStateMap(tableViewExternal), TableViewsUtils.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -790,8 +791,8 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void testAllSegmentsGoodConsumingOfflineTable() {
-    TableViews.TableView tableViewExternal = new TableViews.TableView();
-    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    TableViewsUtils.TableView tableViewExternal = new TableViewsUtils.TableView();
+    TableViewsUtils.TableView tableViewIdeal = new TableViewsUtils.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
@@ -805,8 +806,8 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(
-        tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
+    List<SegmentStatusInfo> segmentStatusInfos = TableViewsUtils.getSegmentStatuses(
+        TableViewsUtils.getStateMap(tableViewExternal), TableViewsUtils.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -815,8 +816,8 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void testAllSegmentsBadOfflineTable() {
-    TableViews.TableView tableViewExternal = new TableViews.TableView();
-    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    TableViewsUtils.TableView tableViewExternal = new TableViewsUtils.TableView();
+    TableViewsUtils.TableView tableViewIdeal = new TableViewsUtils.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
@@ -830,8 +831,8 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(
-        tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
+    List<SegmentStatusInfo> segmentStatusInfos = TableViewsUtils.getSegmentStatuses(
+        TableViewsUtils.getStateMap(tableViewExternal), TableViewsUtils.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -840,8 +841,8 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void testAllSegmentsUpdatingOfflineTable() {
-    TableViews.TableView tableViewExternal = new TableViews.TableView();
-    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    TableViewsUtils.TableView tableViewExternal = new TableViewsUtils.TableView();
+    TableViewsUtils.TableView tableViewIdeal = new TableViewsUtils.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
@@ -855,8 +856,8 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(
-        tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
+    List<SegmentStatusInfo> segmentStatusInfos = TableViewsUtils.getSegmentStatuses(
+        TableViewsUtils.getStateMap(tableViewExternal), TableViewsUtils.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
@@ -865,8 +866,8 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void testAllSegmentsGoodBadOfflineTable() {
-    TableViews.TableView tableViewExternal = new TableViews.TableView();
-    TableViews.TableView tableViewIdeal = new TableViews.TableView();
+    TableViewsUtils.TableView tableViewExternal = new TableViewsUtils.TableView();
+    TableViewsUtils.TableView tableViewIdeal = new TableViewsUtils.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
@@ -884,8 +885,8 @@ public class SegmentStatusCheckerTest {
     tableViewExternal._offline = tableViewExternalOffline;
     tableViewIdeal._offline = tableViewIdealOffline;
     TableViews tableviews = new TableViews();
-    List<SegmentStatusInfo> segmentStatusInfos = tableviews.getSegmentStatuses(
-        tableviews.getStateMap(tableViewExternal), tableviews.getStateMap(tableViewIdeal));
+    List<SegmentStatusInfo> segmentStatusInfos = TableViewsUtils.getSegmentStatuses(
+        TableViewsUtils.getStateMap(tableViewExternal), TableViewsUtils.getStateMap(tableViewIdeal));
     assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
     assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),

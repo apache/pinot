@@ -61,10 +61,13 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -79,6 +82,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -105,6 +109,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.common.utils.tables.TableViewsUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -112,17 +118,14 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = "Table", authorizations = {@Authorization(value = CommonConstants.SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = CommonConstants.DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
+        key = CommonConstants.SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+    @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
 @Path("/")
@@ -140,6 +143,9 @@ public class TablesResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
+
+  @Inject
+  private ServerMetrics _serverMetrics;
 
   @GET
   @Path("/tables")
@@ -624,7 +630,8 @@ public class TablesResource {
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers) {
+      @Context HttpHeaders headers)
+      throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
@@ -644,7 +651,8 @@ public class TablesResource {
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments,
-      @Context HttpHeaders headers) {
+      @Context HttpHeaders headers)
+      throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -652,9 +660,18 @@ public class TablesResource {
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdsType) {
+      String validDocIdsType)
+      throws Exception {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+    String serverStatus = "";
+    if (status == ServiceStatus.Status.GOOD) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+      serverStatus = "OK";
+    } else {
+      serverStatus = "NOT_READY";
+    }
     List<String> missingSegments = new ArrayList<>();
     int nonImmutableSegmentCount = 0;
     int missingValidDocIdSnapshotSegmentCount = 0;
@@ -673,6 +690,21 @@ public class TablesResource {
         LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
+      HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
+      String helixClusterName = _serverInstance.getHelixManager().getClusterName();
+      TableViewsUtils.TableView externalView =
+          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
+              helixClusterName);
+      TableViewsUtils.TableView idealStateView =
+          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
+              helixClusterName);
+
+      Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
+      Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
+
+      Map<String, String> segmentStatusInfoListMap =
+          TableViewsUtils.getSegmentStatusesMap(externalViewStateMap, idealStateMap);
+
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
@@ -716,6 +748,8 @@ public class TablesResource {
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
+        validDocIdsMetadata.put("segmentStatus", segmentStatusInfoListMap.get(segmentDataManager.getSegmentName()));
+        validDocIdsMetadata.put("serverStatus", serverStatus);
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
           validDocIdsMetadata.put("segmentSizeInBytes",
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
