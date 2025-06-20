@@ -56,8 +56,6 @@ public class TextIndexCreationTest {
   @Test
   public void testSameColumnSingleAndMultiColTextIndexCreationFails()
       throws Exception {
-    // create schema copy to avoid side effects between test cases
-    // e.g. timestamp index creates additional virtual columns
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testSchema")
         .addSingleValueDimension("txt", FieldSpec.DataType.STRING)
