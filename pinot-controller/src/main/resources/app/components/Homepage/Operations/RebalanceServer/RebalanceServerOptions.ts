@@ -27,6 +27,9 @@ export type RebalanceServerOption = {
     markWithWarningIcon: boolean;
     allowedValues?: string[];
     toolTip?: string;
+    valueStep?: number;
+    valueMin?: number;
+    valueMax?: number;
 }
 
 export const rebalanceServerOptions: RebalanceServerOption[] = [
@@ -180,9 +183,13 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": -1.0,
         "type": "DOUBLE",
         "label": "Disk Utilization Threshold",
-        "description": "Override disk utilization threshold used in pre-check (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or -1.0), uses the controller's default threshold",
+        "description": "Override disk utilization threshold used in pre-check (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or any negative value), uses the controller's default threshold",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false,
+        "valueStep": 0.05,
+        "valueMin": -1.0,
+        "valueMax": 1.0
         "markWithWarningIcon": false
     },
     {

@@ -47,9 +47,9 @@ export const RebalanceServerConfigurationOptionDouble = (
                     id={`rebalance-server-double-input-${option.name}`}
                     type='number'
                     inputProps={{
-                        step: 0.01,
-                        min: -1,
-                        max: 1
+                        step: option.valueStep,
+                        min: option.valueMin,
+                        max: option.valueMax
                     }}
                     value={value}
                     onChange={(e) => {
