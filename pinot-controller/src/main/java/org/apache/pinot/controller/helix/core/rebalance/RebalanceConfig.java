@@ -136,6 +136,14 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "300000")
   private long _retryInitialDelayInMs = 300000L;
 
+  // Disk utilization threshold override. If set, this will override the default disk utilization threshold
+  // configured at the controller level. Value should be between 0.0 and 1.0 (e.g., 0.85 for 85%) or -1.0, which means
+  // no override. In the latter case the pre-checker will use the default disk utilization threshold from the controller
+  // config.
+  @JsonProperty("diskUtilizationThreshold")
+  @ApiModelProperty(example = "0.85")
+  private double _diskUtilizationThreshold = -1.0;
+
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -282,6 +290,14 @@ public class RebalanceConfig {
     _minimizeDataMovement = minimizeDataMovement;
   }
 
+  public double getDiskUtilizationThreshold() {
+    return _diskUtilizationThreshold;
+  }
+
+  public void setDiskUtilizationThreshold(double diskUtilizationThreshold) {
+    _diskUtilizationThreshold = diskUtilizationThreshold;
+  }
+
   @Override
   public String toString() {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
@@ -292,7 +308,8 @@ public class RebalanceConfig {
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold="
+        + _diskUtilizationThreshold + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -314,6 +331,7 @@ public class RebalanceConfig {
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxAttempts = cfg._maxAttempts;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
+    rc._diskUtilizationThreshold = cfg._diskUtilizationThreshold;
     return rc;
   }
 }

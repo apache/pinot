@@ -27,6 +27,9 @@ import {
 import {
     RebalanceServerConfigurationOptionSelect
 } from "./RebalanceServerConfigurationOptions/RebalanceServerConfigurationOptionSelect";
+import {
+    RebalanceServerConfigurationOptionDouble
+} from "./RebalanceServerConfigurationOptions/RebalanceServerConfigurationOptionDouble";
 
 export const RebalanceServerConfigurationOption = (
     {
@@ -45,6 +48,8 @@ export const RebalanceServerConfigurationOption = (
             return <RebalanceServerConfigurationOptionInteger rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />;
         case "SELECT":
             return <RebalanceServerConfigurationOptionSelect rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />;
+        case "DOUBLE":
+            return <RebalanceServerConfigurationOptionDouble rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />;
         default:
             return null;
     }
