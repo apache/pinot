@@ -19,6 +19,9 @@ public class TableViewsUtils {
   public static final String IDEALSTATE = "idealstate";
   public static final String EXTERNALVIEW = "externalview";
 
+  private TableViewsUtils() {
+  }
+
   public static class TableView {
     @JsonProperty("OFFLINE")
     public Map<String, Map<String, String>> _offline;

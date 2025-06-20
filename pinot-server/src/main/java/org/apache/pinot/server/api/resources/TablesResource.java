@@ -119,15 +119,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Api(tags = "Table", authorizations = {@Authorization(value = CommonConstants.SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = CommonConstants.DATABASE)})
+@Api(tags = "Table", authorizations = {
+    @Authorization(value = CommonConstants.SWAGGER_AUTHORIZATION_KEY), @Authorization(value = CommonConstants.DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = CommonConstants.SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
+        CommonConstants.SWAGGER_AUTHORIZATION_KEY, description = "The format of the key is  ```\"Basic <token>\" or "
+        + "\"Bearer <token>\"```"), @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in =
+    ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.DATABASE, description =
+    "Database context passed through http header. If no context is provided 'default' database "
+        + "context will be considered.")
+}))
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);

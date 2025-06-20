@@ -86,7 +86,11 @@ public class ValidDocIdsMetadataInfo {
     return _segmentCreationTimeMillis;
   }
 
-  public String getSegmentStatus() { return _segmentStatus; }
+  public String getSegmentStatus() {
+    return _segmentStatus;
+  }
 
-  public String getServerStatus() { return _serverStatus; }
+  public String getServerStatus() {
+    return _serverStatus;
+  }
 }
