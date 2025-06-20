@@ -287,6 +287,12 @@ public class ImmutableSegmentLoader {
     MultiColumnLuceneTextIndexReader mcTextReader = null;
     if (segmentReader.hasMultiColumnTextIndex()) {
       mcTextReader = new MultiColumnLuceneTextIndexReader(segmentMetadata);
+      for (String column : segmentMetadata.getMultiColumnTextMetadata().getColumns()) {
+        ColumnIndexContainer container = indexContainerMap.get(column);
+        if (container != null && container instanceof PhysicalColumnIndexContainer) {
+          ((PhysicalColumnIndexContainer) container).setMultiColumnTextIndex(mcTextReader);
+        }
+      }
     }
 
     ImmutableSegmentImpl segment =

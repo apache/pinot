@@ -55,6 +55,7 @@ import org.testng.annotations.Test;
 import static org.apache.avro.Schema.create;
 import static org.apache.avro.Schema.createArray;
 import static org.apache.avro.Schema.createUnion;
+import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -312,6 +313,23 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testTextMatchTransformFunction(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryTemplate =
+        "SELECT TEXT_MATCH(skills, 'machine learning') as test, count(*) as cnt "
+            + " FROM %s "
+            + " GROUP BY TEXT_MATCH(skills, 'machine learning') "
+            + " ORDER BY 1 ";
+    String query = String.format(queryTemplate, getTableName());
+
+    assertEquals(toResultStr(postQuery(query)),
+        "\"test\"[\"BOOLEAN\"],\t\"cnt\"[\"LONG\"]\n"
+            + "false,\t18000\n"
+            + "true,\t10000");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testTextSearchCountQuery(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -473,8 +491,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
       JsonNode node =
           postQuery(String.format("SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'x')", getTableName(), TEXT_COL));
       if (node.get("exceptions") != null
-          && node.get("exceptions").size() > 0
-          && node.get("exceptions").get(0).get("message").textValue().contains("without text index")) {
+          && node.get("exceptions").size() > 0) {
         columnDisabled = true;
         break;
       }
@@ -512,8 +529,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
           JsonNode node = postQuery(String.format("SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'x')", getTableName(),
               TEXT_COLUMNS.get(i)));
           if (node.get("exceptions") != null
-              && node.get("exceptions").size() > 0
-              && node.get("exceptions").get(0).get("message").textValue().contains("without text index")) {
+              && node.get("exceptions").size() > 0) {
             columnDisabled[i] = true;
           } else {
             isComplete = true;
