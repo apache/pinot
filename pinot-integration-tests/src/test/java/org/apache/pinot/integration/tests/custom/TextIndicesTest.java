@@ -18,17 +18,19 @@
  */
 package org.apache.pinot.integration.tests.custom;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -41,6 +43,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.avro.Schema.create;
+import static org.apache.avro.Schema.createUnion;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -49,10 +53,12 @@ import static org.testng.AssertJUnit.fail;
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
-
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_TABLE_NAME = "TextIndicesTest";
 
+  private static final String TEXT_COLUMN_NULL_NAME = "nullable_skills";
   private static final String TEXT_COLUMN_NAME = "skills";
+  private static final String TEXT_COLUMN_NAME_CASE_SENSITIVE = "skills_case_sensitive";
   private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final int NUM_SKILLS = 28;
@@ -79,38 +85,64 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     return null;
   }
 
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
-  }
-
   @Override
   protected List<String> getNoDictionaryColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME);
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
+    return List.of(TEXT_COLUMN_NULL_NAME, TEXT_COLUMN_NAME, TEXT_COLUMN_NAME_CASE_SENSITIVE);
   }
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+    ObjectNode textColumnIndexes;
+    try {
+      textColumnIndexes = (ObjectNode) OBJECT_MAPPER.readTree("{\"text\": {}}");
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
 
-    return Arrays.asList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null),
-        new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
-            propertiesMap));
+    FieldConfig nullableTextConfig =
+        new FieldConfig(TEXT_COLUMN_NULL_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes,
+            null,
+            null);
+
+    FieldConfig textColumnFieldConfig =
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, null, null, null, null, textColumnIndexes, null,
+            null);
+
+    ObjectNode textColumnCaseSensitiveIndexes;
+    try {
+      textColumnCaseSensitiveIndexes = (ObjectNode) OBJECT_MAPPER.readTree(
+          "{"
+              + "  \"text\": "
+              + "  {"
+              + "    \"caseSensitive\": \"true\""
+              + "  }"
+              + "}"
+      );
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+    FieldConfig textColumnCaseSensitiveFieldConfig =
+        new FieldConfig(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
+            textColumnCaseSensitiveIndexes, null, null);
+
+    ObjectNode textColumnNativeIndexes;
+    try {
+      textColumnNativeIndexes = (ObjectNode) OBJECT_MAPPER.readTree(
+          "{"
+              + "  \"text\": "
+              + "  {"
+              + "    \"fst\": \"NATIVE\""
+              + "  }"
+              + "}"
+      );
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+    FieldConfig textColumnNativeFieldConfig =
+        new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, null, null, null, null,
+            textColumnNativeIndexes, null, null);
+    return Arrays.asList(nullableTextConfig, textColumnFieldConfig, textColumnCaseSensitiveFieldConfig,
+        textColumnNativeFieldConfig);
   }
 
   @Override
@@ -120,8 +152,15 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   public Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+    return new Schema.SchemaBuilder()
+        .setSchemaName(getTableName())
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField(TEXT_COLUMN_NULL_NAME, FieldSpec.DataType.STRING, field -> {
+          field.setNullable(true);
+          field.setDefaultNullValue(null);
+        })
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(TEXT_COLUMN_NAME_CASE_SENSITIVE, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
@@ -148,17 +187,23 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
     File avroFile = new File(_tempDir, "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
-        new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME_NATIVE,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
-        new org.apache.avro.Schema.Field(TIME_COLUMN_NAME,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null, null)));
+    avroSchema.setFields(Arrays.asList(
+        new Field(TEXT_COLUMN_NULL_NAME, createUnion(create(Type.NULL), create(Type.STRING)), null, null),
+        new Field(TEXT_COLUMN_NAME,
+            create(Type.STRING), null, null),
+        new Field(TEXT_COLUMN_NAME_CASE_SENSITIVE,
+            create(Type.STRING), null, null),
+        new Field(TEXT_COLUMN_NAME_NATIVE,
+            create(Type.STRING), null, null),
+        new Field(TIME_COLUMN_NAME,
+            create(Type.LONG), null, null)));
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put(TEXT_COLUMN_NULL_NAME, i % 2 == 0 ? null : skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME, skills.get(i % NUM_SKILLS));
+        record.put(TEXT_COLUMN_NAME_CASE_SENSITIVE, skills.get(i % NUM_SKILLS));
         record.put(TEXT_COLUMN_NAME_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COLUMN_NAME, System.currentTimeMillis());
         fileWriter.append(record);
@@ -169,13 +214,23 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   public TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setIngestionConfig(getIngestionConfig())
-        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setNullHandlingEnabled(false)
+        .build();
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -215,8 +270,29 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
       Thread.sleep(100);
     }
 
-    assertTrue(getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()))
-        == NUM_MATCHING_RECORDS_NATIVE);
+    assertEquals(getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName())),
+        NUM_MATCHING_RECORDS_NATIVE);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTextSearchCountQueryCaseSensitive(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Keep posting queries until all records are consumed
+    long previousResult = 0;
+
+    String queryWithMatch = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(skills_case_sensitive, 'Java')";
+    String queryWithoutMatch = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(skills_case_sensitive, 'java')";
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      long result = getTextColumnQueryResult(String.format(queryWithMatch, getTableName()));
+      assertTrue(result >= previousResult);
+      previousResult = result;
+      Thread.sleep(100);
+    }
+
+    assertEquals(getTextColumnQueryResult(String.format(queryWithMatch, getTableName())), 12000);
+    // Test case sensitive match, all skills are 'Java' not 'java'
+    assertEquals(getTextColumnQueryResult(String.format(queryWithoutMatch, getTableName())), 0);
   }
 
   private long getTextColumnQueryResult(String query)

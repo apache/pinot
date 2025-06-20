@@ -48,7 +48,10 @@ import org.apache.pinot.common.response.ProcessingException;
     "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
+    "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "pools"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -78,6 +81,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private int _numServersResponded;
   private long _brokerReduceTimeMs;
   private Set<String> _tablesQueried = Set.of();
+
+  private Set<Integer> _pools = Set.of();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -335,6 +340,26 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
   public long getOfflineSystemActivitiesCpuTimeNs() {
     return 0;
   }
@@ -367,6 +392,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public Map<String, String> getTraceInfo() {
     return Map.of();
+  }
+
+  @Override
+  public void setPools(@NotNull Set<Integer> pools) {
+    _pools = pools;
+  }
+
+  @Override
+  @NotNull
+  public Set<Integer> getPools() {
+    return _pools;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {

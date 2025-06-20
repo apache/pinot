@@ -41,6 +41,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -78,6 +79,8 @@ public abstract class MultiStageOperator
     Tracing.ThreadAccountantOps.sampleMSE();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
+          + getExplainName());
     }
   }
 
@@ -261,15 +264,15 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafStageOperator.StatKey.class) {
+    LEAF(LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
-        StatMap<LeafStageOperator.StatKey> stats = (StatMap<LeafStageOperator.StatKey>) map;
-        response.mergeMaxRowsInOperator(stats.getLong(LeafStageOperator.StatKey.EMITTED_ROWS));
+        StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
-        for (LeafStageOperator.StatKey statKey : stats.keySet()) {
+        for (LeafOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
         response.addBrokerStats(brokerStats);

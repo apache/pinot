@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -113,9 +114,26 @@ public class InstanceAssignmentDriver {
     // if existingInstancePartitions is null.
     boolean minimizeDataMovementFromTableConfig = instanceAssignmentConfig.isMinimizeDataMovement();
     boolean minimizeDataMovement = minimizeDataMovementEnablement.isEnabled(minimizeDataMovementFromTableConfig);
+    InstancePartitionSelector instancePartitionSelector =
+        InstancePartitionSelectorFactory.getInstance(_tableConfig, instanceAssignmentConfig.getPartitionSelector(),
+            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions,
+            preConfiguredInstancePartitions, minimizeDataMovement);
+
     LOGGER.info("Starting {} instance assignment for table: {} with minimizeDataMovement: {} (from table config: {}, "
             + "override: {})", instancePartitionsName, tableNameWithType, minimizeDataMovement,
         minimizeDataMovementFromTableConfig, minimizeDataMovementEnablement);
+
+    return getInstancePartitions(instancePartitionsName, instanceAssignmentConfig, instanceConfigs,
+        existingInstancePartitions, minimizeDataMovement, instancePartitionSelector);
+  }
+
+  @VisibleForTesting
+  InstancePartitions getInstancePartitions(String instancePartitionsName,
+      InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement,
+      InstancePartitionSelector instancePartitionSelector) {
+    String tableNameWithType = _tableConfig.getTableName();
+
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);
@@ -132,10 +150,6 @@ public class InstanceAssignmentDriver {
       poolToInstanceConfigsMap = constraintApplier.applyConstraint(poolToInstanceConfigsMap);
     }
 
-    InstancePartitionSelector instancePartitionSelector =
-        InstancePartitionSelectorFactory.getInstance(instanceAssignmentConfig.getPartitionSelector(),
-            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions,
-            preConfiguredInstancePartitions, minimizeDataMovement);
     InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;

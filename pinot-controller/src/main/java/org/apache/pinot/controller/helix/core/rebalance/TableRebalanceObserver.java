@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 
 /**
  * The <code>TableRebalanceObserver</code> interface provides callbacks to take actions
- * during critical triggers. The 3 main triggers during a rebalance operation are show below.
+ * during critical triggers. The 4 main triggers during a rebalance operation are shown below.
  * For example, we can track stats + status of rebalance during these triggers.
  */
 public interface TableRebalanceObserver {
@@ -37,7 +37,7 @@ public interface TableRebalanceObserver {
     // Ideal state changes due to external events and new target for rebalance is computed
     IDEAL_STATE_CHANGE_TRIGGER,
     // Next assignment calculation change trigger which calculates next assignment to act on
-    NEXT_ASSINGMENT_CALCULATION_TRIGGER,
+    NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
   }
 
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,

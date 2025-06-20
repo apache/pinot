@@ -25,10 +25,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -87,7 +87,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -113,6 +113,9 @@ public class QueryLoggerTest {
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
         + "queryEngine=singleStage,"
+        + "offlineMemAllocatedBytes(total/thread/resSer):0/0/0,"
+        + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
+        + "pools=[],"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }
@@ -122,7 +125,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -138,7 +141,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -152,7 +155,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(true, true, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -166,7 +169,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 1, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -180,7 +183,7 @@ public class QueryLoggerTest {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 1456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     // When:
     queryLogger.log(params);
@@ -214,7 +217,7 @@ public class QueryLoggerTest {
     }).thenReturn(true);
 
     QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
-    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
+    QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, true, _logger, _droppedRateLimiter);
 
     ExecutorService executorService = Executors.newFixedThreadPool(4);
 

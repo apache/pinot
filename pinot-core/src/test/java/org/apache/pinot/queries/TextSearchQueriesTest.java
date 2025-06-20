@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
@@ -58,6 +58,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -90,23 +91,23 @@ import static org.testng.Assert.assertTrue;
  */
 public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
-  private static final String TABLE_NAME = "MyTable";
+  protected static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
 
-  private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
-  private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
-  private static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
-  private static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
-  private static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
-  private static final String SKILLS_TEXT_MV_COL_NAME = "SKILLS_TEXT_MV_COL";
-  private static final String SKILLS_TEXT_MV_COL_DICT_NAME = "SKILLS_TEXT_MV_COL_DICT";
-  private static final String INT_COL_NAME = "INT_COL";
+  protected static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
+  protected static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
+  protected static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
+  protected static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
+  protected static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
+  protected static final String SKILLS_TEXT_MV_COL_NAME = "SKILLS_TEXT_MV_COL";
+  protected static final String SKILLS_TEXT_MV_COL_DICT_NAME = "SKILLS_TEXT_MV_COL_DICT";
+  protected static final String INT_COL_NAME = "INT_COL";
 
-  private static final List<String> RAW_TEXT_INDEX_COLUMNS =
+  protected static final List<String> RAW_TEXT_INDEX_COLUMNS =
       Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME,
           SKILLS_TEXT_NO_RAW_NAME, SKILLS_TEXT_MV_COL_NAME);
 
-  private static final List<String> DICT_TEXT_INDEX_COLUMNS =
+  protected static final List<String> DICT_TEXT_INDEX_COLUMNS =
       Arrays.asList(SKILLS_TEXT_COL_DICT_NAME, SKILLS_TEXT_MV_COL_DICT_NAME);
 
   private static final int INT_BASE_VALUE = 1000;
@@ -123,16 +124,27 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT)
       .build();
 
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName(TABLE_NAME)
-      .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS)
-      .setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
-      .setFieldConfigList(createFieldConfigs())
-      .build();
+  private TableConfig _tableConfig;
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private TableConfig _tableConfig;
+
+  private TableConfig getTableConfig() {
+    if (_tableConfig == null) {
+      _tableConfig = initTableConfig();
+    }
+
+    return _tableConfig;
+  }
+
+  protected TableConfig initTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS)
+        .setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
+        .setFieldConfigList(createFieldConfigs())
+        .build();
+  }
 
   @Override
   protected String getFilter() {
@@ -154,14 +166,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(getTableConfig(), SCHEMA);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  private static List<FieldConfig> createFieldConfigs() {
+  protected List<FieldConfig> createFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(new FieldConfig(QUERY_LOG_TEXT_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null, null));
@@ -177,7 +189,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true")));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_NO_RAW_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null,
-        Map.of(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true", FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")));
+        Map.of(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true",
+            FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null, null));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_DICT_NAME, FieldConfig.EncodingType.DICTIONARY,
@@ -194,7 +207,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private void buildSegment()
       throws Exception {
     List<GenericRow> rows = createTestData();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(getTableConfig(), SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -830,13 +843,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + " LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
     // configurable default value is used
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" "
-            + "AND Java AND C++') LIMIT 50000";
-    expected = new ArrayList<>();
-    expected.add(new Object[]{1005, "ILoveCoding"});
-    expected.add(new Object[]{1017, "ILoveCoding"});
-    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    if (queryDefault()) {
+      query =
+          "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" "
+              + "AND Java AND C++') LIMIT 50000";
+      expected = new ArrayList<>();
+      expected.add(new Object[]{1005, "ILoveCoding"});
+      expected.add(new Object[]{1017, "ILoveCoding"});
+      testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    }
 
     // TEST 22: composite phrase and term query using boolean operator OR
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain ANY of the following
@@ -1372,15 +1387,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test1.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
     // create an NRT index reader
     SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
 
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"machine learning\"");
 
     // acquire a searcher
@@ -1542,8 +1557,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test2.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    CaseAwareStandardAnalyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(50);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1553,7 +1568,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.addDocument(docToIndex);
 
     // create an NRT index reader from the writer -- should see one uncommitted document
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
     IndexReader indexReader1 = DirectoryReader.open(indexWriter);
     IndexSearcher searcher1 = new IndexSearcher(indexReader1);
@@ -1592,9 +1607,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
     // create and open a writer
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1608,7 +1623,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // start writer and reader
     Thread writer = new Thread(new RealtimeWriter(indexWriter));
-    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, standardAnalyzer));
+    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, analyzer));
 
     writer.start();
     realtimeReader.start();
@@ -1674,8 +1689,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     private final QueryParser _queryParser;
     private final SearcherManager _searcherManager;
 
-    RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
-      _queryParser = new QueryParser("skill", standardAnalyzer);
+    RealtimeReader(SearcherManager searcherManager, Analyzer analyzer) {
+      _queryParser = new QueryParser("skill", analyzer);
       _searcherManager = searcherManager;
     }
 
@@ -1991,5 +2006,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
+  }
+
+  protected boolean queryDefault() {
+    return true;
   }
 }

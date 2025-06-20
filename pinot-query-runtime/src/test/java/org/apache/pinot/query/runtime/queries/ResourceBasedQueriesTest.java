@@ -46,7 +46,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
-import org.apache.pinot.query.runtime.operator.LeafStageOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -285,6 +285,24 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
+  @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
+  public void testQueryTestCasesWithNewOptimizerWithOutput(String testCaseName, boolean isIgnored, String sql,
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      throws Exception {
+    final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
+    runQuery(finalSql, expect, false).ifPresent(
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
+  }
+
+  @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
+  public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      throws Exception {
+    final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
+    runQuery(finalSql, expect, false).ifPresent(
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
+  }
+
   private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
 
     Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
@@ -337,7 +355,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
 
         Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-        String statName = LeafStageOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
+        String statName = LeafOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
         int numSegmentsQueried = entry.getValue().get(statName).asInt();
         Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
       }
@@ -356,7 +374,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (except == null) {
         throw e;
       } else {
-        Pattern pattern = Pattern.compile(except);
+        Pattern pattern = Pattern.compile(except, Pattern.DOTALL);
         Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
             String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
                 except));

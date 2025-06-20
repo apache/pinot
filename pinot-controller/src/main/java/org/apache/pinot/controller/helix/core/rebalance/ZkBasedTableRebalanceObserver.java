@@ -25,10 +25,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
+import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -43,10 +45,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkBasedTableRebalanceObserver.class);
   private final String _tableNameWithType;
   private final String _rebalanceJobId;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
   private final TableRebalanceContext _tableRebalanceContext;
-  // These previous stats are used for rollback scenarios where the IdealState update fails dure to a version
+  // These previous stats are used for rollback scenarios where the IdealState update fails due to a version
   // change and the rebalance loop is retried.
   private TableRebalanceProgressStats.RebalanceProgressStats _previousStepStats;
   private TableRebalanceProgressStats.RebalanceProgressStats _previousOverallStats;
@@ -59,13 +61,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final ControllerMetrics _controllerMetrics;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager) {
+      TableRebalanceContext tableRebalanceContext, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
-    Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
+    Preconditions.checkState(propertyStore != null, "ZkHelixPropertyStore cannot be null");
     _tableNameWithType = tableNameWithType;
     _rebalanceJobId = rebalanceJobId;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _propertyStore = propertyStore;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
     _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats();
@@ -136,13 +138,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           updatedStatsInZk = true;
         }
         break;
-      case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+      case NEXT_ASSIGNMENT_CALCULATION_TRIGGER:
         // Update the previous stats with the current values in case a rollback is needed due to IdealState version
         // change
         _previousStepStats = new TableRebalanceProgressStats.RebalanceProgressStats(
             _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep());
         latestProgress = calculateUpdatedProgressStats(targetState, currentState, rebalanceContext,
-            Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
+            Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
           _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
           trackStatsInZk();
@@ -279,8 +281,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private void trackStatsInZk() {
     Map<String, String> jobMetadata =
         createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats, _tableRebalanceContext);
-    _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata, ControllerJobType.TABLE_REBALANCE,
-        prevJobMetadata -> {
+    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, _rebalanceJobId, jobMetadata,
+        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> {
           // In addition to updating job progress status, the observer also checks if the job status is IN_PROGRESS.
           // If not, then no need to update the job status, and we keep this status to end the job promptly.
           if (prevJobMetadata == null) {
@@ -316,7 +318,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
     try {
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
           JsonUtils.objectToString(tableRebalanceProgressStats));
@@ -524,7 +526,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
     switch (trigger) {
       case START_TRIGGER:
-      case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
+      case NEXT_ASSIGNMENT_CALCULATION_TRIGGER:
         // These are initialization steps for global / step progress stats
         progressStats._totalSegmentsToBeAdded = totalSegmentsToBeAdded;
         progressStats._totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
@@ -542,7 +544,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._totalEstimatedDataToBeMovedInBytes =
             TableRebalanceProgressStats.calculateNewEstimatedDataToBeMovedInBytes(0,
                 rebalanceContext.getEstimatedAverageSegmentSizeInBytes(), totalSegmentsToBeAdded);
-        progressStats._startTimeMs = trigger == Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER
+        progressStats._startTimeMs = trigger == Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER
             ? System.currentTimeMillis() : rebalanceProgressStats.getStartTimeMs();
         break;
       case IDEAL_STATE_CHANGE_TRIGGER:

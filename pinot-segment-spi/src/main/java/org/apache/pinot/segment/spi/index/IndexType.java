@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -68,6 +69,11 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   C getDefaultConfig();
 
   Map<String, C> getConfig(TableConfig tableConfig, Schema schema);
+
+  /// Validates if the index config is valid for the given field spec and other index configs. [IllegalStateException]
+  /// is thrown if the validation fails.
+  default void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+  }
 
   default String getPrettyName() {
     return getId();

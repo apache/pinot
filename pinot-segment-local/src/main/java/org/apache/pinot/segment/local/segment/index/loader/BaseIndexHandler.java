@@ -109,11 +109,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
     boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
     ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
 
-    InvertedIndexAndDictionaryBasedForwardIndexCreator invertedIndexAndDictionaryBasedForwardIndexCreator =
+    InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
             forwardIndexConfig, segmentWriter, isTemporaryForwardIndex);
-    invertedIndexAndDictionaryBasedForwardIndexCreator.regenerateForwardIndex();
-
+    creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {
       throw new IOException(String.format("Forward index was not created for column: %s, is temporary: %s", columnName,

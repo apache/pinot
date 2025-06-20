@@ -294,6 +294,15 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT CAST(CAST(ArrTime AS VARCHAR) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
             + "'DL' ORDER BY ArrTime DESC";
     testQuery(query, h2Query);
+
+    // Test orderedPreferredPools option which will fallbacks to non preferred Pools
+    // when non of preferred Pools is available
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
+    query = "SET orderedPreferredPools='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
   }
 
   private void testHardcodedQueriesV2()

@@ -50,7 +50,6 @@ import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     return new PerQueryCPUMemResourceUsageAccountant(config, instanceId, instanceType);
   }
 
-  public static class PerQueryCPUMemResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
+  public static class PerQueryCPUMemResourceUsageAccountant implements ThreadResourceUsageAccountant {
 
     /**
      * MemoryMXBean to get total heap used memory
@@ -119,9 +118,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           return ret;
         }
     );
-
-    // ThreadResourceUsageProvider(ThreadMXBean wrapper) per runner/worker thread
-    private final ThreadLocal<ThreadResourceUsageProvider> _threadResourceUsageProvider;
 
     // track thread cpu time
     private final boolean _isThreadCPUSamplingEnabled;
@@ -173,9 +169,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
-
-      // ThreadMXBean wrapper
-      _threadResourceUsageProvider = new ThreadLocal<>();
 
       // task/query tracking
       _inactiveQuery = new HashSet<>();
@@ -260,6 +253,22 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    @Override
+    public boolean isAnchorThreadInterrupted() {
+      ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
+      if (context != null && context.getAnchorThread() != null) {
+        return context.getAnchorThread().isInterrupted();
+      }
+
+      return false;
+    }
+
+    @Override
+    @Deprecated
+    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+    }
+
     /**
      * for testing only
      */
@@ -268,23 +277,30 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void updateResourceUsageConcurrently(String queryId, TrackingScope resourceType) {
+    @Deprecated
+    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
+    }
+
+    @Override
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
+      TrackingScope resourceType) {
       if (!resourceType.equals(TrackingScope.QUERY)) {
         return;
       }
-
       if (_isThreadCPUSamplingEnabled) {
-        long cpuUsageNS = getThreadResourceUsageProvider().getThreadTimeNs();
         _concurrentTaskCPUStatsAggregator.compute(queryId,
-            (key, value) -> (value == null) ? cpuUsageNS : (value + cpuUsageNS));
+            (key, value) -> (value == null) ? cpuTimeNs : (value + cpuTimeNs));
       }
       if (_isThreadMemorySamplingEnabled) {
-        long memoryAllocatedBytes = getThreadResourceUsageProvider().getThreadAllocatedBytes();
         _concurrentTaskMemStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? memoryAllocatedBytes : (value + memoryAllocatedBytes));
       }
     }
 
+    @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId) {
+    }
 
     /**
      * The thread would need to do {@code setThreadResourceUsageProvider} first upon it is scheduled.
@@ -292,9 +308,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadCPUSamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = provider.getThreadTimeNs();
+      if (_isThreadCPUSamplingEnabled) {
+        _threadLocalEntry.get().updateCpuSnapshot();
       }
     }
 
@@ -304,40 +319,35 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadMemorySamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes = provider.getThreadAllocatedBytes();
+      if (_isThreadMemorySamplingEnabled) {
+        _threadLocalEntry.get().updateMemorySnapshot();
       }
     }
 
-    private ThreadResourceUsageProvider getThreadResourceUsageProvider() {
-      return _threadResourceUsageProvider.get();
-    }
 
     @Override
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-      _threadResourceUsageProvider.set(threadResourceUsageProvider);
-    }
-
-    @Override
-    public void createExecutionContextInner(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext,
-        @Nullable String workloadName) {
+    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+                            @Nullable String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
-      if (parentContext == null) {
-        // is anchor thread
-        assert queryId != null;
+      if (queryId != null) {
         _threadLocalEntry.get()
             .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
                 workloadName);
-      } else {
-        // not anchor thread
-        _threadLocalEntry.get().setThreadTaskStatus(queryId, taskId, parentContext.getTaskType(),
-            parentContext.getAnchorThread(), workloadName);
       }
     }
 
     @Override
+    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+      _threadLocalEntry.get()._errorStatus.set(null);
+      if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
+        _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
+            parentContext.getAnchorThread(), parentContext.getWorkloadName());
+      }
+    }
+
+    @Override
+    @Nullable
     public ThreadExecutionContext getThreadExecutionContext() {
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
     }
@@ -355,10 +365,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
       // clear task info + stats
       threadEntry.setToIdle();
-      // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.remove();
-      // clear _anchorThread
-      super.clear();
     }
 
     @Override

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -33,8 +34,6 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.InstanceType;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -45,7 +44,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -55,14 +56,17 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Periodic task to run rebalancer in background to
- * 1. relocate COMPLETED segments to tag overrides
- * 2. relocate ONLINE segments to tiers if tier configs are set
+ * Periodic task to run rebalancer in background to:
+ * <ol>
+ * <li> Relocate COMPLETED segments to tag overrides
+ * <li> Relocate ONLINE segments to tiers if tier configs are set
+ * </ol>
  * Allow at most one replica unavailable during rebalance. Not applicable for HLC tables.
  */
 public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
+  private final TableRebalanceManager _tableRebalanceManager;
   private final ExecutorService _executorService;
   private final HttpClientConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
@@ -82,14 +86,17 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
-  @Nullable private final Set<String> _tablesUndergoingRebalance;
+  @Nullable
+  private final Set<String> _tablesUndergoingRebalance;
 
-  public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
-      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService, HttpClientConnectionManager connectionManager) {
+  public SegmentRelocator(TableRebalanceManager tableRebalanceManager,
+      PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
+      ControllerConf config, ControllerMetrics controllerMetrics, ExecutorService executorService,
+      HttpClientConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
+    _tableRebalanceManager = tableRebalanceManager;
     _executorService = executorService;
     _connectionManager = connectionManager;
     _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
@@ -142,9 +149,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       } else {
         LOGGER.info("The previous rebalance has not yet completed, skip rebalancing table {}", tableNameWithType);
       }
-      return;
+    } else {
+      putTableToWait(tableNameWithType);
     }
-    putTableToWait(tableNameWithType);
   }
 
   @VisibleForTesting
@@ -222,8 +229,14 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // all segments are put on the right servers. If any segments are not on their target tier, the server local
       // tier migration is triggered for them, basically asking the hosting servers to reload them. The segment
       // target tier may get changed between the two sequential actions, but cluster states converge eventually.
-      RebalanceResult rebalance = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
-          TableRebalancer.createUniqueRebalanceJobIdentifier(), false);
+
+      // We're not using the async rebalance API here because we want to run this on a separate thread pool from the
+      // rebalance thread pool that is used for user initiated rebalances.
+
+      // Retries are disabled because SegmentRelocator itself is a periodic controller task, so we don't want the
+      // RebalanceChecker to unnecessarily retry any such failed rebalances.
+      RebalanceResult rebalance = _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
+          TableRebalancer.createUniqueRebalanceJobIdentifier(), true, false);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);
@@ -294,7 +307,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         }
       }
     }
-    if (serverToSegmentsToMigrate.size() > 0) {
+    if (!serverToSegmentsToMigrate.isEmpty()) {
       LOGGER.info("Notify servers: {} to move segments to new tiers locally", serverToSegmentsToMigrate.keySet());
       reloadSegmentsForLocalTierMigration(tableNameWithType, serverToSegmentsToMigrate, messagingService);
     } else {
@@ -306,18 +319,11 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       Map<String, Set<String>> serverToSegmentsToMigrate, ClusterMessagingService messagingService) {
     for (Map.Entry<String, Set<String>> entry : serverToSegmentsToMigrate.entrySet()) {
       String serverName = entry.getKey();
-      Set<String> segmentNames = entry.getValue();
-      // One SegmentReloadMessage per server but takes all segment names.
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setInstanceName(serverName);
-      recipientCriteria.setResource(tableNameWithType);
-      recipientCriteria.setSessionSpecific(true);
-      SegmentReloadMessage segmentReloadMessage =
-          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false);
+      List<String> segments = new ArrayList<>(entry.getValue());
       LOGGER.info("Sending SegmentReloadMessage to server: {} to reload segments: {} of table: {}", serverName,
-          segmentNames, tableNameWithType);
-      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, -1);
+          segments, tableNameWithType);
+      SegmentReloadMessage message = new SegmentReloadMessage(tableNameWithType, segments, false);
+      int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType, null, serverName);
       if (numMessagesSent > 0) {
         LOGGER.info("Sent SegmentReloadMessage to server: {} for table: {}", serverName, tableNameWithType);
       } else {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,6 +32,26 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * Represents the configuration for a logical table in Pinot.
+ *
+ * <p>
+ * <ul>
+ *   <li><b>tableName</b>: The name of the logical table.</li>
+ *   <li><b>physicalTableConfigMap</b>: A map of physical table names to their configurations.</li>
+ *   <li><b>brokerTenant</b>: The tenant for the broker.</li>
+ *   <li><b>queryConfig</b>: Configuration for query execution on the logical table.</li>
+ *   <li><b>quotaConfig</b>: Configuration for quota management on the logical table.</li>
+ *   <li><b>refOfflineTableName</b>: The name of the offline table whose table config is referenced by this logical
+ *   table.</li>
+ *   <li><b>refRealtimeTableName</b>: The name of the realtime table whose table config is referenced by this logical
+ *   table.</li>
+ *   <li><b>timeBoundaryConfig</b>: Configuration for time boundaries of the logical table. This is used to determine
+ *   the time boundaries for queries on the logical table, especially in hybrid scenarios where both offline and
+ *   realtime data are present.</li>
+ * </ul>
+ * </p>
+ */
 public class LogicalTableConfig extends BaseJsonConfig {
 
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -42,6 +63,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String REF_OFFLINE_TABLE_NAME_KEY = "refOfflineTableName";
   public static final String REF_REALTIME_TABLE_NAME_KEY = "refRealtimeTableName";
+  public static final String TIME_BOUNDARY_CONFIG_KEY = "timeBoundaryConfig";
 
   private String _tableName;
   private String _brokerTenant;
@@ -52,6 +74,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
   private QuotaConfig _quotaConfig;
   private String _refOfflineTableName;
   private String _refRealtimeTableName;
+  private TimeBoundaryConfig _timeBoundaryConfig;
 
   public static LogicalTableConfig fromString(String logicalTableString)
       throws IOException {
@@ -103,6 +126,7 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _quotaConfig = quotaConfig;
   }
 
+  @Nullable
   public String getRefOfflineTableName() {
     return _refOfflineTableName;
   }
@@ -111,12 +135,22 @@ public class LogicalTableConfig extends BaseJsonConfig {
     _refOfflineTableName = refOfflineTableName;
   }
 
+  @Nullable
   public String getRefRealtimeTableName() {
     return _refRealtimeTableName;
   }
 
   public void setRefRealtimeTableName(String refRealtimeTableName) {
     _refRealtimeTableName = refRealtimeTableName;
+  }
+
+  @Nullable
+  public TimeBoundaryConfig getTimeBoundaryConfig() {
+    return _timeBoundaryConfig;
+  }
+
+  public void setTimeBoundaryConfig(TimeBoundaryConfig timeBoundaryConfig) {
+    _timeBoundaryConfig = timeBoundaryConfig;
   }
 
   private JsonNode toJsonObject() {
@@ -139,6 +173,11 @@ public class LogicalTableConfig extends BaseJsonConfig {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @JsonIgnore
+  public boolean isHybridLogicalTable() {
+    return _refOfflineTableName != null && _refRealtimeTableName != null;
   }
 
   @Override

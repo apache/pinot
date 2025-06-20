@@ -62,7 +62,7 @@ public class OperatorTestUtil {
   public static MultiStageQueryStats getDummyStats(int stageId) {
     MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(stageId);
     stats.getCurrentStats()
-        .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafStageOperator.StatKey.class));
+        .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class));
     return stats;
   }
 

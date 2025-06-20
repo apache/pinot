@@ -219,6 +219,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY,
+            String.valueOf(getMaxZKCreationTimeMillis(groups.get(0))));
         configs.put(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, String.valueOf(
             Long.parseLong(
                 taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
@@ -295,7 +297,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
           break;
         } else {
-          Integer partitionID = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+          Integer partitionID = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
           if (partitionID == null) {
             LOGGER.warn("Partition ID not found for segment: {}, skipping it for {}", segmentName,
                 MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
@@ -461,5 +463,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return StringUtils.join(
         segmentMergerMetadataList.stream().map(x -> String.valueOf(x.getSegmentZKMetadata().getCrc()))
             .collect(Collectors.toList()), ",");
+  }
+
+  @VisibleForTesting
+  protected long getMaxZKCreationTimeMillis(List<SegmentMergerMetadata> segmentMergerMetadataList) {
+    return segmentMergerMetadataList.stream().mapToLong(x -> x.getSegmentZKMetadata().getCreationTime()).max()
+        .orElse(-1);
   }
 }

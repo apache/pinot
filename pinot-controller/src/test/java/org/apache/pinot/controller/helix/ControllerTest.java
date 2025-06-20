@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.entity.EntityBuilder;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -69,6 +70,8 @@ import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -81,6 +84,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -95,6 +99,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
@@ -156,6 +161,8 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected TableRebalanceManager _tableRebalanceManager;
+  protected TableSizeReader _tableSizeReader;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -301,6 +308,8 @@ public class ControllerTest {
       _controllerDataDir = _controllerConfig.getDataDir();
       _helixResourceManager = _controllerStarter.getHelixResourceManager();
       _helixManager = _controllerStarter.getHelixControllerManager();
+      _tableRebalanceManager = _controllerStarter.getTableRebalanceManager();
+      _tableSizeReader = _controllerStarter.getTableSizeReader();
       _helixDataAccessor = _helixManager.getHelixDataAccessor();
       ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
       // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
@@ -406,8 +415,9 @@ public class ControllerTest {
         .setBrokerTenant(brokerTenant)
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
-        .setQuotaConfig(new QuotaConfig(null, "999"))
+        .setQuotaConfig(new QuotaConfig(null, "99999"))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
+        .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
     return builder.build();
   }
@@ -750,9 +760,19 @@ public class ControllerTest {
     getControllerRequestClient().addTableConfig(tableConfig);
   }
 
+  public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().addLogicalTableConfig(logicalTableConfig);
+  }
+
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().updateTableConfig(tableConfig);
+  }
+
+  public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
+      throws IOException {
+    getControllerRequestClient().updateLogicalTableConfig(logicalTableConfig);
   }
 
   public void toggleTableState(String tableName, TableType type, boolean enable)
@@ -785,6 +805,11 @@ public class ControllerTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+  }
+
+  public void dropLogicalTable(String logicalTableName)
+      throws IOException {
+    getControllerRequestClient().deleteLogicalTable(logicalTableName);
   }
 
   public void waitForEVToAppear(String tableNameWithType) {
@@ -842,9 +867,9 @@ public class ControllerTest {
     return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
   }
 
-  public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
+  public String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
   public String reloadRealtimeTable(String tableName)
@@ -989,6 +1014,23 @@ public class ControllerTest {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
+  /**
+   * Sends a GET request to the specified URL and returns the status code along with the stringified response.
+   * @param urlString the URL to send the GET request
+   * @param headers the headers to include in the GET request
+   * @return a Pair containing the status code and the stringified response
+   */
+  public static Pair<Integer, String> sendGetRequestWithStatusCode(String urlString, Map<String, String> headers)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendGetRequest(new URL(urlString).toURI(), headers);
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public static String sendPostRequest(String urlString)
       throws IOException {
     return sendPostRequest(urlString, null);
@@ -1006,6 +1048,24 @@ public class ControllerTest {
           getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /**
+   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
+   * stringified response.
+   * @param urlString the URL to send the POST request to
+   * @param payload the payload to send in the POST request
+   * @return a Pair containing the status code and the stringified response
+   */
+  public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
+      throws IOException {
+    try {
+      SimpleHttpResponse resp =
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+      return Pair.of(resp.getStatusCode(), constructResponse(resp));
+    } catch (URISyntaxException e) {
       throw new IOException(e);
     }
   }
@@ -1233,6 +1293,14 @@ public class ControllerTest {
     assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getAllTables()));
     // No pre-existing schemas
     assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getSchemaNames()));
+  }
+
+  @DataProvider
+  public Object[][] tableTypeProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
   }
 
   /**

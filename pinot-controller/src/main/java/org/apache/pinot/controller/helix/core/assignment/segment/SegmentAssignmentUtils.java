@@ -24,22 +24,18 @@ import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Pairs;
 
@@ -142,25 +138,72 @@ public class SegmentAssignmentUtils {
     return instancesAssigned;
   }
 
-  /**
-   * Rebalances the table with Helix AutoRebalanceStrategy.
-   */
-  public static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
-      Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {
-    // Use Helix AutoRebalanceStrategy to rebalance the table
-    LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-    states.put(SegmentStateModel.ONLINE, replication);
-    AutoRebalanceStrategy autoRebalanceStrategy =
-        new AutoRebalanceStrategy(null, new ArrayList<>(currentAssignment.keySet()), states);
-    // Make a copy of the current assignment because this step might change the passed in assignment
-    Map<String, Map<String, String>> currentAssignmentCopy = new TreeMap<>();
+  /// Rebalances the table with non-replica-group based segment assignment strategy by uniformly spraying segment
+  /// replicas to the servers.
+  /// 1. Calculate the target number of segments on each server
+  /// 2. Loop over all the segments and keep the assignment if target number of segments for the server has not been
+  /// reached and track the not assigned segments
+  /// 3. Assign the left-over segments to the servers with the least segments, or the smallest index if there is a tie
+  public static Map<String, Map<String, String>> rebalanceNonReplicaGroupBasedTable(
+      Map<String, Map<String, String>> currentAssignment, List<String> servers, int replication) {
+    Map<String, Integer> serverIds = getInstanceNameToIdMap(servers);
+
+    // Calculate target number of segments per server
+    // NOTE: in order to minimize the segment movements, use the ceiling of the quotient
+    int numServers = servers.size();
+    int numSegments = currentAssignment.size();
+    int targetNumSegmentsPerServer = (numSegments * replication + numServers - 1) / numServers;
+
+    // Do not move segment if target number of segments is not reached, track the segments need to be moved
+    Map<String, Map<String, String>> newAssignment = new TreeMap<>();
+    int[] numSegmentsAssignedPerServer = new int[numServers];
+    List<String> segmentsNotAssigned = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      currentAssignmentCopy.put(segmentName, new TreeMap<>(instanceStateMap));
+      String segment = entry.getKey();
+      Set<String> currentServers = entry.getValue().keySet();
+      int remainingReplicas = replication;
+      for (String server : currentServers) {
+        Integer serverId = serverIds.get(server);
+        if (serverId != null && numSegmentsAssignedPerServer[serverId] < targetNumSegmentsPerServer) {
+          newAssignment.computeIfAbsent(segment, k -> new TreeMap<>()).put(server, SegmentStateModel.ONLINE);
+          numSegmentsAssignedPerServer[serverId]++;
+          remainingReplicas--;
+          if (remainingReplicas == 0) {
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < remainingReplicas; i++) {
+        segmentsNotAssigned.add(segment);
+      }
     }
-    return autoRebalanceStrategy.computePartitionAssignment(instances, instances, currentAssignmentCopy, null)
-        .getMapFields();
+
+    // Assign each not assigned segment to the server with the least segments, or the smallest id if there is a tie
+    PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numServers, Pairs.intPairComparator());
+    for (int serverId = 0; serverId < numServers; serverId++) {
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerServer[serverId], serverId));
+    }
+    List<Pairs.IntPair> skippedPairs = new ArrayList<>();
+    for (String segment : segmentsNotAssigned) {
+      Map<String, String> instanceStateMap = newAssignment.computeIfAbsent(segment, k -> new TreeMap<>());
+      while (true) {
+        Pairs.IntPair intPair = heap.remove();
+        int serverId = intPair.getRight();
+        String server = servers.get(serverId);
+        // Skip the server if it already has the segment
+        if (instanceStateMap.put(server, SegmentStateModel.ONLINE) == null) {
+          intPair.setLeft(intPair.getLeft() + 1);
+          heap.add(intPair);
+          break;
+        } else {
+          skippedPairs.add(intPair);
+        }
+      }
+      heap.addAll(skippedPairs);
+      skippedPairs.clear();
+    }
+
+    return newAssignment;
   }
 
   /**
@@ -390,13 +433,15 @@ public class SegmentAssignmentUtils {
      * @param sortedTiers list of tiers, pre-sorted as per desired order by caller
      * @param segmentAssignment segment assignment of the table
      */
-    TierSegmentAssignment(String tableNameWithType, List<Tier> sortedTiers,
+    TierSegmentAssignment(HelixManager helixManager, String tableNameWithType, List<Tier> sortedTiers,
         Map<String, Map<String, String>> segmentAssignment) {
 
       // initialize tier to segmentAssignment map
       sortedTiers.forEach(t -> _tierNameToSegmentAssignmentMap.put(t.getName(), new TreeMap<>()));
 
       // iterate over all segments
+      // TODO: Reduce ZK access
+      ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
@@ -405,11 +450,15 @@ public class SegmentAssignmentUtils {
         // only consider ONLINE segments for tiers
         if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
           // find an eligible tier for the segment, from the ordered list of tiers
-          for (Tier tier : sortedTiers) {
-            if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
-              _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
-              selected = true;
-              break;
+          SegmentZKMetadata segmentZKMetadata =
+              ZKMetadataProvider.getSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+          if (segmentZKMetadata != null) {
+            for (Tier tier : sortedTiers) {
+              if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentZKMetadata)) {
+                _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
+                selected = true;
+                break;
+              }
             }
           }
         }
@@ -437,90 +486,5 @@ public class SegmentAssignmentUtils {
     public Map<String, Map<String, String>> getNonTierSegmentAssignment() {
       return _nonTierSegmentAssignment;
     }
-  }
-
-  /**
-   * Returns a partition id for offline table
-   */
-  public static int getOfflineSegmentPartitionId(String segmentName, String offlineTableName, HelixManager helixManager,
-      @Nullable String partitionColumn) {
-    SegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), offlineTableName, segmentName);
-    Preconditions.checkState(segmentZKMetadata != null,
-        "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, offlineTableName);
-    return getPartitionId(segmentZKMetadata, offlineTableName, partitionColumn);
-  }
-
-  private static int getPartitionId(SegmentZKMetadata segmentZKMetadata, String offlineTableName,
-      @Nullable String partitionColumn) {
-    String segmentName = segmentZKMetadata.getSegmentName();
-    ColumnPartitionMetadata partitionMetadata =
-        segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().get(partitionColumn);
-    Preconditions.checkState(partitionMetadata != null,
-        "Segment ZK metadata for segment: %s of table: %s does not contain partition metadata for column: %s",
-        segmentName, offlineTableName, partitionColumn);
-    Set<Integer> partitions = partitionMetadata.getPartitions();
-    Preconditions.checkState(partitions.size() == 1,
-        "Segment ZK metadata for segment: %s of table: %s contains multiple partitions for column: %s", segmentName,
-        offlineTableName, partitionColumn);
-    return partitions.iterator().next();
-  }
-
-  /**
-   * Returns map of instance partition id to segments for offline tables
-   */
-  public static Map<Integer, List<String>> getOfflineInstancePartitionIdToSegmentsMap(Set<String> segments,
-      int numInstancePartitions, String offlineTableName, HelixManager helixManager, @Nullable String partitionColumn) {
-    // Fetch partition id from segment ZK metadata
-    List<SegmentZKMetadata> segmentsZKMetadata =
-        ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), offlineTableName);
-
-    Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
-    Set<String> segmentsWithoutZKMetadata = new HashSet<>(segments);
-    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      String segmentName = segmentZKMetadata.getSegmentName();
-      if (segmentsWithoutZKMetadata.remove(segmentName)) {
-        int partitionId = getPartitionId(segmentZKMetadata, offlineTableName, partitionColumn);
-        int instancePartitionId = partitionId % numInstancePartitions;
-        instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
-      }
-    }
-    Preconditions.checkState(segmentsWithoutZKMetadata.isEmpty(), "Failed to find ZK metadata for segments: %s",
-        segmentsWithoutZKMetadata);
-
-    return instancePartitionIdToSegmentsMap;
-  }
-
-  /**
-   * Returns a partition id for realtime table
-   */
-  public static int getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
-      HelixManager helixManager, @Nullable String partitionColumn) {
-    Integer segmentPartitionId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn);
-    if (segmentPartitionId == null) {
-      // This case is for the uploaded segments for which there's no partition information.
-      // A random, but consistent, partition id is calculated based on the hash code of the segment name.
-      // Note that '% 10K' is used to prevent having partition ids with large value which will be problematic later in
-      // instance assignment formula.
-      segmentPartitionId = Math.abs(segmentName.hashCode() % 10_000);
-    }
-    return segmentPartitionId;
-  }
-
-  /**
-   * Returns map of instance partition id to segments for realtime tables
-   */
-  public static Map<Integer, List<String>> getRealtimeInstancePartitionIdToSegmentsMap(Set<String> segments,
-      int numInstancePartitions, String realtimeTableName, HelixManager helixManager,
-      @Nullable String partitionColumn) {
-    Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
-    for (String segmentName : segments) {
-      int instancePartitionId =
-          getRealtimeSegmentPartitionId(segmentName, realtimeTableName, helixManager, partitionColumn)
-              % numInstancePartitions;
-      instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
-    }
-    return instancePartitionIdToSegmentsMap;
   }
 }

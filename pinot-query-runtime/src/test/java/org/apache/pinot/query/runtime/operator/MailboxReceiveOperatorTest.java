@@ -239,7 +239,7 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     List<DataBuffer> stats1 = new MultiStageQueryStats.Builder(1).addLast(
         open -> open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
-            .addLastOperator(Type.LEAF, new StatMap<>(LeafStageOperator.StatKey.class))
+            .addLastOperator(Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
             .close()).build().serialize();
     ReceivingMailbox.MseBlockWithStats block1 = OperatorTestUtil.eosWithStats(stats1);
     when(_mailbox1.poll()).thenReturn(block1);
@@ -248,7 +248,7 @@ public class MailboxReceiveOperatorTest {
     List<DataBuffer> stats2 = new MultiStageQueryStats.Builder(1).addLast(
         open -> open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
             .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
-            .addLastOperator(Type.LEAF, new StatMap<>(LeafStageOperator.StatKey.class))
+            .addLastOperator(Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
             .close()).build().serialize();
     ReceivingMailbox.MseBlockWithStats block2 = OperatorTestUtil.eosWithStats(stats2);
     when(_mailbox2.poll()).thenReturn(block2);

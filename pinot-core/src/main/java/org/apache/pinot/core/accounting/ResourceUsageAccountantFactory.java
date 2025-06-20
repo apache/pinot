@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
@@ -182,19 +181,16 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       return queryAggregator.getQueryResources(_threadEntriesMap);
     }
 
-    @Override
-    public void updateResourceUsageConcurrently(String identifier, TrackingScope trackingScope) {
+    public void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long memoryAllocatedBytes,
+                                             TrackingScope trackingScope) {
       ResourceAggregator resourceAggregator = _resourceAggregators.get(trackingScope);
       if (resourceAggregator == null) {
         return;
       }
-
       if (_isThreadCPUSamplingEnabled) {
-        long cpuUsageNS = getThreadResourceUsageProvider().getThreadTimeNs();
-        resourceAggregator.updateConcurrentCpuUsage(identifier, cpuUsageNS);
+        resourceAggregator.updateConcurrentCpuUsage(identifier, cpuTimeNs);
       }
       if (_isThreadMemorySamplingEnabled) {
-        long memoryAllocatedBytes = getThreadResourceUsageProvider().getThreadAllocatedBytes();
         resourceAggregator.updateConcurrentMemUsage(identifier, memoryAllocatedBytes);
       }
     }
@@ -230,25 +226,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     @Override
     public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
       _threadResourceUsageProvider.set(threadResourceUsageProvider);
-    }
-
-    @Override
-    public void createExecutionContextInner(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext,
-        @Nullable String workloadName) {
-      _threadLocalEntry.get()._errorStatus.set(null);
-      if (parentContext == null) {
-        // is anchor thread
-        assert queryId != null;
-        _threadLocalEntry.get()
-            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
-                workloadName);
-      } else {
-        // not anchor thread
-        _threadLocalEntry.get()
-            .setThreadTaskStatus(queryId, taskId, parentContext.getTaskType(), parentContext.getAnchorThread(),
-                workloadName);
-      }
     }
 
     @Override

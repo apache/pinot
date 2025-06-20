@@ -234,6 +234,11 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
     public static final PinotJoinConditionPushRule INSTANCE =
         new PinotJoinConditionPushRule(JoinConditionPushRuleConfig.DEFAULT);
 
+    public static PinotJoinConditionPushRule instanceWithDescription(String description) {
+        return new PinotJoinConditionPushRule(
+            (JoinConditionPushRuleConfig) JoinConditionPushRuleConfig.DEFAULT.withDescription(description));
+    }
+
     private PinotJoinConditionPushRule(JoinConditionPushRuleConfig config) {
       super(config);
     }
@@ -247,6 +252,11 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
   public static class PinotFilterIntoJoinRule extends PinotFilterJoinRule<FilterIntoJoinRuleConfig> {
     public static final PinotFilterIntoJoinRule INSTANCE =
         new PinotFilterIntoJoinRule(FilterIntoJoinRuleConfig.DEFAULT);
+
+    public static PinotFilterIntoJoinRule instanceWithDescription(String description) {
+      return new PinotFilterIntoJoinRule(
+          (FilterIntoJoinRuleConfig) FilterIntoJoinRuleConfig.DEFAULT.withDescription(description));
+    }
 
     private PinotFilterIntoJoinRule(FilterIntoJoinRuleConfig config) {
       super(config);

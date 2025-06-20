@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -42,11 +39,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexWindowBound;
-import org.apache.calcite.rex.RexWindowBounds;
-import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -87,10 +80,10 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     Window window = call.rel(0);
     // Perform all validations
-    validateWindows(window);
+    PinotRuleUtils.WindowUtils.validateWindows(window);
 
     RelNode input = window.getInput();
-    Window.Group windowGroup = updateLiteralArgumentsInWindowGroup(window);
+    Window.Group windowGroup = PinotRuleUtils.WindowUtils.updateLiteralArgumentsInWindowGroup(window);
     Exchange exchange;
     if (windowGroup.keys.isEmpty()) {
       // Empty OVER()
@@ -145,122 +138,6 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
     call.transformTo(LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(),
         List.of(windowGroup)));
-  }
-
-  /**
-   * Replaces the reference to literal arguments in the window group with the actual literal values.
-   * NOTE: {@link Window} has a field called "constants" which contains the literal values. If the input reference is
-   * beyond the window input size, it is a reference to the constants.
-   */
-  private Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
-    Window.Group oldWindowGroup = window.groups.get(0);
-    RelNode input = ((HepRelVertex) window.getInput()).getCurrentRel();
-    int numInputFields = input.getRowType().getFieldCount();
-    List<RexNode> projects = input instanceof Project ? ((Project) input).getProjects() : null;
-
-    List<Window.RexWinAggCall> newAggCallWindow = new ArrayList<>(oldWindowGroup.aggCalls.size());
-    boolean windowChanged = false;
-    for (Window.RexWinAggCall oldAggCall : oldWindowGroup.aggCalls) {
-      boolean changed = false;
-      List<RexNode> oldOperands = oldAggCall.getOperands();
-      List<RexNode> newOperands = new ArrayList<>(oldOperands.size());
-      for (RexNode oldOperand : oldOperands) {
-        RexLiteral literal = getLiteral(oldOperand, numInputFields, window.constants, projects);
-        if (literal != null) {
-          newOperands.add(literal);
-          changed = true;
-          windowChanged = true;
-        } else {
-          newOperands.add(oldOperand);
-        }
-      }
-      if (changed) {
-        newAggCallWindow.add(
-            new Window.RexWinAggCall((SqlAggFunction) oldAggCall.getOperator(), oldAggCall.type, newOperands,
-                oldAggCall.ordinal, oldAggCall.distinct, oldAggCall.ignoreNulls));
-      } else {
-        newAggCallWindow.add(oldAggCall);
-      }
-    }
-
-    RexWindowBound lowerBound = oldWindowGroup.lowerBound;
-    RexNode offset = lowerBound.getOffset();
-    if (offset != null) {
-      RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
-      if (literal == null) {
-        throw new IllegalStateException(
-            "Could not read window lower bound literal value from window group: " + oldWindowGroup);
-      }
-      lowerBound = lowerBound.isPreceding() ? RexWindowBounds.preceding(literal) : RexWindowBounds.following(literal);
-      windowChanged = true;
-    }
-    RexWindowBound upperBound = oldWindowGroup.upperBound;
-    offset = upperBound.getOffset();
-    if (offset != null) {
-      RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
-      if (literal == null) {
-        throw new IllegalStateException(
-            "Could not read window upper bound literal value from window group: " + oldWindowGroup);
-      }
-      upperBound = upperBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
-      windowChanged = true;
-    }
-
-    return windowChanged ? new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, lowerBound, upperBound,
-        oldWindowGroup.exclude, oldWindowGroup.orderKeys, newAggCallWindow) : oldWindowGroup;
-  }
-
-  @Nullable
-  private RexLiteral getLiteral(RexNode rexNode, int numInputFields, ImmutableList<RexLiteral> constants,
-      @Nullable List<RexNode> projects) {
-    if (!(rexNode instanceof RexInputRef)) {
-      return null;
-    }
-    int index = ((RexInputRef) rexNode).getIndex();
-    if (index >= numInputFields) {
-      return constants.get(index - numInputFields);
-    }
-    if (projects != null) {
-      RexNode project = projects.get(index);
-      if (project instanceof RexLiteral) {
-        return (RexLiteral) project;
-      }
-    }
-    return null;
-  }
-
-  private void validateWindows(Window window) {
-    int numGroups = window.groups.size();
-    // For Phase 1 we only handle single window groups
-    Preconditions.checkState(numGroups == 1,
-        String.format("Currently only 1 window group is supported, query has %d groups", numGroups));
-
-    // Validate that only supported window aggregation functions are present
-    Window.Group windowGroup = window.groups.get(0);
-    validateWindowAggCallsSupported(windowGroup);
-
-    // Validate the frame
-    validateWindowFrames(windowGroup);
-  }
-
-  private void validateWindowAggCallsSupported(Window.Group windowGroup) {
-    for (Window.RexWinAggCall aggCall : windowGroup.aggCalls) {
-      SqlKind aggKind = aggCall.getKind();
-      Preconditions.checkState(SUPPORTED_WINDOW_FUNCTION_KIND.contains(aggKind),
-          String.format("Unsupported Window function kind: %s. Only aggregation functions are supported!", aggKind));
-    }
-  }
-
-  private void validateWindowFrames(Window.Group windowGroup) {
-    RexWindowBound lowerBound = windowGroup.lowerBound;
-    RexWindowBound upperBound = windowGroup.upperBound;
-
-    boolean hasOffset = (lowerBound.isPreceding() && !lowerBound.isUnbounded()) || (upperBound.isFollowing()
-        && !upperBound.isUnbounded());
-
-    if (!windowGroup.isRows) {
-      Preconditions.checkState(!hasOffset, "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
-    }
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {

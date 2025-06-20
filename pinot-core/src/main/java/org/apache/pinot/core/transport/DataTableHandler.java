@@ -25,6 +25,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -63,18 +64,20 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-    Tracing.ThreadAccountantOps.setThreadResourceUsageProvider();
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {
       long deserializationStartTimeMs = System.currentTimeMillis();
+      ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
       String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
-      Tracing.ThreadAccountantOps.updateResourceUsageConcurrently(String.valueOf(requestID), TrackingScope.QUERY);
-      Tracing.ThreadAccountantOps.updateResourceUsageConcurrently(workloadName, TrackingScope.WORKLOAD);
+      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
+          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.QUERY);
+      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(workloadName,
+          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);

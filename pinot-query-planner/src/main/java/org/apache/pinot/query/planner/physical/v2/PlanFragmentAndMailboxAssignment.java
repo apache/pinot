@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -38,6 +35,7 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -48,133 +46,134 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
 
 
+/**
+ * <h1>Responsibilities</h1>
+ * This does the following:
+ * <ul>
+ *   <li>Splits plan around PhysicalExchange nodes to create plan fragments.</li>
+ *   <li>Converts PRelNodes to PlanNodes.</li>
+ *   <li>
+ *     Creates mailboxes for connecting plan fragments. This is done simply based on the workers in the send/receive
+ *     plan nodes, and the exchange strategy (identity, partitioning, etc.).
+ *   </li>
+ *   <li>
+ *     Creates metadata for each plan fragment, which includes the scanned tables, unavailable segments, etc.
+ *   </li>
+ * </ul>
+ * <h1>Design Note</h1>
+ * This class is completely un-opinionated. The old optimizer had a lot of custom logic added to mailbox assignment,
+ * but this class instead doesn't do any special handling, apart from assigning mailboxes based on the exchange
+ * strategy. This is an important and conscious design choice, because it ensures division of responsibilities and
+ * allows optimizer rules like worker assignment to completely own their responsibilities. This is also important for
+ * keeping the optimizer maximally pluggable. (e.g. you can swap out the default worker assignment rule with a
+ * custom rule like the LiteMode worker assignment rule).
+ */
 public class PlanFragmentAndMailboxAssignment {
   private static final int ROOT_FRAGMENT_ID = 0;
-  private static final int FIRST_NON_ROOT_FRAGMENT_ID = 1;
 
   public Result compute(PRelNode rootPRelNode, PhysicalPlannerContext physicalPlannerContext) {
-    Preconditions.checkState(!(rootPRelNode.unwrap() instanceof Exchange), "root node should never be exchange");
-    final DataSchema rootDataSchema = PRelToPlanNodeConverter.toDataSchema(rootPRelNode.unwrap().getRowType());
-    // Create input fragment's send node.
-    MailboxSendNode sendNode = new MailboxSendNode(FIRST_NON_ROOT_FRAGMENT_ID, rootDataSchema, new ArrayList<>(),
-        ROOT_FRAGMENT_ID, PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.SINGLETON,
-        null, false, null, false);
-    // Create root receive node.
-    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(ROOT_FRAGMENT_ID, rootDataSchema,
-        FIRST_NON_ROOT_FRAGMENT_ID, PinotRelExchangeType.getDefaultExchangeType(),
-        RelDistribution.Type.BROADCAST_DISTRIBUTED, null, null, false, false, sendNode);
     // Create the first two fragments.
     Context context = new Context(physicalPlannerContext);
-    PlanFragment rootFragment = createFragment(ROOT_FRAGMENT_ID, rootReceiveNode, new ArrayList<>(), context);
-    PlanFragment firstInputFragment = createFragment(FIRST_NON_ROOT_FRAGMENT_ID, sendNode, new ArrayList<>(), context);
-    rootFragment.getChildren().add(firstInputFragment);
-    QueryServerInstance brokerInstance = new QueryServerInstance(physicalPlannerContext.getInstanceId(),
-        physicalPlannerContext.getHostName(), physicalPlannerContext.getPort(), physicalPlannerContext.getPort());
-    computeMailboxInfos(FIRST_NON_ROOT_FRAGMENT_ID, ROOT_FRAGMENT_ID,
-        createWorkerMap(rootPRelNode.getPinotDataDistributionOrThrow().getWorkers(), context),
-        ImmutableMap.of(0, brokerInstance), ExchangeStrategy.SINGLETON_EXCHANGE, context);
     // Traverse entire tree.
-    context._fragmentMetadataMap.get(ROOT_FRAGMENT_ID).setWorkerIdToServerInstanceMap(ImmutableMap.of(
-        0, brokerInstance));
-    visit(rootPRelNode, sendNode, firstInputFragment, context);
+    process(rootPRelNode, null, ROOT_FRAGMENT_ID, context);
     Result result = new Result();
     result._fragmentMetadataMap = context._fragmentMetadataMap;
     result._planFragmentMap = context._planFragmentMap;
     return result;
   }
 
-  /**
-   * Invariants: 1. Parent PlanNode does not have current node in input yet. 2. This node is NOT the fragment root. This
-   * is because each fragment root is a MailboxSendNode.
-   */
-  private void visit(PRelNode pRelNode, @Nullable PlanNode parent, PlanFragment currentFragment, Context context) {
-    int currentFragmentId = currentFragment.getFragmentId();
-    DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
-    if (MapUtils.isEmpty(fragmentMetadata.getWorkerIdToServerInstanceMap())) {
-      // TODO: This is quite a complex invariant.
-      fragmentMetadata.setWorkerIdToServerInstanceMap(createWorkerMap(
-          pRelNode.getPinotDataDistributionOrThrow().getWorkers(), context));
-    }
+  private void process(PRelNode pRelNode, @Nullable PlanNode parent, int currentFragmentId, Context context) {
     if (pRelNode.unwrap() instanceof TableScan) {
-      TableScanMetadata tableScanMetadata = Objects.requireNonNull(pRelNode.getTableScanMetadata(),
-          "No metadata in table scan PRelNode");
-      String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
-      if (!tableScanMetadata.getUnavailableSegmentsMap().isEmpty()) {
-        fragmentMetadata.addUnavailableSegments(tableName,
-            tableScanMetadata.getUnavailableSegmentsMap().get(tableName));
-      }
-      fragmentMetadata.addScannedTable(tableName);
-      fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
-      NodeHint nodeHint = NodeHint.fromRelHints(((TableScan) pRelNode.unwrap()).getHints());
-      fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
-      if (tableScanMetadata.getTimeBoundaryInfo() != null) {
-        fragmentMetadata.setTimeBoundaryInfo(tableScanMetadata.getTimeBoundaryInfo());
-      }
+      processTableScan((PhysicalTableScan) pRelNode.unwrap(), currentFragmentId, context);
     }
     if (pRelNode.unwrap() instanceof PhysicalExchange) {
+      // Split an exchange into two fragments: one for the sender and one for the receiver.
+      // The sender fragment will have a MailboxSendNode and receiver a MailboxReceiveNode.
+      // It is possible that the receiver fragment doesn't exist yet (e.g. when PhysicalExchange is the root node).
+      // In that case, we also create it here. If it exists already, we simply re-use it.
       PhysicalExchange physicalExchange = (PhysicalExchange) pRelNode.unwrap();
-      int senderFragmentId = context._planFragmentMap.size();
+      PlanFragment receiverFragment = context._planFragmentMap.get(currentFragmentId);
+      int senderFragmentId = context._planFragmentMap.size() + (receiverFragment == null ? 1 : 0);
       final DataSchema inputFragmentSchema = PRelToPlanNodeConverter.toDataSchema(
           pRelNode.getPRelInput(0).unwrap().getRowType());
-      RelDistribution.Type distributionType = inferDistributionType(physicalExchange.getExchangeStrategy());
-      List<PlanNode> inputs = new ArrayList<>();
-      MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, inputs, currentFragmentId,
-          PinotRelExchangeType.getDefaultExchangeType(), distributionType, physicalExchange.getDistributionKeys(),
-          false, physicalExchange.getRelCollation().getFieldCollations(), false /* todo: set sortOnSender */);
+      RelDistribution.Type distributionType = ExchangeStrategy.getRelDistribution(
+          physicalExchange.getExchangeStrategy(), physicalExchange.getDistributionKeys()).getType();
+      MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, new ArrayList<>(),
+          currentFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
+          physicalExchange.getDistributionKeys(), false, physicalExchange.getRelCollation().getFieldCollations(),
+          false /* sort on sender */);
       MailboxReceiveNode receiveNode = new MailboxReceiveNode(currentFragmentId, inputFragmentSchema,
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
-          false /* TODO: set sort on receiver */, false /* TODO: set sort on sender */, sendNode);
-      PlanFragment newPlanFragment = createFragment(senderFragmentId, sendNode, new ArrayList<>(), context);
+          !physicalExchange.getRelCollation().getFieldCollations().isEmpty(), false, sendNode);
+      if (receiverFragment == null) {
+        /*
+         * If the root node is an exchange, then the root fragment will not exist yet. We create it here.
+         */
+        receiverFragment = createFragment(currentFragmentId, receiveNode, new ArrayList<>(), context,
+            pRelNode.getPinotDataDistributionOrThrow().getWorkers());
+      }
+      PlanFragment newPlanFragment = createFragment(senderFragmentId, sendNode, new ArrayList<>(), context,
+          physicalExchange.getPRelInputs().get(0).getPinotDataDistributionOrThrow().getWorkers());
       Map<Integer, QueryServerInstance> senderWorkers = createWorkerMap(pRelNode.getPRelInput(0)
           .getPinotDataDistributionOrThrow().getWorkers(), context);
       Map<Integer, QueryServerInstance> receiverWorkers = createWorkerMap(pRelNode.getPinotDataDistributionOrThrow()
           .getWorkers(), context);
       computeMailboxInfos(senderFragmentId, currentFragmentId, senderWorkers, receiverWorkers,
           physicalExchange.getExchangeStrategy(), context);
-      currentFragment.getChildren().add(newPlanFragment);
-      visit(pRelNode.getPRelInput(0), sendNode, newPlanFragment, context);
+      context._planFragmentMap.get(currentFragmentId).getChildren().add(newPlanFragment);
+      process(pRelNode.getPRelInput(0), sendNode, newPlanFragment.getFragmentId(), context);
       if (parent != null) {
         parent.getInputs().add(receiveNode);
       }
       return;
     }
+    // Convert PRelNode to PlanNode, and create parent/input PlanNode tree.
     PlanNode planNode = PRelToPlanNodeConverter.toPlanNode(pRelNode, currentFragmentId);
+    if (context._planFragmentMap.isEmpty()) {
+      /*
+       * If the root-node is NOT an exchange, then we create the root fragment here. If it's an exchange, it will be
+       * created in the process of handling the exchange.
+       */
+      createFragment(ROOT_FRAGMENT_ID, planNode, new ArrayList<>(), context,
+          pRelNode.getPinotDataDistributionOrThrow().getWorkers());
+    }
     for (PRelNode input : pRelNode.getPRelInputs()) {
-      visit(input, planNode, currentFragment, context);
+      process(input, planNode, currentFragmentId, context);
     }
     if (parent != null) {
       parent.getInputs().add(planNode);
     }
   }
 
-  private PlanFragment createFragment(int fragmentId, PlanNode planNode, List<PlanFragment> inputFragments,
-      Context context) {
-    PlanFragment fragment = new PlanFragment(fragmentId, planNode, inputFragments);
-    context._planFragmentMap.put(fragmentId, fragment);
-    context._fragmentMetadataMap.put(fragmentId, new DispatchablePlanMetadata());
-    return fragment;
+  private void processTableScan(PhysicalTableScan tableScan, int currentFragmentId, Context context) {
+    DispatchablePlanMetadata fragmentMetadata = context._fragmentMetadataMap.get(currentFragmentId);
+    TableScanMetadata tableScanMetadata = Objects.requireNonNull(tableScan.getTableScanMetadata(),
+        "No metadata in table scan PRelNode");
+    String tableName = tableScanMetadata.getScannedTables().stream().findFirst().orElseThrow();
+    if (!tableScanMetadata.getUnavailableSegmentsMap().isEmpty()) {
+      fragmentMetadata.addUnavailableSegments(tableName,
+          tableScanMetadata.getUnavailableSegmentsMap().get(tableName));
+    }
+    fragmentMetadata.addScannedTable(tableName);
+    fragmentMetadata.setWorkerIdToSegmentsMap(tableScanMetadata.getWorkedIdToSegmentsMap());
+    NodeHint nodeHint = NodeHint.fromRelHints(tableScan.getHints());
+    fragmentMetadata.setTableOptions(nodeHint.getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
+    if (tableScanMetadata.getTimeBoundaryInfo() != null) {
+      fragmentMetadata.setTimeBoundaryInfo(tableScanMetadata.getTimeBoundaryInfo());
+    }
   }
 
-  private RelDistribution.Type inferDistributionType(ExchangeStrategy desc) {
-    RelDistribution.Type distributionType;
-    switch (desc) {
-      case PARTITIONING_EXCHANGE:
-        distributionType = RelDistribution.Type.HASH_DISTRIBUTED;
-        break;
-      case IDENTITY_EXCHANGE:
-        distributionType = RelDistribution.Type.HASH_DISTRIBUTED;
-        break;
-      case SINGLETON_EXCHANGE:
-        distributionType = RelDistribution.Type.SINGLETON;
-        break;
-      case BROADCAST_EXCHANGE:
-        distributionType = RelDistribution.Type.BROADCAST_DISTRIBUTED;
-        break;
-      default:
-        throw new IllegalStateException("");
-    }
-    return distributionType;
+  private PlanFragment createFragment(int fragmentId, PlanNode planNode, List<PlanFragment> inputFragments,
+      Context context, List<String> workers) {
+    // track new plan fragment
+    PlanFragment fragment = new PlanFragment(fragmentId, planNode, inputFragments);
+    context._planFragmentMap.put(fragmentId, fragment);
+    // add fragment metadata
+    DispatchablePlanMetadata fragmentMetadata = new DispatchablePlanMetadata();
+    fragmentMetadata.setWorkerIdToServerInstanceMap(createWorkerMap(workers, context));
+    context._fragmentMetadataMap.put(fragmentId, fragmentMetadata);
+    return fragment;
   }
 
   private Map<Integer, QueryServerInstance> createWorkerMap(List<String> workers, Context context) {
@@ -225,6 +224,7 @@ public class PlanFragmentAndMailboxAssignment {
             .put(senderStageId, new SharedMailboxInfos(mailboxInfoListForReceiver));
         break;
       }
+      case RANDOM_EXCHANGE:
       case PARTITIONING_EXCHANGE:
       case BROADCAST_EXCHANGE: {
         MailboxInfos mailboxInfoListForSender = new MailboxInfos(createMailboxInfo(receiverWorkers));

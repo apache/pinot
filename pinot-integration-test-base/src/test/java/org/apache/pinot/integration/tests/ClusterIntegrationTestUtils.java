@@ -880,6 +880,10 @@ public class ClusterIntegrationTestUtils {
     return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
+  public static String getTimeSeriesQueryApiUrl(String timeSeriesBaseApiUrl) {
+    return timeSeriesBaseApiUrl + "/timeseries/api/v1/query_range";
+  }
+
   public static String getBrokerQueryCancelUrl(String brokerBaseApiUrl, String brokerId, String clientQueryId) {
     return brokerBaseApiUrl + "/clientQuery/" + brokerId + "/" + clientQueryId;
   }

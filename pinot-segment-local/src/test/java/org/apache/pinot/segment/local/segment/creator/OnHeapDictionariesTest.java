@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -179,17 +178,13 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
 
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
-      HashMap<String, Object> map = new HashMap<>();
-
-      map.put(INT_COLUMN, random.nextInt());
-      map.put(LONG_COLUMN, random.nextLong());
-      map.put(FLOAT_COLUMN, random.nextFloat());
-      map.put(DOUBLE_COLUMN, random.nextDouble());
-      map.put(STRING_COLUMN, RandomStringUtils.randomAscii(100));
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      GenericRow row = new GenericRow();
+      row.putValue(INT_COLUMN, random.nextInt());
+      row.putValue(LONG_COLUMN, random.nextLong());
+      row.putValue(FLOAT_COLUMN, random.nextFloat());
+      row.putValue(DOUBLE_COLUMN, random.nextDouble());
+      row.putValue(STRING_COLUMN, RandomStringUtils.randomAscii(100));
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

@@ -49,9 +49,11 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -73,6 +75,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -166,8 +169,8 @@ public class TableConfigsRestletResource {
         throw new NotFoundException(
             String.format("Schema does not exist for table %s Use POST to create it first.", tableName));
       }
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false, false);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false, false);
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {
@@ -282,7 +285,24 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers) {
     try {
+      if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
+        throw new ControllerApplicationException(LOGGER, "Invalid table name: " + tableName + ". Use raw table name.",
+            Response.Status.BAD_REQUEST);
+      }
+
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+
+      // Validate the table is not referenced in any logical table config.
+      List<LogicalTableConfig> allLogicalTableConfigs =
+          ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+      for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+        if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, tableName)) {
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+                  tableName, logicalTableConfig.getTableName()), Response.Status.CONFLICT);
+        }
+      }
+
       boolean tableExists =
           _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
               tableName);

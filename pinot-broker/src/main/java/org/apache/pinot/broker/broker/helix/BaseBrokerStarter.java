@@ -370,7 +370,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-      _multiStageQueryThrottler = new MultiStageQueryThrottler();
+      _multiStageQueryThrottler = new MultiStageQueryThrottler(_brokerConf);
       _multiStageQueryThrottler.init(_spectatorHelixManager);
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.

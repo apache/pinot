@@ -167,7 +167,7 @@ public class PinotCustomDependencyVersionRuleTest {
     Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
   }
 
-  // Simulate a skipped module
+  // Simulate a skipped module with hardcoded versions
   @Test
   public void testExecuteWithSkippedModule() throws EnforcerRuleException {
     Model model = new Model();
@@ -180,11 +180,15 @@ public class PinotCustomDependencyVersionRuleTest {
     dependencies.add(dependency);
     model.setDependencies(dependencies);
 
+    Mockito.when(_project.getOriginalModel()).thenReturn(model);
+    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
     Mockito.when(_session.getTopLevelProject()).thenReturn(_project);
     Mockito.when(_project.getBasedir()).thenReturn(new File("pinot-plugins"));    // skipped module
-    Mockito.when(_project.getOriginalModel()).thenReturn(new Model());
-    Mockito.when(_project.isExecutionRoot()).thenReturn(false);
 
-    _rule.execute(_helper);
+    EnforcerRuleException thrown = Assert.expectThrows(EnforcerRuleException.class, () -> {
+      _rule.execute(_helper);
+    });
+
+    Assert.assertTrue(thrown.getMessage().contains("Please refer to"));
   }
 }

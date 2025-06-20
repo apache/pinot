@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -42,6 +43,9 @@ public class CPUMemThreadLevelAccountingObjects {
     // current sample of thread memory usage/cputime ; this field is accessed by the thread itself and the accountant
     volatile long _currentThreadCPUTimeSampleMS = 0;
     volatile long _currentThreadMemoryAllocationSampleBytes = 0;
+
+    // reference point for start time/bytes
+    private final ThreadResourceSnapshot _threadResourceSnapshot = new ThreadResourceSnapshot();
 
     // previous query_id, task_id of the thread, this field should only be accessed by the accountant
     TaskEntry _previousThreadTaskStatus = null;
@@ -93,9 +97,10 @@ public class CPUMemThreadLevelAccountingObjects {
       return _currentThreadMemoryAllocationSampleBytes;
     }
 
+    @Nullable
     public String getQueryId() {
       TaskEntry taskEntry = _currentThreadTaskStatus.get();
-      return taskEntry == null ? "" : taskEntry.getQueryId();
+      return taskEntry == null ? null : taskEntry.getQueryId();
     }
 
     public int getTaskId() {
@@ -109,9 +114,23 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? ThreadExecutionContext.TaskType.UNKNOWN : taskEntry.getTaskType();
     }
 
-    public void setThreadTaskStatus(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+    public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nonnull Thread anchorThread, @Nullable String workloadName) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread, workloadName));
+      _threadResourceSnapshot.reset();
+    }
+
+    /**
+     * Note that the precision does not match the name of the variable.
+     * _currentThreadCPUTimeSampleMS is in nanoseconds, but the variable name suggests milliseconds.
+     * This is to maintain backward compatibility. It replaces code that set the value in nanoseconds.
+     */
+    public void updateCpuSnapshot() {
+      _currentThreadCPUTimeSampleMS = _threadResourceSnapshot.getCpuTimeNs();
+    }
+
+    public void updateMemorySnapshot() {
+      _currentThreadMemoryAllocationSampleBytes = _threadResourceSnapshot.getAllocatedBytes();
     }
   }
 

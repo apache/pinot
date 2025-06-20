@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -27,6 +29,13 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 public class TenantRebalanceResult {
   private String _jobId;
   private Map<String, RebalanceResult> _rebalanceTableResults;
+
+  @JsonCreator
+  public TenantRebalanceResult(
+      @JsonProperty("jobId") String jobId,
+      @JsonProperty("rebalanceTableResults") Map<String, RebalanceResult> rebalanceTableResults) {
+    this(jobId, rebalanceTableResults, true);
+  }
 
   public TenantRebalanceResult(String jobId, Map<String, RebalanceResult> rebalanceTableResults, boolean verbose) {
     _jobId = jobId;

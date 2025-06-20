@@ -356,7 +356,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     try {
       long timeOutMs = reducerContext.getReduceTimeOutMs() - (System.currentTimeMillis() - start);
       if (!countDownLatch.await(timeOutMs, TimeUnit.MILLISECONDS)) {
-        throw new TimeoutException("Timed out in broker reduce phase");
+        throw new TimeoutException("Timed out on broker reduce phase");
       }
       Throwable t = exception.get();
       if (t != null) {

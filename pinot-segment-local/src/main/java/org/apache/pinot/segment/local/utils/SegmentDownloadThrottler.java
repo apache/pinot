@@ -49,8 +49,7 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
    */
   public SegmentDownloadThrottler(int maxDownloadConcurrency, int maxDownloadConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
-    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries,
-        ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, LOGGER);
+    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries, LOGGER);
   }
 
   @Override
@@ -70,11 +69,13 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
     LOGGER.info("Updated SegmentDownloadThrottler configs with latest clusterConfigs");
   }
 
-  /**
-   * Get the estimated number of threads waiting for the semaphore
-   * @return the estimated queue length
-   */
-  public int getQueueLength() {
-    return _semaphore.getQueueLength();
+  @Override
+  public void updateThresholdMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, value);
+  }
+
+  @Override
+  public void updateCountMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_DOWNLOAD_COUNT, value);
   }
 }
