@@ -25,10 +25,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
@@ -496,23 +496,10 @@ public class TenantRebalanceResult {
     }
 
     int totalNumConsumingSegmentsToBeMoved = 0;
-    // Find the maximum size of offset and age maps across all tables
-    int maxOffsetMapSize = 0;
-    int maxAgeMapSize = 0;
-    for (RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary : summaries) {
-      if (summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() != null) {
-        maxOffsetMapSize = Math.max(maxOffsetMapSize,
-            summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().size());
-      }
-      if (summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() != null) {
-        maxAgeMapSize = Math.max(maxAgeMapSize,
-            summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().size());
-      }
-    }
 
     // Create maps to store all segments by offset and age
-    Map<String, Integer> allConsumingSegmentsWithOffsets = new HashMap<>();
-    Map<String, Integer> allConsumingSegmentsWithAges = new HashMap<>();
+    Map<String, Integer> consumingSegmentsWithMostOffsetsPerTable = new HashMap<>();
+    Map<String, Integer> consumingSegmentsWithOldestAgePerTable = new HashMap<>();
 
     // Aggregate ConsumingSegmentSummaryPerServer by server name across all tables
     Map<String, AggregatedConsumingSegmentSummaryPerServer> serverAggregates = new HashMap<>();
@@ -520,14 +507,22 @@ public class TenantRebalanceResult {
     for (RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary : summaries) {
       totalNumConsumingSegmentsToBeMoved += summary.getNumConsumingSegmentsToBeMoved();
 
-      // Add all segments with offsets
-      if (summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() != null) {
-        allConsumingSegmentsWithOffsets.putAll(summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp());
+      // Add one segment with offsets for each table
+      if (summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() != null
+          && !summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().isEmpty()) {
+        Map.Entry<String, Integer> consumingSegmentWithMostOffsetsToCatchUp =
+            summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().entrySet().iterator().next();
+        consumingSegmentsWithMostOffsetsPerTable.put(consumingSegmentWithMostOffsetsToCatchUp.getKey(),
+            consumingSegmentWithMostOffsetsToCatchUp.getValue());
       }
 
       // Add all segments with ages
-      if (summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() != null) {
-        allConsumingSegmentsWithAges.putAll(summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes());
+      if (summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() != null
+          && !summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().isEmpty()) {
+        Map.Entry<String, Integer> consumingSegmentWithOldestAge =
+            summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().entrySet().iterator().next();
+        consumingSegmentsWithOldestAgePerTable.put(consumingSegmentWithOldestAge.getKey(),
+            consumingSegmentWithOldestAge.getValue());
       }
 
       // Aggregate server consuming segment summaries by server name
@@ -547,20 +542,16 @@ public class TenantRebalanceResult {
     }
 
     // Keep only top k segments with the highest offsets
-    Map<String, Integer> topKConsumingSegmentsWithOffsets = allConsumingSegmentsWithOffsets.entrySet().stream()
+    Map<String, Integer> sortedConsumingSegmentsWithMostOffsetsPerTable = new LinkedHashMap<>();
+    consumingSegmentsWithMostOffsetsPerTable.entrySet().stream()
         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-        .limit(maxOffsetMapSize)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, HashMap::new));
+        .forEach(entry -> sortedConsumingSegmentsWithMostOffsetsPerTable.put(entry.getKey(), entry.getValue()));
 
     // Keep only top k segments with the oldest ages
-    Map<String, Integer> topKConsumingSegmentsWithAges = allConsumingSegmentsWithAges.entrySet().stream()
+    Map<String, Integer> sortedConsumingSegmentsWithOldestAgePerTable = new LinkedHashMap<>();
+    consumingSegmentsWithOldestAgePerTable.entrySet().stream()
         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-        .limit(maxAgeMapSize)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, HashMap::new));
-
-    // Replace the original maps with the top k versions
-    allConsumingSegmentsWithOffsets = topKConsumingSegmentsWithOffsets;
-    allConsumingSegmentsWithAges = topKConsumingSegmentsWithAges;
+        .forEach(entry -> sortedConsumingSegmentsWithOldestAgePerTable.put(entry.getKey(), entry.getValue()));
 
     // Convert aggregated server data to final ConsumingSegmentSummaryPerServer map
     Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
@@ -571,8 +562,9 @@ public class TenantRebalanceResult {
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(
         totalNumConsumingSegmentsToBeMoved,
         totalNumServersGettingConsumingSegmentsAdded,
-        allConsumingSegmentsWithOffsets.isEmpty() ? null : allConsumingSegmentsWithOffsets,
-        allConsumingSegmentsWithAges.isEmpty() ? null : allConsumingSegmentsWithAges,
+        sortedConsumingSegmentsWithMostOffsetsPerTable.isEmpty() ? null
+            : sortedConsumingSegmentsWithMostOffsetsPerTable,
+        sortedConsumingSegmentsWithOldestAgePerTable.isEmpty() ? null : sortedConsumingSegmentsWithOldestAgePerTable,
         finalServerConsumingSummary.isEmpty() ? null : finalServerConsumingSummary
     );
   }
