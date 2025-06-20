@@ -150,6 +150,7 @@ public class LuceneTextIndexUtils {
         break;
       default:
         parserClassName = "org.apache.lucene.queryparser.classic.QueryParser";
+        break;
     }
 
     // Create parser instance and apply options
