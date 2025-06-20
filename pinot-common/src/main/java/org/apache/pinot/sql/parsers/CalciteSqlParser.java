@@ -63,6 +63,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
@@ -176,6 +177,8 @@ public class CalciteSqlParser {
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
     // Set query options into PinotQuery
     pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
+    // Account the resources used for query compilation
+    Tracing.ThreadAccountantOps.sample();
     return pinotQuery;
   }
 
