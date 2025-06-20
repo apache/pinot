@@ -113,11 +113,8 @@ public class RelToPRelConverter {
           asofJoin.getCondition(), asofJoin.getMatchCondition(), asofJoin.getVariablesSet(), asofJoin.getJoinType(),
           nodeIdGenerator.get(), inputs.get(0), inputs.get(1), null);
     } else if (relNode instanceof PinotLogicalEnrichedJoin) {
-      Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
-      PinotLogicalEnrichedJoin join = (PinotLogicalEnrichedJoin) relNode;
-      return new PhysicalJoin(join.getCluster(), join.getTraitSet(), join.getHints(), join.getCondition(),
-          join.getVariablesSet(), join.getJoinType(), nodeIdGenerator.get(), inputs.get(0), inputs.get(1), null,
-          join.getFilterProjectRexNodes());
+      // this should be unreachable
+      throw new IllegalStateException("EnrichedJoin is not supported in physical optimizer");
     } else if (relNode instanceof Join) {
       Preconditions.checkState(relNode.getInputs().size() == 2, "Expected exactly 2 inputs to join. Found: %s", inputs);
       Join join = (Join) relNode;

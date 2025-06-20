@@ -410,7 +410,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
    *
    * It is debatable whether we always want to use this instead of copying the tuple
    */
-  private abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
+  abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
     protected final int _leftSize;
     protected final int _size;
 

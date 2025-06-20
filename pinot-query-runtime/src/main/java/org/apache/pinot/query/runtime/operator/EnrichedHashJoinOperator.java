@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -100,7 +98,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   private void filterProject(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
     // TODO: this should handle different orders of filter, project
-    List<Object> row = new JoinedRowView(leftRow, rightRow, resultColumnSize, leftColumnSize);
+    List<Object> row = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
 
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
@@ -220,7 +218,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       if (rightRow == null) {
         handleUnmatchedLeftRow(leftRow, rows);
       } else {
-        List<Object> resultRowView = new JoinedRowView(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
+        List<Object> resultRowView = JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
         if (matchNonEquiConditions(resultRowView)) {
           if (isMaxRowsLimitReached(rows.size())) {
             break;
@@ -254,7 +252,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         boolean hasMatchForLeftRow = false;
         int numRightRows = rightRows.size();
         for (int i = 0; i < numRightRows; i++) {
-          List<Object> resultRowView = new JoinedRowView(leftRow, rightRows.get(i), _resultColumnSize, _leftColumnSize);
+          List<Object> resultRowView = JoinedRowView.of(leftRow, rightRows.get(i), _resultColumnSize, _leftColumnSize);
           if (matchNonEquiConditions(resultRowView)) {
             if (isMaxRowsLimitReached(rows.size())) {
               maxRowsLimitReached = true;
@@ -310,54 +308,6 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     }
 
     return getOutputRows(rows);
-  }
-
-  /**
-   * This util class is a view over the left and right row joined together
-   * currently this is used for filtering and input of projection. So if the joined
-   * tuple doesn't pass the predicate, the join result is not materialized into Object[].
-   *
-   * It is debatable whether we always want to use this instead of copying the tuple
-   */
-  private static class JoinedRowView extends AbstractList<Object> implements List<Object> {
-    @Nullable
-    private final Object[] _leftRow;
-    @Nullable
-    private final Object[] _rightRow;
-    private final int _leftSize;
-    private final int _size;
-
-    public JoinedRowView(@Nullable Object[] leftRow, @Nullable Object[] rightRow, int resultColumnSize, int leftSize) {
-      _leftRow = leftRow;
-      _rightRow = rightRow;
-      _leftSize = leftSize;
-      _size = resultColumnSize;
-    }
-
-    @Override
-    public Object get(int i) {
-      return i < _leftSize ? (_leftRow == null ? null : _leftRow[i])
-          : (_rightRow == null ? null : _rightRow[i - _leftSize]);
-    }
-
-    @Override
-    public int size() {
-      return _size;
-    }
-
-    /** materialize the view into a row array */
-    @Override
-    @NotNull
-    public Object[] toArray() {
-      Object[] resultRow = new Object[_size];
-      if (_leftRow != null) {
-        System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
-      }
-      if (_rightRow != null) {
-        System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
-      }
-      return resultRow;
-    }
   }
 
   public enum FilterProjectOperandsType {
