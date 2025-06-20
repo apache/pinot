@@ -86,7 +86,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();
-    waitForAllDocsLoaded(600_000L);    // Disable the pre-checks for the rebalance job
+    waitForAllDocsLoaded(600_000L);
   }
 
   private static String getQueryString(RebalanceConfig rebalanceConfig) {
@@ -128,100 +128,95 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     BaseServerStarter serverStarter2 = startOneServer(2);
     BaseServerStarter serverStarter3 = startOneServer(3);
     createServerTenant(tenantB, 0, 2);
+    try {
+      // Prepare the table to replicate segments across two servers on tenantA
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
+      tableConfig.getValidationConfig().setReplication("2");
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
+      updateTableConfig(tableConfig);
+      RebalanceConfig rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDryRun(false);
+      rebalanceConfig.setIncludeConsuming(true);
 
-    // Prepare the table to replicate segments across two servers on tenantA
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
-    tableConfig.getValidationConfig().setReplication("2");
-    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
-    updateTableConfig(tableConfig);
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setIncludeConsuming(true);
+      String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
+      assertEquals(
+          summary.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+          2);
+      assertEquals(summary.getSegmentInfo().getConsumingSegmentToBeMovedSummary().getNumConsumingSegmentsToBeMoved(),
+          4);
 
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
-    assertEquals(
-        summary.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        2);
-    Set<String> originalConsumingSegmentsToMove = summary.getSegmentInfo()
-        .getConsumingSegmentToBeMovedSummary()
-        .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-        .keySet();
-    assertEquals(originalConsumingSegmentsToMove.size(), 2);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      // test: move segments from tenantA to tenantB
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
+      updateTableConfig(tableConfig);
 
-    // test: move segments from tenantA to tenantB
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
-    updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(true);
 
-    rebalanceConfig.setForceCommit(true);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      assertEquals(
+          rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+          2);
+      summary = rebalanceResult.getRebalanceSummaryResult();
+      Set<String> originalConsumingSegmentsToMove = summary.getSegmentInfo()
+          .getConsumingSegmentToBeMovedSummary()
+          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
+          .keySet();
+      assertFalse(originalConsumingSegmentsToMove.isEmpty());
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertEquals(
-        rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        2);
-    summary = rebalanceResult.getRebalanceSummaryResult();
-    originalConsumingSegmentsToMove = summary.getSegmentInfo()
-        .getConsumingSegmentToBeMovedSummary()
-        .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-        .keySet();
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      LLCSegmentName consumingSegmentOriginal =
+          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
+      assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
 
-    response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-    ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-        JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-    LLCSegmentName consumingSegmentNow = new LLCSegmentName(
-        consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-    LLCSegmentName consumingSegmentOriginal =
-        new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-    assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-    assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
-        originalConsumingSegmentsToMove.size());
+      // test: move segment from tenantB to tenantA with downtime
 
-    // test: move segment from tenantB to tenantA with downtime
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
+      updateTableConfig(tableConfig);
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
-    updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(true);
+      rebalanceConfig.setIncludeConsuming(false);
 
-    rebalanceConfig.setForceCommit(true);
-    rebalanceConfig.setIncludeConsuming(false);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 60000);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 60000);
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      consumingSegmentOriginal = consumingSegmentNow;
+      consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      // the sequence number should not increase since the consuming segment is not committed
+      assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
 
-    response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-    consumingSegmentInfoResponse =
-        JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-    consumingSegmentOriginal = consumingSegmentNow;
-    consumingSegmentNow = new LLCSegmentName(
-        consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-    // the sequence number should not increase since the consuming segment is not committed
-    assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
-    assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
-        originalConsumingSegmentsToMove.size());
-
-    // Resume the table
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
-    tableConfig.getValidationConfig().setReplication("1");
-    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
-    updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommit(false);
-    rebalanceConfig.setMinAvailableReplicas(0);
-    rebalanceConfig.setDowntime(false);
-    rebalanceConfig.setIncludeConsuming(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
-
-    serverStarter0.stop();
-    serverStarter1.stop();
-    serverStarter2.stop();
-    serverStarter3.stop();
+      // Resume the table
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
+      tableConfig.getValidationConfig().setReplication("1");
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
+      updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(false);
+      rebalanceConfig.setMinAvailableReplicas(0);
+      rebalanceConfig.setDowntime(false);
+      rebalanceConfig.setIncludeConsuming(true);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+    } finally {
+      serverStarter0.stop();
+      serverStarter1.stop();
+      serverStarter2.stop();
+      serverStarter3.stop();
+    }
   }
 
   @Test
@@ -237,138 +232,133 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     BaseServerStarter serverStarter2 = startOneServer(2);
     BaseServerStarter serverStarter3 = startOneServer(3);
     createServerTenant(tenantB, 0, 2);
+    try {
+      // Prepare the table to replicate segments across two servers on tenantA
+      TableConfig tableConfig = getRealtimeTableConfig();
+      tableConfig.setRoutingConfig(
+          new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+              false));
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
+      tableConfig.getValidationConfig().setReplication("2");
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
-    // Prepare the table to replicate segments across two servers on tenantA
-    TableConfig tableConfig = getRealtimeTableConfig();
-    tableConfig.setRoutingConfig(
-        new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-            false));
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
-    tableConfig.getValidationConfig().setReplication("2");
-    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
+      updateTableConfig(tableConfig);
 
-    updateTableConfig(tableConfig);
+      RebalanceConfig rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDryRun(false);
+      rebalanceConfig.setIncludeConsuming(true);
 
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setIncludeConsuming(true);
+      String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
+      assertEquals(
+          summary.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+          2);
+      assertEquals(summary.getSegmentInfo().getConsumingSegmentToBeMovedSummary().getNumConsumingSegmentsToBeMoved(),
+          4);
 
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
-    assertEquals(
-        summary.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        2);
-    Set<String> originalConsumingSegmentsToMove = summary.getSegmentInfo()
-        .getConsumingSegmentToBeMovedSummary()
-        .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-        .keySet();
-    assertEquals(originalConsumingSegmentsToMove.size(), 2);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      // test: move segments from tenantA to tenantB
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
+      updateTableConfig(tableConfig);
 
-    // test: move segments from tenantA to tenantB
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
-    updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(true);
 
-    rebalanceConfig.setForceCommit(true);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      assertEquals(
+          rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+          2);
+      summary = rebalanceResult.getRebalanceSummaryResult();
+      Set<String> originalConsumingSegmentsToMove = summary.getSegmentInfo()
+          .getConsumingSegmentToBeMovedSummary()
+          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
+          .keySet();
+      assertFalse(originalConsumingSegmentsToMove.isEmpty());
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    assertEquals(
-        rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        2);
-    summary = rebalanceResult.getRebalanceSummaryResult();
-    originalConsumingSegmentsToMove = summary.getSegmentInfo()
-        .getConsumingSegmentToBeMovedSummary()
-        .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-        .keySet();
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      LLCSegmentName consumingSegmentOriginal =
+          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
+      assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
 
-    response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-    ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-        JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-    LLCSegmentName consumingSegmentNow = new LLCSegmentName(
-        consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-    LLCSegmentName consumingSegmentOriginal =
-        new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-    assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-    assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
-        originalConsumingSegmentsToMove.size());
+      // test: move segment from tenantB to tenantA with batch size
 
-    // test: move segment from tenantB to tenantA with batch size
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
+      updateTableConfig(tableConfig);
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantA, null));
-    updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(true);
+      rebalanceConfig.setBatchSizePerServer(1);
 
-    rebalanceConfig.setForceCommit(true);
-    rebalanceConfig.setBatchSizePerServer(1);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      summary = rebalanceResult.getRebalanceSummaryResult();
+      originalConsumingSegmentsToMove = summary.getSegmentInfo()
+          .getConsumingSegmentToBeMovedSummary()
+          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
+          .keySet();
+      assertFalse(originalConsumingSegmentsToMove.isEmpty());
+      assertEquals(
+          rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+          2);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    summary = rebalanceResult.getRebalanceSummaryResult();
-    originalConsumingSegmentsToMove = summary.getSegmentInfo()
-        .getConsumingSegmentToBeMovedSummary()
-        .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-        .keySet();
-    assertEquals(
-        rebalanceResult.getRebalanceSummaryResult().getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
-        2);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      consumingSegmentOriginal =
+          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
+      assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
 
-    response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-    consumingSegmentInfoResponse =
-        JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-    consumingSegmentNow = new LLCSegmentName(
-        consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-    consumingSegmentOriginal = new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-    assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-    assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
-        originalConsumingSegmentsToMove.size());
+      // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
+      // committed
 
-    // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
-    // committed
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
+      updateTableConfig(tableConfig);
 
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), tenantB, null));
-    updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(true);
+      rebalanceConfig.setIncludeConsuming(false);
 
-    rebalanceConfig.setForceCommit(true);
-    rebalanceConfig.setIncludeConsuming(false);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      consumingSegmentOriginal = consumingSegmentNow;
+      consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      // the sequence number should not increase since the consuming segment is not committed
+      assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
 
-    response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-    consumingSegmentInfoResponse =
-        JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-    consumingSegmentOriginal = consumingSegmentNow;
-    consumingSegmentNow = new LLCSegmentName(
-        consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-    // the sequence number should not increase since the consuming segment is not committed
-    assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
-    assertEquals(consumingSegmentInfoResponse._segmentToConsumingInfoMap.size(),
-        originalConsumingSegmentsToMove.size());
-
-    // Resume the table
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
-    tableConfig.getValidationConfig().setReplication("1");
-    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
-    updateTableConfig(tableConfig);
-    rebalanceConfig.setForceCommit(false);
-    rebalanceConfig.setMinAvailableReplicas(0);
-    rebalanceConfig.setDowntime(false);
-    rebalanceConfig.setIncludeConsuming(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-    waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
-
-    serverStarter0.stop();
-    serverStarter1.stop();
-    serverStarter2.stop();
-    serverStarter3.stop();
+      // Resume the table
+      tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
+      tableConfig.getValidationConfig().setReplication("1");
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
+      updateTableConfig(tableConfig);
+      rebalanceConfig.setForceCommit(false);
+      rebalanceConfig.setMinAvailableReplicas(0);
+      rebalanceConfig.setDowntime(false);
+      rebalanceConfig.setIncludeConsuming(true);
+      response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
+    } finally {
+      serverStarter0.stop();
+      serverStarter1.stop();
+      serverStarter2.stop();
+      serverStarter3.stop();
+    }
   }
 
   private void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
@@ -384,26 +374,5 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         return null;
       }
     }, 1000L, timeoutMs, "Failed to complete rebalance");
-  }
-
-  private void waitForTableEVISConverge(String tableName, long timeoutMs) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView idealState =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-
-        requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView externalView =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
-      } catch (Exception e) {
-        return null;
-      }
-    }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
   }
 }
