@@ -96,6 +96,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final ComplexTypeConfig.CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
+  private final boolean _retainOriginalFieldInUnnest;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig), parseCollectionNotUnnestedToJson(tableConfig),
@@ -121,6 +122,10 @@ public class ComplexTypeTransformer implements RecordTransformer {
     _continueOnError =
         tableConfig != null && tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig()
             .isContinueOnError();
+    _retainOriginalFieldInUnnest =
+        tableConfig != null && tableConfig.getIngestionConfig() != null
+             && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
+             && tableConfig.getIngestionConfig().getComplexTypeConfig().shouldRetainOriginalFieldInUnnest();
   }
 
   private static List<String> parseFieldsToUnnest(TableConfig tableConfig) {
@@ -179,20 +184,26 @@ public class ComplexTypeTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     try {
-      GenericRow originalRow = _fieldsToUnnest.isEmpty() ? null : record.copy(_fieldsToUnnest);
-      flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
-      for (String field : _fieldsToUnnest) {
-        unnestCollection(record, field);
-      }
-      Object unnestedRows = record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-      if (originalRow != null && unnestedRows instanceof Collection) {
-        for (GenericRow unnestedRow : (Collection<GenericRow>) unnestedRows) {
-          for (String field : _fieldsToUnnest) {
-            unnestedRow.putValue(field, originalRow.getValue(field));
+      if (_retainOriginalFieldInUnnest) {
+        GenericRow originalRow = _fieldsToUnnest.isEmpty() ? null : record.copy(_fieldsToUnnest);
+        flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
+        for (String field : _fieldsToUnnest) {
+          unnestCollection(record, field);
+        }
+        Object unnestedRows = record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+        if (originalRow != null && unnestedRows instanceof Collection) {
+          for (GenericRow unnestedRow : (Collection<GenericRow>) unnestedRows) {
+            for (String field : _fieldsToUnnest) {
+              unnestedRow.putValue(field, originalRow.getValue(field));
+            }
           }
         }
+      } else {
+        flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
+        for (String collection : _fieldsToUnnest) {
+          unnestCollection(record, collection);
+        }
       }
-
       renamePrefixes(record);
     } catch (Exception e) {
       if (!_continueOnError) {
@@ -207,23 +218,21 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   private GenericRow unnestCollection(GenericRow record, String column) {
     Object value = record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    List<GenericRow> list = new ArrayList<>();
     if (value == null) {
-      List<GenericRow> list = new ArrayList<>();
       unnestCollection(record, column, list);
-      record.putValue(GenericRow.MULTIPLE_RECORDS_KEY, list);
     } else {
       Collection<GenericRow> records = (Collection) value;
-      List<GenericRow> list = new ArrayList<>();
       for (GenericRow innerRecord : records) {
         unnestCollection(innerRecord, column, list);
       }
-      record.putValue(GenericRow.MULTIPLE_RECORDS_KEY, list);
     }
+    record.putValue(GenericRow.MULTIPLE_RECORDS_KEY, list);
     return record;
   }
 
   private void unnestCollection(GenericRow record, String column, List<GenericRow> list) {
-    Object value = record.getValue(column);
+    Object value = _retainOriginalFieldInUnnest ? record.getValue(column) : record.removeValue(column);
     if (value == null) {
       // use the record itself
       list.add(record);
@@ -382,7 +391,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       Object value = map.get(field);
       String concatName = concat(path, field);
       if (value instanceof Map) {
-        Map<String, Object> innerMap = (Map<String, Object>) value;
+        Map<String, Object> innerMap = (Map<String, Object>) (_retainOriginalFieldInUnnest ? value : map.remove(field));
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();

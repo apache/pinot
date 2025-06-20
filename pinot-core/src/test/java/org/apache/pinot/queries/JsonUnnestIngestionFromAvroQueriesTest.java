@@ -55,7 +55,6 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.*;
@@ -88,19 +87,6 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(EVENTTIME_JSON_COLUMN, DataType.TIMESTAMP)
       .addSingleValueDimension("eventTimeColumn_10m", DataType.TIMESTAMP)
       .build();
-  //@formatter:on
-  private static final TableConfig TABLE_CONFIG;
-
-  static {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(
-        List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
-            new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")));
-    ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(List.of(JSON_COLUMN), null, null, null));
-    TABLE_CONFIG =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
-            .setJsonIndexColumns(List.of(JSON_COLUMN)).build();
-  }
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -294,13 +280,22 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
-  @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp(boolean retainOriginalFieldInUnnest)
+          throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     createInputFile();
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(
+            List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
+                    new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")));
+    ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(
+            List.of(JSON_COLUMN), null, null, null, retainOriginalFieldInUnnest));
+    TableConfig tableConfig =
+            new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
+                    .setJsonIndexColumns(List.of(JSON_COLUMN)).build();
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setInputFilePath(AVRO_DATA_FILE.getPath());
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
@@ -308,7 +303,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, createRecordReader());
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     ImmutableSegment segment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
@@ -316,22 +311,29 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testComplexSelectOnJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator(
-        "select intColumn, stringColumn, jsonColumn, \"jsonColumn.timestamp\", jsonColumn.data, jsonColumn.data.a, "
-            + "jsonColumn.data.b, eventTimeColumn, eventTimeColumn_10m FROM testTable LIMIT 1000");
-    SelectionResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(3), DataSchema.ColumnDataType.TIMESTAMP);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(4), DataSchema.ColumnDataType.JSON);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(5), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(6), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(7), DataSchema.ColumnDataType.TIMESTAMP);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(8), DataSchema.ColumnDataType.TIMESTAMP);
+  public void testComplexSelectOnJsonColumnWithoutOriginalFieldsRetained() throws Exception {
+    setUp(false);
+    List<String> expecteds = Arrays.asList(
+        "[1, daffy duck, null, 1719390721, null, 1, 2, 1719390721000, 1719390720000]",
+        "[1, daffy duck, null, 1719390722, null, 2, 4, 1719390721000, 1719390720000]",
+        "[2, mickey mouse, null, 1719390722, null, 2, 4, 1719390722000, 1719390720000]",
+        "[2, mickey mouse, null, 1719390723, null, 3, 6, 1719390722000, 1719390720000]",
+        "[3, donald duck, null, 1719390723, null, 3, 6, 1719390723000, 1719390720000]",
+        "[3, donald duck, null, 1719390724, null, 4, 8, 1719390723000, 1719390720000]",
+        "[4, scrooge mcduck, null, 1719390724, null, 4, 8, 1719390724000, 1719390720000]",
+        "[4, scrooge mcduck, null, 1719390725, null, 5, 10, 1719390724000, 1719390720000]",
+        "[5, minney mouse, null, 1719390725, null, 5, 10, 1719390725000, 1719390720000]",
+        "[5, minney mouse, null, 1719390726, null, 6, 12, 1719390725000, 1719390720000]",
+        "[6, pluto, null, 1719390726, null, 6, 12, 1719390726000, 1719390720000]",
+        "[6, pluto, null, 1719390727, null, 7, 14, 1719390726000, 1719390720000]",
+        "[7, scooby doo, null, 1719390727, null, 7, 14, 1719390727000, 1719390720000]",
+        "[7, scooby doo, null, 1719390728, null, 8, 16, 1719390727000, 1719390720000]");
+    testComplexSelectOnJsonColumn(expecteds);
+  }
 
+  @Test
+  public void testComplexSelectOnJsonColumnWithOriginalFieldsRetained() throws Exception {
+    setUp(true);
     List<String> expecteds = Arrays.asList(
         "[1, daffy duck, [{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721},{\"data\":{\"a\":\"2\","
             + "\"b\":\"4\"},\"timestamp\":1719390722}], 1719390721, {\"a\":\"1\",\"b\":\"2\"}, 1, 2, 1719390721000, "
@@ -375,6 +377,25 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
         "[7, scooby doo, [{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727},{\"data\":{\"a\":\"8\","
             + "\"b\":\"16\"},\"timestamp\":1719390728}], 1719390728, {\"a\":\"8\",\"b\":\"16\"}, 8, 16, "
             + "1719390727000, 1719390720000]");
+    testComplexSelectOnJsonColumn(expecteds);
+  }
+
+  private void testComplexSelectOnJsonColumn(List<String> expecteds) throws Exception {
+    Operator<SelectionResultsBlock> operator = getOperator(
+            "select intColumn, stringColumn, jsonColumn, \"jsonColumn.timestamp\", jsonColumn.data, jsonColumn.data.a, "
+                    + "jsonColumn.data.b, eventTimeColumn, eventTimeColumn_10m FROM testTable LIMIT 1000");
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(3), DataSchema.ColumnDataType.TIMESTAMP);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(4), DataSchema.ColumnDataType.JSON);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(5), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(6), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(7), DataSchema.ColumnDataType.TIMESTAMP);
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(8), DataSchema.ColumnDataType.TIMESTAMP);
+
     Assert.assertEquals(rows.size(), 14);
     int index = 0;
     for (Object[] row : rows) {

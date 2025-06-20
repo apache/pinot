@@ -487,6 +487,13 @@ public class TableConfigSerDeTest {
     assertEquals(ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps().size(), 1);
     assertEquals(ingestionConfig.getStreamIngestionConfig().getParallelSegmentConsumptionPolicy(),
         ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+    assertNotNull(ingestionConfig.getComplexTypeConfig());
+    assertEquals(ingestionConfig.getComplexTypeConfig().getFieldsToUnnest(), Arrays.asList("c1", "c2"));
+    assertEquals(ingestionConfig.getComplexTypeConfig().getDelimiter(), ".");
+    assertEquals(ingestionConfig.getComplexTypeConfig().getCollectionNotUnnestedToJson(),
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+    assertEquals(ingestionConfig.getComplexTypeConfig().getPrefixesToRename(), Collections.emptyMap());
+    assertFalse(ingestionConfig.getComplexTypeConfig().shouldRetainOriginalFieldInUnnest());
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {
