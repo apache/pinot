@@ -161,6 +161,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
+    java.util.Map.Entry<String, java.util.Map<String, String>> result =
+        LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
+    if (result != null) {
+      return getDocIdsWithOptions(result.getKey(), result.getValue());
+    }
+    return getDocIdsWithoutOptions(searchQuery);
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
@@ -187,6 +196,23 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException(msg, e);
     }
   }
+
+  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery, Map<String, String> options) {
+    Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
+
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+
+    try {
+      _indexSearcher.search(query, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      String msg =
+          "Failed to execute query with configured parser for column: " + _column + " search query: " + actualQuery;
+      throw new RuntimeException(msg, e);
+    }
+  }
+
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that

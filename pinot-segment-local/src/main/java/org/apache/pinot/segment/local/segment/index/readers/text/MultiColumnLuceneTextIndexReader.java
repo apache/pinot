@@ -351,6 +351,33 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
 
   @Override
   public MutableRoaringBitmap getDocIds(String column, String searchQuery) {
+    java.util.Map.Entry<String, java.util.Map<String, String>> result =
+        org.apache.pinot.segment.local.utils.LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
+    if (result != null) {
+      return getDocIdsWithOptions(column, result.getKey(), result.getValue());
+    } else {
+      return getDocIdsWithoutOptions(column, searchQuery);
+    }
+  }
+
+  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery, Map<String, String> options) {
+    Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, column, _analyzer);
+
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+
+    try {
+      // Execute the search
+      _indexSearcher.search(query, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      String msg =
+          "Failed to execute query with configured parser for columns: " + _columns + " search query: " + actualQuery;
+      throw new RuntimeException(msg, e);
+    }
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String column, String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
