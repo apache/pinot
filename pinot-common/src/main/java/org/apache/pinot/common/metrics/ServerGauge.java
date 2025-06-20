@@ -122,7 +122,10 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
   // how many message are there in the server's message queue in helix
-  HELIX_MESSAGES_COUNT("count", true);
+  HELIX_MESSAGES_COUNT("count", true),
+
+  // commit-time compaction gauge metrics
+  COMMIT_TIME_COMPACTION_RATIO_PERCENT("percentage", false, "Percentage of rows removed during commit-time compaction");
 
   private final String _gaugeName;
   private final String _unit;

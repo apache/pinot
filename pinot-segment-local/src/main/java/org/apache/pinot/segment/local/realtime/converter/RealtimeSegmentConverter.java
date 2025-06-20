@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.segment.local.realtime.converter;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -96,23 +96,61 @@ public class RealtimeSegmentConverter {
     _realtimeSegmentImpl.commit();
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      String sortedColumn = null;
-      List<String> columnSortOrder = genConfig.getColumnSortOrder();
-      if (CollectionUtils.isNotEmpty(columnSortOrder)) {
-        sortedColumn = columnSortOrder.get(0);
-      }
-      int[] sortedDocIds =
-          sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
-      recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-      RealtimeSegmentSegmentCreationDataSource dataSource =
-          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
 
-      if (!_enableColumnMajor) {
-        driver.build();
-      } else {
-        driver.buildByColumn(_realtimeSegmentImpl);
+    // Check if commit-time compaction is enabled for upsert tables
+    boolean useCompactedReader = isCommitTimeCompactionEnabled();
+
+    String sortedColumn = null;
+    List<String> columnSortOrder = genConfig.getColumnSortOrder();
+    if (columnSortOrder != null && !columnSortOrder.isEmpty()) {
+      sortedColumn = columnSortOrder.get(0);
+    }
+    int[] sortedDocIds =
+        sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
+
+    if (useCompactedReader) {
+      // Collect metrics for commit-time compaction
+      long compactionStartTime = System.currentTimeMillis();
+      int preCompactionRowCount = _realtimeSegmentImpl.getNumDocsIndexed();
+      // Track that commit-time compaction is enabled for this segment
+      if (serverMetrics != null) {
+        serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
+        serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
+            preCompactionRowCount);
+      }
+
+      // Use CompactedPinotSegmentRecordReader to remove obsolete records
+      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
+          _realtimeSegmentImpl.getValidDocIds(), _realtimeSegmentImpl.getDeleteRecordColumn())) {
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        RealtimeSegmentSegmentCreationDataSource dataSource =
+            new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds);
+        driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
+
+        if (!_enableColumnMajor) {
+          driver.build();
+        } else {
+          driver.buildByColumn(_realtimeSegmentImpl);
+        }
+      }
+
+      // Collect and publish post-compaction metrics
+      if (serverMetrics != null) {
+        publishCompactionMetrics(serverMetrics, preCompactionRowCount, driver, compactionStartTime);
+      }
+    } else {
+      // Use regular PinotSegmentRecordReader (existing behavior)
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        RealtimeSegmentSegmentCreationDataSource dataSource =
+            new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
+        driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
+
+        if (!_enableColumnMajor) {
+          driver.build();
+        } else {
+          driver.buildByColumn(_realtimeSegmentImpl);
+        }
       }
     }
 
@@ -126,9 +164,46 @@ public class RealtimeSegmentConverter {
   }
 
   /**
+   * Publishes detailed commit-time compaction metrics
+   */
+  private void publishCompactionMetrics(ServerMetrics serverMetrics, int preCompactionRowCount,
+      SegmentIndexCreationDriverImpl driver, long compactionStartTime) {
+    try {
+      int postCompactionRowCount = driver.getSegmentStats().getTotalDocCount();
+      long compactionProcessingTime = System.currentTimeMillis() - compactionStartTime;
+      int rowsRemoved = preCompactionRowCount - postCompactionRowCount;
+
+      // Publish basic row count metrics
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
+          postCompactionRowCount);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
+          compactionProcessingTime);
+
+      // Calculate and publish compaction ratio percentage (only if we had rows to compact)
+      if (preCompactionRowCount > 0) {
+        double compactionRatioPercent = (double) rowsRemoved / preCompactionRowCount * 100.0;
+        serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
+            (long) compactionRatioPercent);
+      }
+    } catch (Exception e) {
+      //no-op.
+    }
+  }
+
+  /**
+   * Checks if commit-time compaction is enabled for upsert tables
+   */
+  private boolean isCommitTimeCompactionEnabled() {
+    if (_tableConfig.getUpsertConfig() == null) {
+      return false;
+    }
+    return _tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+  }
+
+  /**
    * Returns a new schema containing only physical columns
    */
-  @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
     return original.withoutVirtualColumns();
   }
