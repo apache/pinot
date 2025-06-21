@@ -143,10 +143,10 @@ public class TableViews {
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     TableViewsUtils.TableView tableExternalView = null;
     try {
-      tableExternalView =
-          TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin, helixClusterName);
+      tableExternalView = TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin,
+          helixClusterName);
     } catch (Exception e) {
-        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
     if (StringUtils.isNotEmpty(segmentNames)) {
       List<String> segmentNamesList =
