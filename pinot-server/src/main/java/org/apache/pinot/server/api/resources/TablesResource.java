@@ -699,8 +699,8 @@ public class TablesResource {
       Map<String, String> segmentStatusInfoListMap = new HashMap<>();
       try {
         TableViewsUtils.TableView externalView =
-            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
-                helixClusterName);
+            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME,
+                helixAdmin, helixClusterName);
         TableViewsUtils.TableView idealStateView =
             TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
                 helixClusterName);
