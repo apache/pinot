@@ -41,7 +41,7 @@ public class ValidDocIdsMetadataInfo {
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
       @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
-      @JsonProperty("segmentStatus") String segmentStatus, String serverStatus) {
+      @JsonProperty("segmentStatus") String segmentStatus, @JsonProperty("serverStatus")String serverStatus) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
