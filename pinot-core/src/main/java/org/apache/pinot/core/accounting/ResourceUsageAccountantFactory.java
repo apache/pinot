@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
@@ -77,9 +78,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
           return ret;
         });
 
-    // ThreadResourceUsageProvider(ThreadMXBean wrapper) per runner/worker thread
-    private final ThreadLocal<ThreadResourceUsageProvider> _threadResourceUsageProvider;
-
     // track thread cpu time
     private final boolean _isThreadCPUSamplingEnabled;
 
@@ -126,8 +124,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
-      // ThreadMXBean wrapper
-      _threadResourceUsageProvider = new ThreadLocal<>();
       _watcherTask = new WatcherTask();
 
       _resourceAggregators = new HashMap<>();
@@ -160,6 +156,27 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       }
     }
 
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+                            @Nullable String workloadName) {
+      _threadLocalEntry.get()._errorStatus.set(null);
+      if (queryId != null) {
+        _threadLocalEntry.get()
+            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
+                workloadName);
+      }
+    }
+
+    @Override
+    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+                            @Nullable ThreadExecutionContext parentContext) {
+      _threadLocalEntry.get()._errorStatus.set(null);
+      if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
+        _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
+            parentContext.getAnchorThread(), parentContext.getWorkloadName());
+      }
+    }
+
     /**
      * for testing only
      */
@@ -181,6 +198,7 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       return queryAggregator.getQueryResources(_threadEntriesMap);
     }
 
+    @Override
     public void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long memoryAllocatedBytes,
                                              TrackingScope trackingScope) {
       ResourceAggregator resourceAggregator = _resourceAggregators.get(trackingScope);
@@ -196,36 +214,23 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     /**
-     * The thread would need to do {@code setThreadResourceUsageProvider} first upon it is scheduled.
      * This is to be called from a worker or a runner thread to update its corresponding cpu usage entry
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadCPUSamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = provider.getThreadTimeNs();
+      if (_isThreadCPUSamplingEnabled) {
+        _threadLocalEntry.get().updateCpuSnapshot();
       }
     }
 
     /**
-     * The thread would need to do {@code setThreadResourceUsageProvider} first upon it is scheduled.
      * This is to be called from a worker or a runner thread to update its corresponding memory usage entry
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
-      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
-      if (_isThreadMemorySamplingEnabled && provider != null) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes = provider.getThreadAllocatedBytes();
+      if (_isThreadMemorySamplingEnabled) {
+        _threadLocalEntry.get().updateMemorySnapshot();
       }
-    }
-
-    private ThreadResourceUsageProvider getThreadResourceUsageProvider() {
-      return _threadResourceUsageProvider.get();
-    }
-
-    @Override
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-      _threadResourceUsageProvider.set(threadResourceUsageProvider);
     }
 
     @Override
@@ -242,8 +247,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
       // clear task info + stats
       threadEntry.setToIdle();
-      // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.remove();
       // clear _anchorThread
       super.clear();
     }

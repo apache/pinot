@@ -74,8 +74,10 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
       String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      // QUERY scope - keyed by requestId
       Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
           resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.QUERY);
+      // WORKLOAD scope - keyed by workloadName
       Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(workloadName,
           resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.WORKLOAD);
     } catch (Exception e) {

@@ -282,9 +282,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
+    }
+
+    @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
-      TrackingScope resourceType) {
-      if (!resourceType.equals(TrackingScope.QUERY)) {
+                                             TrackingScope trackingScope) {
+      if (trackingScope != TrackingScope.QUERY) {
+        // only update for QUERY scope
         return;
       }
       if (_isThreadCPUSamplingEnabled) {
@@ -322,6 +328,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       if (_isThreadMemorySamplingEnabled) {
         _threadLocalEntry.get().updateMemorySnapshot();
       }
+    }
+
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupRunner(queryId, taskId, taskType, null);
     }
 
 

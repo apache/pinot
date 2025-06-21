@@ -19,7 +19,7 @@
 package org.apache.pinot.perf;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -55,24 +55,26 @@ public class BenchmarkWorkloadBudgetManager {
     static final long CPU = 10L;
     static final long MEM = 10L;
 
+    static WorkloadBudgetManager _manager;
+
     @Setup(Level.Iteration)
     public void setup() {
       PinotConfiguration config = new PinotConfiguration();
       config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
       config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, Long.MAX_VALUE);
 
-      WorkloadBudgetManager.init(config);
-      WorkloadBudgetManager.getInstance().addOrUpdateWorkload(WORKLOAD, Long.MAX_VALUE, Long.MAX_VALUE);
+      _manager = new WorkloadBudgetManager(config);
+      _manager.addOrUpdateWorkload(WORKLOAD, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
     @TearDown(Level.Iteration)
     public void tearDown() {
       // TODO(Vivek): Check if there are stale threads after each benchmark.
-      WorkloadBudgetManager.getInstance().shutdown();
+      _manager.shutdown();
     }
 
     public WorkloadBudgetManager manager() {
-      return WorkloadBudgetManager.getInstance();
+      return _manager;
     }
   }
 
