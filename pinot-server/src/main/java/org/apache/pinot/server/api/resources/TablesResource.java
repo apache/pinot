@@ -694,8 +694,6 @@ public class TablesResource {
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
       String helixClusterName = _serverInstance.getHelixManager().getClusterName();
-      TableViewsUtils.TableView externalView =
-      
       // Get segment status information from Helix, with null checks
       Map<String, String> segmentStatusInfoListMap = new HashMap<>();
       try {
