@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -96,14 +97,23 @@ public class TableViews {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
       @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
-      String segmentNames, @Context HttpHeaders headers)
-      throws Exception {
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    TableType tableType = null;
+    try {
+      tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
-    TableViewsUtils.TableView tableIdealStateView =
-        TableViewsUtils.getTableState(tableName, TableViewsUtils.IDEALSTATE, tableType, helixAdmin, helixClusterName);
+    TableViewsUtils.TableView tableIdealStateView = null;
+    try {
+      tableIdealStateView =
+          TableViewsUtils.getTableState(tableName, TableViewsUtils.IDEALSTATE, tableType, helixAdmin, helixClusterName);
+    } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
     if (StringUtils.isNotEmpty(segmentNames)) {
       List<String> segmentNamesList =
           Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
@@ -121,14 +131,23 @@ public class TableViews {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
       @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
-      String segmentNames, @Context HttpHeaders headers)
-      throws Exception {
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    TableType tableType = null;
+    try {
+      tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
-    TableViewsUtils.TableView tableExternalView =
-        TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin, helixClusterName);
+    TableViewsUtils.TableView tableExternalView = null;
+    try {
+      tableExternalView =
+          TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin, helixClusterName);
+    } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
     if (StringUtils.isNotEmpty(segmentNames)) {
       List<String> segmentNamesList =
           Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
@@ -147,15 +166,26 @@ public class TableViews {
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
       @ApiParam(value = "Include segments being replaced", required = false) @QueryParam("includeReplacedSegments")
       @DefaultValue("true") boolean includeReplacedSegments, @Context HttpHeaders headers)
-      throws Exception {
+      throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    TableType tableType = null;
+    try {
+      tableType = TableViewsUtils.validateTableType(tableTypeStr);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    }
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
-    TableViewsUtils.TableView externalView =
-        TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin, helixClusterName);
-    TableViewsUtils.TableView idealStateView =
-        TableViewsUtils.getTableState(tableName, TableViewsUtils.IDEALSTATE, tableType, helixAdmin, helixClusterName);
+    TableViewsUtils.TableView externalView = null;
+    TableViewsUtils.TableView idealStateView = null;
+    try {
+      externalView = TableViewsUtils.getTableState(tableName, TableViewsUtils.EXTERNALVIEW, tableType, helixAdmin,
+          helixClusterName);
+      idealStateView =
+          TableViewsUtils.getTableState(tableName, TableViewsUtils.IDEALSTATE, tableType, helixAdmin, helixClusterName);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    }
 
     Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
     Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);

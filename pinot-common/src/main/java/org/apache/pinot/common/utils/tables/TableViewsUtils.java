@@ -47,9 +47,9 @@ public class TableViewsUtils {
     public Map<String, Map<String, String>> _realtime;
   }
 
-  public static TableViewsUtils.TableView getSegmentsView(TableViewsUtils.TableView tableView,
+  public static TableView getSegmentsView(TableView tableView,
       List<String> segmentNames) {
-    TableViewsUtils.TableView tableViewResult = new TableViewsUtils.TableView();
+    TableView tableViewResult = new TableView();
     if (tableView._offline != null) {
       tableViewResult._offline = getTableTypeSegmentsView(tableView._offline, segmentNames);
     }
@@ -129,7 +129,7 @@ public class TableViewsUtils {
     return tableTypeViewResult;
   }
 
-  public static Map<String, Map<String, String>> getStateMap(TableViewsUtils.TableView view) {
+  public static Map<String, Map<String, String>> getStateMap(TableView view) {
     if (view != null && view._offline != null && !view._offline.isEmpty()) {
       return view._offline;
     } else if (view != null && view._realtime != null && !view._realtime.isEmpty()) {
@@ -155,28 +155,26 @@ public class TableViewsUtils {
 
   // we use name "view" to closely match underlying names and to not
   // confuse with table state of enable/disable
-  public static TableViewsUtils.TableView getTableState(String tableName, String view, @Nullable TableType tableType,
+  public static TableView getTableState(String tableName, String view, @Nullable TableType tableType,
       HelixAdmin helixAdmin, String helixClusterName)
       throws Exception {
-    TableViewsUtils.TableView tableView;
+    TableView tableView = null;
     if (view.equalsIgnoreCase(IDEALSTATE)) {
       tableView = getTableIdealState(tableName, tableType, helixAdmin, helixClusterName);
     } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
       tableView = getTableExternalView(tableName, tableType, helixAdmin, helixClusterName);
     } else {
-      throw new Exception(
-          "Bad view name: " + view + ". Expected idealstate or externalview");
+      throw new Exception("Bad view name, expected ideal state of external view");
     }
-
-    if (tableView._offline == null && tableView._realtime == null) {
+    if (tableView != null && tableView._offline == null && tableView._realtime == null) {
       throw new Exception("Table not found");
     }
     return tableView;
   }
 
-  public static TableViewsUtils.TableView getTableIdealState(String tableNameOptType, @Nullable TableType tableType,
+  public static TableView getTableIdealState(String tableNameOptType, @Nullable TableType tableType,
       HelixAdmin helixAdmin, String helixClusterName) {
-    TableViewsUtils.TableView tableView = new TableViewsUtils.TableView();
+    TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView._offline = getIdealState(tableNameOptType, TableType.OFFLINE, helixAdmin, helixClusterName);
     }
@@ -186,9 +184,9 @@ public class TableViewsUtils {
     return tableView;
   }
 
-  public static TableViewsUtils.TableView getTableExternalView(@Nonnull String tableNameOptType,
+  public static TableView getTableExternalView(@Nonnull String tableNameOptType,
       @Nullable TableType tableType, HelixAdmin helixAdmin, String helixClusterName) {
-    TableViewsUtils.TableView tableView = new TableViewsUtils.TableView();
+    TableView tableView = new TableView();
     if (tableType == null || tableType == TableType.OFFLINE) {
       tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE, helixAdmin, helixClusterName);
     }
