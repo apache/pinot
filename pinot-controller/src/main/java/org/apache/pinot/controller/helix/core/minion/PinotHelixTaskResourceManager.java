@@ -790,7 +790,8 @@ public class PinotHelixTaskResourceManager {
     }
     Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
     for (String helixJobName : helixJobStates.keySet()) {
-      taskDebugInfos.put(getPinotTaskName(helixJobName), getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+      taskDebugInfos.put(getPinotTaskName(helixJobName),
+          getTaskDebugInfo(workflowContext, helixJobName, null, verbosity));
     }
     return taskDebugInfos;
   }
@@ -826,7 +827,7 @@ public class PinotHelixTaskResourceManager {
         if (pinotConfigs != null) {
           String tableNameConfig = pinotConfigs.get(TABLE_NAME);
           if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
-            // Found a match. Add task debug info for this table  to the result
+            // Found a match. Add task debug info for this table to the result
             taskDebugInfos.put(pinotTaskName,
                 getTaskDebugInfo(workflowContext, helixJobName, tableNameWithType, verbosity));
             break;
@@ -909,7 +910,7 @@ public class PinotHelixTaskResourceManager {
         if (helixTaskConfig != null) {
           PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
           if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
-            // Filter task configs that matches this table name
+            // Filter task configs that match this table name
             continue;
           }
           subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
