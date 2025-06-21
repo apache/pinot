@@ -890,6 +890,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _tableUpsertMetadataManager;
   }
 
+  @VisibleForTesting
+  public TableDedupMetadataManager getTableDedupMetadataManager() {
+    return _tableDedupMetadataManager;
+  }
+
   /**
    * Retrieves a mapping of partition id to the primary key count for the partition.
    *

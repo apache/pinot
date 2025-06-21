@@ -29,14 +29,17 @@ public class ResourceUtilizationManager {
 
   private final boolean _isResourceUtilizationCheckEnabled;
   private final DiskUtilizationChecker _diskUtilizationChecker;
+  private final PrimaryKeyCountChecker _primaryKeyCountChecker;
 
-  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker) {
+  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker,
+      PrimaryKeyCountChecker primaryKeyCountChecker) {
     _isResourceUtilizationCheckEnabled = controllerConf.isResourceUtilizationCheckEnabled();
     LOGGER.info("Resource utilization check is: {}", _isResourceUtilizationCheckEnabled ? "enabled" : "disabled");
     _diskUtilizationChecker = diskUtilizationChecker;
+    _primaryKeyCountChecker = primaryKeyCountChecker;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
     if (!_isResourceUtilizationCheckEnabled) {
       return true;
     }
@@ -44,6 +47,11 @@ public class ResourceUtilizationManager {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    return _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
+    boolean isDiskUtilizationWithinLimits = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
+    boolean isPrimaryKeyCountWithinLimits =
+        _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableNameWithType, skipRealtimeIngestion);
+    LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}, skipRealtimeIngestion: {}",
+        isDiskUtilizationWithinLimits, isPrimaryKeyCountWithinLimits, skipRealtimeIngestion);
+    return isDiskUtilizationWithinLimits && isPrimaryKeyCountWithinLimits;
   }
 }
