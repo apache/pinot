@@ -294,7 +294,7 @@ public class PinotClientRequest {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
         PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext,
-          makeHttpIdentity(requestCtx));
+          makeHttpIdentity(requestCtx), httpHeaders);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
           return;
@@ -538,8 +538,9 @@ public class PinotClientRequest {
   }
 
   private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
-    RequestContext requestContext, RequesterIdentity requesterIdentity) {
-    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext, requesterIdentity);
+    RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext, requesterIdentity,
+      httpHeaders);
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
