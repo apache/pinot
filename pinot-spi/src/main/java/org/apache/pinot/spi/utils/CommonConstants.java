@@ -677,6 +677,7 @@ public class CommonConstants {
         // that was supposed to be in partition-1.
         public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
+
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
@@ -689,6 +690,10 @@ public class CommonConstants {
         /// For MSE queries, when this option is set to true, only use servers for leaf stages as the workers for the
         /// intermediate stages. This is useful to control the fanout of the query and reduce data shuffling.
         public static final String USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = "useLeafServerForIntermediateStage";
+
+        // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
+        // each workload if "Query Workload Isolation" feature enabled.
+        public static final String WORKLOAD_NAME = "workloadName";
       }
 
       public static class QueryOptionValue {
@@ -1416,7 +1421,7 @@ public class CommonConstants {
     public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
 
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
-    public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
 
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
     public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;
@@ -1452,6 +1457,55 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
     public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
+
+    /**
+     * QUERY WORKLOAD ISOLATION Configs
+     *
+     * This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
+     * QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
+     * costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller cost
+     * for each instance involved in executing queries of the workload.
+     *
+     *
+     * At each instance (broker,server), there are two parts to workload isolation:
+     * 1. Workload Cost Collection
+     * 2. Workload Cost Enforcement
+     *
+     *
+     * Workload Cost collection happens at various stages of query execution. On server, the resource costs associated
+     * with pruning, planning and execution are collected. On broker, the resource costs associated with compilation &
+     * reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in the instance.
+     * Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in the
+     * workload are killed until the enforcementWindow is refreshed.
+     *
+     * More details in https://tinyurl.com/2p9vuzbd
+     *
+     * Pre-req configs for enabling Query Workload Isolation:
+     *  - CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME  = ResourceUsageAccountantFactory
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = true
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = true
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = true
+     *  - Instance Config: enableThreadCpuTimeMeasurement = true
+     *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
+     */
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
+        "accounting.workload.enable.cost.collection";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
+        "accounting.workload.enable.cost.enforcement";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
+
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
+        "accounting.workload.enforcement.window.ms";
+    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
+
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
+        "accounting.workload.sleep.time.ms";
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+
+    public static final String DEFAULT_WORKLOAD_NAME = "default";
   }
 
   public static class ExecutorService {

@@ -31,6 +31,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -178,12 +179,13 @@ public class Tracing {
 
     @Override
     public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext parentContext) {
+                                       @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Deprecated
     public void createExecutionContextInner(@Nullable String queryId, int taskId,
-        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
+                                            ThreadExecutionContext.TaskType taskType,
+                                            @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -198,7 +200,6 @@ public class Tracing {
     public void sampleUsageMSE() {
     }
 
-    @Override
     @Deprecated
     public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
     }
@@ -215,12 +216,17 @@ public class Tracing {
     }
 
     @Override
-    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+    }
+
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+                            @Nullable String workloadName) {
     }
 
     @Override
     public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext parentContext) {
+                            @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -255,16 +261,29 @@ public class Tracing {
   public static class ThreadAccountantOps {
 
     public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
+    public static WorkloadBudgetManager _workloadBudgetManager;
 
     private ThreadAccountantOps() {
     }
 
+
     public static void setupRunner(String queryId) {
-      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, null);
+    }
+
+    public static void setupRunner(String queryId, @Nullable String workloadName) {
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, workloadName);
     }
 
     public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
-      Tracing.getThreadAccountant().setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType);
+      setupRunner(queryId, taskType, null);
+    }
+
+    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType,
+                                   @Nullable String workloadName) {
+      // Set up the runner thread with the given query ID and workload name
+      Tracing.getThreadAccountant().setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType,
+          workloadName);
     }
 
     /**
@@ -301,6 +320,7 @@ public class Tracing {
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      _workloadBudgetManager = new WorkloadBudgetManager(config);
       if (factoryName == null) {
         LOGGER.warn("No thread accountant factory provided, using default implementation");
       } else {
@@ -349,6 +369,10 @@ public class Tracing {
       if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
         sampleAndCheckInterruption();
       }
+    }
+
+    public static WorkloadBudgetManager getWorkloadBudgetManager() {
+      return _workloadBudgetManager;
     }
   }
 }

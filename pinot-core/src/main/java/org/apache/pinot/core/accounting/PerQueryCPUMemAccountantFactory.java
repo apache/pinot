@@ -58,6 +58,10 @@ import org.slf4j.LoggerFactory;
  * Accounting mechanism for thread task execution status and thread resource usage sampling
  * Design and algorithm see
  * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+ *
+ * TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
+ * this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
+ * achieving stability.
  */
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
@@ -190,9 +194,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
         // sample current usage
         CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-        long currentMemSample =
-            _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
+        long currentCPUSample = _isThreadCPUSamplingEnabled
+            ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+        long currentMemSample = _isThreadMemorySamplingEnabled
+            ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
         // sample current running task status
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
         Thread thread = entry.getKey();
@@ -315,11 +320,19 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupRunner(queryId, taskId, taskType, null);
+    }
+
+
+    @Override
+    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+                            @Nullable String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
         _threadLocalEntry.get()
-            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
+            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
+                workloadName);
       }
     }
 
@@ -329,7 +342,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _threadLocalEntry.get()._errorStatus.set(null);
       if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
-            parentContext.getAnchorThread());
+            parentContext.getAnchorThread(), parentContext.getWorkloadName());
       }
     }
 
@@ -399,10 +412,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
         // sample current usage
         CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        long currentCPUSample = _isThreadCPUSamplingEnabled
-            ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-        long currentMemSample = _isThreadMemorySamplingEnabled
-            ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
+
+        long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+        long currentMemSample =
+            _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
         // sample current running task status
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
         Thread thread = entry.getKey();
@@ -580,7 +593,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // kill all queries if heap usage exceeds this
       private final long _panicLevel = (long) (_maxHeapSize
           * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-          CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+          CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
 
       // kill the most expensive query if heap usage exceeds this
       private final long _criticalLevel = (long) (_maxHeapSize
