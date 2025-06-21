@@ -666,14 +666,6 @@ public class TablesResource {
       throws Exception {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-    String serverStatus = "";
-    if (status == ServiceStatus.Status.GOOD) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
-      serverStatus = "OK";
-    } else {
-      serverStatus = "NOT_READY";
-    }
     List<String> missingSegments = new ArrayList<>();
     int nonImmutableSegmentCount = 0;
     int missingValidDocIdSnapshotSegmentCount = 0;
@@ -691,6 +683,15 @@ public class TablesResource {
         // process the remaining available segments.
         LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+      String serverStatus = "";
+      if (status == ServiceStatus.Status.GOOD) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+        serverStatus = "OK";
+      } else {
+        serverStatus = "NOT_READY";
+      }
+
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
       String helixClusterName = _serverInstance.getHelixManager().getClusterName();
