@@ -22,13 +22,13 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.ExpressionType;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.FilterKind;
 
 

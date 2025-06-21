@@ -23,11 +23,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.ExpressionType;
+import org.apache.pinot.spi.request.Function;
 import org.apache.pinot.sql.FilterKind;
 
 

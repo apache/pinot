@@ -20,10 +20,10 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.Literal;
 import org.apache.pinot.sql.FilterKind;
 
 

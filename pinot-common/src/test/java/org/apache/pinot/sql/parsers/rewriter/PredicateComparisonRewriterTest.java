@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.testng.Assert;

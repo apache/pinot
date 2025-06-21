@@ -25,6 +25,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.spi.auth.controller.AccessControl;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

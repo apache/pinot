@@ -26,12 +26,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.Literal;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 

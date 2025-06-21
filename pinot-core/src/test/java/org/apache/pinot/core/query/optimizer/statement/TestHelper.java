@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 import static org.testng.Assert.assertEquals;

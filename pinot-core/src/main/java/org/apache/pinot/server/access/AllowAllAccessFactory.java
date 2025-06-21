@@ -19,6 +19,7 @@
 package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package org.apache.pinot.controller.api.access;
+package org.apache.pinot.spi.auth.core;
 
 /**
- * Different access types used in access control of the rest endpoints
+ * Target object types used in fine grain access control of the rest endpoints
  */
-public enum AccessType {
-  CREATE, READ, UPDATE, DELETE
+public enum TargetType {
+  CLUSTER, TABLE
 }

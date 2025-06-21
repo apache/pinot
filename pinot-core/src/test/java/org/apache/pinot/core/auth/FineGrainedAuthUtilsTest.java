@@ -23,6 +23,8 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.pinot.spi.auth.core.FineGrainedAccessControl;
+import org.apache.pinot.spi.auth.core.TargetType;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

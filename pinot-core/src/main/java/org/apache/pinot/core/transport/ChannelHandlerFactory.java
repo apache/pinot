@@ -31,7 +31,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
-import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.auth.server.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

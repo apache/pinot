@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 

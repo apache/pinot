@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import org.apache.pinot.spi.auth.controller.AccessControl;
+
+
 public class AllowAllAccessFactory implements AccessControlFactory {
   private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
   };

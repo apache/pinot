@@ -26,11 +26,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.spi.request.DataSource;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.PinotQuery;
 
 
 /**
