@@ -63,12 +63,12 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.common.utils.tables.TableViewsUtils;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -972,7 +972,7 @@ public class ControllerTest {
     TestUtils.waitForCondition((aVoid) -> {
           try {
             AtomicInteger numConsumingSegments = new AtomicInteger(0);
-            TableViews.TableView tableView = getExternalView(tableName, type);
+            TableViewsUtils.TableView tableView = getExternalView(tableName, type);
             Map<String, Map<String, String>> viewForType =
                 type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
             viewForType.values().forEach((v) -> {
@@ -987,10 +987,10 @@ public class ControllerTest {
     );
   }
 
-  public TableViews.TableView getExternalView(String tableName, TableType type)
+  public TableViewsUtils.TableView getExternalView(String tableName, TableType type)
       throws IOException {
     String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
-    return JsonUtils.stringToObject(state, TableViews.TableView.class);
+    return JsonUtils.stringToObject(state, TableViewsUtils.TableView.class);
   }
 
   public static String sendGetRequest(String urlString)
