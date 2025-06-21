@@ -46,6 +46,8 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -104,7 +106,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
-      RequestContext requestContext, RequesterIdentity requesterIdentity) {
+      RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
     PinotBrokerTimeSeriesResponse timeSeriesResponse = null;
     long queryStartTime = System.currentTimeMillis();
     try {
@@ -121,6 +123,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
+      tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableName());
       timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
       return timeSeriesResponse;
@@ -235,6 +238,24 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   private void firstStageAccessControlCheck(RequesterIdentity requesterIdentity) {
     AccessControl accessControl = _accessControlFactory.create();
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (!authorizationResult.hasAccess()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
+        Response.Status.FORBIDDEN);
+    }
+  }
+
+  /**
+   * Table-level access control check for the request.
+   * This method checks if the requester has access to the tables in the request.
+   *
+   * @param httpHeaders The HTTP headers of the request.
+   * @param tableName The name of the table to check access for.
+   */
+  private void tableLevelAccessControlCheck(HttpHeaders httpHeaders, String tableName) {
+    AccessControl accessControl = _accessControlFactory.create();
+    AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
+      Actions.Table.QUERY);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
