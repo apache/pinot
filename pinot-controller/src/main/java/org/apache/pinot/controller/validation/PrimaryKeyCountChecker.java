@@ -120,7 +120,7 @@ public class PrimaryKeyCountChecker {
       CompletionServiceHelper completionServiceHelper) {
     if (_primaryKeyCountThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled
-      LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning true");
+      LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning");
       ResourceUtilizationInfo.setPrimaryKeyCountInfo(Collections.emptyMap());
       return;
     }
