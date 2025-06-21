@@ -695,17 +695,24 @@ public class TablesResource {
       HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
       String helixClusterName = _serverInstance.getHelixManager().getClusterName();
       TableViewsUtils.TableView externalView =
-          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
-              helixClusterName);
-      TableViewsUtils.TableView idealStateView =
-          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
-              helixClusterName);
+      
+      // Get segment status information from Helix, with null checks
+      Map<String, String> segmentStatusInfoListMap = new HashMap<>();
+      try {
+        TableViewsUtils.TableView externalView =
+            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
+                helixClusterName);
+        TableViewsUtils.TableView idealStateView =
+            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
+                helixClusterName);
 
-      Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
-      Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
-
-      Map<String, String> segmentStatusInfoListMap =
-          TableViewsUtils.getSegmentStatusesMap(externalViewStateMap, idealStateMap);
+        Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
+        Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
+        segmentStatusInfoListMap = TableViewsUtils.getSegmentStatusesMap(externalViewStateMap, idealStateMap);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get segment status from Helix for table {}: {}", tableNameWithType, e.getMessage());
+        // Continue without segment status information
+      }
 
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();

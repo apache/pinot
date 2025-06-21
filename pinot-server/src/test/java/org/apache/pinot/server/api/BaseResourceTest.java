@@ -30,7 +30,11 @@ import java.util.concurrent.Executors;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -118,7 +122,39 @@ public abstract class BaseResourceTest {
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         FileUtils.getTempDirectoryPath());
-    when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
+    
+    // Create a single HelixManager mock with proper segment data
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+    
+    // Mock IdealState and ExternalView for segment status
+    IdealState idealState = mock(IdealState.class);
+    ExternalView externalView = mock(ExternalView.class);
+    when(helixAdmin.getResourceIdealState(anyString(), anyString())).thenReturn(idealState);
+    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(externalView);
+
+    // Mock record and map field methods
+    ZNRecord idealStateRecord = mock(ZNRecord.class);
+    ZNRecord externalViewRecord = mock(ZNRecord.class);
+    when(idealState.getRecord()).thenReturn(idealStateRecord);
+    when(externalView.getRecord()).thenReturn(externalViewRecord);
+
+    // Create realistic segment state maps for testing
+    Map<String, Map<String, String>> idealStateMap = new HashMap<>();
+    Map<String, Map<String, String>> externalViewMap = new HashMap<>();
+    
+    // Add a segment with ONLINE state (GOOD status) - use the actual segment name from the test
+    Map<String, String> onlineSegmentState = new HashMap<>();
+    onlineSegmentState.put("testInstance", "ONLINE");
+    idealStateMap.put("testTable_default", onlineSegmentState);
+    externalViewMap.put("testTable_default", onlineSegmentState);
+    
+    when(idealStateRecord.getMapFields()).thenReturn(idealStateMap);
+    when(externalViewRecord.getMapFields()).thenReturn(externalViewMap);
+    
+    when(serverInstance.getHelixManager()).thenReturn(helixManager);
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
@@ -200,15 +236,48 @@ public abstract class BaseResourceTest {
   protected void addTable(String tableNameWithType) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    when(instanceDataManagerConfig.getInstanceId()).thenReturn("Server_1_100.89.121.12");
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     assertNotNull(tableType);
     TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(tableNameWithType).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType)).build();
+    
+    // Create a properly configured HelixManager mock
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+    
+    // Mock IdealState and ExternalView for segment status
+    IdealState idealState = mock(IdealState.class);
+    ExternalView externalView = mock(ExternalView.class);
+    when(helixAdmin.getResourceIdealState(anyString(), anyString())).thenReturn(idealState);
+    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(externalView);
+
+    // Mock record and map field methods
+    ZNRecord idealStateRecord = mock(ZNRecord.class);
+    ZNRecord externalViewRecord = mock(ZNRecord.class);
+    when(idealState.getRecord()).thenReturn(idealStateRecord);
+    when(externalView.getRecord()).thenReturn(externalViewRecord);
+
+    // Create realistic segment state maps for testing
+    Map<String, Map<String, String>> idealStateMap = new HashMap<>();
+    Map<String, Map<String, String>> externalViewMap = new HashMap<>();
+    
+    // Add a segment with ONLINE state (GOOD status) - use the actual segment name from the test
+    Map<String, String> onlineSegmentState = new HashMap<>();
+    onlineSegmentState.put("testInstance", "ONLINE");
+    idealStateMap.put("testTable_default", onlineSegmentState);
+    externalViewMap.put("testTable_default", onlineSegmentState);
+    
+    when(idealStateRecord.getMapFields()).thenReturn(idealStateMap);
+    when(externalViewRecord.getMapFields()).thenReturn(externalViewMap);
+    
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager performs
     //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
