@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;

@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;

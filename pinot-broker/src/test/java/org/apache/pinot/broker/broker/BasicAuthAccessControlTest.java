@@ -25,7 +25,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.WebApplicationException;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;

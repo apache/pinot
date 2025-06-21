@@ -42,7 +42,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMeter;

@@ -51,7 +51,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;

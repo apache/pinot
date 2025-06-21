@@ -46,7 +46,7 @@ import javax.ws.rs.core.Response;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;

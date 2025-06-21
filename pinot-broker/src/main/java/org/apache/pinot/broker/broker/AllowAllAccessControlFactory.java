@@ -19,7 +19,7 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.Set;
-import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.auth.broker.AccessControl;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
