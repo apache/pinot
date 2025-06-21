@@ -752,6 +752,7 @@ public class TablesResource {
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         validDocIdsMetadata.put("segmentStatus", segmentStatusInfoListMap.get(segmentDataManager.getSegmentName()));
         validDocIdsMetadata.put("serverStatus", serverStatus);
+        validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
           validDocIdsMetadata.put("segmentSizeInBytes",
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
