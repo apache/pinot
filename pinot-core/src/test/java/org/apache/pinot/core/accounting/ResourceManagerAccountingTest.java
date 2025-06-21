@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -239,10 +240,11 @@ public class ResourceManagerAccountingTest {
 
     String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    WorkloadBudgetManager.init(pinotCfg);
-    WorkloadBudgetManager.getInstance().addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
         InstanceType.SERVER);
+    WorkloadBudgetManager workloadBudgetManager =
+        Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+    workloadBudgetManager.addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
 
     for (int k = 0; k < 30; k++) {
@@ -375,7 +377,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
-    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
@@ -445,8 +446,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
-    WorkloadBudgetManager.init(config);
-
 
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
@@ -504,7 +503,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
 
     PinotConfiguration config = getConfig(2, 2, configs);
-    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",

@@ -76,7 +76,6 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -407,9 +406,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
-
-    // Initialize WorkloadBudgetManager for Query Workload Isolation.
-    WorkloadBudgetManager.init(_brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX));
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(

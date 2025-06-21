@@ -181,17 +181,18 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       return queryAggregator.getQueryResources(_threadEntriesMap);
     }
 
-    public void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long memoryAllocatedBytes,
-                                             TrackingScope trackingScope) {
-      ResourceAggregator resourceAggregator = _resourceAggregators.get(trackingScope);
-      if (resourceAggregator == null) {
-        return;
-      }
-      if (_isThreadCPUSamplingEnabled) {
-        resourceAggregator.updateConcurrentCpuUsage(identifier, cpuTimeNs);
-      }
-      if (_isThreadMemorySamplingEnabled) {
-        resourceAggregator.updateConcurrentMemUsage(identifier, memoryAllocatedBytes);
+    public void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long memoryAllocatedBytes) {
+      for (TrackingScope trackingScope : TrackingScope.values()) {
+        ResourceAggregator resourceAggregator = _resourceAggregators.get(trackingScope);
+        if (resourceAggregator == null) {
+          return;
+        }
+        if (_isThreadCPUSamplingEnabled) {
+          resourceAggregator.updateConcurrentCpuUsage(identifier, cpuTimeNs);
+        }
+        if (_isThreadMemorySamplingEnabled) {
+          resourceAggregator.updateConcurrentMemUsage(identifier, memoryAllocatedBytes);
+        }
       }
     }
 

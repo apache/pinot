@@ -46,7 +46,6 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -282,11 +281,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
-      TrackingScope resourceType) {
-      if (!resourceType.equals(TrackingScope.QUERY)) {
-        return;
-      }
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
       if (_isThreadCPUSamplingEnabled) {
         _concurrentTaskCPUStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? cpuTimeNs : (value + cpuTimeNs));
@@ -322,6 +317,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       if (_isThreadMemorySamplingEnabled) {
         _threadLocalEntry.get().updateMemorySnapshot();
       }
+    }
+
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupRunner(queryId, taskId, taskType, null);
     }
 
 

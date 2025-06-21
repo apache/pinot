@@ -16,15 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.accounting;
+package org.apache.pinot.spi.accounting;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -34,26 +32,29 @@ import org.slf4j.LoggerFactory;
 public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
-  private static final AtomicReference<WorkloadBudgetManager> INSTANCE = new AtomicReference<>();
-
   private long _enforcementWindowMs;
   private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
 
-  public static void init(PinotConfiguration config) {
-    if (INSTANCE.compareAndSet(null, new WorkloadBudgetManager(config))) {
-      LOGGER.info("Initialized WorkloadBudgetManager");
-    } else {
-      LOGGER.error("WorkloadBudgetManager is already initialized, not initializing it again");
+  public WorkloadBudgetManager(PinotConfiguration config) {
+    _isEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
+    // Return an object even if disabled. All functionalities of this class will be noops.
+    if (!_isEnabled) {
+      LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
+      return;
     }
+    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
+    startBudgetResetTask();
+    LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
   }
 
   public void shutdown() {
     if (!_isEnabled) {
       return;
     }
-
     _isEnabled = false;
     _resetScheduler.shutdownNow();
     try {
@@ -63,30 +64,9 @@ public class WorkloadBudgetManager {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-
-    INSTANCE.set(null);
     LOGGER.info("WorkloadBudgetManager has been shut down.");
   }
 
-  @Nullable
-  public static WorkloadBudgetManager getInstance() {
-    return INSTANCE.get();
-  }
-
-  private WorkloadBudgetManager(PinotConfiguration config) {
-    _isEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
-    // Return an object even if disabled. All functionalities of this class will be noops.
-    if (!_isEnabled) {
-      LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
-      return;
-    }
-
-    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
-    startBudgetResetTask();
-    LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
-  }
 
   /**
    * Adds or updates budget for a workload (Thread-Safe).
