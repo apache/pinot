@@ -29,10 +29,11 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.utils.AuthUtils;
 
 
-public class AuthQuickstart extends Quickstart {
+public class TimeSeriesEngineAuthQuickStart extends TimeSeriesEngineQuickStart {
+
   @Override
   public List<String> types() {
-    return Collections.singletonList("AUTH");
+    return Collections.singletonList("TIME_SERIES_AUTH");
   }
 
   @Override
@@ -47,9 +48,9 @@ public class AuthQuickstart extends Quickstart {
     return properties;
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     PluginManager.get().init();
-    new AuthQuickstart().execute();
+    new TimeSeriesEngineAuthQuickStart().execute();
+    printStatus(Color.GREEN, "Default login credential to login controller is admin/verysecret.");
   }
 }

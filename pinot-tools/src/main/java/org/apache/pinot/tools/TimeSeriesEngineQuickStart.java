@@ -77,7 +77,8 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapStreamTableDirectories(quickstartTmpDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(quickstartTableRequests, 1, 1, 2, 1, quickstartRunnerDir, getConfigOverrides());
+        new QuickstartRunner(quickstartTableRequests, 1, 1, 2, 1, quickstartRunnerDir, getConfigOverrides(),
+          getAuthProvider());
 
     startKafka();
     startAllDataStreams(_kafkaStarter, quickstartTmpDir);
