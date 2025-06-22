@@ -25,10 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -36,6 +32,10 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.request.DataSource;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.Function;
+import org.apache.pinot.spi.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 

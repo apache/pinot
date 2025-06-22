@@ -21,6 +21,8 @@ package org.apache.pinot.controller.api.access;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.spi.auth.controller.AccessControl;
+import org.apache.pinot.spi.auth.controller.AccessType;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

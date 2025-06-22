@@ -22,8 +22,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -36,6 +34,8 @@ import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StringPredicateFilterOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Expression;
+import org.apache.pinot.spi.request.PinotQuery;
 
 
 public class QueryOptimizer {
