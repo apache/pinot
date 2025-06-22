@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.grpc.GrpcRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -136,15 +137,30 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
-      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-
-      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-      Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-              .map(_token2principal::get).filter(Objects::nonNull)
-              .findFirst();
-      return principalOpt;
+      Preconditions.checkArgument(
+          requesterIdentity instanceof HttpRequesterIdentity || requesterIdentity instanceof GrpcRequesterIdentity,
+          "BasicAuthAccessControl only supports HttpRequesterIdentity or GrpcRequesterIdentity, got %s",
+          requesterIdentity == null ? "null" : requesterIdentity.getClass().getName());
+      Collection<String> tokens = null;
+      if (requesterIdentity instanceof HttpRequesterIdentity) {
+        HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+        tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
+      }
+      if (requesterIdentity instanceof GrpcRequesterIdentity) {
+        GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
+        for (String key : identity.getMetadata().keySet()) {
+          if (HEADER_AUTHORIZATION.equalsIgnoreCase(key)) {
+            tokens = identity.getMetadata().get(key);
+            break;
+          }
+        }
+      }
+      if (tokens == null || tokens.isEmpty()) {
+        return Optional.empty();
+      }
+      return tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+          .map(_token2principal::get).filter(Objects::nonNull)
+          .findFirst();
     }
   }
 }
