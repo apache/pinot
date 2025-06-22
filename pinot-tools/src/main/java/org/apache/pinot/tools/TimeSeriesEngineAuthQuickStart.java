@@ -50,7 +50,7 @@ public class TimeSeriesEngineAuthQuickStart extends TimeSeriesEngineQuickStart {
   @Override
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
-    properties.putAll(AuthUtils.getAuthConfigs());
+    properties.putAll(AuthUtils.getAuthQuickStartDefaultConfigs());
     return properties;
   }
 

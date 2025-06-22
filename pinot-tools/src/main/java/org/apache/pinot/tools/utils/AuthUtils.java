@@ -23,14 +23,15 @@ import java.util.Map;
 
 
 public class AuthUtils {
+  private static final String DEFAULT_AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA==";
 
   private AuthUtils() {
   }
 
-  public static Map<String, Object> getAuthConfigs() {
+  public static Map<String, Object> getAuthQuickStartDefaultConfigs() {
     Map<String, Object> properties = new HashMap<>();
     // controller
-    properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.controller.segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
       "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user, service, tableonly");
@@ -52,13 +53,13 @@ public class AuthUtils {
     properties.put("pinot.broker.access.control.principals.tableonly.tables", "baseballStats");
 
     // server
-    properties.put("pinot.server.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("pinot.server.segment.uploader.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("pinot.server.instance.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("pinot.server.segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
+    properties.put("pinot.server.segment.uploader.auth.token", DEFAULT_AUTH_TOKEN);
+    properties.put("pinot.server.instance.auth.token", DEFAULT_AUTH_TOKEN);
 
     // minion
-    properties.put("segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
-    properties.put("task.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    properties.put("segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
+    properties.put("task.auth.token", DEFAULT_AUTH_TOKEN);
 
     // loggers
     properties.put("pinot.controller.logger.root.dir", "logs");
