@@ -674,8 +674,7 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
-      TableSegments tableSegments, @Context HttpHeaders headers)
-      throws Exception {
+      TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -683,8 +682,7 @@ public class TablesResource {
   }
 
   private List<Map<String, Object>> processValidDocIdsMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdsType)
-      throws Exception {
+      String validDocIdsType) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
