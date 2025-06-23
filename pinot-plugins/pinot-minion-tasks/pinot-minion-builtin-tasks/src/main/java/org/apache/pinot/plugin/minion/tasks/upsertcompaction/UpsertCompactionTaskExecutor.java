@@ -102,6 +102,14 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
           .build();
     }
 
+    if (!validDocIdsBitmapResponse.getServerStatus().equals("OK")) {
+      String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+          + validDocIdsBitmapResponse.getServerStatus() + ", skipping " + MinionConstants.UpsertCompactionTask.TASK_TYPE
+          + " execution for segment: " + segmentName;
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
+    }
+
     int totalDocsAfterCompaction;
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
       compactedRecordReader.init(indexDir, null, null);

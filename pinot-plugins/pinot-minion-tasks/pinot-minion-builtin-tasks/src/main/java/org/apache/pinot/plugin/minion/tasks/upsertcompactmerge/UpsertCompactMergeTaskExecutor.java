@@ -125,6 +125,16 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
         LOGGER.error(message);
         throw new IllegalStateException(message);
       }
+
+      if (!validDocIdsBitmapResponse.getServerStatus().equals("OK")) {
+        String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+            + validDocIdsBitmapResponse.getServerStatus() + ", skipping "
+            + MinionConstants.UpsertCompactMergeTask.TASK_TYPE + " execution for segment: "
+            + validDocIdsBitmapResponse.getSegmentName();
+        LOGGER.error(message);
+        throw new IllegalStateException(message);
+      }
+
       return new CompactedPinotSegmentRecordReader(validDocIds);
     }).collect(Collectors.toList());
     List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>(recordReaders.size());

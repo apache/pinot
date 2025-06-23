@@ -227,6 +227,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
               segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
           continue;
         }
+
+        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
+        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
+        if (!validDocIdsMetadata.getServerStatus().equals("OK")) {
+          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}", validDocIdsMetadata.getInstanceId(),
+              validDocIdsMetadata.getServerStatus(), MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
+          continue;
+        }
+
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
         if (totalInvalidDocs == totalDocs) {
