@@ -488,7 +488,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
-      LOGGER.error("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
+      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
           queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
           queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage);
     }
@@ -865,7 +865,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         for (QueryResourceTracker queryResourceTracker : queryResources.values()) {
           logTerminatedQuery(queryResourceTracker, _usedBytes);
         }
-        logQueryResourceUsage(getQueryResources());
+        logQueryResourceUsage(queryResources);
       }
 
       /**
