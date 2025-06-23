@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -1203,16 +1204,19 @@ public class PinotSegmentRestletResource {
           + "The retention period controls how long deleted segments are retained before permanent removal. "
           + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
           + "Use 0d or -1d for immediate deletion without retention.")
-  public SuccessResponse deleteSegmentsFromSequenceNum(
+  public String deleteSegmentsFromSequenceNum(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "List of segment names. For each segment, all segments with higher sequence IDs in the same "
           + "partition will be deleted", required = true, allowMultiple = true)
       @QueryParam("segments") List<String> segments,
+      @ApiParam(value = "Dry run to list the segment names that will get deleted per partition", defaultValue = "true")
+      @QueryParam("dryRun") boolean dryRun,
       @ApiParam(value = "Force flag to bypass checks for pauseless being enabled and table being paused",
           defaultValue = "false") @QueryParam("force") boolean force,
       @Context HttpHeaders headers
-  ) {
+  )
+      throws JsonProcessingException {
 
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
 
@@ -1246,15 +1250,43 @@ public class PinotSegmentRestletResource {
     Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
         getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
             partitionIdToLatestSegment);
+
+    Map<String, Object> response = new HashMap<>();
+    Map<Integer, Object> partitionDetails = new HashMap<>();
+
     for (Integer partitionID : partitionToOldestSegment.keySet()) {
-      Set<String> segmentToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
-      LOGGER.info("Deleting : {} segments from segment: {} to segment: {} for partition: {}",
-          segmentToDeleteForPartition.size(), partitionToOldestSegment.get(partitionID),
-          partitionIdToLatestSegment.get(partitionID), partitionID);
-      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentToDeleteForPartition), null);
+      Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionID);
+      LLCSegmentName latestSegment = partitionIdToLatestSegment.get(partitionID);
+
+      Map<String, Object> partitionInfo = new HashMap<>();
+      partitionInfo.put("segmentsToDelete", new ArrayList<>(segmentsToDeleteForPartition));
+      partitionInfo.put("oldestSegment", oldestSegment.getSegmentName());
+      partitionInfo.put("latestSegment", latestSegment.getSegmentName());
+      partitionInfo.put("segmentCount", segmentsToDeleteForPartition.size());
+
+      partitionDetails.put(partitionID, partitionInfo);
+
+      // Only perform actual deletion if dryRun is false
+      if (!dryRun) {
+        LOGGER.info(
+            "Deleting {} segments from segment: {} to segment: {} for partition: {}. Segments being deleted are: {}",
+            segmentsToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID,
+            segmentsToDeleteForPartition);
+        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDeleteForPartition), null);
+      }
     }
 
-    return new SuccessResponse("Successfully deleted segments for table: " + tableNameWithType);
+    response.put("tableName", tableNameWithType);
+    response.put("dryRun", dryRun);
+    response.put("partitions", partitionDetails);
+
+    if (dryRun) {
+      response.put("message", "Dry run completed. Segments identified for deletion but not actually deleted.");
+    } else {
+      response.put("message", "Successfully deleted segments for table: " + tableNameWithType);
+    }
+    return JsonUtils.objectToString(response);
   }
 
   /**
