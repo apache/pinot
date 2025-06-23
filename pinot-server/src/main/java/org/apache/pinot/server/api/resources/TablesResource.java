@@ -61,7 +61,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -86,7 +85,6 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.tables.TableViewsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -540,19 +538,7 @@ public class TablesResource {
       } else {
         serverStatus = "NOT_READY";
       }
-      HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
-      String helixClusterName = _serverInstance.getHelixManager().getClusterName();
 
-      TableViewsUtils.TableView externalView =
-          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
-              helixClusterName);
-      TableViewsUtils.TableView idealStateView =
-          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
-              helixClusterName);
-
-      Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
-      Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
-      String segmentStatus = TableViewsUtils.getSegmentStatus(externalViewStateMap, idealStateMap, segmentName);
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
@@ -568,8 +554,7 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, segmentStatus,
-          _serverInstance.getInstanceDataManager().getInstanceId(), serverStatus);
+          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(), serverStatus);
     } catch (Exception e) {
       LOGGER.error("Failed to get validDocIds for table {}: {}", tableNameWithType, e.getMessage());
       return null;
@@ -712,25 +697,6 @@ public class TablesResource {
       }
 
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
-      HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
-      String helixClusterName = _serverInstance.getHelixManager().getClusterName();
-      // Get segment status information from Helix, with null checks
-      Map<String, String> segmentStatusInfoListMap = new HashMap<>();
-      try {
-        TableViewsUtils.TableView externalView =
-            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME,
-                helixAdmin, helixClusterName);
-        TableViewsUtils.TableView idealStateView =
-            TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
-                helixClusterName);
-
-        Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
-        Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
-        segmentStatusInfoListMap = TableViewsUtils.getSegmentStatusesMap(externalViewStateMap, idealStateMap);
-      } catch (Exception e) {
-        LOGGER.warn("Failed to get segment status from Helix for table {}: {}", tableNameWithType, e.getMessage());
-        // Continue without segment status information
-      }
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
@@ -774,7 +740,6 @@ public class TablesResource {
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
-        validDocIdsMetadata.put("segmentStatus", segmentStatusInfoListMap.get(segmentDataManager.getSegmentName()));
         validDocIdsMetadata.put("serverStatus", serverStatus);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
