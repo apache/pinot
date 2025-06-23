@@ -723,8 +723,7 @@ public class StringFunctions {
   @ScalarFunction
   public static String randomString(String length) {
     try {
-//      int len = Integer.parseInt(length);
-      int len  = 100000;
+      int len = 100000;
       if (len <= 0) {
         return "";
       }
