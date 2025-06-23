@@ -27,10 +27,13 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -42,10 +45,15 @@ import org.immutables.value.Value;
 @Value.Enclosing
 public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
   enum PatternType {
+    SORT_PROJECT_FILTER_JOIN,
+    SORT_FILTER_PROJECT_JOIN,
     FILTER_PROJECT_JOIN,
     PROJECT_FILTER_JOIN,
+    SORT_PROJECT_JOIN,
+    SORT_FILTER_JOIN,
     PROJECT_JOIN,
-    FILTER_JOIN
+    FILTER_JOIN,
+    SORT_JOIN
   }
 
   @Value.Immutable
@@ -58,6 +66,28 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     PatternType patternType();
 
     Config withPatternType(PatternType patternType);
+
+    Config SORT_FILTER_PROJECT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b ->
+            b.operand(LogicalSort.class).oneInput(b0 ->
+                b0.operand(LogicalFilter.class).oneInput(b1 ->
+                    b1.operand(LogicalProject.class).oneInput(b2 ->
+                        b2.operand(LogicalJoin.class).anyInputs()
+                    )
+                )
+            )
+        ).patternType(PatternType.SORT_FILTER_PROJECT_JOIN).build();
+
+    Config SORT_PROJECT_FILTER_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b ->
+            b.operand(LogicalSort.class).oneInput(b0 ->
+                b0.operand(LogicalProject.class).oneInput(b1 ->
+                    b1.operand(LogicalFilter.class).oneInput(b2 ->
+                        b2.operand(LogicalJoin.class).anyInputs()
+                    )
+                )
+            )
+        ).patternType(PatternType.SORT_PROJECT_FILTER_JOIN).build();
 
     Config FILTER_PROJECT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
         .operandSupplier(b0 ->
@@ -77,6 +107,24 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
             )
         ).patternType(PatternType.PROJECT_FILTER_JOIN).build();
 
+    Config SORT_FILTER_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b0 ->
+            b0.operand(LogicalSort.class).oneInput(b1 ->
+                b1.operand(LogicalFilter.class).oneInput(b2 ->
+                    b2.operand(LogicalJoin.class).anyInputs()
+                )
+            )
+        ).patternType(PatternType.SORT_FILTER_JOIN).build();
+
+    Config SORT_PROJECT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b0 ->
+            b0.operand(LogicalSort.class).oneInput(b1 ->
+                b1.operand(LogicalProject.class).oneInput(b2 ->
+                    b2.operand(LogicalJoin.class).anyInputs()
+                )
+            )
+        ).patternType(PatternType.SORT_PROJECT_JOIN).build();
+
     Config PROJECT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
         .operandSupplier(b0 ->
             b0.operand(LogicalProject.class).oneInput(b1 ->
@@ -90,17 +138,36 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
                 b1.operand(LogicalJoin.class).anyInputs()
             )
         ).patternType(PatternType.FILTER_JOIN).build();
+
+    Config SORT_JOIN = ImmutablePinotEnrichedJoinRule.Config.builder()
+        .operandSupplier(b0 ->
+            b0.operand(LogicalSort.class).oneInput(b1 ->
+                b1.operand(LogicalJoin.class).anyInputs()
+            )
+        ).patternType(PatternType.SORT_JOIN).build();
   }
 
   private PinotEnrichedJoinRule(Config config) {
     super(config);
   }
 
+  public static final PinotEnrichedJoinRule SORT_FILTER_PROJECT_JOIN =
+      (PinotEnrichedJoinRule) Config.SORT_FILTER_PROJECT_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
+  public static final PinotEnrichedJoinRule SORT_PROJECT_FILTER_JOIN =
+      (PinotEnrichedJoinRule) Config.SORT_PROJECT_FILTER_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule FILTER_PROJECT_JOIN =
       (PinotEnrichedJoinRule) Config.FILTER_PROJECT_JOIN.withDescription(
           CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule PROJECT_FILTER_JOIN =
       (PinotEnrichedJoinRule) Config.PROJECT_FILTER_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
+  public static final PinotEnrichedJoinRule SORT_PROJECT_JOIN =
+      (PinotEnrichedJoinRule) Config.SORT_PROJECT_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
+  public static final PinotEnrichedJoinRule SORT_FILTER_JOIN =
+      (PinotEnrichedJoinRule) Config.SORT_FILTER_JOIN.withDescription(
           CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
   public static final PinotEnrichedJoinRule PROJECT_JOIN =
       (PinotEnrichedJoinRule) Config.PROJECT_JOIN.withDescription(
@@ -108,12 +175,20 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
   public static final PinotEnrichedJoinRule FILTER_JOIN =
       (PinotEnrichedJoinRule) Config.FILTER_JOIN.withDescription(
           CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
+  public static final PinotEnrichedJoinRule SORT_JOIN =
+      (PinotEnrichedJoinRule) Config.SORT_JOIN.withDescription(
+          CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN).toRule();
 
   public static final List<RelOptRule> PINOT_ENRICHED_JOIN_RULES = List.of(
+      SORT_FILTER_PROJECT_JOIN,
+      SORT_PROJECT_FILTER_JOIN,
       FILTER_PROJECT_JOIN,
       PROJECT_FILTER_JOIN,
+      SORT_PROJECT_JOIN,
+      SORT_FILTER_JOIN,
       PROJECT_JOIN,
-      FILTER_JOIN
+      FILTER_JOIN,
+      SORT_JOIN
   );
 
   @Override
@@ -131,14 +206,66 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     @Nullable
     final Set<CorrelationId> projectVariableSet;
     @Nullable
+    final RelCollation collation;
+    @Nullable
+    final RexNode fetch;
+    @Nullable
+    final RexNode offset;
+    @Nullable
     final LogicalProject project;
     @Nullable
     final LogicalFilter filter;
+    @Nullable
+    final LogicalSort sort;
     final LogicalJoin join;
 
     List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>();
 
     switch (patternType) {
+      case SORT_FILTER_PROJECT_JOIN:
+        sort = call.rel(0);
+        filter = call.rel(1);
+        project = call.rel(2);
+        join = call.rel(3);
+
+        traitSet = join.getTraitSet();
+        // add projection to the set
+        projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // add filter to the set
+        filterRex = filter.getCondition();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // provide final output rowtype
+        projectRowType = project.getRowType();
+        projectVariableSet = project.getVariablesSet();
+
+        collation = sort.getCollation();
+        fetch = sort.fetch;
+        offset = sort.offset;
+        break;
+
+      case SORT_PROJECT_FILTER_JOIN:
+        sort = call.rel(0);
+        project = call.rel(1);
+        filter = call.rel(2);
+        join = call.rel(3);
+
+        traitSet = join.getTraitSet();
+        // add filter to the set
+        filterRex = filter.getCondition();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // add projection to the set
+        projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // provide final output rowtype
+        projectRowType = project.getRowType();
+        projectVariableSet = project.getVariablesSet();
+
+        collation = sort.getCollation();
+        fetch = sort.fetch;
+        offset = sort.offset;
+        break;
+
       case FILTER_PROJECT_JOIN:
         filter = call.rel(0);
         project = call.rel(1);
@@ -153,8 +280,11 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
         // provide final output rowtype
         projectRowType = project.getRowType();
-
         projectVariableSet = project.getVariablesSet();
+
+        collation = null;
+        fetch = null;
+        offset = null;
         break;
 
       case PROJECT_FILTER_JOIN:
@@ -171,8 +301,47 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
         // provide final output rowtype
         projectRowType = project.getRowType();
-
         projectVariableSet = project.getVariablesSet();
+
+        collation = null;
+        fetch = null;
+        offset = null;
+        break;
+
+      case SORT_PROJECT_JOIN:
+        sort = call.rel(0);
+        project = call.rel(1);
+        join = call.rel(2);
+
+        traitSet = join.getTraitSet();
+        // add projection to the set
+        projects = project.getProjects();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
+        // provide final output rowtype
+        projectRowType = project.getRowType();
+        projectVariableSet = project.getVariablesSet();
+
+        collation = sort.getCollation();
+        fetch = sort.fetch;
+        offset = sort.offset;
+        break;
+
+      case SORT_FILTER_JOIN:
+        sort = call.rel(0);
+        filter = call.rel(1);
+        join = call.rel(2);
+
+        traitSet = join.getTraitSet();
+        // add filter to the set
+        filterRex = filter.getCondition();
+        filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(filterRex));
+        // no projection, final output row type is same as join output
+        projectRowType = null;
+        projectVariableSet = null;
+
+        collation = sort.getCollation();
+        fetch = sort.fetch;
+        offset = sort.offset;
         break;
 
       case PROJECT_JOIN:
@@ -180,13 +349,16 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         join = call.rel(1);
 
         traitSet = join.getTraitSet();
-        filterRex = null;
         // add projection to the set
         projects = project.getProjects();
         filterProjectRexNodes.add(new PinotLogicalEnrichedJoin.FilterProjectRexNode(projects, project.getRowType()));
         // provide final output rowtype
         projectRowType = project.getRowType();
         projectVariableSet = project.getVariablesSet();
+
+        collation = null;
+        fetch = null;
+        offset = null;
         break;
 
       case FILTER_JOIN:
@@ -200,10 +372,33 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         // no projection, final output row type is same as join output
         projectRowType = null;
         projectVariableSet = null;
+
+        collation = null;
+        fetch = null;
+        offset = null;
+        break;
+
+      case SORT_JOIN:
+        sort = call.rel(0);
+        join = call.rel(1);
+
+        traitSet = join.getTraitSet();
+        // no projection, final output row type is same as join output
+        projectRowType = null;
+        projectVariableSet = null;
+
+        collation = sort.getCollation();
+        fetch = sort.fetch;
+        offset = sort.offset;
         break;
 
       default:
         throw new IllegalStateException("unknown patternType for PinotEnrichedJoinRule");
+    }
+
+    // Enriched join does not support sort collation, only fetch and offset
+    if (collation != null && !collation.equals(RelCollations.EMPTY)) {
+      return;
     }
 
     // Disable lookup join for now
@@ -223,7 +418,8 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
         join.getCondition(), join.getVariablesSet(), join.getJoinType(),
         filterProjectRexNodes,
         projectRowType,
-        projectVariableSet);
+        projectVariableSet,
+        fetch, offset);
 
     call.transformTo(pinotLogicalEnrichedJoin);
   }

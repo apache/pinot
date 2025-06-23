@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
@@ -342,6 +343,266 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.get(0), new Object[]{3});
   }
 
+  @Test
+  public void shouldHandleBasicLimit() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(4, "Be")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "BB")
+        .addRow(4, "Bd")
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(2, "Bc")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    // NonEquiCondition
+    List<RexExpression> nonEquiConditions = List.of(
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.INT, SqlKind.LESS_THAN_OR_EQUAL.name(), List.of(
+            new RexExpression.InputRef(0), new RexExpression.InputRef(2)
+        )));
+
+    int offset = 1;
+    int fetch = 2;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), nonEquiConditions,
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 2);
+  }
+
+  @Test
+  public void shouldHandleOffsetLargerThanResult() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(4, "Be")
+        .addRow(2, "BB")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "BB")
+        .addRow(4, "Bd")
+        .addRow(2, "Aa")
+        .addRow(2, "BB")
+        .addRow(2, "Bc")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    // NonEquiCondition
+    List<RexExpression> nonEquiConditions = List.of(
+        new RexExpression.FunctionCall(DataSchema.ColumnDataType.INT, SqlKind.LESS_THAN_OR_EQUAL.name(), List.of(
+            new RexExpression.InputRef(0), new RexExpression.InputRef(2)
+        )));
+
+    int offset = 3;
+    int fetch = -1;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), nonEquiConditions,
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 0);
+  }
+
+  @Test
+  public void shouldHandleOffsetLeftJoinOneBlock() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "Be")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Bc")
+        .addRow(2, "Aa")
+        .addRow(3, "BB")
+        .addRow(2, "BB")
+        .addRow(4, "Bd")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    int offset = 4;
+    int fetch = -1;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1),
+            Collections.emptyList(),
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{4, "Be", null, null});
+  }
+
+  @Test
+  public void shouldHandleOffsetLeftJoinTwoBlocks() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "Be")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Bc")
+        .addRow(2, "Aa")
+        .addRow(3, "BB")
+        .addRow(2, "BB")
+        .addRow(4, "Bd")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    int offset = 3;
+    int fetch = -1;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1),
+            Collections.emptyList(),
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0)[1], "BB");
+    assertEquals(resultRows.get(1), new Object[]{4, "Be", null, null});
+  }
+
+  @Test
+  public void shouldHandleOffsetRightJoinOneBlock() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "Be")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Bc")
+        .addRow(2, "Aa")
+        .addRow(3, "BB")
+        .addRow(2, "BB")
+        .addRow(4, "Bd")
+        .addRow(5, "Bf")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    int offset = 4;
+    int fetch = -1;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1),
+            Collections.emptyList(),
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{null, null, 4, "Bd"});
+    assertEquals(resultRows.get(1), new Object[]{null, null, 5, "Bf"});
+  }
+
+  @Test
+  public void shouldHandleOffsetRightJoinTwoBlocks() {
+    _leftInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(3, "Bc")
+        .addRow(1, "Aa")
+        .addRow(2, "BB")
+        .addRow(4, "Be")
+        .buildWithEos();
+
+    _rightInput = new BlockListMultiStageOperator.Builder(DEFAULT_CHILD_SCHEMA)
+        .addRow(2, "Bc")
+        .addRow(2, "Aa")
+        .addRow(3, "BB")
+        .addRow(2, "BB")
+        .addRow(4, "Bd")
+        .addRow(5, "Bf")
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(
+        new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+        });
+
+    int offset = 3;
+    int fetch = 2;
+
+    HashJoinOperator operator =
+        getOperator(DEFAULT_CHILD_SCHEMA, resultSchema, JoinRelType.RIGHT, List.of(1), List.of(1),
+            Collections.emptyList(),
+            PlanNode.NodeHint.EMPTY, null, null, null, fetch, offset);
+
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock resultBlock = operator.nextBlock();
+    while (!resultBlock.isEos()) {
+      resultRows.addAll(((MseBlock.Data) resultBlock).asRowHeap().getRows());
+      resultBlock = operator.nextBlock();
+    }
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0)[1], "BB");
+    assertEquals(resultRows.get(1), new Object[]{null, null, 4, "Bd"});
+  }
+
+
   // utils ----
   private EnrichedHashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
@@ -359,7 +620,29 @@ public class EnrichedHashJoinOperatorTest {
         new EnrichedJoinNode(-1, resultSchema, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys,
             nonEquiConditions,
             JoinNode.JoinStrategy.HASH, matchCondition,
-            filterProjectRexes));
+            filterProjectRexes,
+            -1, -1));
+  }
+
+  private EnrichedHashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
+      PlanNode.NodeHint nodeHint,
+      RexExpression matchCondition, RexExpression filterCondition, List<RexExpression> projects,
+      int fetch, int offset
+  ) {
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = new ArrayList<>();
+    if (filterCondition != null) {
+      filterProjectRexes.add(new EnrichedJoinNode.FilterProjectRex(filterCondition));
+    }
+    if (projects != null) {
+      filterProjectRexes.add(new EnrichedJoinNode.FilterProjectRex(projects, resultSchema));
+    }
+    return new EnrichedHashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
+        new EnrichedJoinNode(-1, resultSchema, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys,
+            nonEquiConditions,
+            JoinNode.JoinStrategy.HASH, matchCondition,
+            filterProjectRexes,
+            fetch, offset));
   }
 
   private EnrichedHashJoinOperator getProjectedOperator(DataSchema leftSchema, DataSchema joinSchema,
@@ -379,7 +662,8 @@ public class EnrichedHashJoinOperatorTest {
         new EnrichedJoinNode(-1, joinSchema, projectSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys,
             nonEquiConditions,
             JoinNode.JoinStrategy.HASH, matchCondition,
-            filterProjectRexes));
+            filterProjectRexes,
+            -1, -1));
   }
 
   private HashJoinOperator getBasicOperator(DataSchema resultSchema, JoinRelType joinType,

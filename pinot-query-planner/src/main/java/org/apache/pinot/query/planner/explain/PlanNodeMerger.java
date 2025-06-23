@@ -226,6 +226,9 @@ class PlanNodeMerger {
       if (!Objects.equals(node.getFilterProjectRexes(), otherNode.getFilterProjectRexes())) {
         return null;
       }
+      if (node.getFetch() != otherNode.getFetch() || node.getOffset() != otherNode.getOffset()) {
+        return null;
+      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;

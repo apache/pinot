@@ -133,7 +133,10 @@ public class PlanNodeDeserializer {
         convertJoinStrategy(protoEnrichedJoinNode.getJoinStrategy()),
         protoEnrichedJoinNode.hasMatchCondition()
             ? ProtoExpressionToRexExpression.convertExpression(protoEnrichedJoinNode.getMatchCondition()) : null,
-        filterProjectRexes);
+        filterProjectRexes,
+        protoEnrichedJoinNode.getFetch(),
+        protoEnrichedJoinNode.getOffset()
+        );
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {

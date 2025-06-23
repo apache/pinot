@@ -50,12 +50,17 @@ public class PinotLogicalEnrichedJoin extends Join {
   private final Set<CorrelationId> _projectVariableSet;
   @Nullable
   private final List<RexNode> _squashedProjects;
+  @Nullable
+  private final RexNode _fetch;
+  @Nullable
+  private final RexNode _offset;
 
   public PinotLogicalEnrichedJoin(RelOptCluster cluster, RelTraitSet traitSet,
       List<RelHint> hints, RelNode left, RelNode right, RexNode joinCondition,
       Set<CorrelationId> variablesSet, JoinRelType joinType,
       List<FilterProjectRexNode> filterProjectRexNodes,
-      @Nullable RelDataType outputRowType, @Nullable Set<CorrelationId> projectVariableSet) {
+      @Nullable RelDataType outputRowType, @Nullable Set<CorrelationId> projectVariableSet,
+      @Nullable RexNode fetch, @Nullable RexNode offset) {
     super(cluster, traitSet, hints, left, right, joinCondition, variablesSet, joinType);
     _filterProjectRexNodes = filterProjectRexNodes;
     _squashedProjects = squashProjects();
@@ -65,6 +70,8 @@ public class PinotLogicalEnrichedJoin extends Join {
     //   otherwise it's the same as _joinRowType
     _outputRowType = outputRowType == null ? _joinRowType : outputRowType;
     _projectVariableSet = projectVariableSet;
+    _offset = offset;
+    _fetch = fetch;
   }
 
   @Override
@@ -72,7 +79,8 @@ public class PinotLogicalEnrichedJoin extends Join {
       RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     return new PinotLogicalEnrichedJoin(getCluster(), traitSet, getHints(), left, right,
         conditionExpr, getVariablesSet(), getJoinType(),
-        _filterProjectRexNodes, _outputRowType, _projectVariableSet);
+        _filterProjectRexNodes, _outputRowType, _projectVariableSet,
+        _fetch, _offset);
   }
 
   @Override
@@ -191,5 +199,15 @@ public class PinotLogicalEnrichedJoin extends Join {
     public ProjectAndResultRowType getProjectAndResultRowType() {
       return _projectAndResultRowType;
     }
+  }
+
+  @Nullable
+  public RexNode getFetch() {
+    return _fetch;
+  }
+
+  @Nullable
+  public RexNode getOffset() {
+    return _offset;
   }
 }
