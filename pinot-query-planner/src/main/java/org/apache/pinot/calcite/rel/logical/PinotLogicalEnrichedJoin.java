@@ -27,6 +27,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
@@ -83,6 +84,32 @@ public class PinotLogicalEnrichedJoin extends Join {
         _fetch, _offset);
   }
 
+  public PinotLogicalEnrichedJoin withNewProject(FilterProjectRexNode project, RelDataType outputRowType,
+      Set<CorrelationId> projectVariableSet) {
+    List<FilterProjectRexNode> filterProjectRexNodes = _filterProjectRexNodes;
+    filterProjectRexNodes.add(project);
+    return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
+        getCondition(), getVariablesSet(), getJoinType(),
+        filterProjectRexNodes, outputRowType, projectVariableSet,
+        _fetch, _offset);
+  }
+
+  public PinotLogicalEnrichedJoin withNewFilter(FilterProjectRexNode filter) {
+    List<FilterProjectRexNode> filterProjectRexNodes = _filterProjectRexNodes;
+    filterProjectRexNodes.add(filter);
+    return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
+        getCondition(), getVariablesSet(), getJoinType(),
+        filterProjectRexNodes, _outputRowType, _projectVariableSet,
+        _fetch, _offset);
+  }
+
+  public PinotLogicalEnrichedJoin withNewFetchOffset(@Nullable RexNode fetch, @Nullable RexNode offset) {
+    return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
+        getCondition(), getVariablesSet(), getJoinType(),
+        _filterProjectRexNodes, _outputRowType, _projectVariableSet,
+        fetch, offset);
+  }
+
   @Override
   protected RelDataType deriveRowType() {
     return checkNotNull(_outputRowType);
@@ -134,7 +161,9 @@ public class PinotLogicalEnrichedJoin extends Join {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     return super.explainTerms(pw)
-        .item("filterProjectRex", _filterProjectRexNodes);
+        .item("filterProjectRex", _filterProjectRexNodes)
+        .itemIf("limit", _fetch, _fetch != null)
+        .itemIf("offset", _offset, _offset != null);
   }
 
   public enum FilterProjectRexNodeType {
