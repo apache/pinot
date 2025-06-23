@@ -120,13 +120,13 @@ public abstract class BaseResourceTest {
     when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         FileUtils.getTempDirectoryPath());
-    
+
     // Create a single HelixManager mock with proper segment data
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("testCluster");
-    
+
     when(_serverInstance.getHelixManager()).thenReturn(helixManager);
 
     // Mock the segment uploader
@@ -215,10 +215,10 @@ public abstract class BaseResourceTest {
     TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(tableNameWithType).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType)).build();
-    
+
     // Get the HelixManager from the server instance (already configured in setUp)
     HelixManager helixManager = _serverInstance.getHelixManager();
-    
+
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager performs
     //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
