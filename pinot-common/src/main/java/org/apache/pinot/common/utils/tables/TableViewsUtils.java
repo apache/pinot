@@ -82,6 +82,13 @@ public class TableViewsUtils {
     return segmentStatusInfoList;
   }
 
+  public static String getSegmentStatus(Map<String, Map<String, String>> externalViewMap,
+      Map<String, Map<String, String>> idealStateViewMap, String segment) {
+    Map<String, String> externalViewEntryValue = externalViewMap.get(segment);
+    Map<String, String> idealViewEntryValue = idealStateViewMap.get(segment);
+    return computeDisplayStatus(externalViewEntryValue, idealViewEntryValue);
+  }
+
   public static Map<String, String> getSegmentStatusesMap(Map<String, Map<String, String>> externalViewMap,
       Map<String, Map<String, String>> idealStateMap) {
     Map<String, String> segmentStatusInfoList = new HashMap<>();

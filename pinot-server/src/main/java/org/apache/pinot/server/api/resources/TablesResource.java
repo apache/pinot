@@ -507,8 +507,7 @@ public class TablesResource {
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
@@ -533,7 +532,27 @@ public class TablesResource {
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
             Response.Status.BAD_REQUEST);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+      String serverStatus = "";
+      if (status.equals(ServiceStatus.Status.GOOD)) {
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+        serverStatus = "OK";
+      } else {
+        serverStatus = "NOT_READY";
+      }
+      HelixAdmin helixAdmin = _serverInstance.getHelixManager().getClusterManagmentTool();
+      String helixClusterName = _serverInstance.getHelixManager().getClusterName();
 
+      TableViewsUtils.TableView externalView =
+          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.EXTERNALVIEW, TableType.REALTIME, helixAdmin,
+              helixClusterName);
+      TableViewsUtils.TableView idealStateView =
+          TableViewsUtils.getTableState(tableNameWithType, TableViewsUtils.IDEALSTATE, TableType.REALTIME, helixAdmin,
+              helixClusterName);
+
+      Map<String, Map<String, String>> externalViewStateMap = TableViewsUtils.getStateMap(externalView);
+      Map<String, Map<String, String>> idealStateMap = TableViewsUtils.getStateMap(idealStateView);
+      String segmentStatus = TableViewsUtils.getSegmentStatus(externalViewStateMap, idealStateMap, segmentName);
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
@@ -542,15 +561,18 @@ public class TablesResource {
       if (validDocIdSnapshot == null) {
         String msg = String.format(
             "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
+                + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+            segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
-
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes);
+          finalValidDocIdsType, validDocIdsBytes, segmentStatus,
+          _serverInstance.getInstanceDataManager().getInstanceId(), serverStatus);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get segment status from Helix for table {}: {}", tableNameWithType, e.getMessage());
+      return null;
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -651,9 +673,8 @@ public class TablesResource {
   public String getValidDocIdsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments,
-      @Context HttpHeaders headers)
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
+      TableSegments tableSegments, @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
