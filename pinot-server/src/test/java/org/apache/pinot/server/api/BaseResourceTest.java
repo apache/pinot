@@ -129,33 +129,6 @@ public abstract class BaseResourceTest {
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("testCluster");
 
-    // Mock IdealState and ExternalView for segment status
-    IdealState idealState = mock(IdealState.class);
-    ExternalView externalView = mock(ExternalView.class);
-    when(helixAdmin.getResourceIdealState(anyString(), anyString())).thenReturn(idealState);
-    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(externalView);
-
-    // Mock record and map field methods
-    ZNRecord idealStateRecord = mock(ZNRecord.class);
-    ZNRecord externalViewRecord = mock(ZNRecord.class);
-    when(idealState.getRecord()).thenReturn(idealStateRecord);
-    when(externalView.getRecord()).thenReturn(externalViewRecord);
-
-    // Create realistic segment state maps for testing
-    Map<String, Map<String, String>> idealStateMap = new HashMap<>();
-    Map<String, Map<String, String>> externalViewMap = new HashMap<>();
-
-    // Add a segment with ONLINE state (GOOD status) - use the actual segment name from the test
-    Map<String, String> onlineSegmentState = new HashMap<>();
-    onlineSegmentState.put("testInstance", "ONLINE");
-    idealStateMap.put("testTable_default", onlineSegmentState);
-    externalViewMap.put("testTable_default", onlineSegmentState);
-
-    when(idealStateRecord.getMapFields()).thenReturn(idealStateMap);
-    when(externalViewRecord.getMapFields()).thenReturn(externalViewMap);
-
-    when(serverInstance.getHelixManager()).thenReturn(helixManager);
-
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
     when(segmentUploader.uploadSegment(any(File.class),

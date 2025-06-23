@@ -554,7 +554,8 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(), serverStatus);
+          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
+          serverStatus);
     } catch (Exception e) {
       LOGGER.error("Failed to get validDocIds for table {}: {}", tableNameWithType, e.getMessage());
       return null;
