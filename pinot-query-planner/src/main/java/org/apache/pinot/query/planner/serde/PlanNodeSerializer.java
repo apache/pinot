@@ -159,6 +159,9 @@ public class PlanNodeSerializer {
         enrichedJoinNode.addFilterProjectRex(rexBuilder.build());
       }
 
+      enrichedJoinNode.setFetch(node.getFetch());
+      enrichedJoinNode.setOffset(node.getOffset());
+
       if (node.getMatchCondition() != null) {
         enrichedJoinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
       }

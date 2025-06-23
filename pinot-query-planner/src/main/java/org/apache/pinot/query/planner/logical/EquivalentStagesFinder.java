@@ -269,7 +269,9 @@ public class EquivalentStagesFinder {
         }
         EnrichedJoinNode that = (EnrichedJoinNode) node2;
         return Objects.equals(node1.getFilterProjectRexes(), that.getFilterProjectRexes())
-            && node1.getJoinStrategy() == that.getJoinStrategy();
+            && node1.getJoinStrategy() == that.getJoinStrategy()
+            && node1.getFetch() == that.getFetch()
+            && node1.getOffset() == that.getOffset();
       }
 
       @Override

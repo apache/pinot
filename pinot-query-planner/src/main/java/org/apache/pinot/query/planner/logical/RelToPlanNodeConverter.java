@@ -429,12 +429,16 @@ public final class RelToPlanNodeConverter {
     // convert filter and project RexNode into RexExpression
     List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = getFilterProjectRexes(rel);
 
+    int fetch = RexExpressionUtils.getValueAsInt(rel.getFetch());
+    int offset = RexExpressionUtils.getValueAsInt(rel.getOffset());
+
     return new EnrichedJoinNode(DEFAULT_STAGE_ID, joinResultSchema, projectedSchema,
         NodeHint.fromRelHints(rel.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy,
         null,
-        filterProjectRexes);
+        filterProjectRexes,
+        fetch, offset);
   }
 
   @NotNull
