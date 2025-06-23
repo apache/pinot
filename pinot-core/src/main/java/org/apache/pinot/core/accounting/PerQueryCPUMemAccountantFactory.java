@@ -482,7 +482,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
     }
 
-    protected void logQueryResourceUsage(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
+    protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
       LOGGER.warn("Current task status recorded is {}", _threadEntriesMap);
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery.toString());
     }
@@ -855,6 +855,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           System.gc();
           _numQueriesKilledConsecutively = 0;
         }
+        logQueryResourceUsage(getQueryResources());
       }
 
       /**
@@ -924,6 +925,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             interruptRunnerThread(value.getAnchorThread());
           }
         }
+        logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
       }
 
       private void interruptRunnerThread(Thread thread) {
