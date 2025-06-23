@@ -1587,7 +1587,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
    * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
    *
    * @param rebalanceConfig the rebalance configuration
-   * @param tableConfig the table configuration  
+   * @param tableConfig the table configuration
    * @param newTenant the new tenant to move segments to
    * @param shouldCommit whether segments should be committed (affects verification)
    * @param timeoutMs timeout in milliseconds
@@ -1610,9 +1610,9 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Get original consuming segments (if present)
     Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null &&
-        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null &&
-        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
+    if (rebalanceResult.getRebalanceSummaryResult() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
       originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
           .getConsumingSegmentToBeMovedSummary()
           .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()

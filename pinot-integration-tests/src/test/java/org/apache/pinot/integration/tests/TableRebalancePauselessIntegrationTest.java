@@ -306,9 +306,9 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
 
     // Get original consuming segments (if present)
     Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null &&
-        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null &&
-        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
+    if (rebalanceResult.getRebalanceSummaryResult() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
       originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
           .getConsumingSegmentToBeMovedSummary()
           .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
