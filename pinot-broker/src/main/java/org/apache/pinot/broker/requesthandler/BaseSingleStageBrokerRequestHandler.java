@@ -124,6 +124,7 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -447,7 +448,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
         queryOptions.put(tableName, combinedFilters);
         pinotQuery.setQueryOptions(queryOptions);
-        CalciteSqlParser.queryRewrite(pinotQuery);
+        try {
+          CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
+        } catch (Exception e) {
+          LOGGER.error(
+              "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
+              RlsFiltersRewriter.class.getName(), e);
+        }
       });
 
       // Validate QPS quota
