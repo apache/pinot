@@ -1252,30 +1252,28 @@ public class PinotSegmentRestletResource {
             partitionIdToLatestSegment);
 
     Map<String, Object> response = new HashMap<>();
-    Map<String, Object> partitionDetails = new HashMap<>();
+    Map<Integer, Object> partitionDetails = new HashMap<>();
 
     for (Integer partitionID : partitionToOldestSegment.keySet()) {
-      Set<String> segmentToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
+      Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
       LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionID);
       LLCSegmentName latestSegment = partitionIdToLatestSegment.get(partitionID);
 
       Map<String, Object> partitionInfo = new HashMap<>();
-      partitionInfo.put("segmentsToDelete", new ArrayList<>(segmentToDeleteForPartition));
-      partitionInfo.put("smallestSegment", oldestSegment.getSegmentName());
-      partitionInfo.put("largestSegment", latestSegment.getSegmentName());
-      partitionInfo.put("segmentCount", segmentToDeleteForPartition.size());
+      partitionInfo.put("segmentsToDelete", new ArrayList<>(segmentsToDeleteForPartition));
+      partitionInfo.put("oldestSegment", oldestSegment.getSegmentName());
+      partitionInfo.put("latestSegment", latestSegment.getSegmentName());
+      partitionInfo.put("segmentCount", segmentsToDeleteForPartition.size());
 
-      partitionDetails.put("partition_" + partitionID, partitionInfo);
-
-      LOGGER.info("Partition {}: {} segments to delete from {} to {}",
-          partitionID, segmentToDeleteForPartition.size(),
-          oldestSegment.getSegmentName(), latestSegment.getSegmentName());
+      partitionDetails.put(partitionID, partitionInfo);
 
       // Only perform actual deletion if dryRun is false
       if (!dryRun) {
-        LOGGER.info("Deleting {} segments from segment: {} to segment: {} for partition: {}",
-            segmentToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID);
-        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentToDeleteForPartition), null);
+        LOGGER.info(
+            "Deleting {} segments from segment: {} to segment: {} for partition: {}. Segments being deleted are: {}",
+            segmentsToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID,
+            segmentsToDeleteForPartition);
+        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDeleteForPartition), null);
       }
     }
 
