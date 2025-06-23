@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PrimaryKeyCountChecker {
+public class PrimaryKeyCountChecker implements UtilizationChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(PrimaryKeyCountChecker.class);
   private static final long DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK = 0;
   public static final String PRIMARY_KEY_COUNT_API_PATH = "/instance/primaryKeyCount";
@@ -54,18 +54,25 @@ public class PrimaryKeyCountChecker {
     _resourceUtilizationCheckerFrequencyMs = controllerConf.getResourceUtilizationCheckerFrequency() * 1000;
   }
 
+  @Override
+  public String getName() {
+    return PrimaryKeyCountChecker.class.getSimpleName();
+  }
+
   /**
    * Check if the number of primary keys for the requested table is within the configured limits.
    */
-  public boolean isPrimaryKeyCountWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
+  @Override
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion) {
     if (_primaryKeyCountThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled
       LOGGER.debug("Primary key count threshold <= 0, which means it is disabled, returning true");
       return true;
     }
-    if (!skipRealtimeIngestion) {
-      // The primary key count check should be ignored for code paths that aren't do skip ingestion
-      LOGGER.debug("Called from a code path other than to skip realtime ingestion, returning true");
+    if (isForMinion) {
+      // The primary key count check should be ignored if isForMinion = true (this should only be set to true
+      // from the minion task code paths)
+      LOGGER.debug("Skipping primary key count check as called from Minion task generation framework");
       return true;
     }
     if (StringUtils.isEmpty(tableNameWithType)) {
@@ -116,7 +123,8 @@ public class PrimaryKeyCountChecker {
   /**
    * Compute disk utilization for the requested instances using the <code>CompletionServiceHelper</code>.
    */
-  public void computePrimaryKeyCount(BiMap<String, String> endpointsToInstances,
+  @Override
+  public void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper) {
     if (_primaryKeyCountThreshold <= DISABLE_NUMBER_OF_PRIMARY_KEYS_CHECK) {
       // The primary key count check is disabled

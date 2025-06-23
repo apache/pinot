@@ -20,9 +20,11 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.collect.BiMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import javax.annotation.Nonnull;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -46,21 +48,18 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
 
   private final PoolingHttpClientConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
-  private final DiskUtilizationChecker _diskUtilizationChecker;
-  private final PrimaryKeyCountChecker _primaryKeyCountChecker;
+  private final List<UtilizationChecker> _utilizationCheckerList;
   private final Executor _executor;
   private final PinotHelixResourceManager _helixResourceManager;
 
   public ResourceUtilizationChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, DiskUtilizationChecker diskUtilizationChecker,
-      PrimaryKeyCountChecker primaryKeyCountChecker, Executor executor,
+      ControllerMetrics controllerMetrics, @Nonnull List<UtilizationChecker> utilizationCheckerList, Executor executor,
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(TASK_NAME, config.getResourceUtilizationCheckerFrequency(),
         config.getResourceUtilizationCheckerInitialDelay());
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _diskUtilizationChecker = diskUtilizationChecker;
-    _primaryKeyCountChecker = primaryKeyCountChecker;
+    _utilizationCheckerList = utilizationCheckerList;
     _executor = executor;
     _helixResourceManager = pinotHelixResourceManager;
   }
@@ -81,8 +80,9 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       BiMap<String, String> endpointsToInstances = instanceAdminEndpoints.inverse();
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
-      _diskUtilizationChecker.computeDiskUtilization(endpointsToInstances, completionServiceHelper);
-      _primaryKeyCountChecker.computePrimaryKeyCount(endpointsToInstances, completionServiceHelper);
+      for (UtilizationChecker utilizationChecker : _utilizationCheckerList) {
+        utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

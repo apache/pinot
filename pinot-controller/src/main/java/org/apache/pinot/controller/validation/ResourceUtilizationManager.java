@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.slf4j.Logger;
@@ -28,18 +30,17 @@ public class ResourceUtilizationManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtilizationManager.class);
 
   private final boolean _isResourceUtilizationCheckEnabled;
-  private final DiskUtilizationChecker _diskUtilizationChecker;
-  private final PrimaryKeyCountChecker _primaryKeyCountChecker;
+  private final List<UtilizationChecker> _utilizationCheckerList;
 
-  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker,
-      PrimaryKeyCountChecker primaryKeyCountChecker) {
+  public ResourceUtilizationManager(ControllerConf controllerConf,
+      @Nonnull List<UtilizationChecker> utilizationCheckerList) {
     _isResourceUtilizationCheckEnabled = controllerConf.isResourceUtilizationCheckEnabled();
-    LOGGER.info("Resource utilization check is: {}", _isResourceUtilizationCheckEnabled ? "enabled" : "disabled");
-    _diskUtilizationChecker = diskUtilizationChecker;
-    _primaryKeyCountChecker = primaryKeyCountChecker;
+    LOGGER.info("Resource utilization check is: {}, with {} resource utilization checkers",
+        _isResourceUtilizationCheckEnabled ? "enabled" : "disabled", utilizationCheckerList.size());
+    _utilizationCheckerList = utilizationCheckerList;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean skipRealtimeIngestion) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean skipValidation) {
     if (!_isResourceUtilizationCheckEnabled) {
       return true;
     }
@@ -47,11 +48,16 @@ public class ResourceUtilizationManager {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    boolean isDiskUtilizationWithinLimits = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
-    boolean isPrimaryKeyCountWithinLimits =
-        _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableNameWithType, skipRealtimeIngestion);
-    LOGGER.info("isDiskUtilizationWithinLimits: {}, isPrimaryKeyCountWithinLimits: {}, skipRealtimeIngestion: {}",
-        isDiskUtilizationWithinLimits, isPrimaryKeyCountWithinLimits, skipRealtimeIngestion);
-    return isDiskUtilizationWithinLimits && isPrimaryKeyCountWithinLimits;
+    boolean overallIsResourceUtilizationWithinLimits = true;
+    for (UtilizationChecker utilizationChecker : _utilizationCheckerList) {
+      boolean isResourceUtilizationWithinLimits =
+          utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, skipValidation);
+      LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, skipValidation: {}",
+          utilizationChecker.getName(), isResourceUtilizationWithinLimits, skipValidation);
+      if (!isResourceUtilizationWithinLimits) {
+        overallIsResourceUtilizationWithinLimits = false;
+      }
+    }
+    return overallIsResourceUtilizationWithinLimits;
   }
 }

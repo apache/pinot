@@ -123,6 +123,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -213,6 +214,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _rebalancerExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
+  protected List<UtilizationChecker> _utilizationCheckerList;
   protected DiskUtilizationChecker _diskUtilizationChecker;
   protected PrimaryKeyCountChecker _primaryKeyCountChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
@@ -275,6 +277,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
     }
+
+    _utilizationCheckerList = new ArrayList<>();
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
@@ -557,8 +561,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
     _primaryKeyCountChecker = new PrimaryKeyCountChecker(_helixResourceManager, _config);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_config, _diskUtilizationChecker,
-        _primaryKeyCountChecker);
+    _utilizationCheckerList.add(_diskUtilizationChecker);
+    _utilizationCheckerList.add(_primaryKeyCountChecker);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_config, _utilizationCheckerList);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
     _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
@@ -908,8 +913,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         _controllerMetrics, _executorService, _connectionManager);
     periodicTasks.add(responseStoreCleaner);
     PeriodicTask resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
-        _controllerMetrics, _diskUtilizationChecker, _primaryKeyCountChecker, _executorService,
-        _helixResourceManager);
+        _controllerMetrics, _utilizationCheckerList, _executorService, _helixResourceManager);
     periodicTasks.add(resourceUtilizationChecker);
 
     return periodicTasks;

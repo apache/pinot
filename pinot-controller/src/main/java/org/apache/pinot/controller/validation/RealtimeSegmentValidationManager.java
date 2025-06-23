@@ -157,7 +157,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
     // Perform resource utilization checks.
     boolean isResourceUtilizationWithinLimits =
-        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType, true);
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType, false);
     if (!isResourceUtilizationWithinLimits) {
       LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,

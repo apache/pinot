@@ -66,15 +66,15 @@ public class PrimaryKeyCountCheckerTest {
   @Test
   public void testNumberOfPrimaryKeysCheckerWithNullOrEmptyTableName() {
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(null, true));
+        () -> _primaryKeyCountChecker.isResourceUtilizationWithinLimits(null, false));
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits("", true));
+        () -> _primaryKeyCountChecker.isResourceUtilizationWithinLimits("", false));
 
-    // If skipRealtimeIngestion = false (i.e. code paths initiated by the Minion side) no exception should be thrown,
+    // If isForMinion = true (i.e. code paths initiated by the Minion side) no exception should be thrown,
     // and true should always be returned
-    boolean value = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(null, false);
+    boolean value = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(null, true);
     Assert.assertTrue(value);
-    value = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits("", false);
+    value = _primaryKeyCountChecker.isResourceUtilizationWithinLimits("", true);
     Assert.assertTrue(value);
   }
 
@@ -84,10 +84,10 @@ public class PrimaryKeyCountCheckerTest {
     String tableName = "test_OFFLINE";
     when(_helixResourceManager.getTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -96,10 +96,10 @@ public class PrimaryKeyCountCheckerTest {
     String tableName = "test_REALTIME";
     when(_helixResourceManager.getTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -125,10 +125,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -156,10 +156,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -186,10 +186,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -216,10 +216,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -246,10 +246,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertFalse(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -276,10 +276,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertFalse(result);
 
-    result = _primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = _primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -314,10 +314,10 @@ public class PrimaryKeyCountCheckerTest {
     primaryKeyCountInfoMap.put("server2", primaryKeyCountInfo2);
     ResourceUtilizationInfo.setPrimaryKeyCountInfo(primaryKeyCountInfoMap);
 
-    boolean result = primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, true);
+    boolean result = primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, false);
     Assert.assertTrue(result);
 
-    result = primaryKeyCountChecker.isPrimaryKeyCountWithinLimits(tableName, false);
+    result = primaryKeyCountChecker.isResourceUtilizationWithinLimits(tableName, true);
     Assert.assertTrue(result);
   }
 
@@ -364,7 +364,7 @@ public class PrimaryKeyCountCheckerTest {
     Assert.assertEquals(primaryKeyCountInfo2.getLastUpdatedTimeInEpochMs(), -1L);
 
     // The ResourceUtilizationInfo should be updated after this
-    _primaryKeyCountChecker.computePrimaryKeyCount(instanceAdminEndpoints.inverse(), completionServiceHelper);
+    _primaryKeyCountChecker.computeResourceUtilization(instanceAdminEndpoints.inverse(), completionServiceHelper);
 
     // The primary key counts should be updated
     primaryKeyCountInfo1 = ResourceUtilizationInfo.getPrimaryKeyCountInfo("server1");

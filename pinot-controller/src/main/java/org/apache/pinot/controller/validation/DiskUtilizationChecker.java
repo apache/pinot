@@ -36,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DiskUtilizationChecker {
+public class DiskUtilizationChecker implements UtilizationChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(DiskUtilizationChecker.class);
   private final int _resourceUtilizationCheckTimeoutMs;
   private final long _resourceUtilizationCheckerFrequencyMs;
@@ -54,10 +54,16 @@ public class DiskUtilizationChecker {
     _resourceUtilizationCheckerFrequencyMs = controllerConf.getResourceUtilizationCheckerFrequency() * 1000;
   }
 
+  @Override
+  public String getName() {
+    return DiskUtilizationChecker.class.getSimpleName();
+  }
+
   /**
    * Check if disk utilization for the requested table is within the configured limits.
    */
-  public boolean isDiskUtilizationWithinLimits(String tableNameWithType) {
+  @Override
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion) {
     if (StringUtils.isEmpty(tableNameWithType)) {
       throw new IllegalArgumentException("Table name found to be null or empty while computing disk utilization.");
     }
@@ -102,7 +108,8 @@ public class DiskUtilizationChecker {
   /**
    * Compute disk utilization for the requested instances using the <code>CompletionServiceHelper</code>.
    */
-  public void computeDiskUtilization(BiMap<String, String> endpointsToInstances,
+  @Override
+  public void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper) {
     List<String> diskUtilizationUris = new ArrayList<>(endpointsToInstances.size());
     for (String endpoint : endpointsToInstances.keySet()) {
