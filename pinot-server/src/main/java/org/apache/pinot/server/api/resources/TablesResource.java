@@ -571,7 +571,7 @@ public class TablesResource {
           finalValidDocIdsType, validDocIdsBytes, segmentStatus,
           _serverInstance.getInstanceDataManager().getInstanceId(), serverStatus);
     } catch (Exception e) {
-      LOGGER.warn("Failed to get segment status from Helix for table {}: {}", tableNameWithType, e.getMessage());
+      LOGGER.error("Failed to get validDocIds for table {}: {}", tableNameWithType, e.getMessage());
       return null;
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
