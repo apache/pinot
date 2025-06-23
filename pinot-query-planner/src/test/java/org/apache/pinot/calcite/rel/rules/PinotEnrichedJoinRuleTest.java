@@ -24,6 +24,7 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelCollation;
@@ -168,6 +169,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerFilterJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -205,6 +207,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerProjectJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -242,6 +245,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerProjectFilterJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -284,6 +288,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerFilterProjectJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -330,6 +335,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerLimitFilterProjectJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -383,6 +389,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleWithPlannerLimitProjectFilterJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
@@ -436,6 +443,7 @@ public class PinotEnrichedJoinRuleTest {
   public void testRuleRejectSortWithCollationProjectFilterJoinCase() {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
     RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
     cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
