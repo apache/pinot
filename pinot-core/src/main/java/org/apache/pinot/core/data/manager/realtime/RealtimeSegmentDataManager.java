@@ -965,6 +965,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (!_shouldStop) {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
+
+      if ((_stopReason != null) && (_stopReason.equals(SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP)
+          || _stopReason.equals(SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED))) {
+        // If consumer is ending its execution and stop reason is either reached end of partition or force commit of the
+        // segment, There is a possibility that this server is not going to host the next consuming segment. Hence,
+        // mark this segment for verification so that the ingestionDelayTracker can remove ingestion metrics from
+        // this server no new consuming segment exists.
+        _realtimeTableDataManager.getIngestionDelayTracker().markPartitionForVerification(_segmentNameStr);
+      }
     }
 
     private void handleSegmentBuildFailure() {

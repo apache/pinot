@@ -902,6 +902,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return Collections.emptyMap();
   }
 
+  public IngestionDelayTracker getIngestionDelayTracker() {
+    return _ingestionDelayTracker;
+  }
+
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
     IngestionConfig ingestionConfig = getCachedTableConfigAndSchema().getLeft().getIngestionConfig();
