@@ -687,7 +687,7 @@ public class TablesResource {
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
     int nonImmutableSegmentCount = 0;
-    int missingValidDocIdSnapshotSegmentCount = 0;
+    List<String> missingValidDocsSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers;
     if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -731,7 +731,6 @@ public class TablesResource {
         LOGGER.warn("Failed to get segment status from Helix for table {}: {}", tableNameWithType, e.getMessage());
         // Continue without segment status information
       }
-
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
@@ -761,7 +760,7 @@ public class TablesResource {
                 segmentDataManager.getSegmentName(), validDocIdsType);
             LOGGER.debug(msg);
           }
-          missingValidDocIdSnapshotSegmentCount++;
+          missingValidDocsSegments.add(segmentDataManager.getSegmentName());
           continue;
         }
 
@@ -789,10 +788,10 @@ public class TablesResource {
         LOGGER.warn("Table {} has {} non-immutable segments found while processing validDocIdsMetadata",
             tableNameWithType, nonImmutableSegmentCount);
       }
-      if (missingValidDocIdSnapshotSegmentCount > 0) {
-        LOGGER.warn("Found that validDocIds is missing for {} segments while processing validDocIdsMetadata "
-                + "for table {} while reading the validDocIds with validDocIdType {}. ",
-            missingValidDocIdSnapshotSegmentCount, tableNameWithType, validDocIdsType);
+      if (!missingValidDocsSegments.isEmpty()) {
+        LOGGER.warn("Found that validDocIds is missing for segments {} while processing validDocIdsMetadata "
+                + "for table {} while reading the validDocIds with validDocIdType {}. ", missingValidDocsSegments,
+            tableNameWithType, validDocIdsType);
       }
       return allValidDocIdsMetadata;
     } finally {
