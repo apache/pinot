@@ -124,7 +124,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // get server to segment mappings
       PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
-      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getOnlineServerToSegmentsMap(tableNameWithType);
       BiMap<String, String> serverToEndpoints;
       try {
         serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());

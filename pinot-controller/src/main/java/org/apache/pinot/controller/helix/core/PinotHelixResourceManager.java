@@ -3236,6 +3236,36 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the servers to segments map for which servers are ONLINE in external view for those segments in IDEAL STATE
+   */
+  public Map<String, List<String>> getOnlineServerToSegmentsMap(String tableNameWithType) {
+    Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal State does not exist for table: " + tableNameWithType);
+    }
+    if (externalView == null) {
+      throw new IllegalStateException("External View state does not exist for table: " + tableNameWithType);
+    }
+
+    Map<String, Map<String, String>> externalViewMap = externalView.getRecord().getMapFields();
+    Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> externalViewStateMap = externalViewMap.get(segmentName);
+      for (Map.Entry<String, String> instanceStateEntry : externalViewStateMap.entrySet()) {
+        String server = instanceStateEntry.getKey();
+        if (instanceStateEntry.getValue().equals(SegmentStateModel.ONLINE)) {
+          serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+        }
+      }
+    }
+    return serverToSegmentsMap;
+  }
+
+  /**
    * Returns a map from server instance to count of segments it serves for the given table. Ignore OFFLINE segments from
    * the ideal state because they are not supposed to be served.
    */
