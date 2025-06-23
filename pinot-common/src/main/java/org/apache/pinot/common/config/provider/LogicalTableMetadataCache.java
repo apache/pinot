@@ -246,7 +246,7 @@ public class LogicalTableMetadataCache {
       try {
         LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
         String logicalTableName = logicalTableConfig.getTableName();
-        LogicalTableConfig oldLogicalTableConfig = _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
+        LogicalTableConfig oldLogicalTableConfig = _logicalTableConfigMap.get(logicalTableName);
         Preconditions.checkArgument(oldLogicalTableConfig != null,
             "Logical table config for logical table: %s should have been created before", logicalTableName);
 
@@ -269,6 +269,7 @@ public class LogicalTableMetadataCache {
             && !logicalTableConfig.getRefRealtimeTableName().equals(oldLogicalTableConfig.getRefRealtimeTableName())) {
           addTableConfig(logicalTableConfig.getRefRealtimeTableName(), logicalTableName);
         }
+        _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
         LOGGER.info("Updated the logical table config: {} in cache", logicalTableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception while refreshing logical table for ZNRecord: {}", znRecord.getId(), e);
