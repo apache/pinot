@@ -1486,7 +1486,9 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       rebalanceConfig.setIncludeConsuming(true);
       // notice that this could get an HTTP 409 CONFLICT, when the test failed due to the timeout waiting on the table
       // to converge, and try to rebalance again here. So we need to cancel the original job first.
-      sendDeleteRequest(StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance") + "?type=" + tableConfig.getTableType().toString());
+      sendDeleteRequest(
+          StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
+              + "?type=" + tableConfig.getTableType().toString());
       String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
