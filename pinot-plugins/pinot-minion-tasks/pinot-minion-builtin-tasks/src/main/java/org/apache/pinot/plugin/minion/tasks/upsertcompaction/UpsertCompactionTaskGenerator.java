@@ -231,8 +231,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
         // server is NOT READY as UPDATING segments might be updating the ONLINE segments
         if (!validDocIdsMetadata.getServerStatus().equals("OK")) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}", validDocIdsMetadata.getInstanceId(),
-              validDocIdsMetadata.getServerStatus(), MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
+          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
+              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
+              MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
           continue;
         }
 
@@ -244,15 +245,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
             && totalInvalidDocs >= invalidRecordsThresholdCount) {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                          + "(count threshold: {}, percent threshold: {}), adding it to the compaction list",
-                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
-                  invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), adding it to the compaction list", segmentName,
+              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
           segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
         } else {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                          + "(count threshold: {}, percent threshold: {}), skipping it for compaction",
-                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
-                  invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), skipping it for compaction", segmentName,
+              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
         }
         break;
       }
