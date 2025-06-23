@@ -22,9 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -57,20 +55,6 @@ public class Quickstart extends QuickStartBase {
 
   public AuthProvider getAuthProvider() {
     return null;
-  }
-
-  @Override
-  protected Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
-    properties.put("requestThrottlingMemoryThresholdBytes", 400 * 1000 * 1000);
-    return properties;
-  }
-
-  @Override
-  protected String[] getDefaultBatchTableDirectories() {
-    return new String[]{
-        "examples/batch/githubComplexTypeEvents"
-    };
   }
 
   public void execute()
@@ -117,6 +101,46 @@ public class Quickstart extends QuickStartBase {
 
   protected int getNumQuickstartRunnerServers() {
     return 1;
+  }
+
+  @Override
+  public void runSampleQueries(QuickstartRunner runner)
+      throws Exception {
+    String q1 = "select count(*) from baseballStats limit 1";
+    printStatus(Color.YELLOW, "Total number of documents in the table");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q2 = "select playerName, sum(runs) from baseballStats group by playerName order by sum(runs) desc limit 5";
+    printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q3 =
+        "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) "
+            + "desc limit 5";
+    printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
+    printStatus(Color.CYAN, "Query : " + q3);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q4 =
+        "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) "
+            + "desc limit 10";
+    printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
+    printStatus(Color.CYAN, "Query : " + q4);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q5 = "select playerName, runs, homeRuns from baseballStats order by yearID limit 10";
+    printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
+    printStatus(Color.CYAN, "Query : " + q5);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    runVectorQueryExamples(runner);
   }
 
   public static void main(String[] args)
