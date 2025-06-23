@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
@@ -89,7 +88,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   // TODO: check null in advance and do code specialization
 
   /** limit on a row, return false if the limit reached before adding this row */
-  private boolean limitRow(List<Object> row) {
+  private boolean limitRow() {
     // limit only, terminate if enough rows
     if (_rowsSeen++ == _numRowsToKeep) {
       earlyTerminate();
@@ -105,13 +104,28 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return BooleanUtils.isTrueInternalValue(filterResult);
   }
 
-  /** return the projected rowView */
-  private List<Object> projectRow(List<Object> rowView, List<TransformOperand> project) {
+  /** filter a row */
+  private boolean filterRow(Object[] row, TransformOperand filter) {
+    Object filterResult = filter.apply(row);
+    return BooleanUtils.isTrueInternalValue(filterResult);
+  }
+
+  /** return the projected row */
+  private Object[] projectRow(List<Object> rowView, List<TransformOperand> project) {
     Object[] resultRow = new Object[project.size()];
     for (int i = 0; i < project.size(); i++) {
       resultRow[i] = project.get(i).apply(rowView);
     }
-    return Arrays.asList(resultRow);
+    return resultRow;
+  }
+
+  /** return the projected row from input row */
+  private Object[] projectRow(Object[] row, List<TransformOperand> project) {
+    Object[] resultRow = new Object[project.size()];
+    for (int i = 0; i < project.size(); i++) {
+      resultRow[i] = project.get(i).apply(row);
+    }
+    return resultRow;
   }
 
   /** read result from _priorityQueue if sort needed, else return rows */
@@ -133,42 +147,59 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   private void filterProjectLimit(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
     // TODO: this should handle different orders of filter, project
-    List<Object> row = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
+    List<Object> rowView = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
+    Object[] row = null;
 
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
-        if (!filterRow(row, filterProjectOperand.getFilter())) {
+        // use rowView before reaching a project
+        if (row == null
+            ? filterRow(rowView, filterProjectOperand.getFilter())
+            : filterRow(row, filterProjectOperand.getFilter())
+        ) {
           return;
         }
       } else {
-        row = projectRow(row, filterProjectOperand.getProject());
+        row = row == null
+            ? projectRow(rowView, filterProjectOperand.getProject())
+            : projectRow(row, filterProjectOperand.getProject());
       }
     }
 
-    if (!limitRow(row)) {
+    if (!limitRow()) {
       return;
     }
 
-    rows.add(row.toArray());
+    // if filter only, materialize rowView at the end
+    rows.add(row == null ? rowView.toArray() : row);
   }
 
   /** filter, project on a joined row view */
-  private void filterProjectLimit(List<Object> row, List<Object[]> rows) {
+  private void filterProjectLimit(List<Object> rowView, List<Object[]> rows) {
+    Object[] row = null;
+
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
-        if (!filterRow(row, filterProjectOperand.getFilter())) {
+        // use rowView before reaching a project
+        if (row == null
+            ? filterRow(rowView, filterProjectOperand.getFilter())
+            : filterRow(row, filterProjectOperand.getFilter())
+        ) {
           return;
         }
       } else {
-        row = projectRow(row, filterProjectOperand.getProject());
+        row = row == null
+            ? projectRow(rowView, filterProjectOperand.getProject())
+            : projectRow(row, filterProjectOperand.getProject());
       }
     }
 
-    if (!limitRow(row)) {
+    if (!limitRow()) {
       return;
     }
 
-    rows.add(row.toArray());
+    // if filter only, materialize rowView at the end
+    rows.add(row == null ? rowView.toArray() : row);
   }
 
   /**
