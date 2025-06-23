@@ -43,6 +43,7 @@ public class AuthQuickstart extends Quickstart {
   @Override
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
+    properties.put("pinot.broker.grpc.port", "8010");
     properties.putAll(AuthUtils.getAuthQuickStartDefaultConfigs());
     return properties;
   }
