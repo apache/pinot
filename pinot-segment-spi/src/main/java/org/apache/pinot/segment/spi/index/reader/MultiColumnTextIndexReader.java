@@ -37,7 +37,6 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
   /**
    * Returns the matching document ids for the given search query against given column with options string.
    * Lucene-based multi-column text index readers should implement this method.
-   * 
    * @param column The column name to search
    * @param searchQuery The search query string
    * @param optionsString Options string in format "key1=value1,key2=value2", can be null

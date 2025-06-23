@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.util.Map;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -40,7 +39,6 @@ public interface TextIndexReader extends IndexReader {
    * Returns the matching document ids for the given search query with options string.
    * This method allows passing options as a string parameter that will be parsed internally.
    * Lucene-based text index readers should implement this method.
-   * 
    * @param searchQuery The search query string
    * @param optionsString Options string in format "key1=value1,key2=value2", can be null
    * @return Matching document ids
