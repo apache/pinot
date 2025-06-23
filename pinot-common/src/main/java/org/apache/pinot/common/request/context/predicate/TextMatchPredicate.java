@@ -30,12 +30,10 @@ public class TextMatchPredicate extends BasePredicate {
   private final String _options;
 
   public TextMatchPredicate(ExpressionContext lhs, String value) {
-    super(lhs);
-    _value = value;
-    _options = null;
+    this(lhs, value, null);
   }
 
-  public TextMatchPredicate(ExpressionContext lhs, String value, String options) {
+  public TextMatchPredicate(ExpressionContext lhs, String value, @Nullable String options) {
     super(lhs);
     _value = value;
     _options = options;
