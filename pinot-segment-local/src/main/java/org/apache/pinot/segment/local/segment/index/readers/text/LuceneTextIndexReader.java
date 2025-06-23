@@ -162,7 +162,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Deprecated
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    throw new UnsupportedOperationException("Not supported. Use getDocIds(String, String) instead.");
+    return getDocIds(searchQuery, null);
   }
 
   @Override
