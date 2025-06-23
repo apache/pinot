@@ -94,6 +94,7 @@ public abstract class BaseResourceTest {
   protected AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
   protected String _instanceId;
+  protected ServerInstance _serverInstance;
 
   @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
@@ -114,17 +115,19 @@ public abstract class BaseResourceTest {
     when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
 
     // Mock the server instance
-    ServerInstance serverInstance = mock(ServerInstance.class);
-    when(serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
-    when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
-    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
+    _serverInstance = mock(ServerInstance.class);
+    when(_serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
+    when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
+    when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         FileUtils.getTempDirectoryPath());
-
+    
     // Create a single HelixManager mock with proper segment data
     HelixManager helixManager = mock(HelixManager.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixManager.getClusterName()).thenReturn("testCluster");
+    
+    when(_serverInstance.getHelixManager()).thenReturn(helixManager);
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
@@ -151,7 +154,7 @@ public abstract class BaseResourceTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
@@ -212,13 +215,10 @@ public abstract class BaseResourceTest {
     TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(tableNameWithType).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType)).build();
-
-    // Create a properly configured HelixManager mock
-    HelixManager helixManager = mock(HelixManager.class);
-    HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
-    when(helixManager.getClusterName()).thenReturn("testCluster");
-
+    
+    // Get the HelixManager from the server instance (already configured in setUp)
+    HelixManager helixManager = _serverInstance.getHelixManager();
+    
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager performs
     //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
