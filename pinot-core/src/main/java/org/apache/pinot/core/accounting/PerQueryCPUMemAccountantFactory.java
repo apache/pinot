@@ -487,6 +487,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery.toString());
     }
 
+    protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
+      LOGGER.error("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
+          queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
+          queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage);
+    }
+
     @Override
     public Exception getErrorStatus() {
       return _threadLocalEntry.get()._errorStatus.getAndSet(null);
@@ -855,6 +861,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           System.gc();
           _numQueriesKilledConsecutively = 0;
         }
+        Map<String, ? extends QueryResourceTracker> queryResources = getQueryResources();
+        for (QueryResourceTracker queryResourceTracker : queryResources.values()) {
+          logTerminatedQuery(queryResourceTracker, _usedBytes);
+        }
         logQueryResourceUsage(getQueryResources());
       }
 
@@ -898,8 +908,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                     " Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                     maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
             interruptRunnerThread(maxUsageTuple.getAnchorThread());
-            LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed true}",
-                maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+            logTerminatedQuery(maxUsageTuple, _usedBytes);
           } else if (!_oomKillQueryEnabled) {
             LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
                     + "because oomKillQueryEnabled is false",
@@ -923,6 +932,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
             interruptRunnerThread(value.getAnchorThread());
+            logTerminatedQuery(value, _usedBytes);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
