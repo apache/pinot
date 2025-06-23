@@ -159,12 +159,20 @@ public class LuceneTextIndexReader implements TextIndexReader {
     throw new UnsupportedOperationException("");
   }
 
+  @Deprecated
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    java.util.Map.Entry<String, java.util.Map<String, String>> result =
-        LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
-    if (result != null) {
-      return getDocIdsWithOptions(result.getKey(), result.getValue());
+    throw new UnsupportedOperationException("Not supported. Use getDocIds(String, String) instead.");
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(String searchQuery, String optionsString) {
+    Map<String, String> options = null;
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      options = LuceneTextIndexUtils.parseOptionsString(optionsString);
+    }
+    if (options != null && !options.isEmpty()) {
+      return getDocIdsWithOptions(searchQuery, options);
     }
     return getDocIdsWithoutOptions(searchQuery);
   }

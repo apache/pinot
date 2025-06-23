@@ -350,11 +350,13 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(String column, String searchQuery) {
-    java.util.Map.Entry<String, java.util.Map<String, String>> result =
-        org.apache.pinot.segment.local.utils.LuceneTextIndexUtils.parseOptionsFromSearchString(searchQuery);
-    if (result != null) {
-      return getDocIdsWithOptions(column, result.getKey(), result.getValue());
+  public MutableRoaringBitmap getDocIds(String column, String searchQuery, String optionsString) {
+    Map<String, String> options = null;
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      options = LuceneTextIndexUtils.parseOptionsString(optionsString);
+    }
+    if (options != null && !options.isEmpty()) {
+      return getDocIdsWithOptions(column, searchQuery, options);
     } else {
       return getDocIdsWithoutOptions(column, searchQuery);
     }

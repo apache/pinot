@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
@@ -41,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for Lucene text index operations.
- * Contains common methods for parsing __OPTIONS and creating query parsers.
+ * Contains common methods for parsing options and creating query parsers.
  */
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
@@ -80,89 +77,6 @@ public class LuceneTextIndexUtils {
     SpanNearQuery spanNearQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
     LOGGER.debug("The phrase query {} is re-written as {}", query, spanNearQuery);
     return spanNearQuery;
-  }
-
-  /**
-   * Parses search options from a search query string.
-   * The options can be specified anywhere in the query using __OPTIONS(...) syntax.
-   * For example: "term1 __OPTIONS(parser=CLASSIC) AND term2 __OPTIONS(analyzer=STANDARD)"
-   * Options from later occurrences will override earlier ones.
-   *
-   * @param searchQuery The search query string
-   * @return A Map.Entry containing the cleaned search term and options map, or null if no options found
-   */
-  public static Map.Entry<String, Map<String, String>> parseOptionsFromSearchString(String searchQuery) {
-    try {
-      // Early check for __OPTIONS to avoid unnecessary processing
-      if (searchQuery == null || !searchQuery.contains("__OPTIONS")) {
-        return null;
-      }
-
-      // Pattern to match __OPTIONS(...) with word boundaries
-      // (?<!\\\\) - negative lookbehind to avoid escaped __OPTIONS
-      // \\b - word boundary to ensure __OPTIONS is standalone
-      // __OPTIONS\\((.*?)\\) - non-greedy match for content inside parentheses
-      Pattern pattern = Pattern.compile("(?<!\\\\)\\b__OPTIONS\\((.*?)\\)");
-      Matcher matcher = pattern.matcher(searchQuery);
-
-      Map<String, String> mergedOptions = new HashMap<>();
-      boolean foundOptions = false;
-
-      // Find all __OPTIONS and parse them
-      while (matcher.find()) {
-        foundOptions = true;
-        String optionsStr = matcher.group(1).trim();
-
-        // Check for nested parentheses - not allowed
-        if (optionsStr.contains("(") || optionsStr.contains(")")) {
-          LOGGER.warn("Malformed search string: nested parentheses not allowed in __OPTIONS: {}", searchQuery);
-          return null;
-        }
-
-        // Skip empty options
-        if (!optionsStr.isEmpty()) {
-          // Parse options
-          for (String option : optionsStr.split(",")) {
-            String[] parts = option.trim().split("=");
-            if (parts.length == 2) {
-              String key = parts[0].trim();
-              String value = parts[1].trim();
-              if (!key.isEmpty() && !value.isEmpty()) {
-                // Check for maximum length (2k characters)
-                if (value.length() > 2000) {
-                  LOGGER.warn("Malformed search string: option value too long (max 2000 chars): {}", searchQuery);
-                  return null;
-                }
-                mergedOptions.put(key, value);
-              } else {
-                LOGGER.warn("Malformed search string: empty key or value in option: {}", searchQuery);
-                return null;
-              }
-            } else {
-              LOGGER.warn("Malformed search string: invalid option format (expected key=value): {}", searchQuery);
-              return null;
-            }
-          }
-        }
-      }
-
-      // If no valid options found, return null
-      if (!foundOptions || mergedOptions.isEmpty()) {
-        return null;
-      }
-
-      // Remove all __OPTIONS blocks from the search term
-      String actualSearchTerm = pattern.matcher(searchQuery).replaceAll("").trim();
-      // Clean up extra whitespace and fix multiple consecutive operators
-      String result = actualSearchTerm.replaceAll("\\s+", " ").trim();
-      result = result.replaceAll("\\b(AND|OR|NOT)\\s+\\1\\b", "$1");
-      result = result.replaceAll("\\s+", " ").trim();
-
-      return new AbstractMap.SimpleEntry<>(result, mergedOptions);
-    } catch (Exception e) {
-      LOGGER.warn("Error parsing options from search string: {}", searchQuery, e);
-      return null;
-    }
   }
 
   /**
@@ -278,5 +192,34 @@ public class LuceneTextIndexUtils {
       String msg = "Failed to create or parse query: " + e.getMessage();
       throw new RuntimeException(msg, e);
     }
+  }
+
+  /**
+   * Parses options from a separate options string parameter.
+   * The options should be in the format: "key1=value1,key2=value2,key3=value3"
+   *
+   * @param optionsString The options string in key=value format
+   * @return A Map containing the parsed options, or empty map if optionsString is null/empty
+   */
+  public static Map<String, String> parseOptionsString(String optionsString) {
+    if (optionsString == null || optionsString.trim().isEmpty()) {
+      return new HashMap<>();
+    }
+
+    Map<String, String> options = new HashMap<>();
+    String[] keyValuePairs = optionsString.split(",");
+    for (String keyValuePair : keyValuePairs) {
+      String[] parts = keyValuePair.trim().split("=");
+      if (parts.length == 2) {
+        String key = parts[0].trim();
+        String value = parts[1].trim();
+        if (!key.isEmpty() && !value.isEmpty()) {
+          options.put(key, value);
+        }
+      } else {
+        LOGGER.warn("Invalid option format (expected key=value): {}", keyValuePair);
+      }
+    }
+    return options;
   }
 }

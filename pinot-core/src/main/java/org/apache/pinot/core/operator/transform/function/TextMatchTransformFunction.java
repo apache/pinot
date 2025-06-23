@@ -36,6 +36,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class TextMatchTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "textMatch";
   private String _predicate;
+  private String _options;
   private TextIndexReader _textIndexReader;
 
   @Override
@@ -75,6 +76,19 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     }
 
     _predicate = ((LiteralTransformFunction) predicate).getStringLiteral();
+
+    // Handle optional third parameter for options
+    if (arguments.size() > 2) {
+      TransformFunction options = arguments.get(2);
+      if (!(options instanceof LiteralTransformFunction && options.getResultMetadata().isSingleValue())) {
+        throw new IllegalArgumentException(
+            "The third argument of TEXT_MATCH transform function must be a single-valued string literal");
+      }
+      _options = ((LiteralTransformFunction) options).getStringLiteral();
+    } else {
+      _options = null;
+    }
+
     _textIndexReader = indexReader;
   }
 
@@ -83,7 +97,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     initZeroFillingIntValuesSV(length);
 
     int[] docIds = valueBlock.getDocIds();
-    MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate);
+    MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate, _options);
 
     for (int i = 0; i < length; i++) {
       if (indexDocIds.contains(docIds[i])) {
