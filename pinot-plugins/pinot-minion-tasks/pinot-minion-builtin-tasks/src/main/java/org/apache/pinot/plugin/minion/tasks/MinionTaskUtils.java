@@ -32,7 +32,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -196,8 +195,8 @@ public class MinionTaskUtils {
    * deepstore copy (expectedCrc).
    */
   @Nullable
-  public static ValidDocIdsBitmapResponse getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
+  public static ValidDocIdsBitmapResponse getValidDocIdFromServerMatchingCrc(String tableNameWithType,
+      String segmentName, String validDocIdsType, MinionContext minionContext, String expectedCrc) {
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     RoaringBitmap validDocIds = null;

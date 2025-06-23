@@ -110,8 +110,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
 
     // Fetch validDocID snapshot from server and get record-reader for compacted reader.
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
-      ValidDocIdsBitmapResponse validDocIdsBitmapResponse = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
+      ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
+          MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
+              ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
       RoaringBitmap validDocIds = null;
       if (validDocIdsBitmapResponse != null) {
         validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());

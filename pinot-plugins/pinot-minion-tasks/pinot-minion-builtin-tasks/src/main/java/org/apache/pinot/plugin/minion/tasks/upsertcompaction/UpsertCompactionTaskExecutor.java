@@ -74,9 +74,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
-    ValidDocIdsBitmapResponse
-        validDocIdsBitmapResponse = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-        MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
+        MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
     RoaringBitmap validDocIds = null;
     if (validDocIdsBitmapResponse != null) {
       validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
