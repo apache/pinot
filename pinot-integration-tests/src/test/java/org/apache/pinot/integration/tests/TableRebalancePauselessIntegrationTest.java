@@ -129,7 +129,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     tableConfigStrictReplicaGroup.setRoutingConfig(
         new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
             false));
-    tableConfigStrictReplicaGroup.setTenantConfig(new TenantConfig(getBrokerTenant(), originalTenantStrictReplicaGroup, null));
+    tableConfigStrictReplicaGroup.setTenantConfig(
+        new TenantConfig(getBrokerTenant(), originalTenantStrictReplicaGroup, null));
     tableConfigStrictReplicaGroup.getValidationConfig().setReplication("2");
     tableConfigStrictReplicaGroup.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
@@ -144,7 +145,6 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       throws Exception {
     final String tenantA = tableConfig.getTenantConfig().getServer();
     final String tenantB = tenantA + "_new";
-
 
     BaseServerStarter serverStarter0 = startOneServer(0);
     BaseServerStarter serverStarter1 = startOneServer(1);
@@ -181,18 +181,19 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
         rebalanceConfig.setBatchSizePerServer(1);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
 
-        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be committed
+        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
+        // committed
         rebalanceConfig.setIncludeConsuming(false);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
       } else {
         // test: move segments from tenantA to tenantB
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
 
-        // test: move segment from tenantB to tenantA with includeConsuming = false, consuming segment should not be committed
+        // test: move segment from tenantB to tenantA with includeConsuming = false, consuming segment should not be
+        // committed
         rebalanceConfig.setIncludeConsuming(false);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, false, 30000);
       }
-
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
     } finally {
@@ -258,16 +259,19 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
    * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
    */
   void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-      boolean shouldCommit, long timeoutMs) throws Exception {
+      boolean shouldCommit, long timeoutMs)
+      throws Exception {
     performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
   }
 
   /**
    * Helper method to perform segment moving test with EVIS convergence wait.
-   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance completion.
+   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+   * completion.
    */
   void performSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
-      String newTenant, boolean shouldCommit, long timeoutMs) throws Exception {
+      String newTenant, boolean shouldCommit, long timeoutMs)
+      throws Exception {
     performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
   }
 
@@ -280,10 +284,12 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
    * @param newTenant the new tenant to move segments to
    * @param shouldCommit whether segments should be committed (affects verification)
    * @param timeoutMs timeout in milliseconds
-   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for rebalance completion
+   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+   *                            rebalance completion
    */
   private void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge) throws Exception {
+      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
+      throws Exception {
     // Change tenant
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), newTenant, null));
     updateTableConfig(tableConfig);

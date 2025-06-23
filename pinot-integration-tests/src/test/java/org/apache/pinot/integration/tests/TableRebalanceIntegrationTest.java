@@ -1402,7 +1402,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfigStrictReplicaGroup.setRoutingConfig(
         new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
             false));
-    tableConfigStrictReplicaGroup.setTenantConfig(new TenantConfig(getBrokerTenant(), originalTenantStrictReplicaGroup, null));
+    tableConfigStrictReplicaGroup.setTenantConfig(
+        new TenantConfig(getBrokerTenant(), originalTenantStrictReplicaGroup, null));
     tableConfigStrictReplicaGroup.getValidationConfig().setReplication("2");
 
     return new Object[][]{
@@ -1453,7 +1454,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         rebalanceConfig.setBatchSizePerServer(1);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
 
-        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be committed
+        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
+        // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
@@ -1465,15 +1467,15 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         rebalanceConfig.setDowntime(true);
         performSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true, 30000);
 
-        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be committed
+        // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
+        // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
         performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
       }
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
-    }
-    finally {
+    } finally {
       // Resume the table
       tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
       tableConfig.getValidationConfig().setReplication("1");
@@ -1494,7 +1496,6 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       serverStarter3.stop();
     }
   }
-
 
   private String getReloadJobIdFromResponse(String response) {
     Pattern pattern = new JavaUtilPattern("([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})");
@@ -1562,16 +1563,19 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
    * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
    */
   void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-                                        boolean shouldCommit, long timeoutMs) throws Exception {
+      boolean shouldCommit, long timeoutMs)
+      throws Exception {
     performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
   }
 
   /**
    * Helper method to perform segment moving test with EVIS convergence wait.
-   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance completion.
+   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+   * completion.
    */
   void performSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
-                                                        String newTenant, boolean shouldCommit, long timeoutMs) throws Exception {
+      String newTenant, boolean shouldCommit, long timeoutMs)
+      throws Exception {
     performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
   }
 
@@ -1584,10 +1588,12 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
    * @param newTenant the new tenant to move segments to
    * @param shouldCommit whether segments should be committed (affects verification)
    * @param timeoutMs timeout in milliseconds
-   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for rebalance completion
+   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+   *                            rebalance completion
    */
   private void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-                                        boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge) throws Exception {
+      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
+      throws Exception {
     // Change tenant
     tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), newTenant, null));
     updateTableConfig(tableConfig);
@@ -1601,8 +1607,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Get original consuming segments (if present)
     Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null && 
-        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null && 
+    if (rebalanceResult.getRebalanceSummaryResult() != null &&
+        rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null &&
         rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
       originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
           .getConsumingSegmentToBeMovedSummary()
