@@ -129,6 +129,8 @@ message EnrichedJoinNode {
   Expression matchCondition = 6;
   repeated FilterProjectRex filterProjectRex = 7;
   DataSchema joinResultDataSchema = 8;
+  int32 fetch = 9;
+  int32 offset = 10;
 }
 
 enum ExchangeType {

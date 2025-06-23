@@ -32,17 +32,23 @@ public class EnrichedJoinNode extends JoinNode {
   private final DataSchema _joinResultSchema;
   // output schema after projection, same as _joinResultSchema if no projection
   private final DataSchema _projectResultSchema;
+  private final int _fetch;
+  private final int _offset;
+
 
   public EnrichedJoinNode(int stageId, DataSchema joinResultSchema, DataSchema projectResultSchema,
       NodeHint nodeHint, List<PlanNode> inputs,
       JoinRelType joinType, List<Integer> leftKeys, List<Integer> rightKeys,
       List<RexExpression> nonEquiConditions, JoinStrategy joinStrategy, RexExpression matchCondition,
-      List<FilterProjectRex> filterProjectRexes) {
+      List<FilterProjectRex> filterProjectRexes,
+      int fetch, int offset) {
     super(stageId, projectResultSchema, nodeHint, inputs, joinType, leftKeys, rightKeys,
         nonEquiConditions, joinStrategy, matchCondition);
     _joinResultSchema = joinResultSchema;
     _projectResultSchema = projectResultSchema;
     _filterProjectRexes = filterProjectRexes;
+    _fetch = fetch;
+    _offset = offset;
   }
 
   public DataSchema getJoinResultSchema() {
@@ -77,7 +83,15 @@ public class EnrichedJoinNode extends JoinNode {
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new EnrichedJoinNode(_stageId, _joinResultSchema, _projectResultSchema, _nodeHint,
         inputs, getJoinType(), getLeftKeys(), getRightKeys(), getNonEquiConditions(),
-        getJoinStrategy(), getMatchCondition(), getFilterProjectRexes());
+        getJoinStrategy(), getMatchCondition(), _filterProjectRexes, _fetch, _offset);
+  }
+
+  public int getFetch() {
+    return _fetch;
+  }
+
+  public int getOffset() {
+    return _offset;
   }
 
   public enum FilterProjectRexType {

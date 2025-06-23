@@ -21,16 +21,21 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class EnrichedHashJoinOperator extends HashJoinOperator {
@@ -42,6 +47,10 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   //    does not care about input schema
   private final DataSchema _projectResultSchema;
   private final int _resultColumnSize;
+  private final int _offset;
+  private final int _numRowsToKeep;
+  private int _rowsSeen = 0;
+  private int _numRowsToOffset;
 
   public EnrichedHashJoinOperator(OpChainExecutionContext context,
       MultiStageOperator leftInput, DataSchema leftSchema, MultiStageOperator rightInput,
@@ -64,6 +73,14 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
     _projectResultSchema = currentSchema;
     _projectResultSize = _projectResultSchema.size();
+
+    _offset = Math.max(node.getOffset(), 0);
+    int fetch = node.getFetch();
+
+    // TODO: see if this need to be converted to input args
+    int defaultResponseLimit = CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT;
+    _numRowsToKeep = fetch > 0 ? fetch + _offset : defaultResponseLimit;
+    _numRowsToOffset = _offset;
   }
 
   @Override
@@ -73,6 +90,17 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
   // TODO: support filter above project predicate
   // TODO: check null in advance and do code specialization
+
+  /** limit on a row, return false if the limit reached before adding this row */
+  private boolean limitRow(List<Object> row) {
+    // limit only, terminate if enough rows
+    if (_rowsSeen++ == _numRowsToKeep) {
+      earlyTerminate();
+      logger().debug("EnrichedHashJoinOperator: seen enough rows with no sort, early terminating");
+      return false;
+    }
+    return true;
+  }
 
   /** filter a row by left and right child, return whether the row is kept */
   private boolean filterRow(List<Object> rowView, TransformOperand filter) {
@@ -91,11 +119,21 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
 
   /** read result from _priorityQueue if sort needed, else return rows */
   private List<Object[]> getOutputRows(List<Object[]> rows) {
-    return rows;
+    if (_numRowsToOffset <= 0) {
+      return rows;
+    }
+    if (rows.size() > _numRowsToOffset) {
+      int rowSize = rows.size();
+      rows = rows.subList(_numRowsToOffset, rows.size());
+      _numRowsToOffset -= rowSize;
+      return rows;
+    }
+    _numRowsToOffset -= rows.size();
+    return Collections.emptyList();
   }
 
-  /** filter, project on the left and right row by creating a view */
-  private void filterProject(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
+  /** filter, project, limit on the left and right row by creating a view */
+  private void filterProjectLimit(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
     // TODO: this should handle different orders of filter, project
     List<Object> row = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
@@ -110,11 +148,15 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       }
     }
 
+    if (!limitRow(row)) {
+      return;
+    }
+
     rows.add(row.toArray());
   }
 
   /** filter, project on a joined row view */
-  private void filterProject(List<Object> row, List<Object[]> rows) {
+  private void filterProjectLimit(List<Object> row, List<Object[]> rows) {
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
         if (!filterRow(row, filterProjectOperand.getFilter())) {
@@ -123,6 +165,10 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       } else {
         row = projectRow(row, filterProjectOperand.getProject());
       }
+    }
+
+    if (!limitRow(row)) {
+      return;
     }
 
     rows.add(row.toArray());
@@ -144,7 +190,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
           continue;
         }
         // join row with null, then project-merge-sort-limit
-        filterProject(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
+        filterProjectLimit(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
       }
     } else {
       for (Map.Entry<Object, Object> entry : _rightTable.entrySet()) {
@@ -152,13 +198,13 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
         if (matchedIndices == null) {
           for (Object[] rightRow : rightRows) {
-            filterProject(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
+            filterProjectLimit(null, rightRow, rows, _resultColumnSize, _leftColumnSize);
           }
         } else {
           int numRightRows = rightRows.size();
           int unmatchedIndex = 0;
           while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
-            filterProject(null, rightRows.get(unmatchedIndex++), rows, _resultColumnSize, _leftColumnSize);
+            filterProjectLimit(null, rightRows.get(unmatchedIndex++), rows, _resultColumnSize, _leftColumnSize);
           }
         }
       }
@@ -172,7 +218,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       if (isMaxRowsLimitReached(rows.size())) {
         return;
       }
-      filterProject(leftRow, null, rows, _resultColumnSize, _leftColumnSize);
+      filterProjectLimit(leftRow, null, rows, _resultColumnSize, _leftColumnSize);
     }
   }
 
@@ -224,7 +270,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
             break;
           }
           // filter project sortLimit on the produced row
-          filterProject(resultRowView, rows);
+          filterProjectLimit(resultRowView, rows);
           if (_matchedRightRows != null) {
             _matchedRightRows.put(key, BIT_SET_PLACEHOLDER);
           }
@@ -259,7 +305,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
               break;
             }
             // filter project sortLimit on the produced row
-            filterProject(resultRowView, rows);
+            filterProjectLimit(resultRowView, rows);
             hasMatchForLeftRow = true;
             if (_matchedRightRows != null) {
               _matchedRightRows.computeIfAbsent(key, k -> new BitSet(numRightRows)).set(i);
@@ -287,7 +333,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // ANTI-JOIN only checks non-existence of the key
       if (!_rightTable.containsKey(key)) {
-        filterProject(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
+        filterProjectLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
     }
 
@@ -303,7 +349,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // SEMI-JOIN only checks existence of the key
       if (_rightTable.containsKey(key)) {
-        filterProject(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
+        filterProjectLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
     }
 
