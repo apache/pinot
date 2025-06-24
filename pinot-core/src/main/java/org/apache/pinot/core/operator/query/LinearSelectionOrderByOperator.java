@@ -244,7 +244,8 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator, _queryContext);
+    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator, _orderByExpressions,
+        _queryContext);
   }
 
   protected DataSchema createDataSchema() {
