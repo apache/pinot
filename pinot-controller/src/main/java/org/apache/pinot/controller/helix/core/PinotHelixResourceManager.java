@@ -3249,12 +3249,11 @@ public class PinotHelixResourceManager {
       throw new IllegalStateException("External View state does not exist for table: " + tableNameWithType);
     }
 
-    Map<String, Map<String, String>> externalViewMap = externalView.getRecord().getMapFields();
     Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
 
     for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segmentName = entry.getKey();
-      Map<String, String> externalViewStateMap = externalViewMap.get(segmentName);
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (Map.Entry<String, String> instanceStateEntry : externalViewStateMap.entrySet()) {
         String server = instanceStateEntry.getKey();
         if (instanceStateEntry.getValue().equals(SegmentStateModel.ONLINE)) {
