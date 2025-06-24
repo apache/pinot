@@ -33,6 +33,8 @@ public interface UtilizationChecker {
 
   /**
    * Returns true if the resource's utilization is within limits
+   * @param tableNameWithType table name with type
+   * @param isForMinion should be true if called from the minion task generation framework
    */
   boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion);
 
