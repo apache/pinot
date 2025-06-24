@@ -860,10 +860,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           System.gc();
           _numQueriesKilledConsecutively = 0;
         }
-        Map<String, ? extends QueryResourceTracker> queryResources = getQueryResources();
-        for (QueryResourceTracker queryResourceTracker : queryResources.values()) {
-          logTerminatedQuery(queryResourceTracker, _usedBytes);
-        }
       }
 
       /**
