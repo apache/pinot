@@ -354,6 +354,12 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877636);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+
+    // Verify server status information
+    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
+    String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
+    Assert.assertNotNull(serverStatus, "Server status should not be null");
+    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
   }
 
   // Verify metadata file from segments.
