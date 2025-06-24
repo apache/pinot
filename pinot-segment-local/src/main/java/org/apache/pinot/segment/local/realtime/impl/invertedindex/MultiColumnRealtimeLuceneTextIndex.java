@@ -156,7 +156,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
       Map<String, String> optionsMap = options.getOptions();
       if (!optionsMap.isEmpty()) {
-        return getDocIdsWithOptions(column, searchQuery, optionsMap);
+        return getDocIdsWithOptions(column, searchQuery, options);
       }
     }
     return getDocIdsWithoutOptions(column, searchQuery);
@@ -167,7 +167,8 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
     return getDocIdsWithoutOptions(column, searchQuery);
   }
 
-  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery, Map<String, String> options) {
+  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter

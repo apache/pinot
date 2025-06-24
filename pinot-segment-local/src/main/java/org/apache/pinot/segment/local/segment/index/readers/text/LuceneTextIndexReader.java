@@ -169,9 +169,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
     if (optionsString != null && !optionsString.trim().isEmpty()) {
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-      Map<String, String> optionsMap = options.getOptions();
-      if (!optionsMap.isEmpty()) {
-        return getDocIdsWithOptions(searchQuery, optionsMap);
+      if (!options.getOptions().isEmpty()) {
+        return getDocIdsWithOptions(searchQuery, options);
       }
     }
     return getDocIdsWithoutOptions(searchQuery);
@@ -205,19 +204,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
-  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery, Map<String, String> options) {
-    Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
-
+  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
-
     try {
+      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      String msg =
-          "Failed to execute query with configured parser for column: " + _column + " search query: " + actualQuery;
-      throw new RuntimeException(msg, e);
+      LOGGER.error("Failed while searching the text index for column {}, search query {}, exception {}", _column,
+          actualQuery, e.getMessage());
+      throw new RuntimeException(e);
     }
   }
 

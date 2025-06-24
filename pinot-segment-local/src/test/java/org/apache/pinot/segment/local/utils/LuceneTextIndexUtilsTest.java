@@ -123,39 +123,39 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals("CLASSIC", result.get("parser"));
 
     // Test multiple options
-    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC,AllowLeadingWildcard=true,DefaultOperator=AND");
+    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND");
     result = options.getOptions();
     Assert.assertEquals(3, result.size());
     Assert.assertEquals("CLASSIC", result.get("parser"));
-    Assert.assertEquals("true", result.get("AllowLeadingWildcard"));
-    Assert.assertEquals("AND", result.get("DefaultOperator"));
+    Assert.assertEquals("true", result.get("allowLeadingWildcard"));
+    Assert.assertEquals("AND", result.get("defaultOperator"));
 
     // Test options with spaces
-    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC, AllowLeadingWildcard=true , DefaultOperator=AND");
+    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC, allowLeadingWildcard=true , defaultOperator=AND");
     result = options.getOptions();
     Assert.assertEquals(3, result.size());
     Assert.assertEquals("CLASSIC", result.get("parser"));
-    Assert.assertEquals("true", result.get("AllowLeadingWildcard"));
-    Assert.assertEquals("AND", result.get("DefaultOperator"));
+    Assert.assertEquals("true", result.get("allowLeadingWildcard"));
+    Assert.assertEquals("AND", result.get("defaultOperator"));
 
     // Test invalid option format (should be ignored)
-    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC,invalidOption,DefaultOperator=AND");
+    options = LuceneTextIndexUtils.createOptions("parser=CLASSIC,invalidOption,defaultOperator=AND");
     result = options.getOptions();
     Assert.assertEquals(2, result.size());
     Assert.assertEquals("CLASSIC", result.get("parser"));
-    Assert.assertEquals("AND", result.get("DefaultOperator"));
+    Assert.assertEquals("AND", result.get("defaultOperator"));
 
     // Test empty key or value (should be ignored)
-    options = LuceneTextIndexUtils.createOptions("=CLASSIC,parser=,DefaultOperator=AND");
+    options = LuceneTextIndexUtils.createOptions("=CLASSIC,parser=,defaultOperator=AND");
     result = options.getOptions();
     Assert.assertEquals(1, result.size());
-    Assert.assertEquals("AND", result.get("DefaultOperator"));
+    Assert.assertEquals("AND", result.get("defaultOperator"));
   }
 
   @Test
   public void testLuceneTextIndexOptionsWrapper() {
     // Test creating options from string
-    String optionsString = "parser=CLASSIC,DefaultOperator=AND,AllowLeadingWildcard=true";
+    String optionsString = "parser=CLASSIC,defaultOperator=AND,allowLeadingWildcard=true";
     LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
 
     // Test getter methods
@@ -177,12 +177,12 @@ public class LuceneTextIndexUtilsTest {
   }
 
   @Test
-  public void testLuceneTextIndexOptionsGetters() {
+  public void testLuceneTextIndexOptionsAllGetters() {
     // Test all getter methods with various options
-    String optionsString = "parser=STANDARD,DefaultOperator=AND,AllowLeadingWildcard=true,"
-        + "EnablePositionIncrements=false,AutoGeneratePhraseQueries=true,SplitOnWhitespace=false,"
-        + "LowercaseExpandedTerms=false,AnalyzeWildcard=true,FuzzyPrefixLength=3,FuzzyMinSim=0.8,"
-        + "Locale=fr,TimeZone=EST,PhraseSlop=2,MaxDeterminizedStates=5000";
+    String optionsString = "parser=STANDARD,defaultOperator=AND,allowLeadingWildcard=true,"
+        + "enablePositionIncrements=false,autoGeneratePhraseQueries=true,splitOnWhitespace=false,"
+        + "lowercaseExpandedTerms=false,analyzeWildcard=true,fuzzyPrefixLength=3,fuzzyMinSim=0.8,"
+        + "locale=fr,timeZone=EST,phraseSlop=2,maxDeterminizedStates=5000";
 
     LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
 

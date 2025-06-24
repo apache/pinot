@@ -45,39 +45,38 @@ import org.slf4j.LoggerFactory;
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
-  // Parser option key
-  public static final String PARSER_OPTION = "parser";
-
-  // Parser values
   public static final String PARSER_CLASSIC = "CLASSIC";
   public static final String PARSER_STANDARD = "STANDARD";
   public static final String PARSER_COMPLEX = "COMPLEX";
 
-  // Default operator values
+  // Default operator constants
   public static final String DEFAULT_OPERATOR_AND = "AND";
   public static final String DEFAULT_OPERATOR_OR = "OR";
 
-  // Boolean values
+  // Boolean constants
   public static final String TRUE = "true";
   public static final String FALSE = "false";
 
-  // Option keys - Lucene QueryParser configuration options
-  // These options are applied to Lucene QueryParser instances via reflection
-  // Documentation:
-  // https://lucene.apache.org/core/9_8_0/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html
-  public static final String DEFAULT_OPERATOR_OPTION = "DefaultOperator";
-  public static final String ALLOW_LEADING_WILDCARD_OPTION = "AllowLeadingWildcard";
-  public static final String ENABLE_POSITION_INCREMENTS_OPTION = "EnablePositionIncrements";
-  public static final String AUTO_GENERATE_PHRASE_QUERIES_OPTION = "AutoGeneratePhraseQueries";
-  public static final String SPLIT_ON_WHITESPACE_OPTION = "SplitOnWhitespace";
-  public static final String LOWERCASE_EXPANDED_TERMS_OPTION = "LowercaseExpandedTerms";
-  public static final String ANALYZE_WILDCARD_OPTION = "AnalyzeWildcard";
-  public static final String FUZZY_PREFIX_LENGTH_OPTION = "FuzzyPrefixLength";
-  public static final String FUZZY_MIN_SIM_OPTION = "FuzzyMinSim";
-  public static final String LOCALE_OPTION = "Locale";
-  public static final String TIME_ZONE_OPTION = "TimeZone";
-  public static final String PHRASE_SLOP_OPTION = "PhraseSlop";
-  public static final String MAX_DETERMINIZED_STATES_OPTION = "MaxDeterminizedStates";
+  /**
+   * Option keys for Lucene text index configuration.
+   * These keys are used in the options string format: "key1=value1,key2=value2"
+   */
+  public static class OptionKey {
+    public static final String PARSER = "parser";
+    public static final String DEFAULT_OPERATOR = "defaultOperator";
+    public static final String ALLOW_LEADING_WILDCARD = "allowLeadingWildcard";
+    public static final String ENABLE_POSITION_INCREMENTS = "enablePositionIncrements";
+    public static final String AUTO_GENERATE_PHRASE_QUERIES = "autoGeneratePhraseQueries";
+    public static final String SPLIT_ON_WHITESPACE = "splitOnWhitespace";
+    public static final String LOWERCASE_EXPANDED_TERMS = "lowercaseExpandedTerms";
+    public static final String ANALYZE_WILDCARD = "analyzeWildcard";
+    public static final String FUZZY_PREFIX_LENGTH = "fuzzyPrefixLength";
+    public static final String FUZZY_MIN_SIM = "fuzzyMinSim";
+    public static final String LOCALE = "locale";
+    public static final String TIME_ZONE = "timeZone";
+    public static final String PHRASE_SLOP = "phraseSlop";
+    public static final String MAX_DETERMINIZED_STATES = "maxDeterminizedStates";
+  }
 
   // Parser class names
   public static final String STANDARD_QUERY_PARSER_CLASS =
@@ -123,20 +122,22 @@ public class LuceneTextIndexUtils {
   }
 
   /**
-   * Creates a configured Lucene query with the specified options.
-   * This method can be used by both single-column and multi-column text index readers.
+   * Creates a Lucene QueryParser with the specified options and parses the query.
+   * This method uses reflection to dynamically apply options to the query parser.
    *
-   * @param actualQuery The cleaned query string without __OPTIONS
-   * @param options The parsed options map
+   * @param actualQuery The search query string
+   * @param options The parsed options wrapper
    * @param column The column name for the search
    * @param analyzer The Lucene analyzer to use
    * @return The parsed Lucene Query object
    * @throws RuntimeException if parser creation or query parsing fails
    */
-  public static Query createQueryParserWithOptions(String actualQuery, Map<String, String> options, String column,
+  public static Query createQueryParserWithOptions(String actualQuery, LuceneTextIndexOptions options, String column,
       Analyzer analyzer) {
+    Map<String, String> optionsMap = options.getOptions();
+
     // Get parser type from options
-    String parserType = options.getOrDefault(PARSER_OPTION, PARSER_CLASSIC);
+    String parserType = options.getParser();
     String parserClassName;
 
     switch (parserType.toUpperCase()) {
@@ -173,9 +174,9 @@ public class LuceneTextIndexUtils {
 
       // Dynamically apply options using reflection
       Class<?> clazz = parser.getClass();
-      for (Map.Entry<String, String> entry : options.entrySet()) {
+      for (Map.Entry<String, String> entry : optionsMap.entrySet()) {
         String key = entry.getKey();
-        if (key.equals(PARSER_OPTION)) {
+        if (key.equals(OptionKey.PARSER)) {
           continue; // Skip parser option as it's only used for initialization
         }
         String value = entry.getValue();
@@ -277,59 +278,59 @@ public class LuceneTextIndexUtils {
     }
 
     public String getParser() {
-      return _options.getOrDefault(PARSER_OPTION, PARSER_CLASSIC);
+      return _options.getOrDefault(OptionKey.PARSER, PARSER_CLASSIC);
     }
 
     public String getDefaultOperator() {
-      return _options.getOrDefault(DEFAULT_OPERATOR_OPTION, DEFAULT_OPERATOR_OR);
+      return _options.getOrDefault(OptionKey.DEFAULT_OPERATOR, DEFAULT_OPERATOR_OR);
     }
 
     public boolean isAllowLeadingWildcard() {
-      return Boolean.parseBoolean(_options.getOrDefault(ALLOW_LEADING_WILDCARD_OPTION, FALSE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.ALLOW_LEADING_WILDCARD, FALSE));
     }
 
     public boolean isEnablePositionIncrements() {
-      return Boolean.parseBoolean(_options.getOrDefault(ENABLE_POSITION_INCREMENTS_OPTION, TRUE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.ENABLE_POSITION_INCREMENTS, TRUE));
     }
 
     public boolean isAutoGeneratePhraseQueries() {
-      return Boolean.parseBoolean(_options.getOrDefault(AUTO_GENERATE_PHRASE_QUERIES_OPTION, FALSE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.AUTO_GENERATE_PHRASE_QUERIES, FALSE));
     }
 
     public boolean isSplitOnWhitespace() {
-      return Boolean.parseBoolean(_options.getOrDefault(SPLIT_ON_WHITESPACE_OPTION, TRUE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.SPLIT_ON_WHITESPACE, TRUE));
     }
 
     public boolean isLowercaseExpandedTerms() {
-      return Boolean.parseBoolean(_options.getOrDefault(LOWERCASE_EXPANDED_TERMS_OPTION, TRUE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.LOWERCASE_EXPANDED_TERMS, TRUE));
     }
 
     public boolean isAnalyzeWildcard() {
-      return Boolean.parseBoolean(_options.getOrDefault(ANALYZE_WILDCARD_OPTION, FALSE));
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.ANALYZE_WILDCARD, FALSE));
     }
 
     public int getFuzzyPrefixLength() {
-      return Integer.parseInt(_options.getOrDefault(FUZZY_PREFIX_LENGTH_OPTION, "0"));
+      return Integer.parseInt(_options.getOrDefault(OptionKey.FUZZY_PREFIX_LENGTH, "0"));
     }
 
     public float getFuzzyMinSim() {
-      return Float.parseFloat(_options.getOrDefault(FUZZY_MIN_SIM_OPTION, "2.0"));
+      return Float.parseFloat(_options.getOrDefault(OptionKey.FUZZY_MIN_SIM, "2.0"));
     }
 
     public String getLocale() {
-      return _options.getOrDefault(LOCALE_OPTION, "en");
+      return _options.getOrDefault(OptionKey.LOCALE, "en");
     }
 
     public String getTimeZone() {
-      return _options.getOrDefault(TIME_ZONE_OPTION, "UTC");
+      return _options.getOrDefault(OptionKey.TIME_ZONE, "UTC");
     }
 
     public int getPhraseSlop() {
-      return Integer.parseInt(_options.getOrDefault(PHRASE_SLOP_OPTION, "0"));
+      return Integer.parseInt(_options.getOrDefault(OptionKey.PHRASE_SLOP, "0"));
     }
 
     public int getMaxDeterminizedStates() {
-      return Integer.parseInt(_options.getOrDefault(MAX_DETERMINIZED_STATES_OPTION, "10000"));
+      return Integer.parseInt(_options.getOrDefault(OptionKey.MAX_DETERMINIZED_STATES, "10000"));
     }
   }
 

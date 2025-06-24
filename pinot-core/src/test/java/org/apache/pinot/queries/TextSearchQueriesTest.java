@@ -2029,7 +2029,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=CLASSIC,AllowLeadingWildcard=true,DefaultOperator=AND') LIMIT 50000";
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     List<Object[]> expected1 = new ArrayList<>();
@@ -2038,47 +2038,47 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         + "storage, concurrency, multi-threading"
     });
     String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava realtime streaming system*', 'parser=CLASSIC,AllowLeadingWildcard=true,DefaultOperator=AND') LIMIT "
+        + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
         + "50000";
     testTextSearchSelectQueryHelper(query1, expected.size(), false, expected);
 
     // Test regex pattern with AND operator
     String query2 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava realtime streaming system* AND *chine learn*', 'parser=CLASSIC,AllowLeadingWildcard=true,"
-        + "DefaultOperator=AND') LIMIT 50000";
+        + ", '*ava realtime streaming system* AND *chine learn*', 'parser=CLASSIC,allowLeadingWildcard=true,"
+        + "defaultOperator=AND') LIMIT 50000";
     testTextSearchSelectQueryHelper(query2, expected.size(), false, expected);
 
     // Test regex pattern with AND operator (no match)
     String query3 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
         + ", '\"*ava realtime streaming system*\" AND \"*chine learner*\"', 'parser=CLASSIC,"
-        + "AllowLeadingWildcard=true') LIMIT 50000";
+        + "allowLeadingWildcard=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
 
     // Test regex pattern with OR operator
     String query4 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
         + ", '\"*ava realtime streaming system*\" OR \"*chine learner*\"', 'parser=COMPLEX,"
-        + "AllowLeadingWildcard=true') LIMIT 50000";
+        + "allowLeadingWildcard=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query4, expected1.size(), false, expected1);
 
     // Test regex pattern with multiple wildcards
     String query5 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ava* AND *stream* AND *learn*', 'parser=CLASSIC,AllowLeadingWildcard=true') LIMIT 50000";
+        + ", '*ava* AND *stream* AND *learn*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query5, expected.size(), false, expected);
 
     // Test regex pattern with invalid parser type (should fall back to default)
     String query6 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=INVALID,AllowLeadingWildcard=true,DefaultOperator=AND') LIMIT 50000";
+        + ", '*ealtime streaming system*', 'parser=INVALID,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
     testTextSearchSelectQueryHelper(query6, expected.size(), false, expected);
 
     // Test regex pattern with multiple options (should merge options)
     String query7 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=CLASSIC,AllowLeadingWildcard=true,DefaultOperator=AND,"
-        + "AllowLeadingWildcard=true') LIMIT 50000";
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query7, expected.size(), false, expected);
 
     // Test regex pattern with STANDARD parser
     String query8 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=STANDARD,AllowLeadingWildcard=true,DefaultOperator=AND') LIMIT "
+        + ", '*ealtime streaming system*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
         + "50000";
     testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
   }
@@ -2102,7 +2102,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String querySingleAnd =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,DefaultOperator=AND') LIMIT "
+            + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
             + "50000";
     testTextSearchSelectQueryHelper(querySingleAnd, expectedSingleAnd.size(), false, expectedSingleAnd);
 
@@ -2121,13 +2121,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String querySingleOr =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", '\"distributed systems\" AND (Java AND C++)', 'parser=CLASSIC,DefaultOperator=AND') LIMIT "
+            + ", '\"distributed systems\" AND (Java AND C++)', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
             + "50000";
     testTextSearchSelectQueryHelper(querySingleOr, expectedSingleOr.size(), false, expectedSingleOr);
 
     // Test 3: Aggregation queries with options
     String queryAggAnd = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,DefaultOperator=AND')";
+        + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND')";
     testTextSearchAggregationQueryHelper(queryAggAnd, expectedSingleAnd.size());
   }
 
@@ -2153,14 +2153,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String queryWildcardAnd =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", '*ava* AND *stream*', 'parser=CLASSIC,AllowLeadingWildcard=true,DefaultOperator=AND') "
+            + ", '*ava* AND *stream*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') "
             + "LIMIT 50000";
     testTextSearchSelectQueryHelper(queryWildcardAnd, expectedWildcardAnd.size(), false, expectedWildcardAnd);
 
     // Test with different parser types
     String queryStandardParser =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", '*ava* AND *stream*', 'parser=STANDARD,AllowLeadingWildcard=true,DefaultOperator=AND') "
+            + ", '*ava* AND *stream*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') "
             + "LIMIT 50000";
     testTextSearchSelectQueryHelper(queryStandardParser, expectedWildcardAnd.size(), false, expectedWildcardAnd);
   }

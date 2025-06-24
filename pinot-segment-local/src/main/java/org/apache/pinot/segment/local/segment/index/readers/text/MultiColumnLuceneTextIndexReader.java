@@ -354,28 +354,25 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   public MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
     if (optionsString != null && !optionsString.trim().isEmpty()) {
       LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
-      Map<String, String> optionsMap = options.getOptions();
-      if (!optionsMap.isEmpty()) {
-        return getDocIdsWithOptions(column, searchQuery, optionsMap);
+      if (!options.getOptions().isEmpty()) {
+        return getDocIdsWithOptions(column, searchQuery, options);
       }
     }
     return getDocIdsWithoutOptions(column, searchQuery);
   }
 
-  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery, Map<String, String> options) {
-    Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, column, _analyzer);
-
+  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
-
     try {
-      // Execute the search
+      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, column, _analyzer);
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      String msg =
-          "Failed to execute query with configured parser for columns: " + _columns + " search query: " + actualQuery;
-      throw new RuntimeException(msg, e);
+      LOGGER.error("Failed while searching the text index for column {}, search query {}, exception {}", column,
+          actualQuery, e.getMessage());
+      throw new RuntimeException(e);
     }
   }
 
