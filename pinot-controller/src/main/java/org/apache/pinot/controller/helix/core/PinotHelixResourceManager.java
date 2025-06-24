@@ -3238,7 +3238,8 @@ public class PinotHelixResourceManager {
   /**
    * Get the servers to segments map for which servers are ONLINE in external view for those segments in IDEAL STATE
    */
-  public Map<String, List<String>> getOnlineServerToSegmentsMap(String tableNameWithType) {
+  public Map<String, List<String>> getExternalViewServerToSegmentsMap(String tableNameWithType,
+      boolean includeReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
@@ -3250,14 +3251,22 @@ public class PinotHelixResourceManager {
     }
 
     Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+    Set<String> segments = idealStateMap.keySet();
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage =
+          SegmentLineageAccessHelper.getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
 
     for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
-      for (Map.Entry<String, String> instanceStateEntry : externalViewStateMap.entrySet()) {
-        String server = instanceStateEntry.getKey();
-        if (instanceStateEntry.getValue().equals(SegmentStateModel.ONLINE)) {
-          serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+      if (externalViewStateMap != null) {
+        for (Map.Entry<String, String> instanceStateEntry : externalViewStateMap.entrySet()) {
+          String server = instanceStateEntry.getKey();
+          if (instanceStateEntry.getValue().equals(SegmentStateModel.ONLINE)) {
+            serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+          }
         }
       }
     }

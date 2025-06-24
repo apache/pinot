@@ -244,7 +244,7 @@ public class MinionTaskUtils {
         String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
             + validDocIdsBitmapResponse.getServerStatus() + " state, skipping it for execution for segment: "
             + validDocIdsBitmapResponse.getSegmentName() + ". Will try other servers.";
-        LOGGER.error(message);
+        LOGGER.warn(message);
         continue;
       }
 

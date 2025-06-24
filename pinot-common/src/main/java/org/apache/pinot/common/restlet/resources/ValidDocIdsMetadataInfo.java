@@ -33,8 +33,8 @@ public class ValidDocIdsMetadataInfo {
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
   private final long _segmentCreationTimeMillis;
-  private final ServiceStatus.Status _serverStatus;
   private final String _instanceId;
+  private final ServiceStatus.Status _serverStatus;
 
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
@@ -42,7 +42,7 @@ public class ValidDocIdsMetadataInfo {
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
       @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
-      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus, @JsonProperty("instanceId") String instanceId) {
+      @JsonProperty("instanceId") String instanceId, @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -51,8 +51,8 @@ public class ValidDocIdsMetadataInfo {
     _validDocIdsType = validDocIdsType;
     _segmentSizeInBytes = segmentSizeInBytes;
     _segmentCreationTimeMillis = segmentCreationTimeMillis;
-    _serverStatus = serverStatus;
     _instanceId = instanceId;
+    _serverStatus = serverStatus;
   }
 
   public String getSegmentName() {
@@ -87,11 +87,11 @@ public class ValidDocIdsMetadataInfo {
     return _segmentCreationTimeMillis;
   }
 
-  public ServiceStatus.Status getServerStatus() {
-    return _serverStatus;
-  }
-
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public ServiceStatus.Status getServerStatus() {
+    return _serverStatus;
   }
 }

@@ -58,11 +58,11 @@ public class ValidDocIdsBitmapResponse {
     return _bitmap;
   }
 
-  public ServiceStatus.Status getServerStatus() {
-    return _serverStatus;
-  }
-
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  public ServiceStatus.Status getServerStatus() {
+    return _serverStatus;
   }
 }
