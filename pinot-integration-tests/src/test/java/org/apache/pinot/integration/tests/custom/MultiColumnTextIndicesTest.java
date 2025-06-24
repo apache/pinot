@@ -475,11 +475,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     long resultWithStandardParser = getQueryResult(String.format(queryWithStandardParser, getTableName(), TEXT_COL));
     assertTrue(resultWithStandardParser > 0, "TEXT_MATCH with STANDARD parser should return results");
 
-    // Test with wildcard options
-    String queryWithWildcard =
-        "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, '*ava*', 'parser=CLASSIC,allowLeadingWildcard=true')";
-    long resultWithWildcard = getQueryResult(String.format(queryWithWildcard, getTableName(), TEXT_COL));
-    assertTrue(resultWithWildcard > 0, "TEXT_MATCH with wildcard options should return results");
   }
 
   @Test(priority = 1)

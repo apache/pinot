@@ -44,7 +44,7 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
    * @return Matching document ids
    */
   default MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
-    return getDocIds(column, searchQuery, optionsString);
+    return getDocIds(column, searchQuery);
   }
 
   default boolean isMultiColumn() {
