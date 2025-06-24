@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.utils.config;
 
 import java.io.File;
 import java.net.URL;
@@ -28,10 +28,10 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class SchemaUtilsTest {
+public class SchemaSerDeUtilsTest {
 
   @Test
-  public void testSchemaSerDe()
+  public void testSerDe()
       throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
     assertNotNull(resourceUrl);
@@ -45,7 +45,7 @@ public class SchemaUtilsTest {
     assertEquals(schemaToCompare, schema);
     assertEquals(schemaToCompare.hashCode(), schema.hashCode());
 
-    schemaToCompare = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
+    schemaToCompare = SchemaSerDeUtils.fromZNRecord(SchemaSerDeUtils.toZNRecord(schema));
     assertEquals(schemaToCompare, schema);
     assertEquals(schemaToCompare.hashCode(), schema.hashCode());
 

@@ -16,30 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.config;
+package org.apache.pinot.spi.config.table;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.config.table.QueryConfig;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class TableConfigTest {
@@ -94,15 +88,14 @@ public class TableConfigTest {
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setHashFunction(HashFunction.MD5);
 
-    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setAggregateMetrics(true)
         .setRetentionTimeValue("5")
         .setRetentionTimeUnit("DAYS")
         .setNumReplicas(2)
         .setIngestionConfig(ingestionConfig)
         .setDedupConfig(dedupConfig)
-        .setQueryConfig(new QueryConfig(2000L, true, false, Collections.emptyMap(), 100_000L, 100_000L))
+        .setQueryConfig(new QueryConfig(2000L, true, false, Map.of(), 100_000L, 100_000L))
         .setTierConfigList(List.of(new TierConfig("name", "type", null, null, "storageType", null, null, null)))
         .build();
 

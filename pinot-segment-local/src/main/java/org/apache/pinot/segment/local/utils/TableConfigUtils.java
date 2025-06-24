@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +61,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -65,6 +70,7 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
@@ -92,6 +98,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +108,6 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
 /**
  * Utils related to table config operations
- * FIXME: Merge this TableConfigUtils with the TableConfigUtils from pinot-common when merging of modules is done
  */
 public final class TableConfigUtils {
   private TableConfigUtils() {
@@ -1462,5 +1468,221 @@ public final class TableConfigUtils {
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  /**
+   * Helper method to convert from legacy/deprecated configs into current version of TableConfig.
+   * <ul>
+   *   <li>Moves deprecated ingestion related configs into Ingestion Config.</li>
+   *   <li>The conversion happens in-place, the specified tableConfig is mutated in-place.</li>
+   * </ul>
+   *
+   * @param tableConfig Input table config.
+   */
+  @SuppressWarnings("deprecation")
+  public static void convertFromLegacyTableConfig(TableConfig tableConfig) {
+    // It is possible that indexing as well as ingestion configs exist, in which case we always honor ingestion config.
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    BatchIngestionConfig batchIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getBatchIngestionConfig() : null;
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String segmentPushType = validationConfig.getSegmentPushType();
+    String segmentPushFrequency = validationConfig.getSegmentPushFrequency();
+
+    if (batchIngestionConfig == null) {
+      // Only create the config if any of the deprecated config is not null.
+      if (segmentPushType != null || segmentPushFrequency != null) {
+        batchIngestionConfig = new BatchIngestionConfig(null, segmentPushType, segmentPushFrequency);
+      }
+    } else {
+      // This should not happen typically, but since we are in repair mode, might as well cover this corner case.
+      if (batchIngestionConfig.getSegmentIngestionType() == null) {
+        batchIngestionConfig.setSegmentIngestionType(segmentPushType);
+      }
+      if (batchIngestionConfig.getSegmentIngestionFrequency() == null) {
+        batchIngestionConfig.setSegmentIngestionFrequency(segmentPushFrequency);
+      }
+    }
+
+    StreamIngestionConfig streamIngestionConfig =
+        (ingestionConfig != null) ? ingestionConfig.getStreamIngestionConfig() : null;
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+
+    if (streamIngestionConfig == null) {
+      // Only set the new config if the deprecated one is set.
+      Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
+      if (MapUtils.isNotEmpty(streamConfigs)) {
+        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+      }
+    }
+
+    if (ingestionConfig == null) {
+      if (batchIngestionConfig != null || streamIngestionConfig != null) {
+        ingestionConfig = new IngestionConfig();
+        ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+        ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+      }
+    } else {
+      ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+      ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    }
+
+    // Set the new config fields.
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    // Clear the deprecated ones.
+    indexingConfig.setStreamConfigs(null);
+    validationConfig.setSegmentPushFrequency(null);
+    validationConfig.setSegmentPushType(null);
+  }
+
+  /**
+   * Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
+   * that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
+   * consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
+   *
+   * {
+   *   "tableIndexConfig": {
+   *     ... // configs allowed in IndexingConfig, for default tier
+   *     "tierOverwrites": {
+   *       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
+   *       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
+   *     }
+   *   }
+   *   "fieldConfigList": [
+   *     {
+   *       ... // configs allowed in FieldConfig, for default tier
+   *       "tierOverwrites": {
+   *         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
+   *         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
+   *       }
+   *     },
+   *     ...
+   *   ]
+   * }
+   *
+   * Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
+   * corresponding configs set for default tier.
+   *
+   * TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
+   *       keep tier overwrites transparent to consumers of TableConfig.
+   *
+   * @param tableConfig the input table config which is kept intact
+   * @param tier        the target tier to overwrite the table config
+   * @return a new table config overwritten for the tier, or the original table if overwriting doesn't happen.
+   */
+  public static TableConfig overwriteTableConfigForTier(TableConfig tableConfig, @Nullable String tier) {
+    if (tier == null) {
+      return tableConfig;
+    }
+    try {
+      boolean updated = false;
+      JsonNode tblCfgJson = tableConfig.toJsonNode();
+      // Apply tier specific overwrites for `tableIndexConfig`
+      JsonNode tblIdxCfgJson = tblCfgJson.get(TableConfig.INDEXING_CONFIG_KEY);
+      if (tblIdxCfgJson != null && tblIdxCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
+        JsonNode tierCfgJson = tblIdxCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
+        if (tierCfgJson != null) {
+          LOGGER.debug("Got table index config overwrites: {} for tier: {}", tierCfgJson, tier);
+          overwriteConfig(tblIdxCfgJson, tierCfgJson);
+          updated = true;
+        }
+      }
+      // Apply tier specific overwrites for `fieldConfigList`
+      JsonNode fieldCfgListJson = tblCfgJson.get(TableConfig.FIELD_CONFIG_LIST_KEY);
+      if (fieldCfgListJson != null && fieldCfgListJson.isArray()) {
+        Iterator<JsonNode> fieldCfgListItr = fieldCfgListJson.elements();
+        while (fieldCfgListItr.hasNext()) {
+          JsonNode fieldCfgJson = fieldCfgListItr.next();
+          if (!fieldCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
+            continue;
+          }
+          JsonNode tierCfgJson = fieldCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
+          if (tierCfgJson != null) {
+            LOGGER.debug("Got field index config overwrites: {} for tier: {}", tierCfgJson, tier);
+            overwriteConfig(fieldCfgJson, tierCfgJson);
+            updated = true;
+          }
+        }
+      }
+      if (updated) {
+        LOGGER.debug("Got overwritten table config: {} for tier: {}", tblCfgJson, tier);
+        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfig.class);
+      } else {
+        LOGGER.debug("No table config overwrites for tier: {}", tier);
+        return tableConfig;
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Failed to overwrite table config for tier: {} for table: {}", tier, tableConfig.getTableName(), e);
+      return tableConfig;
+    }
+  }
+
+  private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
+    Iterator<Map.Entry<String, JsonNode>> cfgItr = newCfg.fields();
+    while (cfgItr.hasNext()) {
+      Map.Entry<String, JsonNode> cfgEntry = cfgItr.next();
+      ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
+    }
+  }
+
+  /**
+   * Get the partition column from tableConfig instance assignment config map.
+   * @param tableConfig table config
+   * @return partition column
+   */
+  public static String getPartitionColumn(TableConfig tableConfig) {
+    // check InstanceAssignmentConfigMap is null or empty,
+    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+        //check InstanceAssignmentConfig has the InstanceReplicaGroupPartitionConfig with non-empty partitionColumn
+        if (StringUtils.isNotEmpty(instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn())) {
+          return instanceAssignmentConfig.getReplicaGroupPartitionConfig().getPartitionColumn();
+        }
+      }
+    }
+
+    // for backward-compatibility, If partitionColumn value isn't there in InstanceReplicaGroupPartitionConfig
+    // check ReplicaGroupStrategyConfig for partitionColumn
+    //noinspection deprecation
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    return replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+  }
+
+  public static Set<String> getRelevantTags(TableConfig tableConfig) {
+    Set<String> relevantTags = new HashSet<>();
+    String serverTenantName = tableConfig.getTenantConfig().getServer();
+    if (serverTenantName != null) {
+      String serverTenantTag =
+          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      relevantTags.add(serverTenantTag);
+    }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig != null) {
+      String completedTag = tagOverrideConfig.getRealtimeCompleted();
+      String consumingTag = tagOverrideConfig.getRealtimeConsuming();
+      if (completedTag != null) {
+        relevantTags.add(completedTag);
+      }
+      if (consumingTag != null) {
+        relevantTags.add(consumingTag);
+      }
+    }
+    if (tableConfig.getInstanceAssignmentConfigMap() != null) {
+      // for simplicity, including all segment types present in instanceAssignmentConfigMap
+      tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
+        String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
+        relevantTags.add(tag);
+      });
+    }
+    if (tableConfig.getTierConfigsList() != null) {
+      tableConfig.getTierConfigsList().forEach(tierConfig -> {
+        String tierTag = tierConfig.getServerTag();
+        relevantTags.add(tierTag);
+      });
+    }
+    return relevantTags;
   }
 }
