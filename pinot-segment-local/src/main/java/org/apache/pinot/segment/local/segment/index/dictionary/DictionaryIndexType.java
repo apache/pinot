@@ -127,12 +127,6 @@ public class DictionaryIndexType
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictionaryColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getNoDictionaryColumns(),
             (accum, column) -> accum.put(column, DictionaryIndexConfig.DISABLED));
-    ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs =
-        IndexConfigDeserializer.fromCollection(TableConfig::getFieldConfigList, (accum, fieldConfig) -> {
-          if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
-            accum.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
-          }
-        });
     ColumnConfigDeserializer<DictionaryIndexConfig> fromIndexingConfig = (tableConfig, schema) -> {
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       Set<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns() != null ? new HashSet<>(
@@ -150,7 +144,6 @@ public class DictionaryIndexType
       return dictionaryIndexConfigMap;
     };
     return fromNoDictionaryConfigs.withFallbackAlternative(fromNoDictionaryColumns)
-        .withFallbackAlternative(fromFieldConfigs)
         .withFallbackAlternative(fromIndexingConfig);
   }
 
