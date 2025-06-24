@@ -302,7 +302,8 @@ public class UpsertCompactionTaskGeneratorTest {
     // check if both the candidates for compaction are coming in sorted descending order
     json = "{\"" + _completedSegment.getSegmentName() + "\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
         + "\"segmentName\": \"" + _completedSegment.getSegmentName() + "\", \"totalDocs\": 100, \"segmentCrc\": \""
-        + _completedSegment.getCrc() + "\", \"segmentCreationTimeMillis\": 1234567890, \"serverStatus\": \"OK\",  \"instanceId\": \"server1\"}], \""
+        + _completedSegment.getCrc()
+        + "\", \"segmentCreationTimeMillis\": 1234567890, \"serverStatus\": \"OK\",  \"instanceId\": \"server1\"}], \""
         + _completedSegment2.getSegmentName() + "\": "
         + "[{\"totalValidDocs\": 10, \"totalInvalidDocs\": 40, \"segmentName\": \""
         + _completedSegment2.getSegmentName() + "\", \"segmentCrc\": \"" + _completedSegment2.getCrc() + "\", "
