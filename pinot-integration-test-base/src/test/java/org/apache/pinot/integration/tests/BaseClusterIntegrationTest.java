@@ -824,7 +824,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
-        SimpleHttpResponse httpResponse = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        SimpleHttpResponse httpResponse =
+            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
         ServerRebalanceJobStatusResponse rebalanceStatus =
             JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
         return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
