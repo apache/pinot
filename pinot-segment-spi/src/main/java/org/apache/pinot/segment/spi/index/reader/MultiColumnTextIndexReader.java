@@ -43,9 +43,7 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
    * @param optionsString Options string in format "key1=value1,key2=value2", can be null
    * @return Matching document ids
    */
-  default MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
-    return getDocIds(column, searchQuery);
-  }
+  MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString);
 
   default boolean isMultiColumn() {
     return true;
