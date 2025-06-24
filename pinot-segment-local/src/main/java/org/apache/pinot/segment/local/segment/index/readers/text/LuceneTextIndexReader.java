@@ -166,13 +166,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(String searchQuery, String optionsString) {
-    Map<String, String> options = null;
+  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
     if (optionsString != null && !optionsString.trim().isEmpty()) {
-      options = LuceneTextIndexUtils.parseOptionsString(optionsString);
-    }
-    if (options != null && !options.isEmpty()) {
-      return getDocIdsWithOptions(searchQuery, options);
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      Map<String, String> optionsMap = options.getOptions();
+      if (!optionsMap.isEmpty()) {
+        return getDocIdsWithOptions(searchQuery, optionsMap);
+      }
     }
     return getDocIdsWithoutOptions(searchQuery);
   }

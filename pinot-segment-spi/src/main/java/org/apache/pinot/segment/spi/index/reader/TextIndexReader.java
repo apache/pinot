@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -43,7 +44,7 @@ public interface TextIndexReader extends IndexReader {
    * @param optionsString Options string in format "key1=value1,key2=value2", can be null
    * @return Matching document ids
    */
-  default MutableRoaringBitmap getDocIds(String searchQuery, String optionsString) {
+  default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
     // Default implementation falls back to the regular method for backward compatibility
     return getDocIds(searchQuery);
   }

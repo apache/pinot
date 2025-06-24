@@ -19,6 +19,7 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
@@ -48,6 +49,7 @@ public class TextMatchPredicate extends BasePredicate {
     return _value;
   }
 
+  @Nullable
   public String getOptions() {
     return _options;
   }

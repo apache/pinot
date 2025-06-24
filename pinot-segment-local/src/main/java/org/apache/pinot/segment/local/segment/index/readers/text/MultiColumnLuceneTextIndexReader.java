@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.Document;
@@ -350,16 +351,15 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(String column, String searchQuery, String optionsString) {
-    Map<String, String> options = null;
+  public MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
     if (optionsString != null && !optionsString.trim().isEmpty()) {
-      options = LuceneTextIndexUtils.parseOptionsString(optionsString);
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      Map<String, String> optionsMap = options.getOptions();
+      if (!optionsMap.isEmpty()) {
+        return getDocIdsWithOptions(column, searchQuery, optionsMap);
+      }
     }
-    if (options != null && !options.isEmpty()) {
-      return getDocIdsWithOptions(column, searchQuery, options);
-    } else {
-      return getDocIdsWithoutOptions(column, searchQuery);
-    }
+    return getDocIdsWithoutOptions(column, searchQuery);
   }
 
   private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery, Map<String, String> options) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -42,8 +43,8 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
    * @param optionsString Options string in format "key1=value1,key2=value2", can be null
    * @return Matching document ids
    */
-  default MutableRoaringBitmap getDocIds(String column, String searchQuery, String optionsString) {
-    return getDocIds(searchQuery, optionsString);
+  default MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
+    return getDocIds(column, searchQuery, optionsString);
   }
 
   default boolean isMultiColumn() {
