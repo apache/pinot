@@ -316,6 +316,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
     }
+    if (_multiColumnTextIndex != null) {
+      try {
+        _multiColumnTextIndex.close();
+      } catch (Exception e) {
+        LOGGER.error("Failed to close multi-column index for segment " + segmentName + ". Continuing with error.", e);
+      }
+    }
+
     for (Map.Entry<String, ColumnIndexContainer> entry : _indexContainerMap.entrySet()) {
       try {
         entry.getValue().close();

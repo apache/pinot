@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -42,6 +43,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
   private final IndexTypeMap _indexTypeMap;
+
+  // Reference to shared segment-level multi-column text index reader.
+  // This reader is closed on segment destroy() and not in this class' close() method.
+  private MultiColumnLuceneTextIndexReader _multiColTextReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -163,5 +168,16 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         }
       }
     }
+    // This reader is closed on segment destroy()
+    _multiColTextReader = null;
+  }
+
+  public MultiColumnLuceneTextIndexReader getMultiColumnTextIndex() {
+    return _multiColTextReader;
+  }
+
+  public void setMultiColumnTextIndex(
+      MultiColumnLuceneTextIndexReader multiColTextReader) {
+    _multiColTextReader = multiColTextReader;
   }
 }

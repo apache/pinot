@@ -173,14 +173,11 @@ public class SegmentPreProcessor implements AutoCloseable {
         _segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
-    }
-
-    //TODO: can we use one of the previous writers ?
-    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create/modify/remove multi-col text index if required.
       if (processMultiColTextIndex(indexDir, _indexLoadingConfig.getFieldIndexConfigByColName(),
           _indexLoadingConfig.getTableConfig(), segmentWriter, segmentOperationsThrottler)) {
-        _segmentDirectory.reloadMetadata();
+        // NOTE: When adding new steps after this, un-comment the next line.
+        //_segmentDirectory.reloadMetadata();
         segmentWriter.save();
       }
     }
@@ -282,7 +279,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig);
   }
 
-  private boolean processMultiColTextIndex(File indexDir, Map<String, FieldIndexConfigs> configsByCol,
+  private boolean processMultiColTextIndex(File indexDir,
+      Map<String, FieldIndexConfigs> configsByCol,
       TableConfig tableConfig, SegmentDirectory.Writer segmentWriter,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {

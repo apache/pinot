@@ -94,6 +94,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -194,7 +195,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final MultiColumnRealtimeLuceneTextIndex _multiColumnTextIndex;
   private final Object2IntOpenHashMap _multiColumnPos;
   private final List<Object> _multiColumnValues;
-  private MultiColumnTextMetadata _multiColumnTextMetadata;
+  private final MultiColumnTextMetadata _multiColumnTextMetadata;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -472,6 +473,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _multiColumnTextIndex = null;
       _multiColumnPos = null;
       _multiColumnValues = null;
+      _multiColumnTextMetadata = null;
     }
   }
 
@@ -1557,10 +1559,17 @@ public class MutableSegmentImpl implements MutableSegment {
             _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
             _valuesInfo._varByteMVMaxRowLengthInBytes);
       }
+      MultiColumnTextIndexReader multiColTextReader;
+      if (_multiColumnTextMetadata != null && _multiColumnTextMetadata.getColumns().contains(_fieldSpec.getName())) {
+        multiColTextReader = _multiColumnTextIndex;
+      } else {
+        multiColTextReader = null;
+      }
+
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
           _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
           _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
-          _valuesInfo._varByteMVMaxRowLengthInBytes);
+          _valuesInfo._varByteMVMaxRowLengthInBytes, multiColTextReader);
     }
 
     @Override
