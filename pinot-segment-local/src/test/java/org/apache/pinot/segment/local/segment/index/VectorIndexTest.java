@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.segment.index;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.stream.Collectors;
-import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
-import org.apache.pinot.segment.local.segment.index.text.TextIndexType;
 import org.apache.pinot.segment.local.segment.index.vector.VectorIndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.testng.Assert;

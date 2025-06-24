@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.util.stream.Collectors;
-import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
