@@ -34,14 +34,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.HttpStatus;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -55,6 +66,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -63,12 +75,15 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
+
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -627,7 +642,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
-      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs)
+      throws Exception {
     URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
     assert dataPathUrl != null;
     File file = new File(dataPathUrl.getFile());
@@ -797,5 +813,137 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return JsonUtils.stringToJsonNode(
             sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
         .get("columnIndexSizeMap").get(column);
+  }
+
+  protected String getTableRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
+    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
+        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+  }
+
+  protected void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
+        SimpleHttpResponse httpResponse = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        ServerRebalanceJobStatusResponse rebalanceStatus =
+            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+        return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
+      } catch (HttpErrorStatusException e) {
+        if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
+          Assert.fail("Caught unexpected HTTP error while waiting for rebalance to complete: " + e.getMessage(), e);
+        }
+        return null;
+      } catch (Exception e) {
+        Assert.fail("Caught exception while waiting for rebalance to complete", e);
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to complete rebalance");
+  }
+
+  protected void waitForTableEVISConverge(String tableName, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
+        SimpleHttpResponse httpResponse =
+            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        TableViews.TableView idealState =
+            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+
+        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
+        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
+        TableViews.TableView externalView =
+            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
+  }
+
+  /**
+   * Helper method to perform segment moving test with specified configuration.
+   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+   */
+  protected void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
+      String newTenant,
+      boolean shouldCommit, long timeoutMs)
+      throws Exception {
+    performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
+  }
+
+  /**
+   * Helper method to perform segment moving test with EVIS convergence wait.
+   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+   * completion.
+   */
+  protected void performForceCommitSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig,
+      TableConfig tableConfig,
+      String newTenant, boolean shouldCommit, long timeoutMs)
+      throws Exception {
+    performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
+  }
+
+  /**
+   * Helper method to perform segment moving test with specified configuration.
+   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+   *
+   * @param rebalanceConfig the rebalance configuration
+   * @param tableConfig the table configuration
+   * @param newTenant the new tenant to move segments to
+   * @param shouldCommit whether segments should be committed (affects verification)
+   * @param timeoutMs timeout in milliseconds
+   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+   *                            rebalance completion
+   */
+  private void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
+      String newTenant,
+      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
+      throws Exception {
+    // Change tenant
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), newTenant, null));
+    updateTableConfig(tableConfig);
+
+    // Set force commit
+    rebalanceConfig.setForceCommit(true);
+
+    // Execute rebalance
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+
+    // Get original consuming segments (if present)
+    Set<String> originalConsumingSegmentsToMove = null;
+    if (rebalanceResult.getRebalanceSummaryResult() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
+      originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
+          .getConsumingSegmentToBeMovedSummary()
+          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
+          .keySet();
+    }
+
+    // Wait for completion based on the flag
+    if (waitForEVISConverge) {
+      waitForTableEVISConverge(getTableName(), timeoutMs);
+    } else {
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
+    }
+
+    // Check if segments were committed (only if there were consuming segments to move)
+    if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      LLCSegmentName consumingSegmentOriginal =
+          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
+
+      if (shouldCommit) {
+        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
+      } else {
+        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
+      }
+    }
   }
 }

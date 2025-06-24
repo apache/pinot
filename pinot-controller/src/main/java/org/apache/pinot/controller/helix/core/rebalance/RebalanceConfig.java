@@ -347,6 +347,22 @@ public class RebalanceConfig {
         + ", _forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs + '}';
   }
 
+  public String toQueryString() {
+    return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&reassignInstances=" + _reassignInstances
+        + "&includeConsuming=" + _includeConsuming + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime
+        + "&minAvailableReplicas=" + _minAvailableReplicas + "&bestEfforts=" + _bestEfforts
+        + "&minimizeDataMovement=" + _minimizeDataMovement.name() + "&batchSizePerServer=" + _batchSizePerServer
+        + "&externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + "&externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
+        + "&updateTargetTier=" + _updateTargetTier + "&heartbeatIntervalInMs=" + _heartbeatIntervalInMs
+        + "&heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + "&maxAttempts=" + _maxAttempts
+        + "&retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + "&forceCommit=" + _forceCommit
+        + "&forceCommitBatchSize=" + _forceCommitBatchSize
+        + "&forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
+        + "&forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs;
+  }
+
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;

@@ -26,12 +26,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -39,9 +37,7 @@ import org.apache.pinot.common.utils.regex.JavaUtilPattern;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -52,7 +48,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,29 +77,6 @@ import static org.testng.Assert.*;
 
 
 public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
-  private static String getQueryString(RebalanceConfig rebalanceConfig) {
-    return "dryRun=" + rebalanceConfig.isDryRun() + "&preChecks=" + rebalanceConfig.isPreChecks()
-        + "&reassignInstances=" + rebalanceConfig.isReassignInstances()
-        + "&includeConsuming=" + rebalanceConfig.isIncludeConsuming()
-        + "&minimizeDataMovement=" + rebalanceConfig.getMinimizeDataMovement()
-        + "&bootstrap=" + rebalanceConfig.isBootstrap() + "&downtime=" + rebalanceConfig.isDowntime()
-        + "&minAvailableReplicas=" + rebalanceConfig.getMinAvailableReplicas()
-        + "&bestEfforts=" + rebalanceConfig.isBestEfforts()
-        + "&batchSizePerServer=" + rebalanceConfig.getBatchSizePerServer()
-        + "&externalViewCheckIntervalInMs=" + rebalanceConfig.getExternalViewCheckIntervalInMs()
-        + "&externalViewStabilizationTimeoutInMs=" + rebalanceConfig.getExternalViewStabilizationTimeoutInMs()
-        + "&updateTargetTier=" + rebalanceConfig.isUpdateTargetTier()
-        + "&heartbeatIntervalInMs=" + rebalanceConfig.getHeartbeatIntervalInMs()
-        + "&heartbeatTimeoutInMs=" + rebalanceConfig.getHeartbeatTimeoutInMs()
-        + "&maxAttempts=" + rebalanceConfig.getMaxAttempts()
-        + "&retryInitialDelayInMs=" + rebalanceConfig.getRetryInitialDelayInMs()
-        + "&forceCommit=" + rebalanceConfig.isForceCommit();
-  }
-
-  private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
-  }
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -135,7 +107,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setMinAvailableReplicas(-1);
     rebalanceConfig.setIncludeConsuming(true);
-    sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
 
     // We're using IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR based instance assignment for this table.
     // This test verifies that INSTANCE_PARTITIONS is written to ZK after instance assignment in the rebalance and has
@@ -168,7 +140,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Reset the table config and rebalance
     updateTableConfig(getTableConfigBuilder(TableType.REALTIME).build());
-    sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
 
     TestUtils.waitForCondition(
         aVoid -> {
@@ -196,13 +168,13 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TableConfig originalTableConfig = new TableConfig(tableConfig);
 
     // Ensure pre-check status is null if not enabled
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNull(rebalanceResult.getPreChecksResult());
 
     rebalanceConfig.setPreChecks(true);
     rebalanceConfig.setIncludeConsuming(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -221,7 +193,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled for COMPLETED segments, but instance assignment is allowed",
@@ -238,14 +210,14 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // response will be the same for MinimizeDataMovementOptions.DISABLE and MinimizeDataMovementOptions.DEFAULT in
     // this case
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     assertEquals(JsonUtils.stringToObject(response, RebalanceResult.class)
             .getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage());
 
     // Use MinimizeDataMovementOptions.ENABLE
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
@@ -265,7 +237,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled for COMPLETED segments in table config but it's overridden with disabled",
@@ -286,7 +258,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed",
@@ -303,14 +275,14 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // response will be the same for MinimizeDataMovementOptions.DISABLE and MinimizeDataMovementOptions.DEFAULT in
     // this case
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     assertEquals(JsonUtils.stringToObject(response, RebalanceResult.class)
             .getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage());
 
     // Use MinimizeDataMovementOptions.ENABLE
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
@@ -331,7 +303,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with disabled",
@@ -353,7 +325,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
@@ -374,14 +346,14 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // response will be the same for MinimizeDataMovementOptions.DISABLE and MinimizeDataMovementOptions.DEFAULT in
     // this case
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     assertEquals(JsonUtils.stringToObject(response, RebalanceResult.class)
             .getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage());
 
     // Use MinimizeDataMovementOptions.ENABLE
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
@@ -404,7 +376,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
@@ -423,13 +395,13 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // response will be the same for MinimizeDataMovementOptions.ENABLE and MinimizeDataMovementOptions.DEFAULT in
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     assertEquals(JsonUtils.stringToObject(response, RebalanceResult.class)
             .getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage());
 
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled for both COMPLETED and CONSUMING segments in table config but it's "
@@ -453,7 +425,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
@@ -481,7 +453,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTenantConfig(tenantConfig);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with disabled",
@@ -509,13 +481,13 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TableConfig originalTableConfig = new TableConfig(tableConfig);
 
     // Ensure pre-check status is null if not enabled
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNull(rebalanceResult.getPreChecksResult());
 
     // Enable pre-checks, nothing is set
     rebalanceConfig.setPreChecks(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -534,7 +506,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     rebalanceConfig.setIncludeConsuming(true);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
@@ -553,7 +525,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -567,7 +539,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -587,7 +559,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setReassignInstances(true);
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -609,7 +581,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     Schema schema = getSchema(getTableName());
     schema.addField(new MetricFieldSpec("NewAddedIntMetricB", FieldSpec.DataType.INT, 1));
     updateSchema(schema);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -626,7 +598,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("COMPLETED").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
@@ -646,7 +618,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("CONSUMING").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
@@ -670,7 +642,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setMinAvailableReplicas(-1);
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -689,7 +661,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     rebalanceConfig.setBestEfforts(false);
     rebalanceConfig.setBootstrap(false);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -719,14 +691,14 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TableConfig originalTableConfig = new TableConfig(tableConfig);
 
     // Ensure pre-check status is null if not enabled
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
 
     // Enable pre-checks, nothing is set
     rebalanceConfig.setPreChecks(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -744,7 +716,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -760,7 +732,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Override minimizeDataMovement
     rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -781,7 +753,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
     rebalanceConfig.setMinimizeDataMovement(Enablement.DEFAULT);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -800,7 +772,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -814,7 +786,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -832,7 +804,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     tableConfig.setTierConfigsList(Collections.singletonList(tierConfig));
     updateTableConfig(tableConfig);
     rebalanceConfig.setUpdateTargetTier(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -845,7 +817,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     rebalanceConfig.setUpdateTargetTier(false);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -869,7 +841,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     BaseServerStarter serverStarter0 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     tableConfig.setInstanceAssignmentConfigMap(null);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
@@ -890,7 +862,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     Schema schema = createSchema();
     schema.addField(new MetricFieldSpec("NewAddedIntMetric", FieldSpec.DataType.INT, 1));
     updateSchema(schema);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -907,7 +879,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -927,7 +899,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     replicaGroupPartitionConfig = instanceAssignmentConfigMap.get("OFFLINE").getReplicaGroupPartitionConfig();
     tableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
@@ -950,7 +922,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setMinAvailableReplicas(-1);
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
@@ -972,7 +944,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         false));
     waitForReloadToComplete(getReloadJobIdFromResponse(response), 30_000);
 
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
@@ -988,7 +960,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
     rebalanceConfig.setDryRun(false);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1067,7 +1039,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TableConfig originalTableConfig = new TableConfig(tableConfig);
 
     // Ensure summary status is non-null always
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, NUM_SERVERS_REALTIME,
@@ -1088,7 +1060,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     TableConfig originalTableConfig = new TableConfig(tableConfig);
 
     // Ensure summary status is non-null always
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1099,7 +1071,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     createServerTenant(getServerTenant(), 1, 0);
     rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1110,7 +1082,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(false);
     rebalanceConfig.setDowntime(true);
     rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1123,7 +1095,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Re-enable dry-run
     rebalanceConfig.setDryRun(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1134,7 +1106,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setDryRun(false);
     rebalanceConfig.setDowntime(true);
     rebalanceConfig.setReassignInstances(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1147,7 +1119,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Try dry-run again
     rebalanceConfig.setDryRun(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNull(rebalanceResult.getPreChecksResult());
@@ -1156,7 +1128,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Enable pre-checks just to verify that the pre-checks object is not null
     rebalanceConfig.setPreChecks(true);
-    response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
+    response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE));
     rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertNotNull(rebalanceResult.getPreChecksResult());
@@ -1315,7 +1287,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     rebalanceConfig.setReassignInstances(true);
 
     Pair<Integer, String> response =
-        postRequestWithStatusCode(getRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
+        postRequestWithStatusCode(getTableRebalanceUrl(rebalanceConfig, TableType.OFFLINE), null);
     assertEquals(response.getLeft(), Response.Status.CONFLICT.getStatusCode());
     assertTrue(response.getRight().contains("Rebalance job is already in progress for table"));
 
@@ -1433,7 +1405,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       rebalanceConfig.setIncludeConsuming(true);
       rebalanceConfig.setMinAvailableReplicas(0);
 
-      String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
       assertEquals(
@@ -1448,30 +1420,30 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
           && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           tableConfig.getRoutingConfig().getInstanceSelectorType())) {
         // test: move segments from tenantA to tenantB
-        performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
 
         // test: move segment from tenantB to tenantA with batch size
         rebalanceConfig.setBatchSizePerServer(1);
-        performSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantA, true, 30000);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
-        performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
       } else {
         // test: move segments from tenantA to tenantB
-        performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, true, 30000);
 
         // test: move segment from tenantB to tenantA with downtime
         rebalanceConfig.setDowntime(true);
-        performSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true, 30000);
+        performForceCommitSegmentMovingTestWithEVISConverge(rebalanceConfig, tableConfig, tenantA, true, 30000);
 
         // test: move segment from tenantA to tenantB with includeConsuming = false, consuming segment should not be
         // committed
         rebalanceConfig.setDowntime(false);
         rebalanceConfig.setIncludeConsuming(false);
-        performSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
+        performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, tenantB, false, 30000);
       }
     } catch (Exception e) {
       Assert.fail("Caught exception during force commit test", e);
@@ -1489,7 +1461,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       sendDeleteRequest(
           StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
               + "?type=" + tableConfig.getTableType().toString());
-      String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       waitForRebalanceToComplete(rebalanceResult.getJobId(), 30000);
 
@@ -1525,122 +1497,6 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     }, 1000L, timeoutMs, "Failed to reload all segments");
   }
 
-  private void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
-        SimpleHttpResponse httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
-        ServerRebalanceJobStatusResponse rebalanceStatus =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-        return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
-      } catch (Exception e) {
-        Assert.fail("Caught exception while waiting for rebalance to complete", e);
-        return null;
-      }
-    }, 1000L, timeoutMs, "Failed to complete rebalance");
-  }
 
-  private void waitForTableEVISConverge(String tableName, long timeoutMs) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView idealState =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
 
-        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
-        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
-        TableViews.TableView externalView =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
-      } catch (Exception e) {
-        Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
-        return null;
-      }
-    }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
-  }
-
-  /**
-   * Helper method to perform segment moving test with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   */
-  void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-      boolean shouldCommit, long timeoutMs)
-      throws Exception {
-    performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
-  }
-
-  /**
-   * Helper method to perform segment moving test with EVIS convergence wait.
-   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
-   * completion.
-   */
-  void performSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
-      String newTenant, boolean shouldCommit, long timeoutMs)
-      throws Exception {
-    performSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
-  }
-
-  /**
-   * Helper method to perform segment moving test with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   *
-   * @param rebalanceConfig the rebalance configuration
-   * @param tableConfig the table configuration
-   * @param newTenant the new tenant to move segments to
-   * @param shouldCommit whether segments should be committed (affects verification)
-   * @param timeoutMs timeout in milliseconds
-   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
-   *                            rebalance completion
-   */
-  private void performSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig, String newTenant,
-      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
-      throws Exception {
-    // Change tenant
-    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), newTenant, null));
-    updateTableConfig(tableConfig);
-
-    // Set force commit
-    rebalanceConfig.setForceCommit(true);
-
-    // Execute rebalance
-    String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
-
-    // Get original consuming segments (if present)
-    Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
-      originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
-          .getConsumingSegmentToBeMovedSummary()
-          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-          .keySet();
-    }
-
-    // Wait for completion based on the flag
-    if (waitForEVISConverge) {
-      waitForTableEVISConverge(getTableName(), timeoutMs);
-    } else {
-      waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
-    }
-
-    // Check if segments were committed (only if there were consuming segments to move)
-    if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
-      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
-          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-      LLCSegmentName consumingSegmentOriginal =
-          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-
-      if (shouldCommit) {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-      } else {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
-      }
-    }
-  }
 }
