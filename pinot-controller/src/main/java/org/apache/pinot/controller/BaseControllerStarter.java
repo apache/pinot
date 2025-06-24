@@ -118,7 +118,6 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
-import org.apache.pinot.controller.validation.PrimaryKeyCountChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
@@ -216,7 +215,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected StorageQuotaChecker _storageQuotaChecker;
   protected List<UtilizationChecker> _utilizationCheckerList;
   protected DiskUtilizationChecker _diskUtilizationChecker;
-  protected PrimaryKeyCountChecker _primaryKeyCountChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
@@ -560,9 +558,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         _helixResourceManager, _config);
 
     _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _config);
-    _primaryKeyCountChecker = new PrimaryKeyCountChecker(_helixResourceManager, _config);
     _utilizationCheckerList.add(_diskUtilizationChecker);
-    _utilizationCheckerList.add(_primaryKeyCountChecker);
     _resourceUtilizationManager = new ResourceUtilizationManager(_config, _utilizationCheckerList);
     _rebalancePreChecker = RebalancePreCheckerFactory.create(_config.getRebalancePreCheckerClass());
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
@@ -627,7 +623,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
-        bind(_primaryKeyCountChecker).to(PrimaryKeyCountChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);

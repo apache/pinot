@@ -21,7 +21,6 @@ package org.apache.pinot.controller.validation;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
-import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 
 
 /**
@@ -35,7 +34,6 @@ public class ResourceUtilizationInfo {
 
   // Assumption – instanceId is unique across all tenants
   private static Map<String, DiskUsageInfo> _instanceDiskUsageInfo = new HashMap<>();
-  private static Map<String, PrimaryKeyCountInfo> _instancePrimaryKeyCountInfo = new HashMap<>();
 
   public static DiskUsageInfo getDiskUsageInfo(String instanceId) {
     return _instanceDiskUsageInfo.getOrDefault(instanceId, new DiskUsageInfo(instanceId));
@@ -43,13 +41,5 @@ public class ResourceUtilizationInfo {
 
   public static void setDiskUsageInfo(Map<String, DiskUsageInfo> newDiskUsageInfo) {
     _instanceDiskUsageInfo = newDiskUsageInfo;
-  }
-
-  public static PrimaryKeyCountInfo getPrimaryKeyCountInfo(String instanceId) {
-    return _instancePrimaryKeyCountInfo.getOrDefault(instanceId, new PrimaryKeyCountInfo(instanceId));
-  }
-
-  public static void setPrimaryKeyCountInfo(Map<String, PrimaryKeyCountInfo> newPrimaryKeyCountInfo) {
-    _instancePrimaryKeyCountInfo = newPrimaryKeyCountInfo;
   }
 }
