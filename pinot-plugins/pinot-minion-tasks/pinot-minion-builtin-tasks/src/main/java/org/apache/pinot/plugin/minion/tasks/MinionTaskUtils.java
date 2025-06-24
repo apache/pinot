@@ -240,7 +240,8 @@ public class MinionTaskUtils {
 
       // skipping servers which are not in READY state. The bitmaps would be inconsistent when
       // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-      if (!validDocIdsBitmapResponse.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
+      if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
+          .equals(ServiceStatus.Status.GOOD)) {
         String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
             + validDocIdsBitmapResponse.getServerStatus() + " state, skipping it for execution for segment: "
             + validDocIdsBitmapResponse.getSegmentName() + ". Will try other servers.";

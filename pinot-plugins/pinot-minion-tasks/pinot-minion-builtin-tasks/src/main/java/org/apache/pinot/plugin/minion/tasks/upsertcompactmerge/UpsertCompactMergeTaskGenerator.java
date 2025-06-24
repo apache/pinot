@@ -158,7 +158,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // get server to segment mappings
       PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
       Map<String, List<String>> serverToSegments =
-          pinotHelixResourceManager.getExternalViewServerToSegmentsMap(tableNameWithType, true);
+          pinotHelixResourceManager.getServerToOnlineSegmentsMapFromEV(tableNameWithType, true);
       BiMap<String, String> serverToEndpoints;
       try {
         serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -292,7 +292,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
         // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
         // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (!validDocIdsMetadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
+        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
+            .equals(ServiceStatus.Status.GOOD)) {
           LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
               validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);

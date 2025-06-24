@@ -3238,7 +3238,7 @@ public class PinotHelixResourceManager {
   /**
    * Get the servers to segments map for which servers are ONLINE in external view for those segments in IDEAL STATE
    */
-  public Map<String, List<String>> getExternalViewServerToSegmentsMap(String tableNameWithType,
+  public Map<String, List<String>> getServerToOnlineSegmentsMapFromEV(String tableNameWithType,
       boolean includeReplacedSegments) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
