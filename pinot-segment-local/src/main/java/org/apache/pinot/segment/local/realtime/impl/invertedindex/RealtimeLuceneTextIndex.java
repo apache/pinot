@@ -150,6 +150,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     return getDocIdsWithoutOptions(searchQuery);
   }
 
+  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
+  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
+  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
   private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
       LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
@@ -182,13 +185,11 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       return searchFuture.get();
     } catch (InterruptedException e) {
       docIDCollector.markShouldCancel();
-      LOGGER.warn("TEXT_MATCH query interrupted while querying the consuming segment {}, column {}, search query {}",
-          _segmentName, _column, actualQuery);
-      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment " + _segmentName
+          + " for column " + _column + " with search query: " + actualQuery, e);
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
-          + " exception {}", _segmentName, _column, actualQuery, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed while searching the realtime text index for segment " + _segmentName
+          + " for column " + _column + " with search query: " + actualQuery, e);
     }
   }
 
@@ -241,13 +242,11 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       return searchFuture.get();
     } catch (InterruptedException e) {
       docIDCollector.markShouldCancel();
-      LOGGER.warn("TEXT_MATCH query interrupted while querying the consuming segment {}, column {}, search query {}",
-          _segmentName, _column, searchQuery);
-      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment " + _segmentName
+          + " for column " + _column + " with search query: " + searchQuery, e);
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
-          + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed while searching the realtime text index for segment " + _segmentName
+          + " for column " + _column + " with search query: " + searchQuery, e);
     }
   }
 

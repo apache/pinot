@@ -204,6 +204,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
     }
   }
 
+  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
+  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
+  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
   private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
       LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
@@ -213,9 +216,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the text index for column {}, search query {}, exception {}", _column,
-          actualQuery, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException(
+          "Failed while searching the text index for column " + _column + " with search query: " + actualQuery, e);
     }
   }
 
