@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableT
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -36,6 +37,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class TextMatchTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "textMatch";
   private String _predicate;
+  private String _options;
   private TextIndexReader _textIndexReader;
 
   @Override
@@ -74,7 +76,37 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
           "The second argument of TEXT_MATCH transform function must be a single-valued string literal");
     }
 
-    _predicate = ((LiteralTransformFunction) predicate).getStringLiteral();
+    // Verify that the second parameter is actually a string literal
+    LiteralTransformFunction literalPredicate = (LiteralTransformFunction) predicate;
+    if (literalPredicate.getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+      throw new IllegalArgumentException(
+          "The second argument of TEXT_MATCH transform function must be a string literal, got: "
+              + literalPredicate.getResultMetadata().getDataType());
+    }
+
+    _predicate = literalPredicate.getStringLiteral();
+
+    // Handle optional third parameter for options
+    if (arguments.size() > 2) {
+      TransformFunction options = arguments.get(2);
+      if (!(options instanceof LiteralTransformFunction && options.getResultMetadata().isSingleValue())) {
+        throw new IllegalArgumentException(
+            "The third argument of TEXT_MATCH transform function must be a single-valued string literal");
+      }
+
+      // Verify that the third parameter is actually a string literal
+      LiteralTransformFunction literalOptions = (LiteralTransformFunction) options;
+      if (literalOptions.getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+        throw new IllegalArgumentException(
+            "The third argument of TEXT_MATCH transform function must be a string literal, got: "
+                + literalOptions.getResultMetadata().getDataType());
+      }
+
+      _options = literalOptions.getStringLiteral();
+    } else {
+      _options = null;
+    }
+
     _textIndexReader = indexReader;
   }
 
@@ -83,7 +115,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     initZeroFillingIntValuesSV(length);
 
     int[] docIds = valueBlock.getDocIds();
-    MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate);
+    MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate, _options);
 
     for (int i = 0; i < length; i++) {
       if (indexDocIds.contains(docIds[i])) {
