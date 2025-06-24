@@ -340,7 +340,7 @@ public class PinotAppConfigs {
 
   public String toJSONString() {
     try {
-      return JsonUtils.objectToPrettyString(new Obfuscator().toJson(this));
+      return JsonUtils.objectToPrettyString(Obfuscator.DEFAULT.toJson(this));
     } catch (JsonProcessingException e) {
       return e.getMessage();
     }

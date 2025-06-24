@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -73,7 +74,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     _eventObserver.notifyProgress(pinotTaskConfig, "Converting segments: " + numInputSegments);
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
+    }
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -146,7 +149,10 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
             .getSkippedRowsFound() + ", sanitized:" + framework.getSanitizedRowsFound());
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType,
+          Obfuscator.DEFAULT.toJsonString(configs), (endMillis - startMillis));
+    }
 
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File outputSegmentDir : outputSegmentDirs) {
