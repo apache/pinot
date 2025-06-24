@@ -26,19 +26,14 @@ public class ValidDocIdsBitmapResponse {
   private final String _segmentCrc;
   private final ValidDocIdsType _validDocIdsType;
   private final byte[] _bitmap;
-  private final String _instanceId;
-  private final String _serverStatus;
 
   public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
-      @JsonProperty("bitmap") byte[] bitmap, @JsonProperty("instanceId") String instanceId,
-      @JsonProperty("serverStatus") String serverStatus) {
+      @JsonProperty("bitmap") byte[] bitmap) {
     _segmentName = segmentName;
     _segmentCrc = crc;
     _validDocIdsType = validDocIdsType;
     _bitmap = bitmap;
-    _instanceId = instanceId;
-    _serverStatus = serverStatus;
   }
 
   public String getSegmentName() {
@@ -55,13 +50,5 @@ public class ValidDocIdsBitmapResponse {
 
   public byte[] getBitmap() {
     return _bitmap;
-  }
-
-  public String getServerStatus() {
-    return _serverStatus;
-  }
-
-  public String getInstanceId() {
-    return _instanceId;
   }
 }

@@ -159,11 +159,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
       int skippedSegmentsCount = validDocIdsMetadataList.size()
-              - segmentSelectionResult.getSegmentsForCompaction().size()
-              - segmentSelectionResult.getSegmentsForDeletion().size();
+          - segmentSelectionResult.getSegmentsForCompaction().size()
+          - segmentSelectionResult.getSegmentsForDeletion().size();
       LOGGER.info("Selected {} segments for compaction, {} segments for deletion and skipped {} segments for table: {}",
           segmentSelectionResult.getSegmentsForCompaction().size(),
-              segmentSelectionResult.getSegmentsForDeletion().size(), skippedSegmentsCount, tableNameWithType);
+          segmentSelectionResult.getSegmentsForDeletion().size(), skippedSegmentsCount, tableNameWithType);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -190,7 +190,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
         configs.put(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
             taskConfigs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
-            String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
+                String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -227,16 +227,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
               segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
           continue;
         }
-
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (!validDocIdsMetadata.getServerStatus().equals("OK")) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
-          continue;
-        }
-
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
         if (totalInvalidDocs == totalDocs) {
@@ -245,13 +235,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
             && totalInvalidDocs >= invalidRecordsThresholdCount) {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                  + "(count threshold: {}, percent threshold: {}), adding it to the compaction list", segmentName,
-              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), adding it to the compaction list",
+              segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
+              invalidRecordsThresholdPercent);
           segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
         } else {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                  + "(count threshold: {}, percent threshold: {}), skipping it for compaction", segmentName,
-              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), skipping it for compaction",
+              segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
+              invalidRecordsThresholdPercent);
         }
         break;
       }

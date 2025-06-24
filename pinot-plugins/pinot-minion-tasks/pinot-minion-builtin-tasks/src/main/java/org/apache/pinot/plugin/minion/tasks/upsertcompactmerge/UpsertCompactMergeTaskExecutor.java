@@ -28,9 +28,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -110,13 +108,8 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
 
     // Fetch validDocID snapshot from server and get record-reader for compacted reader.
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
-      ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
-          MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-              ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
-      RoaringBitmap validDocIds = null;
-      if (validDocIdsBitmapResponse != null) {
-        validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-      }
+      RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -125,16 +118,6 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
         LOGGER.error(message);
         throw new IllegalStateException(message);
       }
-
-      if (!validDocIdsBitmapResponse.getServerStatus().equals("OK")) {
-        String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
-            + validDocIdsBitmapResponse.getServerStatus() + ", skipping "
-            + MinionConstants.UpsertCompactMergeTask.TASK_TYPE + " execution for segment: "
-            + validDocIdsBitmapResponse.getSegmentName();
-        LOGGER.error(message);
-        throw new IllegalStateException(message);
-      }
-
       return new CompactedPinotSegmentRecordReader(validDocIds);
     }).collect(Collectors.toList());
     List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>(recordReaders.size());

@@ -530,14 +530,6 @@ public class TablesResource {
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
             Response.Status.BAD_REQUEST);
       }
-      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-      String serverStatus = "";
-      if (status.equals(ServiceStatus.Status.GOOD)) {
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
-        serverStatus = "OK";
-      } else {
-        serverStatus = "NOT_READY";
-      }
 
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
@@ -554,8 +546,7 @@ public class TablesResource {
       }
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          serverStatus);
+          finalValidDocIdsType, validDocIdsBytes);
     } catch (Exception e) {
       LOGGER.error("Failed to get validDocIds for table {}: {}", tableNameWithType, e.getMessage());
       return null;
