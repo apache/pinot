@@ -24,9 +24,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -74,13 +72,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
-    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
+    RoaringBitmap validDocIds =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
             MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
-    RoaringBitmap validDocIds = null;
-    if (validDocIdsBitmapResponse != null) {
-      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-    }
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -100,14 +94,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       }
       return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
           .build();
-    }
-
-    if (!validDocIdsBitmapResponse.getServerStatus().equals("OK")) {
-      String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
-          + validDocIdsBitmapResponse.getServerStatus() + ", skipping " + MinionConstants.UpsertCompactionTask.TASK_TYPE
-          + " execution for segment: " + segmentName;
-      LOGGER.error(message);
-      throw new IllegalStateException(message);
     }
 
     int totalDocsAfterCompaction;

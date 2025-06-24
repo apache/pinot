@@ -19,6 +19,7 @@
 package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.common.utils.ServiceStatus;
 
 
 public class ValidDocIdsBitmapResponse {
@@ -27,12 +28,12 @@ public class ValidDocIdsBitmapResponse {
   private final ValidDocIdsType _validDocIdsType;
   private final byte[] _bitmap;
   private final String _instanceId;
-  private final String _serverStatus;
+  private final ServiceStatus.Status _serverStatus;
 
   public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("bitmap") byte[] bitmap, @JsonProperty("instanceId") String instanceId,
-      @JsonProperty("serverStatus") String serverStatus) {
+      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _segmentCrc = crc;
     _validDocIdsType = validDocIdsType;
@@ -57,7 +58,7 @@ public class ValidDocIdsBitmapResponse {
     return _bitmap;
   }
 
-  public String getServerStatus() {
+  public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
   }
 

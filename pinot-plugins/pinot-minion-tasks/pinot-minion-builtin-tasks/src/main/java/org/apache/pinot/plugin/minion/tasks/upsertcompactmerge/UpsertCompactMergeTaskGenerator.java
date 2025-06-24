@@ -37,6 +37,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -291,7 +292,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
         // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
         // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (!validDocIdsMetadata.getServerStatus().equals("OK")) {
+        if (!validDocIdsMetadata.getServerStatus().equals(ServiceStatus.Status.GOOD)) {
           LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
               validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);

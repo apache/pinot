@@ -65,8 +65,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -143,9 +141,6 @@ public class TablesResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
-
-  @Inject
-  private ServerMetrics _serverMetrics;
 
   @GET
   @Path("/tables")
@@ -531,13 +526,6 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-      String serverStatus = "";
-      if (status.equals(ServiceStatus.Status.GOOD)) {
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
-        serverStatus = "OK";
-      } else {
-        serverStatus = "NOT_READY";
-      }
 
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
@@ -555,10 +543,7 @@ public class TablesResource {
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
           finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
-          serverStatus);
-    } catch (Exception e) {
-      LOGGER.error("Failed to get validDocIds for table {}: {}", tableNameWithType, e.getMessage());
-      return null;
+          status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -689,13 +674,6 @@ public class TablesResource {
         LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-      String serverStatus = "";
-      if (status == ServiceStatus.Status.GOOD) {
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
-        serverStatus = "OK";
-      } else {
-        serverStatus = "NOT_READY";
-      }
 
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -741,7 +719,7 @@ public class TablesResource {
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
-        validDocIdsMetadata.put("serverStatus", serverStatus);
+        validDocIdsMetadata.put("serverStatus", status);
         validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
           validDocIdsMetadata.put("segmentSizeInBytes",

@@ -20,6 +20,7 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.common.utils.ServiceStatus;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -32,7 +33,7 @@ public class ValidDocIdsMetadataInfo {
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
   private final long _segmentCreationTimeMillis;
-  private final String _serverStatus;
+  private final ServiceStatus.Status _serverStatus;
   private final String _instanceId;
 
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
@@ -41,7 +42,7 @@ public class ValidDocIdsMetadataInfo {
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
       @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
-      @JsonProperty("serverStatus") String serverStatus, @JsonProperty("instanceId") String instanceId) {
+      @JsonProperty("serverStatus") ServiceStatus.Status serverStatus, @JsonProperty("instanceId") String instanceId) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -86,7 +87,7 @@ public class ValidDocIdsMetadataInfo {
     return _segmentCreationTimeMillis;
   }
 
-  public String getServerStatus() {
+  public ServiceStatus.Status getServerStatus() {
     return _serverStatus;
   }
 
