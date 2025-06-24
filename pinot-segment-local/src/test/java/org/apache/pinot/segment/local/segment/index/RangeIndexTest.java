@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.util.stream.Collectors;
+import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
@@ -31,7 +32,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 public class RangeIndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
@@ -47,6 +49,8 @@ public class RangeIndexTest {
       JsonNode indexConfig = fieldConfig.getIndexes().get(RangeIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
       assertEquals(RangeIndexConfig.DEFAULT.getVersion(), indexConfig.get("version").asInt());
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      assertNull(fieldConfig.getProperties());
     }
   }
 

@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.local.segment.index.nullvalue.NullValueIndexPlugin;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 

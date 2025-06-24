@@ -71,7 +71,7 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   @JsonCreator
-  public VectorIndexConfig(@JsonProperty("disabled") Boolean disabled,
+  public VectorIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("vectorIndexType") @Nullable String vectorIndexType,
       @JsonProperty("vectorDimension") int vectorDimension,
       @JsonProperty("version") int version,
