@@ -73,8 +73,8 @@ public class VectorIndexConfig extends IndexConfig {
   @JsonCreator
   public VectorIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("vectorIndexType") @Nullable String vectorIndexType,
-      @JsonProperty("vectorDimension") @Nullable int vectorDimension,
-      @JsonProperty("version") @Nullable int version,
+      @JsonProperty("vectorDimension") int vectorDimension,
+      @JsonProperty("version") int version,
       @JsonProperty("vectorDistanceFunction") @Nullable VectorDistanceFunction vectorDistanceFunction,
       @JsonProperty("properties") @Nullable Map<String, String> properties) {
     super(disabled);
