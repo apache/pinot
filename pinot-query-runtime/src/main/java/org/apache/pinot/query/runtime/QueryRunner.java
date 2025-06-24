@@ -285,8 +285,12 @@ public class QueryRunner {
             workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
+      Map<String, String> rlsFilters =
+          requestMetadata.entrySet().stream().filter(e -> e.getKey().startsWith(CommonConstants.RLS_FILTERS))
+              .collect(Collectors.toMap(e -> e.getKey().split("-")[1], Map.Entry::getValue));
       opChain =
-          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService);
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+              rlsFilters);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
@@ -528,7 +532,7 @@ public class QueryRunner {
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-            leafNodesConsumer, true);
+            leafNodesConsumer, true, Map.of());
     opChain.close(); // probably unnecessary, but formally needed
 
     PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);

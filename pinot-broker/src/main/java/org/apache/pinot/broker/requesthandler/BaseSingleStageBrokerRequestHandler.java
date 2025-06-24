@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAuthResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -433,6 +435,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
+
+      TableRowColAuthResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
+
+      //rewrite query
+      Map<String, String> queryOptions =
+          pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
+
+      rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
+        String combinedFilters =
+            rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+        queryOptions.put(tableName, combinedFilters);
+        pinotQuery.setQueryOptions(queryOptions);
+        CalciteSqlParser.queryRewrite(pinotQuery);
+      });
 
       // Validate QPS quota
       if (!_queryQuotaManager.acquireDatabase(database)) {

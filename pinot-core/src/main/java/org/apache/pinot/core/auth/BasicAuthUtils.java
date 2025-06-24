@@ -21,7 +21,9 @@ package org.apache.pinot.core.auth;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -39,6 +41,7 @@ public final class BasicAuthUtils {
   private static final String TABLES = "tables";
   private static final String EXCLUDE_TABLES = "excludeTables";
   private static final String ALL = "*";
+  private static final String RLS_FILTER = "rls";
 
   private BasicAuthUtils() {
     // left blank
@@ -76,8 +79,26 @@ public final class BasicAuthUtils {
       Set<String> excludeTables = extractSet(configuration, prefix + "." + name + "." + EXCLUDE_TABLES);
       Set<String> permissions = extractSet(configuration, prefix + "." + name + "." + PERMISSIONS);
 
+      // Extract RLS filters
+      Map<String, List<String>> tableRlsFilters = new HashMap<>(); // Changed to Map<String, List<String>>
+      if (!tables.isEmpty()) {
+        for (String tableName : tables) {
+          String rlsFilterKey = prefix + "." + name + "." + tableName + "." + RLS_FILTER;
+          String csvRlsFilters = configuration.getProperty(rlsFilterKey); // This is a CSV string
+
+          if (StringUtils.isNotBlank(csvRlsFilters)) {
+            List<String> rlsFilterList = Arrays.stream(csvRlsFilters.split(",")).map(String::trim)
+                .filter(StringUtils::isNotBlank) // Ensure individual filters are not blank
+                .collect(Collectors.toList());
+            if (!rlsFilterList.isEmpty()) {
+              tableRlsFilters.put(tableName, rlsFilterList);
+            }
+          }
+        }
+      }
+
       return new BasicAuthPrincipal(name, org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password),
-          tables, excludeTables, permissions);
+          tables, excludeTables, permissions, tableRlsFilters);
     }).collect(Collectors.toList());
   }
 
@@ -101,9 +122,10 @@ public final class BasicAuthUtils {
               .orElseGet(() -> Collections.emptyList())
               .stream().map(x -> x.toString())
               .collect(Collectors.toSet());
+          //todo: Handle RLS filters properly
           return new ZkBasicAuthPrincipal(name,
-              org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password,
-              component, role, tables, excludeTables, permissions);
+              org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password), password, component, role,
+              tables, excludeTables, permissions, Map.of());
         }).collect(Collectors.toList());
   }
 
