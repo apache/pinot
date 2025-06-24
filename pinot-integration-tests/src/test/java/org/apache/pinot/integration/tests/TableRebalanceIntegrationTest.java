@@ -1496,7 +1496,4 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
       }
     }, 1000L, timeoutMs, "Failed to reload all segments");
   }
-
-
-
 }

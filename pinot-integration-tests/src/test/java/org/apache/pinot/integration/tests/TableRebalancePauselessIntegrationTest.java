@@ -18,19 +18,11 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.net.URL;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -220,5 +212,4 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       serverStarter3.stop();
     }
   }
-
 }
