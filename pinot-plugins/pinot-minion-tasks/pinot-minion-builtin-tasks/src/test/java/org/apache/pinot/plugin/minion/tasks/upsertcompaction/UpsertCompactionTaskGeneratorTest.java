@@ -222,10 +222,10 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
     String json = "{\"testTable__0\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
         + "\"segmentName\": \"testTable__0\", \"totalDocs\": 100, \"segmentCrc\": \"1000\", "
-        + "\"segmentCreationTimeMillis\": 1234567890}], "
+        + "\"segmentCreationTimeMillis\": 1234567890, \"serverStatus\": \"OK\",  \"instanceId\": \"server1\"}], "
         + "\"testTable__1\": [{\"totalValidDocs\": 0, "
         + "\"totalInvalidDocs\": 10, \"segmentName\": \"testTable__1\", \"totalDocs\": 10, \"segmentCrc\": \"2000\", "
-        + "\"segmentCreationTimeMillis\": 9876543210}]}";
+        + "\"segmentCreationTimeMillis\": 9876543210, \"serverStatus\": \"OK\",  \"instanceId\": \"server1\"}]}";
 
     Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfo =
         JsonUtils.stringToObject(json, new TypeReference<>() {
@@ -284,7 +284,8 @@ public class UpsertCompactionTaskGeneratorTest {
         + "\"1234567890\", \"segmentCreationTimeMillis\": 1111111111}], \"" + _completedSegment2.getSegmentName()
         + "\": [{\"totalValidDocs\": 0, " + "\"totalInvalidDocs\": 10, \"segmentName\": \""
         + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\": \"" + _completedSegment2.getCrc()
-        + "\", \"totalDocs\": 10, \"segmentCreationTimeMillis\": 2222222222}]}";
+        + "\", \"totalDocs\": 10, \"segmentCreationTimeMillis\": 2222222222, \"serverStatus\": \"OK\",  "
+        + "\"instanceId\": \"server1\"}]}";
     validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<>() {
     });
     segmentSelectionResult =
@@ -301,11 +302,13 @@ public class UpsertCompactionTaskGeneratorTest {
     // check if both the candidates for compaction are coming in sorted descending order
     json = "{\"" + _completedSegment.getSegmentName() + "\": [{\"totalValidDocs\": 50, \"totalInvalidDocs\": 50, "
         + "\"segmentName\": \"" + _completedSegment.getSegmentName() + "\", \"totalDocs\": 100, \"segmentCrc\": \""
-        + _completedSegment.getCrc() + "\", \"segmentCreationTimeMillis\": 1234567890}], \""
+        + _completedSegment.getCrc()
+        + "\", \"segmentCreationTimeMillis\": 1234567890, \"serverStatus\": \"OK\",  \"instanceId\": \"server1\"}], \""
         + _completedSegment2.getSegmentName() + "\": "
         + "[{\"totalValidDocs\": 10, \"totalInvalidDocs\": 40, \"segmentName\": \""
         + _completedSegment2.getSegmentName() + "\", \"segmentCrc\": \"" + _completedSegment2.getCrc() + "\", "
-        + "\"totalDocs\": 50, \"segmentCreationTimeMillis\": 9876543210}]}";
+        + "\"totalDocs\": 50, \"segmentCreationTimeMillis\": 9876543210, \"serverStatus\": \"OK\",  \"instanceId\": "
+        + "\"server1\"}]}";
     validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<>() {
     });
     compactionConfigs = getCompactionConfigs("30", "0");

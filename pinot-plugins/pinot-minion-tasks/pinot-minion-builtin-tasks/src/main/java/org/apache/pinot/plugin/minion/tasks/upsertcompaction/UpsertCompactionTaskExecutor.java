@@ -24,7 +24,9 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -72,9 +74,13 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
-    RoaringBitmap validDocIds =
+    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
         MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
             MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+    RoaringBitmap validDocIds = null;
+    if (validDocIdsBitmapResponse != null) {
+      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
+    }
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
@@ -96,6 +102,14 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
           .build();
     }
 
+    if (!validDocIdsBitmapResponse.getServerStatus().equals("OK")) {
+      String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+          + validDocIdsBitmapResponse.getServerStatus() + ", skipping " + MinionConstants.UpsertCompactionTask.TASK_TYPE
+          + " execution for segment: " + segmentName;
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
+    }
+
     int totalDocsAfterCompaction;
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
       compactedRecordReader.init(indexDir, null, null);
@@ -115,12 +129,12 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
         new SegmentConversionResult.Builder().setFile(compactedSegmentFile).setTableNameWithType(tableNameWithType)
             .setSegmentName(segmentName).build();
     _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.COMPACTED_RECORDS_COUNT,
-        segmentMetadata.getTotalDocs() - totalDocsAfterCompaction);
+            segmentMetadata.getTotalDocs() - totalDocsAfterCompaction);
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
             + "Total docs after compaction: {}.", taskType, configs, (endMillis - startMillis),
-        segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
+            segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
 
     return result;
   }

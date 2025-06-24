@@ -32,7 +32,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -48,7 +47,6 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,16 +190,16 @@ public class MinionTaskUtils {
   }
 
   /**
-   * Returns the validDocID bitmap from the server whose local segment crc matches both crc of ZK metadata and
+   * Returns the validDocIDs response from the server whose local segment crc matches both crc of ZK metadata and
    * deepstore copy (expectedCrc).
    */
   @Nullable
-  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
+  public static ValidDocIdsBitmapResponse getValidDocIdFromServerMatchingCrc(String tableNameWithType,
+      String segmentName, String validDocIdsType, MinionContext minionContext, String expectedCrc) {
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    RoaringBitmap validDocIds = null;
     List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    ValidDocIdsBitmapResponse validDocIdsBitmapResponse = null;
     for (String server : servers) {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
       String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
@@ -209,7 +207,6 @@ public class MinionTaskUtils {
       // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
       // passing an empty list.
       ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-      ValidDocIdsBitmapResponse validDocIdsBitmapResponse;
       try {
         validDocIdsBitmapResponse =
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
@@ -236,10 +233,9 @@ public class MinionTaskUtils {
         LOGGER.warn(message);
         continue;
       }
-      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
       break;
     }
-    return validDocIds;
+    return validDocIdsBitmapResponse;
   }
 
   public static String toUTCString(long epochMillis) {

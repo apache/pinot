@@ -289,6 +289,15 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
 
+        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
+        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
+        if (!validDocIdsMetadata.getServerStatus().equals("OK")) {
+          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
+              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
+              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
+          continue;
+        }
+
         // segments eligible for deletion with no valid records
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         if (totalInvalidDocs == totalDocs) {
