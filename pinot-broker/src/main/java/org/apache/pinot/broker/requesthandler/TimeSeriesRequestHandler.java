@@ -123,7 +123,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
-      tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableName());
+
+      tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
       timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
           timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
       return timeSeriesResponse;
@@ -250,16 +251,18 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
    * This method checks if the requester has access to the tables in the request.
    *
    * @param httpHeaders The HTTP headers of the request.
-   * @param tableName The name of the table to check access for.
+   * @param tableNames The list of table to check access for.
    */
-  private void tableLevelAccessControlCheck(HttpHeaders httpHeaders, String tableName) {
+  private void tableLevelAccessControlCheck(HttpHeaders httpHeaders, List<String> tableNames) {
     AccessControl accessControl = _accessControlFactory.create();
-    AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
-      Actions.Table.QUERY);
-    if (!authorizationResult.hasAccess()) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
-        Response.Status.FORBIDDEN);
+    for (String tableName : tableNames) {
+      AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
+        Actions.Table.QUERY);
+      if (!authorizationResult.hasAccess()) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+        throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
+          Response.Status.FORBIDDEN);
+      }
     }
   }
 }
