@@ -474,7 +474,6 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     String queryWithStandardParser = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java', 'parser=STANDARD')";
     long resultWithStandardParser = getQueryResult(String.format(queryWithStandardParser, getTableName(), TEXT_COL));
     assertTrue(resultWithStandardParser > 0, "TEXT_MATCH with STANDARD parser should return results");
-
   }
 
   @Test(priority = 1)

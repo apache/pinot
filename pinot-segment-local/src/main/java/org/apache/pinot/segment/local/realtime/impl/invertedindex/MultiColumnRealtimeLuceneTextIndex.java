@@ -161,12 +161,12 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
     }
     return getDocIdsWithoutOptions(column, searchQuery);
   }
-  
+
   @Override
   public MutableRoaringBitmap getDocIds(String column, String searchQuery) {
     return getDocIdsWithoutOptions(column, searchQuery);
   }
-  
+
   private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery, Map<String, String> options) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
@@ -207,7 +207,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       throw new RuntimeException(e);
     }
   }
-  
+
   private MutableRoaringBitmap getDocIdsWithoutOptions(String column, String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
