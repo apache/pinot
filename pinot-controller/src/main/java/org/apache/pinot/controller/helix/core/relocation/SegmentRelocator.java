@@ -236,7 +236,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // Retries are disabled because SegmentRelocator itself is a periodic controller task, so we don't want the
       // RebalanceChecker to unnecessarily retry any such failed rebalances.
       RebalanceResult rebalance = _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
-          TableRebalancer.createUniqueRebalanceJobIdentifier(), true, false);
+          TableRebalancer.createUniqueRebalanceJobIdentifier(), false);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);

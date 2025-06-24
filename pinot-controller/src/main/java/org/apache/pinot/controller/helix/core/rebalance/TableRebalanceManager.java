@@ -70,6 +70,32 @@ public class TableRebalanceManager {
   }
 
   /**
+   * Do a table rebalance dry-run for the table with the given name and type.
+   *
+   * @param tableNameWithType name of the table to rebalance
+   * @param rebalanceConfig configuration for the rebalance operation
+   * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
+   * @return result of the rebalance dry-run operation
+   * @throws TableNotFoundException if the table does not exist
+   */
+  public RebalanceResult rebalanceTableDryRun(String tableNameWithType, RebalanceConfig rebalanceConfig,
+      String rebalanceJobId)
+      throws TableNotFoundException {
+    Preconditions.checkArgument(rebalanceConfig.isDryRun() || rebalanceConfig.isPreChecks());
+    TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
+    }
+    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
+    try {
+      return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig, null);
+    } catch (RebalanceInProgressException e) {
+      // This should not happen for dry-run rebalances
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
    * Rebalance the table with the given name and type synchronously. It's the responsibility of the caller to ensure
    * that this rebalance is run on the rebalance thread pool in the controller that respects the configuration
    * {@link org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS}.
@@ -77,27 +103,23 @@ public class TableRebalanceManager {
    * @param tableNameWithType name of the table to rebalance
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
    * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
-   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
+   *                     {@link RebalanceChecker}).
    * @return result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
    * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
-      String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
+      String rebalanceJobId, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
-    if (allowRetries && !trackRebalanceProgress) {
-      throw new IllegalArgumentException(
-          "Rebalance retries are only supported when rebalance progress is tracked in ZK");
-    }
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
-    if (trackRebalanceProgress) {
+    // For dry-run and downtime rebalances, we do not track the progress in ZK.
+    if (!rebalanceConfig.isDryRun() && !rebalanceConfig.isDowntime()) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
           TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig, allowRetries),
           _resourceManager.getPropertyStore());
@@ -114,15 +136,14 @@ public class TableRebalanceManager {
    * @param tableNameWithType name of the table to rebalance
    * @param rebalanceConfig configuration for the rebalance operation
    * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @param trackRebalanceProgress whether to track rebalance progress stats in ZK
    * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
-   *                     {@link RebalanceChecker}). Requires {@code trackRebalanceProgress} to be true.
+   *                     {@link RebalanceChecker}).
    * @return a CompletableFuture that will complete with the result of the rebalance operation
    * @throws TableNotFoundException if the table does not exist
    * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
    */
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType,
-      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean trackRebalanceProgress, boolean allowRetries)
+      RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
     TableConfig tableConfig = _resourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
@@ -134,8 +155,7 @@ public class TableRebalanceManager {
     return CompletableFuture.supplyAsync(
         () -> {
           try {
-            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, trackRebalanceProgress,
-                allowRetries);
+            return rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, allowRetries);
           } catch (TableNotFoundException e) {
             // Should not happen since we already checked for table existence
             throw new RuntimeException(e);
