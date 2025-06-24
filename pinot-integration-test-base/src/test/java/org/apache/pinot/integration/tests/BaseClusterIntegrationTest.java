@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -507,7 +508,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Returns the headers to be used for Pinot client transport.
+   * Returns the headers to be used for the connection to Pinot cluster.
+   * {@link PinotClientTransportFactory}
    */
   protected Map<String, String> getPinotClientTransportHeaders() {
     return Map.of();

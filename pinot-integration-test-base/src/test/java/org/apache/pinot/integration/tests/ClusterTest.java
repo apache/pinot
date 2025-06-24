@@ -417,7 +417,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Returns the headers to be used for segment upload.
+   * Returns the headers to be sent to the controller for segment upload flow.
    * Can be overridden to add custom headers, e.g., for authentication.
    * By default, returns an empty list.
    */
