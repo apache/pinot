@@ -483,8 +483,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
-      LOGGER.warn("Current task status recorded is {}", _threadEntriesMap);
-      LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery.toString());
+      LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
@@ -865,7 +864,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         for (QueryResourceTracker queryResourceTracker : queryResources.values()) {
           logTerminatedQuery(queryResourceTracker, _usedBytes);
         }
-        logQueryResourceUsage(queryResources);
       }
 
       /**
