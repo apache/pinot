@@ -50,7 +50,7 @@ import org.testng.annotations.BeforeClass;
 import static org.testng.Assert.assertTrue;
 
 
-public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterIntegrationTest {
+public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterIntegrationTestSet {
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
