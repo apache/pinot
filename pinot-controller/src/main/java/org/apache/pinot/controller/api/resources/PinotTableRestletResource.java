@@ -702,22 +702,23 @@ public class PinotTableRestletResource {
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
-      if (dryRun || preChecks || downtime) {
-        // For dry-run, preChecks or rebalance with downtime, it's fine to run the rebalance synchronously since it
-        // should be a really short operation.
-        return _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false, false);
+      if (dryRun || preChecks) {
+        return _tableRebalanceManager.rebalanceTableDryRun(tableNameWithType, rebalanceConfig, rebalanceJobId);
+      } else if (downtime) {
+        // For rebalance with downtime, it's fine to run the rebalance synchronously since it should be a really
+        // short operation.
+        return _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
-            _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false, false);
+            _tableRebalanceManager.rebalanceTableDryRun(tableNameWithType, rebalanceConfig, rebalanceJobId);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
           CompletableFuture<RebalanceResult> rebalanceResultFuture =
-              _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, rebalanceConfig, rebalanceJobId, true,
-                  true);
+              _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
           rebalanceResultFuture.whenComplete((rebalanceResult, throwable) -> {
             if (throwable != null) {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
