@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
  * This class is responsible for checking resource utilization for Pinot instances. To begin with, it checks
  * disk utilization for all server instances. The computed disk utilization is stored in the class
  * <code>org.apache.pinot.controller.validation.ResourceUtilizationInfo</code>.
- * It then checks the primary key count for all server instances, and this is also stored in the above class.
  */
 public class ResourceUtilizationChecker extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtilizationChecker.class);
@@ -81,6 +80,7 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
       for (UtilizationChecker utilizationChecker : _utilizationCheckerList) {
+        LOGGER.debug("Computing resource utilization for checker: {}", utilizationChecker.getName());
         utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);
       }
     } catch (Exception e) {

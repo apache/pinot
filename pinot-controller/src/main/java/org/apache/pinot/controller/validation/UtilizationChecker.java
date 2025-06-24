@@ -40,6 +40,8 @@ public interface UtilizationChecker {
 
   /**
    * Computes the resource's utilization
+   * @param endpointsToInstances map of endpoints to instances
+   * @param completionServiceHelper the completion service helper
    */
   void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper);
