@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -343,10 +344,46 @@ public class StrictRealtimeSegmentAssignmentTest {
         tierInstancePartitionsMap, rebalanceConfig);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, dataProvider = "tableTypes")
+  @Test(dataProvider = "tableTypes")
   public void testAssignSegmentToCompletedServers(String tableType) {
     SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
-    segmentAssignment.assignSegment("seg01", new TreeMap<>(), new TreeMap<>());
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.COMPLETED, new InstancePartitions("completed"));
+    try {
+      segmentAssignment.assignSegment("seg01", new TreeMap<>(), instancePartitionsMap);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to find CONSUMING instance partitions"), e.getMessage());
+    }
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, new InstancePartitions("consuming"));
+    try {
+      segmentAssignment.assignSegment("seg01", new TreeMap<>(), instancePartitionsMap);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("One instance partition type should be provided"), e.getMessage());
+    }
+  }
+
+  @Test(dataProvider = "tableTypes")
+  public void testRebalanceTableToCompletedServers(String tableType) {
+    SegmentAssignment segmentAssignment = createSegmentAssignment(tableType);
+    String tierName = "coldTier";
+    List<Tier> sortedTiers = createSortedTiers(tierName, Collections.emptySet());
+    Map<String, InstancePartitions> tierInstancePartitionsMap = createTierInstancePartitionsMap(tierName, 3);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.COMPLETED, new InstancePartitions("completed"));
+    try {
+      segmentAssignment.rebalanceTable(new TreeMap<>(), instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
+          rebalanceConfig);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Failed to find CONSUMING instance partitions"), e.getMessage());
+    }
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, new InstancePartitions("consuming"));
+    try {
+      segmentAssignment.rebalanceTable(new TreeMap<>(), instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
+          rebalanceConfig);
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("One instance partition type should be provided"), e.getMessage());
+    }
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,
