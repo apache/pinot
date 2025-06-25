@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -66,11 +65,9 @@ public class SelectionOperatorService {
   private final int[] _columnIndices;
   private final int _offset;
   private final int _numRowsToKeep;
+  // NOTE: this pq is only useful for server version < 1.3.0
   private final PriorityQueue<Object[]> _rows;
   private final Comparator<Object[]> _comparator;
-  // list used to merge and store already-sorted input
-  private final List<OrderByExpressionContext> _orderByExpressions;
-  // pq for sorted unsorted inputs
   private List<Object[]> _sortedRows;
 
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema, int[] columnIndices) {
@@ -87,7 +84,6 @@ public class SelectionOperatorService {
         OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
             _queryContext.isNullHandlingEnabled()).reversed());
 
-    _orderByExpressions = _queryContext.getOrderByExpressions();
     _sortedRows = new ArrayList<>();
   }
 
@@ -97,14 +93,14 @@ public class SelectionOperatorService {
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
     for (DataTable dataTable : dataTables) {
-      // if dataTable is sorted, merge it into _sortedRow directly without sorting again
-      // the metadata originates from LinearSelectionOrderByOperator and SelectionOrderByOperator
-      if (String.valueOf(_orderByExpressions).equals(dataTable.getMetadata().get(
-          DataTable.MetadataKey.ORDER_BY_EXPRESSIONS.getName()))) {
+      // dataTable is always sorted for server version >= 1.3.0
+      String sortedOnServer = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED_ON_SERVER.getName());
+      if (sortedOnServer != null && Integer.parseInt(sortedOnServer) == 1) {
         _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
         continue;
       }
-      // TODO: investigate if block is unreachable
+      // TODO: the following block is only for backward compatibility with server version older than
+      //    1.3.0. From 1.3.0 on, all servers produce sorted dataTable
       // else add it to priority queue for sorting
       int numRows = dataTable.getNumberOfRows();
       if (_queryContext.isNullHandlingEnabled()) {
@@ -129,6 +125,7 @@ public class SelectionOperatorService {
           Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
+      // end todo
     }
   }
 

@@ -145,8 +145,8 @@ public interface DataTable {
     NUM_GROUPS_WARNING_LIMIT_REACHED(35, "numGroupsWarningLimitReached", MetadataValueType.STRING),
     THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
     RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
-    // expressions that the result block is sorted on
-    ORDER_BY_EXPRESSIONS(38, "orderByExpressions", MetadataValueType.STRING);
+    // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
+    SORTED_ON_SERVER(38, "sortedOnServer", MetadataValueType.INT);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!

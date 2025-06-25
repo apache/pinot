@@ -202,8 +202,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    // add _orderByExpressions to the constructed results block as metadata
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _orderByExpressions, _queryContext);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
   }
 
   /**
@@ -338,8 +337,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
       DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-      // add _orderByExpressions to result block
-      return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _orderByExpressions, _queryContext);
+      return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
     }
   }
 

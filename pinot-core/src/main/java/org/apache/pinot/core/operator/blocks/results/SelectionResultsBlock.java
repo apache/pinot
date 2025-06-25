@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -38,25 +37,12 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   private final Comparator<? super Object[]> _comparator;
   private final QueryContext _queryContext;
   private List<Object[]> _rows;
-  @Nullable
-  private final List<OrderByExpressionContext> _orderByExpressions;
 
   public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
       @Nullable Comparator<? super Object[]> comparator, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _rows = rows;
     _comparator = comparator;
-    _queryContext = queryContext;
-    _orderByExpressions = null;
-  }
-
-  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
-      @Nullable Comparator<? super Object[]> comparator, List<OrderByExpressionContext> orderByExpressions,
-      QueryContext queryContext) {
-    _dataSchema = dataSchema;
-    _rows = rows;
-    _comparator = comparator;
-    _orderByExpressions = orderByExpressions;
     _queryContext = queryContext;
   }
 
@@ -99,11 +85,11 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
   }
 
-  // metadata of select block that has sort information
+  // provide sorted on server metadata
   @Override
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = super.getResultsMetadata();
-    metadata.put(DataTable.MetadataKey.ORDER_BY_EXPRESSIONS.getName(), String.valueOf(_orderByExpressions));
+    metadata.put(DataTable.MetadataKey.SORTED_ON_SERVER.getName(), "1");
     return metadata;
   }
 }
