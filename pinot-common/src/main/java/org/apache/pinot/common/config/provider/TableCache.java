@@ -39,8 +39,8 @@ import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
@@ -332,7 +332,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void putTableConfig(ZNRecord znRecord)
       throws IOException {
-    TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
+    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
@@ -415,7 +415,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void putSchema(ZNRecord znRecord)
       throws IOException {
-    Schema schema = SchemaUtils.fromZNRecord(znRecord);
+    Schema schema = SchemaSerDeUtils.fromZNRecord(znRecord);
     addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
     Map<String, String> columnNameMap = new HashMap<>();
