@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -190,6 +192,68 @@ public class BrokerReduceServiceTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 10);
     assertEquals(rows.get(0), new Object[]{9});
+    assertEquals(rows.get(1), new Object[]{8});
+    assertEquals(rows.get(2), new Object[]{8});
+    assertEquals(rows.get(3), new Object[]{7});
+    assertEquals(rows.get(4), new Object[]{6});
+    assertEquals(rows.get(7), new Object[]{4});
+    assertEquals(rows.get(8), new Object[]{2});
+    assertEquals(rows.get(9), new Object[]{0});
+  }
+
+  @Test
+  public void testSortReduceSortedAndUnsortedTablesDescNullHandlingEnabled()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest(
+            "SET enableNullHandling=true; SELECT col1 FROM testTable ORDER BY col1 DESC");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new ColumnDataType[]{ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    int numGroups = 5;
+    for (int i = 0; i < numGroups; i++) {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, i * 2);
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.ORDER_BY_EXPRESSIONS.getName(), "[col1 ASC]");
+    // unsorted block
+    List<Object[]> unsortedRows = new ArrayList<>();
+    int numUnsortedGroups = 4;
+    for (int i = 0; i < numUnsortedGroups; i++) {
+      Object[] row = new Object[1];
+      row[0] = numUnsortedGroups + numGroups - i - 1;
+      unsortedRows.add(row);
+    }
+    unsortedRows.add(new Object[]{null});
+
+    DataTable unSortedDataTable = SelectionOperatorUtils.getDataTableFromRows(unsortedRows, dataSchema, true);
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    int numUnSortedInstances = 1;
+    for (int i = 0; i < numUnSortedInstances; i++) {
+      ServerRoutingInstance instance =
+          new ServerRoutingInstance("localhost", i + numSortedInstances, TableType.OFFLINE);
+      dataTableMap.put(instance, unSortedDataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    assertEquals(rows.get(0), new Object[]{null});
     assertEquals(rows.get(1), new Object[]{8});
     assertEquals(rows.get(2), new Object[]{8});
     assertEquals(rows.get(3), new Object[]{7});
