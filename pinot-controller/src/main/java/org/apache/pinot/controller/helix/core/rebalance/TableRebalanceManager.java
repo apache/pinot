@@ -216,7 +216,7 @@ public class TableRebalanceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_resourceManager.getHelixZkManager(), zkBasedTableRebalanceObserver, _controllerMetrics,
-            _rebalancePreChecker, _tableSizeReader);
+            _rebalancePreChecker, _tableSizeReader, _resourceManager.getRealtimeSegmentManager());
 
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }

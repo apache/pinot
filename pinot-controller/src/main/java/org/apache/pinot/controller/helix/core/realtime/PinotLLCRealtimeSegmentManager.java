@@ -2174,7 +2174,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
         if (prevBatch != null) {
-          waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
+          waitUntilSegmentsForceCommitted(tableNameWithType, prevBatch, forceCommitBatchConfig);
         }
         sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
         prevBatch = segmentBatchToCommit;
@@ -2185,7 +2185,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+  public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
       ForceCommitBatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
@@ -2198,17 +2198,17 @@ public class PinotLLCRealtimeSegmentManager {
     Set<?>[] segmentsYetToBeCommitted = new Set[1];
     try {
       retryPolicy.attempt(() -> {
-        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentsToWait);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
     } catch (AttemptFailureException e) {
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
-              + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
+              + "segmentsYetToBeCommitted: %s", segmentsToWait, e.getAttempts(), segmentsYetToBeCommitted[0]);
       throw new RuntimeException(errorMsg, e);
     }
 
-    LOGGER.info("segmentBatch: {} successfully force committed", segmentBatchToCommit);
+    LOGGER.info("segments: {} successfully force committed", segmentsToWait);
   }
 
   @VisibleForTesting

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
@@ -135,6 +136,22 @@ public class RebalanceConfig {
   @JsonProperty("retryInitialDelayInMs")
   @ApiModelProperty(example = "300000")
   private long _retryInitialDelayInMs = 300000L;
+
+  @JsonProperty("forceCommit")
+  @ApiModelProperty(example = "false")
+  private boolean _forceCommit = false;
+
+  @JsonProperty("forceCommitBatchSize")
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
+  private int _forceCommitBatchSize = ForceCommitBatchConfig.DEFAULT_BATCH_SIZE;
+
+  @JsonProperty("forceCommitBatchStatusCheckIntervalMs")
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckIntervalMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000;
+
+  @JsonProperty("forceCommitBatchStatusCheckTimeoutMs")
+  @ApiModelProperty(example = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+  private int _forceCommitBatchStatusCheckTimeoutMs = ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000;
 
   public boolean isDryRun() {
     return _dryRun;
@@ -272,6 +289,38 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
+  public boolean isForceCommit() {
+    return _forceCommit;
+  }
+
+  public void setForceCommit(boolean forceCommit) {
+    _forceCommit = forceCommit;
+  }
+
+  public int getForceCommitBatchSize() {
+    return _forceCommitBatchSize;
+  }
+
+  public void setForceCommitBatchSize(int forceCommitBatchSize) {
+    _forceCommitBatchSize = forceCommitBatchSize;
+  }
+
+  public int getForceCommitBatchStatusCheckIntervalMs() {
+    return _forceCommitBatchStatusCheckIntervalMs;
+  }
+
+  public void setForceCommitBatchStatusCheckIntervalMs(int forceCommitBatchStatusCheckIntervalMs) {
+    _forceCommitBatchStatusCheckIntervalMs = forceCommitBatchStatusCheckIntervalMs;
+  }
+
+  public int getForceCommitBatchStatusCheckTimeoutMs() {
+    return _forceCommitBatchStatusCheckTimeoutMs;
+  }
+
+  public void setForceCommitBatchStatusCheckTimeoutMs(int forceCommitBatchStatusCheckTimeoutMs) {
+    _forceCommitBatchStatusCheckTimeoutMs = forceCommitBatchStatusCheckTimeoutMs;
+  }
+
   public Enablement getMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
@@ -292,7 +341,26 @@ public class RebalanceConfig {
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + ", _forceCommit=" + _forceCommit + ", _forceCommitBatchSize=" + _forceCommitBatchSize
+        + ", _forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
+        + ", _forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs + '}';
+  }
+
+  public String toQueryString() {
+    return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&reassignInstances=" + _reassignInstances
+        + "&includeConsuming=" + _includeConsuming + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime
+        + "&minAvailableReplicas=" + _minAvailableReplicas + "&bestEfforts=" + _bestEfforts
+        + "&minimizeDataMovement=" + _minimizeDataMovement.name() + "&batchSizePerServer=" + _batchSizePerServer
+        + "&externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + "&externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
+        + "&updateTargetTier=" + _updateTargetTier + "&heartbeatIntervalInMs=" + _heartbeatIntervalInMs
+        + "&heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + "&maxAttempts=" + _maxAttempts
+        + "&retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + "&forceCommit=" + _forceCommit
+        + "&forceCommitBatchSize=" + _forceCommitBatchSize
+        + "&forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
+        + "&forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs;
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -314,6 +382,10 @@ public class RebalanceConfig {
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxAttempts = cfg._maxAttempts;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
+    rc._forceCommit = cfg._forceCommit;
+    rc._forceCommitBatchSize = cfg._forceCommitBatchSize;
+    rc._forceCommitBatchStatusCheckIntervalMs = cfg._forceCommitBatchStatusCheckIntervalMs;
+    rc._forceCommitBatchStatusCheckTimeoutMs = cfg._forceCommitBatchStatusCheckTimeoutMs;
     return rc;
   }
 }
