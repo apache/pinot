@@ -36,9 +36,8 @@ public class TableRowColAuthResultImpl implements TableRowColAuthResult {
   }
 
   @Override
-  public TableRowColAuthResult setRLSFilters(List<String> rlsFilters) {
+  public void setRLSFilters(List<String> rlsFilters) {
     _rlsFilters = rlsFilters;
-    return this;
   }
 
   @Override

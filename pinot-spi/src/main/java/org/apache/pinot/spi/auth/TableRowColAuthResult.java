@@ -32,5 +32,5 @@ public interface TableRowColAuthResult {
    */
   Optional<List<String>> getRLSFilters();
 
-  TableRowColAuthResult setRLSFilters(List<String> rlsFilters);
+  void setRLSFilters(List<String> rlsFilters);
 }
