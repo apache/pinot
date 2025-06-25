@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,7 +30,6 @@ import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.BcryptUtils;
@@ -55,7 +53,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  *
  */
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
-  private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
 
@@ -124,10 +121,10 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
-      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-
-      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
+      Collection<String> tokens = extractAuthorizationTokens(requesterIdentity);
+      if (tokens.isEmpty()) {
+        return Optional.empty();
+      }
 
       _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
           .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
@@ -138,10 +135,9 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       Map<String, ZkBasicAuthPrincipal> password2principal =
           name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
 
-      Optional<ZkBasicAuthPrincipal> principalOpt = password2principal.entrySet().stream().filter(
+      return password2principal.entrySet().stream().filter(
           entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
               _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
-      return principalOpt;
     }
   }
 }
