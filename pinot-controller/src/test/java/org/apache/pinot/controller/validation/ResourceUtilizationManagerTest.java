@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
 public class ResourceUtilizationManagerTest {
 
   private DiskUtilizationChecker _diskUtilizationChecker;
-  private List<UtilizationChecker> _utilizationCheckerList;
+  private List<UtilizationChecker> _utilizationCheckers;
   private ControllerConf _controllerConf;
   private ResourceUtilizationManager _resourceUtilizationManager;
   private final String _testTable = "myTable_OFFLINE";
@@ -38,14 +38,14 @@ public class ResourceUtilizationManagerTest {
   @BeforeMethod
   public void setUp() {
     _diskUtilizationChecker = Mockito.mock(DiskUtilizationChecker.class);
-    _utilizationCheckerList = Collections.singletonList(_diskUtilizationChecker);
+    _utilizationCheckers = Collections.singletonList(_diskUtilizationChecker);
     _controllerConf = Mockito.mock(ControllerConf.class);
   }
 
   @Test
   public void testIsResourceUtilizationWithinLimitsWhenCheckIsDisabled() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(false);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertTrue(result, "Resource utilization should be within limits when the check is disabled");
@@ -57,7 +57,7 @@ public class ResourceUtilizationManagerTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testIsResourceUtilizationWithinLimitsWithNullTableName() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     _resourceUtilizationManager.isResourceUtilizationWithinLimits(null, false);
   }
@@ -65,7 +65,7 @@ public class ResourceUtilizationManagerTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testIsResourceUtilizationWithinLimitsWithNullTableNameIsForMinionTrue() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     _resourceUtilizationManager.isResourceUtilizationWithinLimits(null, true);
   }
@@ -73,7 +73,7 @@ public class ResourceUtilizationManagerTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testIsResourceUtilizationWithinLimitsWithEmptyTableName() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     _resourceUtilizationManager.isResourceUtilizationWithinLimits("", false);
   }
@@ -81,7 +81,7 @@ public class ResourceUtilizationManagerTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testIsResourceUtilizationWithinLimitsWithEmptyTableNameIsForMinionTrue() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     _resourceUtilizationManager.isResourceUtilizationWithinLimits("", true);
   }
@@ -90,7 +90,7 @@ public class ResourceUtilizationManagerTest {
   public void testIsResourceUtilizationWithinLimitsWhenCheckIsEnabled() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
     Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable, false)).thenReturn(true);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertTrue(result, "Resource utilization should be within limits when disk check and primary key count "
@@ -106,7 +106,7 @@ public class ResourceUtilizationManagerTest {
   public void testIsResourceUtilizationWithinLimitsWhenCheckFails() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
     Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable, false)).thenReturn(false);
-    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckerList);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
     boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable, false);
     Assert.assertFalse(result, "Resource utilization should not be within limits when disk check returns false");
