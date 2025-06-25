@@ -103,6 +103,7 @@ public class SelectionOperatorService {
         _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
         continue;
       }
+      // TODO: investigate if this never happens?
       // else add it to priority queue for sorting
       int numRows = dataTable.getNumberOfRows();
       if (_queryContext.isNullHandlingEnabled()) {

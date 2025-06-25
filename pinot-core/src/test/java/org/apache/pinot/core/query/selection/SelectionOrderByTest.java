@@ -323,6 +323,65 @@ public class SelectionOrderByTest extends AbstractSelectionOrderByTest {
         );
   }
 
+  @Test
+  public void listOffset() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{1},
+            new Object[]{3}
+        )
+        .andOnSecondInstance(
+            new Object[]{2},
+            new Object[]{null}
+        )
+        .whenQuery("select myField from testTable order by myField offset 1")
+        .thenResultIs("INTEGER",
+            "1",
+            "2",
+            "3"
+        );
+  }
+
+  @Test
+  public void listOffsetLimit() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{1},
+            new Object[]{3}
+        )
+        .andOnSecondInstance(
+            new Object[]{2},
+            new Object[]{null}
+        )
+        .whenQuery("select myField from testTable order by myField offset 1 limit 2")
+        .thenResultIs("INTEGER",
+            "1",
+            "2"
+        );
+  }
+
+  @Test
+  public void listOffsetLargerThanResult() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{1},
+            new Object[]{3}
+        )
+        .andOnSecondInstance(
+            new Object[]{2},
+            new Object[]{null}
+        )
+        .whenQuery("select myField from testTable order by myField offset 10")
+        .thenResultIs("INTEGER"
+        );
+  }
+
   // utils ---
 
   @DataProvider(name = "nullHandlingEnabled")
