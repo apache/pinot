@@ -54,6 +54,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.slf4j.Logger;
@@ -114,7 +115,10 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   @Override
   public Object executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
-    LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}", pinotTaskConfig);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Executing SegmentGenerationAndPushTask with task config: {}",
+          Obfuscator.DEFAULT.toJsonString(pinotTaskConfig));
+    }
     Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
     File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),

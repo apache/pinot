@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -83,9 +82,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         dryRunResults.put(table,
-            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false,
-                false));
-      } catch (TableNotFoundException | RebalanceInProgressException exception) {
+            _tableRebalanceManager.rebalanceTableDryRun(table, rebalanceConfig, createUniqueRebalanceJobIdentifier()));
+      } catch (TableNotFoundException exception) {
         dryRunResults.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
       }
@@ -155,9 +153,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
         rebalanceConfig.setDryRun(true);
         rebalanceResult.put(table,
-            _tableRebalanceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(), false,
-                false));
-      } catch (TableNotFoundException | RebalanceInProgressException exception) {
+            _tableRebalanceManager.rebalanceTableDryRun(table, rebalanceConfig, createUniqueRebalanceJobIdentifier()));
+      } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null, null, null));
       }
@@ -297,7 +294,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       TenantRebalanceObserver observer) {
     try {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
-      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true, true);
+      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
       // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally
       //  breaks the degree of parallelism
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {

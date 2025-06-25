@@ -446,6 +446,36 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     Assert.assertTrue(plan + " doesn't end with: " + suffix, plan.endsWith(suffix));
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTextMatchWithThirdParameter(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test TEXT_MATCH with third parameter (options) for parser configuration
+    String queryWithOptions =
+        "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java', 'parser=CLASSIC,DefaultOperator=AND')";
+
+    // Wait until all rows are available in realtime index
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      Thread.sleep(100);
+    }
+
+    // Test that the query with third parameter works
+    long resultWithOptions = getQueryResult(String.format(queryWithOptions, getTableName(), TEXT_COL));
+    assertTrue(resultWithOptions > 0, "TEXT_MATCH with third parameter should return results");
+
+    // Test that the same query without third parameter returns the same result
+    String queryWithoutOptions = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java')";
+    long resultWithoutOptions = getQueryResult(String.format(queryWithoutOptions, getTableName(), TEXT_COL));
+    assertEquals(resultWithOptions, resultWithoutOptions,
+        "TEXT_MATCH with and without third parameter should return same results for basic queries");
+
+    // Test with different parser options
+    String queryWithStandardParser = "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'Java', 'parser=STANDARD')";
+    long resultWithStandardParser = getQueryResult(String.format(queryWithStandardParser, getTableName(), TEXT_COL));
+    assertTrue(resultWithStandardParser > 0, "TEXT_MATCH with STANDARD parser should return results");
+  }
+
   @Test(priority = 1)
   public void testRemoveColumnFromIndex()
       throws Exception {

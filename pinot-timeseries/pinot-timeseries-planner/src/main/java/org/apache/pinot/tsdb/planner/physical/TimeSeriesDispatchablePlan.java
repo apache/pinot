@@ -35,11 +35,12 @@ public class TimeSeriesDispatchablePlan {
   private final Map<String, Map<String, List<String>>> _leafIdToSegmentsByInstanceId;
   private final Map<String, Integer> _numInputServersForExchangePlanNode;
   private final List<String> _serializedServerFragments;
+  private final List<String> _tableNames;
 
   public TimeSeriesDispatchablePlan(String language, List<TimeSeriesQueryServerInstance> queryServerInstances,
       BaseTimeSeriesPlanNode brokerFragment, List<BaseTimeSeriesPlanNode> serverFragments,
       TimeBuckets initialTimeBuckets, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId,
-      Map<String, Integer> numInputServersForExchangePlanNode) {
+      Map<String, Integer> numInputServersForExchangePlanNode, List<String> tableNames) {
     _language = language;
     _queryServerInstances = queryServerInstances;
     _brokerFragment = brokerFragment;
@@ -49,6 +50,7 @@ public class TimeSeriesDispatchablePlan {
     _numInputServersForExchangePlanNode = numInputServersForExchangePlanNode;
     _serializedServerFragments = serverFragments.stream().map(TimeSeriesPlanSerde::serialize).collect(
         Collectors.toList());
+    _tableNames = tableNames;
   }
 
   public String getLanguage() {
@@ -81,5 +83,9 @@ public class TimeSeriesDispatchablePlan {
 
   public Map<String, Integer> getNumInputServersForExchangePlanNode() {
     return _numInputServersForExchangePlanNode;
+  }
+
+  public List<String> getTableNames() {
+    return _tableNames;
   }
 }
