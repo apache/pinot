@@ -189,8 +189,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "markWithWarningIcon": false,
         "valueStep": 0.05,
         "valueMin": -1.0,
-        "valueMax": 1.0
-        "markWithWarningIcon": false
+        "valueMax": 1.0,
     },
     {
         "name": "forceCommit",
