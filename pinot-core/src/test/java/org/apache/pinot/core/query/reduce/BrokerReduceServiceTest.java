@@ -27,6 +27,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -78,5 +79,123 @@ public class BrokerReduceServiceTest {
     List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.BROKER_TIMEOUT.getId());
+  }
+
+  @Test
+  public void testSortReduceSortedAndUnsortedTables()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT col1 FROM testTable ORDER BY col1");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new ColumnDataType[]{ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    int numGroups = 5;
+    for (int i = 0; i < numGroups; i++) {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, i * 2);
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.ORDER_BY_EXPRESSIONS.getName(), "[col1 ASC]");
+    // unsorted block
+    DataTableBuilder unSortedDataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    int numUnsortedGroups = 5;
+    for (int i = 0; i < numUnsortedGroups; i++) {
+      unSortedDataTableBuilder.startRow();
+      unSortedDataTableBuilder.setColumn(0, numUnsortedGroups + numGroups - i - 1);
+      unSortedDataTableBuilder.finishRow();
+    }
+    DataTable unSortedDataTable = unSortedDataTableBuilder.build();
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    int numUnSortedInstances = 1;
+    for (int i = 0; i < numUnSortedInstances; i++) {
+      ServerRoutingInstance instance =
+          new ServerRoutingInstance("localhost", i + numSortedInstances, TableType.OFFLINE);
+      dataTableMap.put(instance, unSortedDataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    assertEquals(rows.get(0), new Object[]{0});
+    assertEquals(rows.get(1), new Object[]{2});
+    assertEquals(rows.get(2), new Object[]{4});
+    assertEquals(rows.get(3), new Object[]{5});
+    assertEquals(rows.get(4), new Object[]{6});
+    assertEquals(rows.get(7), new Object[]{8});
+    assertEquals(rows.get(8), new Object[]{8});
+    assertEquals(rows.get(9), new Object[]{9});
+  }
+
+  @Test
+  public void testSortReduceSortedAndUnsortedTablesDesc()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT col1 FROM testTable ORDER BY col1 DESC");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new ColumnDataType[]{ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    int numGroups = 5;
+    for (int i = 0; i < numGroups; i++) {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, i * 2);
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.ORDER_BY_EXPRESSIONS.getName(), "[col1 ASC]");
+    // unsorted block
+    DataTableBuilder unSortedDataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    int numUnsortedGroups = 5;
+    for (int i = 0; i < numUnsortedGroups; i++) {
+      unSortedDataTableBuilder.startRow();
+      unSortedDataTableBuilder.setColumn(0, numUnsortedGroups + numGroups - i - 1);
+      unSortedDataTableBuilder.finishRow();
+    }
+    DataTable unSortedDataTable = unSortedDataTableBuilder.build();
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    int numUnSortedInstances = 1;
+    for (int i = 0; i < numUnSortedInstances; i++) {
+      ServerRoutingInstance instance =
+          new ServerRoutingInstance("localhost", i + numSortedInstances, TableType.OFFLINE);
+      dataTableMap.put(instance, unSortedDataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 10);
+    assertEquals(rows.get(0), new Object[]{9});
+    assertEquals(rows.get(1), new Object[]{8});
+    assertEquals(rows.get(2), new Object[]{8});
+    assertEquals(rows.get(3), new Object[]{7});
+    assertEquals(rows.get(4), new Object[]{6});
+    assertEquals(rows.get(7), new Object[]{4});
+    assertEquals(rows.get(8), new Object[]{2});
+    assertEquals(rows.get(9), new Object[]{0});
   }
 }

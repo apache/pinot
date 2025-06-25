@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
@@ -189,7 +190,10 @@ public class SelectionOperatorService {
 
   /** merge sortedRows list and rows priority queue, keeping at most _numRowsToKeep elements */
   private List<Object[]> mergeResult(List<Object[]> sortedRows1, PriorityQueue<Object[]> pq) {
-    List<Object[]> sortedRow2 = new ArrayList<>(pq);
+    LinkedList<Object[]> sortedRow2 = new LinkedList<>();
+    while (!pq.isEmpty()) {
+      sortedRow2.addFirst(pq.poll());
+    }
     return SelectionOperatorUtils.mergeWithOrderingList(sortedRows1, sortedRow2, _comparator, _numRowsToKeep);
   }
 }
