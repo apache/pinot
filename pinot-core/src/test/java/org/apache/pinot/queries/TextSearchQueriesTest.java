@@ -48,6 +48,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -2248,5 +2249,31 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", 'C++', 'parser=COMPLEX') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryDifferentParsers, expectedDifferentColumnsAnd.size(), false,
         expectedDifferentColumnsAnd);
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsSameOptions()
+      throws Exception {
+    // Test that optimizer works when all TEXT_MATCH expressions have the same options with wildcards
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*Python*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsDifferentOptions()
+      throws Exception {
+    // Test that optimizer does NOT work when TEXT_MATCH expressions have different options with wildcards
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Python*', 'parser=STANDARD') LIMIT 50000";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
   }
 }
