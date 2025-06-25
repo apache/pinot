@@ -135,7 +135,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   private PhysicalExchange inferPDDForLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
     RelCollation collation = leafStageRoot.unwrap().getTraitSet().getCollation();
     PinotDataDistribution pdd;
-    if (collation != null && !collation.getFieldCollations().isEmpty()) {
+    if (collation != null) {
       // If the leaf stage root has a collation trait, then we will use a sorted receive in the exchange, so we can
       // add the collation to the PDD.
       pdd = new PinotDataDistribution(
@@ -159,17 +159,14 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
       return new PinotDataDistribution(RelDistribution.Type.SINGLETON, liteModeWorkers,
           liteModeWorkers.hashCode(), null, sort.getCollation());
     }
-    PinotDataDistribution currentNodePDD;
     if (newInputs.isEmpty()) {
       // Can happen for Values node.
-      currentNodePDD = new PinotDataDistribution(RelDistribution.Type.SINGLETON, liteModeWorkers,
+      return new PinotDataDistribution(RelDistribution.Type.SINGLETON, liteModeWorkers,
           liteModeWorkers.hashCode(), null, null);
-    } else {
-      currentNodePDD = newInputs.get(0).getPinotDataDistributionOrThrow().apply(
-          DistMappingGenerator.compute(newInputs.get(0).unwrap(), currentNode.unwrap(), null),
-          PinotDistMapping.doesDropCollation(currentNode.unwrap()) /* dropCollation */);
     }
-    return currentNodePDD;
+    return newInputs.get(0).getPinotDataDistributionOrThrow().apply(
+        DistMappingGenerator.compute(newInputs.get(0).unwrap(), currentNode.unwrap(), null),
+        PinotDistMapping.doesDropCollation(currentNode.unwrap()) /* dropCollation */);
   }
 
   private int nodeId() {
