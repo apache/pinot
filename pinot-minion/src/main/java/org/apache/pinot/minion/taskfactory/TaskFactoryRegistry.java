@@ -148,7 +148,7 @@ public class TaskFactoryRegistry {
               _eventObserver.notifyTaskStart(pinotTaskConfig);
               if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("Start running {}: {} with configs: {}", pinotTaskConfig.getTaskType(), _taskConfig.getId(),
-                    new Obfuscator().toJsonString(pinotTaskConfig.getConfigs()));
+                    Obfuscator.DEFAULT.toJsonString(pinotTaskConfig.getConfigs()));
               }
 
               try {

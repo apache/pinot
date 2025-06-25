@@ -38,8 +38,7 @@ public class TaskFactoryRegistryTest {
     configs.put("apiKey", "sk-1234567890abcdef");
     configs.put("normalConfig", "normalValue");
 
-    Obfuscator obfuscator = new Obfuscator();
-    String obfuscatedJson = obfuscator.toJsonString(configs);
+    String obfuscatedJson = Obfuscator.DEFAULT.toJsonString(configs);
 
     // Verify that sensitive values are masked
     Assert.assertTrue(obfuscatedJson.contains("tableName"));
@@ -66,8 +65,7 @@ public class TaskFactoryRegistryTest {
     configs.put("password", "");
     configs.put("normalConfig", "value");
 
-    Obfuscator obfuscator = new Obfuscator();
-    String obfuscatedJson = obfuscator.toJsonString(configs);
+    String obfuscatedJson = Obfuscator.DEFAULT.toJsonString(configs);
 
     // Verify that null and empty values are handled properly
     Assert.assertTrue(obfuscatedJson.contains("\"authToken\":\"*****\""));
