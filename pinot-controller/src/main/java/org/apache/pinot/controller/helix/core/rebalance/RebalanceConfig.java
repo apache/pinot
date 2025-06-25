@@ -357,9 +357,9 @@ public class RebalanceConfig {
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
         + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold=" + _diskUtilizationThreshold
-        + ", _forceCommit=" + _forceCommit + ", _forceCommitBatchSize=" + _forceCommitBatchSize
-        + ", _forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold="
+        + _diskUtilizationThreshold + ", _forceCommit=" + _forceCommit + ", _forceCommitBatchSize="
+        + _forceCommitBatchSize + ", _forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
         + ", _forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs + '}';
   }
 
