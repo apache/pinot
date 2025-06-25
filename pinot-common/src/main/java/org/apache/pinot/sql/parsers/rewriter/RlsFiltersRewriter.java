@@ -32,8 +32,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 public class RlsFiltersRewriter implements QueryRewriter {
 
-  private static final String ROW_FILTERS = "rowFilters";
-
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
