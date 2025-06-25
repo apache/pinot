@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.validation;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
 import org.mockito.Mockito;
@@ -38,7 +37,7 @@ public class ResourceUtilizationManagerTest {
   @BeforeMethod
   public void setUp() {
     _diskUtilizationChecker = Mockito.mock(DiskUtilizationChecker.class);
-    _utilizationCheckers = Collections.singletonList(_diskUtilizationChecker);
+    _utilizationCheckers = List.of(_diskUtilizationChecker);
     _controllerConf = Mockito.mock(ControllerConf.class);
   }
 

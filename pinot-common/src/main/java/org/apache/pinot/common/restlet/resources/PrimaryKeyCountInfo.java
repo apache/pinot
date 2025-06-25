@@ -21,7 +21,6 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Collections;
 import java.util.Set;
 
 
@@ -35,7 +34,7 @@ public class PrimaryKeyCountInfo {
   public PrimaryKeyCountInfo(@JsonProperty("instanceId") String instanceId) {
     _instanceId = instanceId;
     _numPrimaryKeys = -1;
-    _tablesWithPrimaryKeys = Collections.emptySet();
+    _tablesWithPrimaryKeys = Set.of();
     _lastUpdatedTimeInEpochMs = -1;
   }
 

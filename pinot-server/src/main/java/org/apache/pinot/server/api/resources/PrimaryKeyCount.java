@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.api.resources;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -86,6 +85,6 @@ public class PrimaryKeyCount {
     } else if (tableDataManager.isDedupEnabled()) {
       return tableDataManager.getTableDedupMetadataManager().getPartitionToPrimaryKeyCount();
     }
-    return Collections.emptyMap();
+    return Map.of();
   }
 }

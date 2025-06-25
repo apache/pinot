@@ -213,7 +213,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _rebalancerExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
-  protected List<UtilizationChecker> _utilizationCheckers;
+  protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
   protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
@@ -275,8 +275,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
     }
-
-    _utilizationCheckers = new ArrayList<>();
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
