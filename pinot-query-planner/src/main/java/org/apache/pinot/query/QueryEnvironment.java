@@ -274,8 +274,8 @@ public class QueryEnvironment {
         queryNode = sqlNode;
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
-      // Accounts for resource usage of the compilation process.
-      Tracing.ThreadAccountantOps.sample();
+      // Accounts for resource usage of the compilation phase
+      Tracing.ThreadAccountantOps.sampleMSE();
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
       throw e;

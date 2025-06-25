@@ -53,6 +53,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
 import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -452,6 +453,8 @@ public class WorkerManager {
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
     Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
+    // Account the resource used for routing phase
+    Tracing.ThreadAccountantOps.sampleMSE();
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
     // acquire time boundary info if it is a hybrid table.

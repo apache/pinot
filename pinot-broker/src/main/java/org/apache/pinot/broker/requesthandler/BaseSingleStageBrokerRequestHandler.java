@@ -371,6 +371,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     CompileResult compileResult =
         compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
+    // Accounts for resource usage of the compilation phase
+    Tracing.ThreadAccountantOps.sample();
 
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
       /*
