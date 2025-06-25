@@ -85,7 +85,28 @@
         ]
       },
       {
-        "description": "Example when leaf stage group-by is ignored because LeafStageAggregateRule, that promotes an aggregation to the leaf stage is leveraged. this is because table a is partitioned by col2",
+        "description": "Example of query that avoids exchanges for aggregates",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR with teamOne as (select col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select col2, percentile(sum_of_runs, 50) from all group by col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n    PhysicalUnion(all=[true])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Same query as above but with agg hints. Here the leaf stage group-by is ignored because the default optimizations in v2 optimizer already eliminate aggregation splits.",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR with teamOne as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select /*+ aggOption(is_skip_leaf_stage_group_by='true') */ col2, percentile(sum_of_runs, 50) from all group by col2",
         "output": [
           "Execution Plan",
