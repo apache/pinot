@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -318,13 +319,27 @@ public interface IndexCreationContext {
     private final int[] _immutableToMutableIdMap;
     private final String _tableNameWithType;
 
+    @Deprecated
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
         boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
-        int[] immutableToMutableIdMap, String tableNameWithType) {
+        int[] immutableToMutableIdMap) {
+      this(indexDir, lengthOfLongestEntry, maxNumberOfMultiValueElements, maxRowLengthInBytes, onHeap, fieldSpec,
+          sorted, cardinality, totalNumberOfEntries, totalDocs, hasDictionary, minValue, maxValue,
+          forwardIndexDisabled, sortedUniqueElementsArray, optimizeDictionary, fixedLength, textCommitOnClose,
+          columnStatistics, realtimeConversion, consumerDir, immutableToMutableIdMap, null);
+    }
+
+    public Common(File indexDir, int lengthOfLongestEntry,
+        int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
+        FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
+        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
+        boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
+        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
+        int[] immutableToMutableIdMap, @Nullable String tableNameWithType) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
