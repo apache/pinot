@@ -119,6 +119,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
         return PinotBrokerTimeSeriesResponse.newErrorResponse("BAD_REQUEST", "Error building RangeTimeSeriesRequest");
       }
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
+      // If there are no buckets in the logical plan, return an empty response.
+      if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
+        return PinotBrokerTimeSeriesResponse.newEmptyResponse();
+      }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
       timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
