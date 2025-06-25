@@ -28,7 +28,7 @@ import java.util.Optional;
 public interface TableRowColAuthResult {
   /**
    * Returns the RLS filters associated with a particular table. RLS filters are defined as a list.
-   * @return optional of the RLS filters. Empty optional is there are no RLS filters defined on this table
+   * @return optional of the RLS filters. Empty optional if there are no RLS filters defined on this table
    */
   Optional<List<String>> getRLSFilters();
 
