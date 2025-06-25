@@ -117,9 +117,13 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   public void add(@Nullable Geometry geometry)
       throws IOException {
     if (geometry == null || !(geometry instanceof Point)) {
-      String metricKeyName = _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US)
-          + "-indexingError";
-      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      if (_tableNameWithType != null) {
+        String metricKeyName =
+            _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      } else {
+        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
+      }
       _nextDocId++;
       return;
     }
