@@ -83,30 +83,6 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     waitForAllDocsLoaded(600_000L);
   }
 
-  private static String getQueryString(RebalanceConfig rebalanceConfig) {
-    return "dryRun=" + rebalanceConfig.isDryRun() + "&preChecks=" + rebalanceConfig.isPreChecks()
-        + "&reassignInstances=" + rebalanceConfig.isReassignInstances()
-        + "&includeConsuming=" + rebalanceConfig.isIncludeConsuming()
-        + "&minimizeDataMovement=" + rebalanceConfig.getMinimizeDataMovement()
-        + "&bootstrap=" + rebalanceConfig.isBootstrap() + "&downtime=" + rebalanceConfig.isDowntime()
-        + "&minAvailableReplicas=" + rebalanceConfig.getMinAvailableReplicas()
-        + "&bestEfforts=" + rebalanceConfig.isBestEfforts()
-        + "&batchSizePerServer=" + rebalanceConfig.getBatchSizePerServer()
-        + "&externalViewCheckIntervalInMs=" + rebalanceConfig.getExternalViewCheckIntervalInMs()
-        + "&externalViewStabilizationTimeoutInMs=" + rebalanceConfig.getExternalViewStabilizationTimeoutInMs()
-        + "&updateTargetTier=" + rebalanceConfig.isUpdateTargetTier()
-        + "&heartbeatIntervalInMs=" + rebalanceConfig.getHeartbeatIntervalInMs()
-        + "&heartbeatTimeoutInMs=" + rebalanceConfig.getHeartbeatTimeoutInMs()
-        + "&maxAttempts=" + rebalanceConfig.getMaxAttempts()
-        + "&retryInitialDelayInMs=" + rebalanceConfig.getRetryInitialDelayInMs()
-        + "&forceCommit=" + rebalanceConfig.isForceCommit();
-  }
-
-  private String getRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + getQueryString(rebalanceConfig);
-  }
-
   @DataProvider(name = "forceCommitTableConfigProvider")
   public Object[][] forceCommitTableConfigProvider() {
     String originalTenant = "tenantA";
@@ -152,7 +128,7 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
       rebalanceConfig.setDryRun(false);
       rebalanceConfig.setIncludeConsuming(true);
 
-      String response = sendPostRequest(getRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+      String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
       RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
       RebalanceSummaryResult summary = rebalanceResult.getRebalanceSummaryResult();
       assertEquals(
