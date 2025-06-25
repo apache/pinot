@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import javax.annotation.Nonnull;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -47,18 +46,18 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
 
   private final PoolingHttpClientConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
-  private final List<UtilizationChecker> _utilizationCheckerList;
+  private final List<UtilizationChecker> _utilizationCheckers;
   private final Executor _executor;
   private final PinotHelixResourceManager _helixResourceManager;
 
   public ResourceUtilizationChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, @Nonnull List<UtilizationChecker> utilizationCheckerList, Executor executor,
+      ControllerMetrics controllerMetrics, List<UtilizationChecker> utilizationCheckers, Executor executor,
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(TASK_NAME, config.getResourceUtilizationCheckerFrequency(),
         config.getResourceUtilizationCheckerInitialDelay());
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _utilizationCheckerList = utilizationCheckerList;
+    _utilizationCheckers = utilizationCheckers;
     _executor = executor;
     _helixResourceManager = pinotHelixResourceManager;
   }
@@ -79,7 +78,7 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       BiMap<String, String> endpointsToInstances = instanceAdminEndpoints.inverse();
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
-      for (UtilizationChecker utilizationChecker : _utilizationCheckerList) {
+      for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
         LOGGER.debug("Computing resource utilization for checker: {}", utilizationChecker.getName());
         utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);
       }
