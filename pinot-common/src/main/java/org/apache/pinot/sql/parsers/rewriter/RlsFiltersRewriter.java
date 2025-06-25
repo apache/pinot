@@ -29,7 +29,26 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
-
+/**
+ * A query rewriter that applies Row-Level Security (RLS) filters to Pinot queries.
+ * 
+ * <p>This rewriter examines query options for table-specific row filters and automatically
+ * applies them to the query's WHERE clause. The RLS filters are retrieved from the query
+ * options using the raw table name as the key.
+ * 
+ * <p>The rewriter performs the following operations:
+ * <ul>
+ *   <li>Extracts the raw table name from the query's data source</li>
+ *   <li>Looks up RLS filters from query options using the table name</li>
+ *   <li>Parses the filter string into an Expression object</li>
+ *   <li>Combines the RLS filter with any existing WHERE clause using AND logic</li>
+ * </ul>
+ * 
+ * <p>If no query options are present, no RLS filters are found for the table, or the
+ * filter string is empty, the query is returned unchanged.
+ * 
+ * @see QueryRewriter
+ */
 public class RlsFiltersRewriter implements QueryRewriter {
 
   @Override
