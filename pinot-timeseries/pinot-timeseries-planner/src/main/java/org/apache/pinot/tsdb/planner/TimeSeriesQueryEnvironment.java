@@ -105,7 +105,8 @@ public class TimeSeriesQueryEnvironment {
         fragments, scanVisitorContext.getLeafIdToSegmentsByInstanceId());
     return new TimeSeriesDispatchablePlan(timeSeriesRequest.getLanguage(), serverInstances, fragments.get(0),
         fragments.subList(1, fragments.size()), logicalPlan.getTimeBuckets(),
-        scanVisitorContext.getLeafIdToSegmentsByInstanceId(), numServersForExchangePlanNode);
+        scanVisitorContext.getLeafIdToSegmentsByInstanceId(), numServersForExchangePlanNode,
+      scanVisitorContext.getTableNames());
   }
 
   private Map<String, Integer> computeNumServersForExchangePlanNode(List<TimeSeriesQueryServerInstance> serverInstances,
