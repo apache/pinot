@@ -79,10 +79,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
         // This is because the Root Exchange is added by the RootExchangeInsertRule.
         return currentNode;
       }
-      PinotDataDistribution pdd = inferPDDForLeafExchange(currentNode, liteModeWorkers);
-      RelCollation collation = currentNode.unwrap().getTraitSet().getCollation();
-      return new PhysicalExchange(nodeId(), currentNode, pdd, Collections.emptyList(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy());
+      return inferPDDForLeafExchange(currentNode, liteModeWorkers);
     }
     List<PRelNode> newInputs = new ArrayList<>();
     for (PRelNode input : currentNode.getPRelInputs()) {
@@ -132,20 +129,29 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
     return worker.split("@")[1];
   }
 
-  private static PinotDataDistribution inferPDDForLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
+  /**
+   * Infers Exchange to be added on top of the leaf stage.
+   */
+  private PhysicalExchange inferPDDForLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
     RelCollation collation = leafStageRoot.unwrap().getTraitSet().getCollation();
     PinotDataDistribution pdd;
     if (collation != null && !collation.getFieldCollations().isEmpty()) {
-      // If the leaf stage has a collation, we need to sort it before returning.
+      // If the leaf stage root has a collation trait, then we will use a sorted receive in the exchange, so we can
+      // add the collation to the PDD.
       pdd = new PinotDataDistribution(
           RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, collation);
     } else {
       pdd = new PinotDataDistribution(
           RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, null);
     }
-    return pdd;
+    return new PhysicalExchange(nodeId(), leafStageRoot, pdd, Collections.emptyList(),
+        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy());
   }
 
+  /**
+   * Infers distribution for the current node based on its inputs and node-type. Can also add collation to the PDD
+   * automatically (e.g. if the current node is a Sort or the input is sorted and this node does not drop collation).
+   */
   private static PinotDataDistribution inferPDD(PRelNode currentNode, List<PRelNode> newInputs,
       List<String> liteModeWorkers) {
     if (currentNode instanceof Sort) {
@@ -161,7 +167,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
     } else {
       currentNodePDD = newInputs.get(0).getPinotDataDistributionOrThrow().apply(
           DistMappingGenerator.compute(newInputs.get(0).unwrap(), currentNode.unwrap(), null),
-          !PinotDistMapping.doesNodePreserveSortOrder(currentNode.unwrap()) /* dropCollation */);
+          PinotDistMapping.doesDropCollation(currentNode.unwrap()) /* dropCollation */);
     }
     return currentNodePDD;
   }

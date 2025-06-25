@@ -93,8 +93,11 @@ public class PinotDistMapping {
     return RelCollations.of(newFieldCollations);
   }
 
-  public static boolean doesNodePreserveSortOrder(RelNode relNode) {
-    return relNode instanceof Project || relNode instanceof Filter;
+  /**
+   * If a given RelNode is not guaranteed to preserve the sort order of the input, this returns true.
+   */
+  public static boolean doesDropCollation(RelNode relNode) {
+    return !(relNode instanceof Project) && !(relNode instanceof Filter);
   }
 
   /**

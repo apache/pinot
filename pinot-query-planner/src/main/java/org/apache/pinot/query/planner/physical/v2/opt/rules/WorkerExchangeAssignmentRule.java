@@ -401,16 +401,16 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       return currentNode.getPinotDataDistributionOrThrow();
     }
     PinotDataDistribution inputDistribution = currentNode.getPRelInput(0).getPinotDataDistributionOrThrow();
-    PinotDataDistribution newDistributionWithoutCollation = inputDistribution.apply(DistMappingGenerator.compute(
+    PinotDataDistribution newDistribution = inputDistribution.apply(DistMappingGenerator.compute(
         currentNode.unwrap().getInput(0), currentNode.unwrap(), null),
-        !PinotDistMapping.doesNodePreserveSortOrder(currentNode.unwrap()));
+        PinotDistMapping.doesDropCollation(currentNode.unwrap()));
     if (currentNode instanceof Sort) {
       Sort sort = (Sort) currentNode.unwrap();
       if (!sort.getCollation().getKeys().isEmpty()) {
-        return newDistributionWithoutCollation.withCollation(sort.getCollation());
+        return newDistribution.withCollation(sort.getCollation());
       }
     }
-    return newDistributionWithoutCollation;
+    return newDistribution;
   }
 
   private static boolean isLeafStageBoundary(PRelNode currentNode, @Nullable PRelNode parentNode) {
