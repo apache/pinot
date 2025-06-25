@@ -125,6 +125,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -446,7 +447,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
         String combinedFilters =
             rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-        queryOptions.put(tableName, combinedFilters);
+        String rowFiltersKey = RlsUtils.buildRlsFilterKey(rawTableName);
+        queryOptions.put(rowFiltersKey, combinedFilters);
         pinotQuery.setQueryOptions(queryOptions);
         try {
           CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);

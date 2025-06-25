@@ -171,7 +171,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Test
-  public void testRowFiltersForSingleStateQuery()
+  public void testRowFiltersForSingleStageQuery()
       throws Exception {
     setUseMultiStageQueryEngine(false);
     String query = String.format("select count(*) from %s", DEFAULT_TABLE_NAME);
@@ -187,7 +187,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Test
-  public void testRowFiltersForSingleTableWithMultiStateQuery()
+  public void testRowFiltersForSingleTableWithMultiStageQuery()
       throws Exception {
     setUseMultiStageQueryEngine(true);
     String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
@@ -220,7 +220,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Test
-  public void testRowFiltersForTwoTablesWithMultiStateQuery()
+  public void testRowFiltersForTwoTablesWithMultiStageQuery()
       throws Exception {
     setUseMultiStageQueryEngine(true);
     String query = "select count(*), avg(ActualElapsedTime) from mytable WHERE ActualElapsedTime > 0.1 * ABS("
