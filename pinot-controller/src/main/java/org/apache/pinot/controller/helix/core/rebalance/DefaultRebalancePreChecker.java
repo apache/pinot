@@ -96,7 +96,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     double diskUtilizationThreshold = rebalanceConfig.getDiskUtilizationThreshold() >= 0.0
         ? rebalanceConfig.getDiskUtilizationThreshold() : _defaultDiskUtilizationThreshold;
     // clip the disk utilization threshold to [0.0, 1.0]
-    diskUtilizationThreshold = Math.min(1.0, diskUtilizationThreshold);
+    if (diskUtilizationThreshold > 1.0) {
+      tableRebalanceLogger.warn("Provided disk utilization threshold {} is greater than 1.0, clipping to 1.0",
+          diskUtilizationThreshold);
+      diskUtilizationThreshold = 1.0;
+    }
 
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
