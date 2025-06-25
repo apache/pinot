@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -29,7 +30,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
-import java.util.Objects;
 
 
 /**
@@ -139,7 +139,6 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
       List<String> literals = new ArrayList<>();
       List<Expression> optionsList = new ArrayList<>();
-      
       if (allNot) {
         for (Expression expression : entry.getValue()) {
           Expression operand = expression.getFunctionCall().getOperands().get(0);
@@ -198,7 +197,7 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       } else {
         mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
       }
-      
+
       // Create the merged TEXT_MATCH expression with options if available
       Expression mergedTextMatchExpression;
       if (!optionsList.isEmpty()) {
@@ -238,11 +237,11 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
     if (expressions.size() <= 1) {
       return true;
     }
-    
+
     // Get the options from the first expression
     Expression firstExpression = expressions.get(0);
     String firstOptions = getTextMatchOptions(firstExpression);
-    
+
     // Check if all other expressions have the same options
     for (int i = 1; i < expressions.size(); i++) {
       String currentOptions = getTextMatchOptions(expressions.get(i));
@@ -250,7 +249,7 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
         return false;
       }
     }
-    
+
     return true;
   }
 
