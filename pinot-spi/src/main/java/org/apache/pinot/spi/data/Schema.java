@@ -943,7 +943,7 @@ public final class Schema implements Serializable {
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 
-    dateTimeFieldSpec.setMaxLength(timeFieldSpec.getMaxLength());
+    dateTimeFieldSpec.setMaxLength(timeFieldSpec.getEffectiveMaxLength());
     dateTimeFieldSpec.setDefaultNullValue(timeFieldSpec.getDefaultNullValue());
 
     return dateTimeFieldSpec;

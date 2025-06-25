@@ -60,11 +60,11 @@ public class SanitizationTransformer implements RecordTransformer {
             || dataType.equals(FieldSpec.DataType.JSON)
             || dataType.equals(FieldSpec.DataType.BYTES)) {
 
-          FieldSpec.MaxLengthExceedStrategy strategy = fieldSpec.getMaxLengthExceedStrategy();
+          FieldSpec.MaxLengthExceedStrategy strategy = fieldSpec.getEffectiveMaxLengthExceedStrategy();
           if (!strategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION) || dataType.equals(
               FieldSpec.DataType.STRING)) {
             _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
-                fieldSpec.getMaxLength(), strategy, fieldSpec.getDefaultNullValue()));
+                fieldSpec.getEffectiveMaxLength(), strategy, fieldSpec.getDefaultNullValue()));
           }
         }
       }

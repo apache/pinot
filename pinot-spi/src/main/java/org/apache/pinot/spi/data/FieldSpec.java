@@ -94,15 +94,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
   private static final int DEFAULT_MAX_LENGTH = 512;
 
-  private static MaxLengthExceedStrategy _defaultJsonSanitizationStrategy = MaxLengthExceedStrategy.NO_ACTION;
+  private static MaxLengthExceedStrategy _defaultJsonMaxLengthExceedStrategy = MaxLengthExceedStrategy.NO_ACTION;
   private static int _defaultJsonMaxLength = DEFAULT_MAX_LENGTH;
 
   public static MaxLengthExceedStrategy getDefaultJsonSanitizationStrategy() {
-    return _defaultJsonSanitizationStrategy;
+    return _defaultJsonMaxLengthExceedStrategy;
   }
 
   public static void setDefaultJsonSanitizationStrategy(MaxLengthExceedStrategy defaultJsonSanitizationStrategy) {
-    _defaultJsonSanitizationStrategy = defaultJsonSanitizationStrategy;
+    _defaultJsonMaxLengthExceedStrategy = defaultJsonSanitizationStrategy;
   }
 
   public static int getDefaultJsonMaxLength() {
@@ -250,7 +250,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _notNull = notNull;
   }
 
-  public int getMaxLength() {
+  /**
+   * Returns the effective max length to be used.
+   * This method should be used in business logic instead of {@code getMaxLength()},
+   * as it falls back to data type-specific or global defaults when the field is unset.
+   */
+  @JsonIgnore
+  public int getEffectiveMaxLength() {
     // If explicitly set, return that value
     if (_maxLength != null) {
       return _maxLength;
@@ -266,11 +272,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
+  // Use getEffectiveMaxLength() for default-aware access.
+  @Nullable
+  public Integer getMaxLength() {
+    return _maxLength;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLength(Integer maxLength) {
     _maxLength = maxLength;
   }
 
-  public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
+  /**
+   * Returns the effective max length exceed strategy to be used.
+   * This method should be used in business logic instead of {@code getMaxLengthExceedStrategy()},
+   * as it falls back to data type-specific or global defaults when the field is unset.
+   */
+  @JsonIgnore
+  public MaxLengthExceedStrategy getEffectiveMaxLengthExceedStrategy() {
     if (_maxLengthExceedStrategy != null) {
       return _maxLengthExceedStrategy;
     }
@@ -284,6 +303,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       default:
         return MaxLengthExceedStrategy.NO_ACTION;
     }
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  // Use getEffectiveMaxLengthExceedStrategy() for default-aware access.
+  @Nullable
+  public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
+    return _maxLengthExceedStrategy;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -537,8 +563,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && _dataType == that._dataType
         && _singleValueField == that._singleValueField
         && _notNull == that._notNull
-        && Objects.equals(getMaxLength(), that.getMaxLength())
-        && getMaxLengthExceedStrategy() == that.getMaxLengthExceedStrategy()
+        && Objects.equals(_maxLength, that._maxLength)
+        && Objects.equals(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && _allowTrailingZeros == that._allowTrailingZeros
         && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
         && Objects.equals(_transformFunction, that._transformFunction)
@@ -547,7 +573,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_name, _dataType, _singleValueField, _notNull, getMaxLength(), getMaxLengthExceedStrategy(),
+    return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
         _allowTrailingZeros, getStringValue(_defaultNullValue), _transformFunction, _virtualColumnProvider);
   }
 

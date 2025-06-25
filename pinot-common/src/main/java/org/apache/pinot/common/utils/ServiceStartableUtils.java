@@ -141,7 +141,7 @@ public class ServiceStartableUtils {
 
   public static void initFieldSpecConfig(PinotConfiguration instanceConfig) {
     String defaultJsonSanitizationStrategy =
-        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY);
+        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY);
     if (defaultJsonSanitizationStrategy != null) {
       try {
         FieldSpec.MaxLengthExceedStrategy strategy =

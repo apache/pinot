@@ -932,9 +932,9 @@ public class RecordTransformerTest {
       FieldSpec.setDefaultJsonMaxLength(1024);
 
       Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
-      schemaBuilder.addSingleValueDimension("jsonCol", FieldSpec.DataType.JSON);
+      schemaBuilder.addSingleValueDimension("jsonCol", DataType.JSON);
       DimensionFieldSpec explicitJsonSpec =
-          new DimensionFieldSpec("explicitJsonCol", FieldSpec.DataType.JSON, true, 2048, "");
+          new DimensionFieldSpec("explicitJsonCol", DataType.JSON, true, 2048, "");
       explicitJsonSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
       schemaBuilder.addField(explicitJsonSpec);
 
@@ -944,8 +944,8 @@ public class RecordTransformerTest {
       FieldSpec jsonSpec = schema.getFieldSpecFor("jsonCol");
       FieldSpec explicitSpec = schema.getFieldSpecFor("explicitJsonCol");
 
-      assertEquals(jsonSpec.getMaxLength(), 1024); // Uses JSON default
-      assertEquals(explicitSpec.getMaxLength(), 2048); // Explicit override
+      assertEquals(jsonSpec.getEffectiveMaxLength(), 1024); // Uses JSON default
+      assertEquals(explicitSpec.getEffectiveMaxLength(), 2048); // Explicit override
 
       // Test strategy defaults with sanitization
       jsonSpec.setMaxLength(10);
@@ -967,7 +967,8 @@ public class RecordTransformerTest {
       // Test ServiceStartableUtils configuration
       PinotConfiguration config = new PinotConfiguration();
       config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH, "2048");
-      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_SANITIZATION_STRATEGY, "NO_ACTION");
+      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY,
+          "NO_ACTION");
 
       ServiceStartableUtils.initFieldSpecConfig(config);
       assertEquals(FieldSpec.getDefaultJsonMaxLength(), 2048);
