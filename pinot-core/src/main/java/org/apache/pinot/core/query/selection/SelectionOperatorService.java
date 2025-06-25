@@ -103,7 +103,7 @@ public class SelectionOperatorService {
         _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
         continue;
       }
-      // TODO: investigate if this never happens?
+      // TODO: investigate if block is unreachable
       // else add it to priority queue for sorting
       int numRows = dataTable.getNumberOfRows();
       if (_queryContext.isNullHandlingEnabled()) {
