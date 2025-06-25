@@ -62,7 +62,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final int SEGMENT_ADD_THRESHOLD = 200;
   public static final int RECOMMENDED_BATCH_SIZE = 200;
 
-  private static double _diskUtilizationThreshold;
+  private static double _defaultDiskUtilizationThreshold;
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
   protected ExecutorService _executorService;
@@ -72,7 +72,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       double diskUtilizationThreshold) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
-    _diskUtilizationThreshold = diskUtilizationThreshold;
+    _defaultDiskUtilizationThreshold = diskUtilizationThreshold;
   }
 
   @Override
@@ -92,17 +92,25 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check whether minimizeDataMovement is set in TableConfig
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT,
         checkIsMinimizeDataMovement(tableConfig, rebalanceConfig, tableRebalanceLogger));
+    // Determine the disk utilization threshold to use - either from rebalance config override or default
+    double diskUtilizationThreshold = rebalanceConfig.getDiskUtilizationThreshold() >= 0.0
+        ? rebalanceConfig.getDiskUtilizationThreshold() : _defaultDiskUtilizationThreshold;
+    // clip the disk utilization threshold to [0.0, 1.0]
+    if (diskUtilizationThreshold > 1.0) {
+      tableRebalanceLogger.warn("Provided disk utilization threshold {} is greater than 1.0, clipping to 1.0",
+          diskUtilizationThreshold);
+      diskUtilizationThreshold = 1.0;
+    }
+
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
         checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, true));
+            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, true));
     // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
-    // TODO: Add the option to take disk utilization threshold as a RebalanceConfig option and use that to override
-    //       the default config
     preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
         checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
-            preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));
+            preCheckContext.getTableSubTypeSizeDetails(), diskUtilizationThreshold, false));
 
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
         preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
