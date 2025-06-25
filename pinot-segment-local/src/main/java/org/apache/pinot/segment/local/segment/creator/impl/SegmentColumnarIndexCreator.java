@@ -167,6 +167,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withImmutableToMutableIdMap(immutableToMutableIdMap)
           .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
           .withConsumerDir(segmentCreationSpec.getConsumerDir())
+          .withTableNameWithType(_config.getTableConfig().getTableName())
           .build();
       //@formatter:on
 

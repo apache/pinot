@@ -1192,13 +1192,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       int numDocs, String column, boolean hasDictionary)
       throws Exception {
 
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+    IndexCreationContext.Builder builder = IndexCreationContext.builder()
         .withIndexDir(_indexDir)
         .withFieldSpec(fieldSpec)
         .withColumnIndexCreationInfo(indexCreationInfo)
         .withTotalDocs(numDocs)
-        .withDictionary(hasDictionary)
-        .build();
+        .withDictionary(hasDictionary);
+    if (_indexLoadingConfig.getTableConfig() != null) {
+      builder.withTableNameWithType(_indexLoadingConfig.getTableConfig().getTableName());
+    }
+    IndexCreationContext indexCreationContext = builder.build();
 
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
