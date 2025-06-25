@@ -298,6 +298,10 @@ public class LeafOperator extends MultiStageOperator {
           case NUM_CONSUMING_SEGMENTS_MATCHED:
             _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
             break;
+          case ORDER_BY_EXPRESSIONS:
+            // TODO: currently v1 engine's order by information is not used,
+            //    investigate whether this is necessary to provide collation to v2 operators
+            break;
           default: {
             throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
           }
