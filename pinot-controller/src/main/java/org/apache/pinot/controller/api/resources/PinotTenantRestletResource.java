@@ -394,7 +394,8 @@ public class PinotTenantRestletResource {
     }
   }
 
-  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database, boolean withTableProperties) {
+  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database,
+      boolean withTableProperties) {
     Set<String> tables = new HashSet<>();
     Set<TenantTableWithProperties> tablePropertiesMap = withTableProperties ? new HashSet<>() : null;
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
