@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.query.aggregation.function.AbstractAggregationFunctionTest;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -39,7 +38,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class SelectionOrderByTest extends AbstractAggregationFunctionTest {
+/** query-based tests for selection-orderby */
+public class SelectionOrderByTest extends AbstractSelectionOrderByTest {
 
   @Test
   public void list() {
@@ -322,8 +322,6 @@ public class SelectionOrderByTest extends AbstractAggregationFunctionTest {
             "1|5"
         );
   }
-
-  // TODO: test ordered index scans
 
   // utils ---
 
