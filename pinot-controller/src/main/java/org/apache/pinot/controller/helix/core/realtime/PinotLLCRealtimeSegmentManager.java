@@ -801,9 +801,16 @@ public class PinotLLCRealtimeSegmentManager {
         newConsumingSegmentName = newLLCSegment.getSegmentName();
         LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
             Status.IN_PROGRESS);
+      } else {
+        LOGGER.info(
+            "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
+                + "found in upstream metadata.",
+            committingSegmentName, committingSegmentPartitionGroupId);
       }
     } else {
-      LOGGER.info("Skipped creation of new segment metadata as the table: {} is paused", realtimeTableName);
+      LOGGER.info(
+          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused.",
+          committingSegmentName, realtimeTableName);
     }
     return newConsumingSegmentName;
   }

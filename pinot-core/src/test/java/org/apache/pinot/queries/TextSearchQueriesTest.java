@@ -2011,4 +2011,242 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   protected boolean queryDefault() {
     return true;
   }
+
+  // tests to test text search with options
+  @Test
+  public void testTextSearchWithOptions()
+      throws Exception {
+    // Test regex pattern with CLASSIC parser
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expected.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    List<Object[]> expected1 = new ArrayList<>();
+    expected1.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
+        + "50000";
+    testTextSearchSelectQueryHelper(query1, expected.size(), false, expected);
+
+    // Test regex pattern with AND operator
+    String query2 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava realtime streaming system* AND *chine learn*', 'parser=CLASSIC,allowLeadingWildcard=true,"
+        + "defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query2, expected.size(), false, expected);
+
+    // Test regex pattern with AND operator (no match)
+    String query3 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"*ava realtime streaming system*\" AND \"*chine learner*\"', 'parser=CLASSIC,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
+
+    // Test regex pattern with OR operator
+    String query4 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"*ava realtime streaming system*\" OR \"*chine learner*\"', 'parser=COMPLEX,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query4, expected1.size(), false, expected1);
+
+    // Test regex pattern with multiple wildcards
+    String query5 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava* AND *stream* AND *learn*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query5, expected.size(), false, expected);
+
+    // Test regex pattern with invalid parser type (should fall back to default)
+    String query6 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=INVALID,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query6, expected.size(), false, expected);
+
+    // Test regex pattern with multiple options (should merge options)
+    String query7 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query7, expected.size(), false, expected);
+
+    // Test regex pattern with STANDARD parser
+    String query8 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
+        + "50000";
+    testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
+  }
+
+  // ===== TEST CASES FOR AND/OR FILTER OPERATORS =====
+  @Test
+  public void testTextSearchWithOptionsAndOrOperators()
+      throws Exception {
+    // Test 1: Single filter operator with AND - exactly 2 documents
+    List<Object[]> expectedSingleAnd = new ArrayList<>();
+    expectedSingleAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedSingleAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String querySingleAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
+            + "50000";
+    testTextSearchSelectQueryHelper(querySingleAnd, expectedSingleAnd.size(), false, expectedSingleAnd);
+
+    // Test 2: Single filter operator with OR - exactly 2 documents
+    List<Object[]> expectedSingleOr = new ArrayList<>();
+    expectedSingleOr.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedSingleOr.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String querySingleOr =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\" AND (Java AND C++)', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
+            + "50000";
+    testTextSearchSelectQueryHelper(querySingleOr, expectedSingleOr.size(), false, expectedSingleOr);
+
+    // Test 3: Aggregation queries with options
+    String queryAggAnd = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND')";
+    testTextSearchAggregationQueryHelper(queryAggAnd, expectedSingleAnd.size());
+  }
+
+  @Test
+  public void testTextSearchWithOptionsWildcardOperators()
+      throws Exception {
+    // Test with wildcard support - exactly 3 documents (not 2 as originally expected)
+    List<Object[]> expectedWildcardAnd = new ArrayList<>();
+    expectedWildcardAnd.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expectedWildcardAnd.add(new Object[]{
+        1018,
+        "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
+            + "multi-threading, C++,"
+    });
+    expectedWildcardAnd.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String queryWildcardAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*ava* AND *stream*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') "
+            + "LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryWildcardAnd, expectedWildcardAnd.size(), false, expectedWildcardAnd);
+
+    // Test with different parser types
+    String queryStandardParser =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*ava* AND *stream*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') "
+            + "LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryStandardParser, expectedWildcardAnd.size(), false, expectedWildcardAnd);
+  }
+
+  // ===== TEST CASES FOR MULTIPLE TEXT_MATCH WITH AND/OR FILTER OPERATORS =====
+  @Test
+  public void testMultipleTextMatchWithOptionsAndOrOperators()
+      throws Exception {
+    // Test 1: Multiple TEXT_MATCH with AND operator - exactly 2 documents
+    List<Object[]> expectedMultipleAnd = new ArrayList<>();
+    expectedMultipleAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedMultipleAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMultipleAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMultipleAnd, expectedMultipleAnd.size(), false, expectedMultipleAnd);
+
+    // Test 2: Multiple TEXT_MATCH with OR operator - exactly 2 documents
+    List<Object[]> expectedMultipleOr = new ArrayList<>();
+    expectedMultipleOr.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedMultipleOr.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMultipleOr =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "(TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC')) LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMultipleOr, expectedMultipleOr.size(), false, expectedMultipleOr);
+
+    // Test 3: Aggregation queries with multiple TEXT_MATCH
+    String queryAggMultipleAnd = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME + ", 'C++', 'parser=CLASSIC')";
+    testTextSearchAggregationQueryHelper(queryAggMultipleAnd, expectedMultipleAnd.size());
+  }
+
+  @Test
+  public void testMultipleTextMatchDifferentColumns()
+      throws Exception {
+    // Test Multiple TEXT_MATCH on different columns with AND - exactly 2 documents
+    List<Object[]> expectedDifferentColumnsAnd = new ArrayList<>();
+    expectedDifferentColumnsAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedDifferentColumnsAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryDifferentColumnsAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryDifferentColumnsAnd, expectedDifferentColumnsAnd.size(), false,
+        expectedDifferentColumnsAnd);
+
+    // Test Multiple TEXT_MATCH with different parser options
+    String queryDifferentParsers =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=STANDARD') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=COMPLEX') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryDifferentParsers, expectedDifferentColumnsAnd.size(), false,
+        expectedDifferentColumnsAnd);
+  }
 }

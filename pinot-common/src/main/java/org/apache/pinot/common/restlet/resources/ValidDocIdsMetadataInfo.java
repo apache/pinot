@@ -20,6 +20,7 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.common.utils.ServiceStatus;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -32,13 +33,16 @@ public class ValidDocIdsMetadataInfo {
   private final ValidDocIdsType _validDocIdsType;
   private final long _segmentSizeInBytes;
   private final long _segmentCreationTimeMillis;
+  private final String _instanceId;
+  private final ServiceStatus.Status _serverStatus;
 
   public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
       @JsonProperty("segmentSizeInBytes") long segmentSizeInBytes,
-      @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis) {
+      @JsonProperty("segmentCreationTimeMillis") long segmentCreationTimeMillis,
+      @JsonProperty("instanceId") String instanceId, @JsonProperty("serverStatus") ServiceStatus.Status serverStatus) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -47,6 +51,8 @@ public class ValidDocIdsMetadataInfo {
     _validDocIdsType = validDocIdsType;
     _segmentSizeInBytes = segmentSizeInBytes;
     _segmentCreationTimeMillis = segmentCreationTimeMillis;
+    _instanceId = instanceId;
+    _serverStatus = serverStatus;
   }
 
   public String getSegmentName() {
@@ -79,5 +85,13 @@ public class ValidDocIdsMetadataInfo {
 
   public long getSegmentCreationTimeMillis() {
     return _segmentCreationTimeMillis;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  public ServiceStatus.Status getServerStatus() {
+    return _serverStatus;
   }
 }
