@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -28,7 +27,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -51,8 +49,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
-
-  private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
 
@@ -136,15 +132,13 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
-      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-
-      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-      Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-              .map(_token2principal::get).filter(Objects::nonNull)
-              .findFirst();
-      return principalOpt;
+      Collection<String> tokens = extractAuthorizationTokens(requesterIdentity);
+      if (tokens.isEmpty()) {
+        return Optional.empty();
+      }
+      return tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+          .map(_token2principal::get).filter(Objects::nonNull)
+          .findFirst();
     }
   }
 }

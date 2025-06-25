@@ -254,21 +254,6 @@ public class ResourceManagerAccountingTest {
   public void testGetDataTableOOMSelect()
       throws Exception {
 
-    // generate random rows
-    String[] columnNames = {
-        "int", "long", "float", "double", "big_decimal", "string", "bytes", "int_array", "long_array", "float_array",
-        "double_array", "string_array"
-    };
-    DataSchema.ColumnDataType[] columnDataTypes = {
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT,
-        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.BIG_DECIMAL, DataSchema.ColumnDataType.STRING,
-        DataSchema.ColumnDataType.BYTES, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
-        DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
-        DataSchema.ColumnDataType.STRING_ARRAY
-    };
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
-
     // set up logging and configs
     LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
     LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
@@ -284,6 +269,22 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
+
+    // generate random rows
+    String[] columnNames = {
+        "int", "long", "float", "double", "big_decimal", "string", "bytes", "int_array", "long_array", "float_array",
+        "double_array", "string_array"
+    };
+    DataSchema.ColumnDataType[] columnDataTypes = {
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.BIG_DECIMAL, DataSchema.ColumnDataType.STRING,
+        DataSchema.ColumnDataType.BYTES, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
+        DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+        DataSchema.ColumnDataType.STRING_ARRAY
+    };
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
+
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
 
@@ -318,6 +319,24 @@ public class ResourceManagerAccountingTest {
   public void testGetDataTableOOMGroupBy()
       throws Exception {
 
+    // set up logging and configs
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    HashMap<String, Object> configs = new HashMap<>();
+    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    PinotConfiguration config = getConfig(20, 2, configs);
+    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
+    // init accountant and start watcher task
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
+
     // generate random indexedTable
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4");
@@ -337,24 +356,6 @@ public class ResourceManagerAccountingTest {
     indexedTable.finish(false);
     // set up GroupByResultsBlock
     GroupByResultsBlock groupByResultsBlock = new GroupByResultsBlock(indexedTable, queryContext);
-
-    // set up logging and configs
-    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    HashMap<String, Object> configs = new HashMap<>();
-    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    PinotConfiguration config = getConfig(20, 2, configs);
-    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
-    // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -408,10 +409,10 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
 
     PinotConfiguration config = getConfig(2, 2, configs);
-    ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
         InstanceType.SERVER);
+    ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
 
     Supplier<String> randomJsonValue = () -> {
       Random random = new Random();

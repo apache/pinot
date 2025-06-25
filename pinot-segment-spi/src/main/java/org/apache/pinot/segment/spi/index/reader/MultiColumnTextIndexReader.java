@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -28,10 +29,21 @@ public interface MultiColumnTextIndexReader extends TextIndexReader {
 
   /**
    * Returns the matching document ids for the given search query against given column.
+   * This is the legacy method for backward compatibility.
    */
   default MutableRoaringBitmap getDocIds(String column, String searchQuery) {
     return getDocIds(searchQuery);
   }
+
+  /**
+   * Returns the matching document ids for the given search query against given column with options string.
+   * Lucene-based multi-column text index readers should implement this method.
+   * @param column The column name to search
+   * @param searchQuery The search query string
+   * @param optionsString Options string in format "key1=value1,key2=value2", can be null
+   * @return Matching document ids
+   */
+  MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString);
 
   default boolean isMultiColumn() {
     return true;

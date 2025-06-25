@@ -213,7 +213,11 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
     Assert.assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
+    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("forward_index").asText(), "200008");
+    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("dictionary").asText(), "206384");
     Assert.assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
+    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("forward_index").asText(), "200008");
+    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("dictionary").asText(), "168976");
     Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
     Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
     Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("text-index").asText(), "NO");
@@ -350,6 +354,12 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877636);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+
+    // Verify server status information
+    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
+    String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
+    Assert.assertNotNull(serverStatus, "Server status should not be null");
+    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
   }
 
   // Verify metadata file from segments.

@@ -16,31 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka;
+package org.apache.pinot.plugin.inputformat.json;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.fail;
 
-public class KafkaJSONMessageDecoderTest {
+
+public class JSONMessageDecoderTest {
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_without_outgoing_time_spec.json")
-            .getFile()));
-    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    Schema schema = loadSchema("data/test_sample_data_schema_without_outgoing_time_spec.json");
+    Map<String, DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
     }
@@ -50,66 +53,70 @@ public class KafkaJSONMessageDecoderTest {
   @Test
   public void testJsonDecoderWithOutgoingTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_spec.json")
-            .getFile()));
-    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    Schema schema = loadSchema("data/test_sample_data_schema_with_outgoing_time_spec.json");
+    Map<String, DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
     }
     sourceFields.remove("secondsSinceEpoch");
-    sourceFields.put("time_day", FieldSpec.DataType.INT);
+    sourceFields.put("time_day", DataType.INT);
     testJsonDecoder(sourceFields);
   }
 
   @Test
   public void testJsonDecoderNoTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(
-        new File(getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile()));
-    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    Schema schema = loadSchema("data/test_sample_data_schema_no_time_field.json");
+    Map<String, DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
     }
     testJsonDecoder(sourceFields);
   }
 
-  private void testJsonDecoder(Map<String, FieldSpec.DataType> sourceFields)
+  private Schema loadSchema(String resourcePath)
       throws Exception {
-    try (BufferedReader reader = new BufferedReader(
-        new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
-      KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
-      decoder.init(new HashMap<>(), sourceFields.keySet(), "testTopic");
-      GenericRow r = new GenericRow();
-      String line = reader.readLine();
-      while (line != null) {
+    URL resource = getClass().getClassLoader().getResource(resourcePath);
+    assertNotNull(resource);
+    return Schema.fromFile(new File(resource.getFile()));
+  }
+
+  private void testJsonDecoder(Map<String, DataType> sourceFields)
+      throws Exception {
+    URL resource = getClass().getClassLoader().getResource("data/test_sample_data.json");
+    assertNotNull(resource);
+    try (BufferedReader reader = new BufferedReader(new FileReader(resource.getFile()))) {
+      JSONMessageDecoder decoder = new JSONMessageDecoder();
+      decoder.init(Map.of(), sourceFields.keySet(), "testTopic");
+      GenericRow row = new GenericRow();
+      String line;
+      while ((line = reader.readLine()) != null) {
         JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(line);
-        decoder.decode(line.getBytes(), r);
+        decoder.decode(line.getBytes(), row);
         for (String field : sourceFields.keySet()) {
-          Object actualValue = r.getValue(field);
+          Object actualValue = row.getValue(field);
           JsonNode expectedValue = jsonNode.get(field);
           switch (sourceFields.get(field)) {
             case STRING:
-              Assert.assertEquals(actualValue, expectedValue.asText());
+              assertEquals(actualValue, expectedValue.asText());
               break;
             case INT:
-              Assert.assertEquals(actualValue, expectedValue.asInt());
+              assertEquals(actualValue, expectedValue.asInt());
               break;
             case LONG:
-              Assert.assertEquals(actualValue, expectedValue.asLong());
+              assertEquals(actualValue, expectedValue.asLong());
               break;
             case FLOAT:
-              Assert.assertEquals(actualValue, (float) expectedValue.asDouble());
+              assertEquals(actualValue, (float) expectedValue.asDouble());
               break;
             case DOUBLE:
-              Assert.assertEquals(actualValue, expectedValue.asDouble());
+              assertEquals(actualValue, expectedValue.asDouble());
               break;
             default:
-              Assert.assertTrue(false, "Shouldn't arrive here.");
+              fail("Shouldn't arrive here.");
               break;
           }
         }
-        line = reader.readLine();
       }
     }
   }

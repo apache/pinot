@@ -81,6 +81,12 @@ public class DriverUtils {
       String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
       headers.put(AUTH_HEADER, authToken);
     }
+    for (Object key : info.keySet()) {
+      if (key.toString().equalsIgnoreCase(AUTH_HEADER)) {
+        headers.put(AUTH_HEADER, info.getProperty(key.toString()));
+        break;
+      }
+    }
   }
 
   public static List<String> getBrokersFromURL(String url) {
@@ -117,7 +123,6 @@ public class DriverUtils {
     String controllerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
     return controllerUrl;
   }
-
 
   public static String getPinotScheme(String url) {
     if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {

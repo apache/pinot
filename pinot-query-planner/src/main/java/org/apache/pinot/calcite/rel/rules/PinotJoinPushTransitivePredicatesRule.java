@@ -37,6 +37,10 @@ public class PinotJoinPushTransitivePredicatesRule extends JoinPushTransitivePre
   public static final PinotJoinPushTransitivePredicatesRule INSTANCE
       = new PinotJoinPushTransitivePredicatesRule(Config.DEFAULT);
 
+  public static PinotJoinPushTransitivePredicatesRule instanceWithDescription(String description) {
+      return new PinotJoinPushTransitivePredicatesRule((Config) Config.DEFAULT.withDescription(description));
+  }
+
   // Following code are copy-pasted from Calcite, and modified to not push down filter into right side of lookup join.
   //@formatter:off
   @Override public void onMatch(RelOptRuleCall call) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.AbstractRelNode;
@@ -39,11 +40,15 @@ import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
  */
 public class PinotSeminJoinDistinctProjectRule extends RelOptRule {
   public static final PinotSeminJoinDistinctProjectRule INSTANCE =
-      new PinotSeminJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY);
+      new PinotSeminJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-  public PinotSeminJoinDistinctProjectRule(RelBuilderFactory factory) {
+  public static PinotSeminJoinDistinctProjectRule instanceWithDescription(String description) {
+      return new PinotSeminJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
+  }
+
+  public PinotSeminJoinDistinctProjectRule(RelBuilderFactory factory, @Nullable String description) {
     super(operand(LogicalJoin.class, operand(AbstractRelNode.class, any()), operand(LogicalProject.class, any())),
-        factory, null);
+        factory, description);
   }
 
   @Override
