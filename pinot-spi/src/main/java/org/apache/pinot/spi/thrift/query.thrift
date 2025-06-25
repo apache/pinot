@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-namespace java org.apache.pinot.common.request
+namespace java org.apache.pinot.spi.request
 
 struct PinotQuery {
   1: optional i32 version;

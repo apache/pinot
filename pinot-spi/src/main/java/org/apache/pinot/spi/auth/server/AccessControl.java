@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.access;
+package org.apache.pinot.spi.auth.server;
 
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
-import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
 @InterfaceAudience.Public

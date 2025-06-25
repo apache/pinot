@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.auth.controller.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 

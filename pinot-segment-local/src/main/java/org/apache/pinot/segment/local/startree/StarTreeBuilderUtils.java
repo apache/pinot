@@ -31,7 +31,6 @@ import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -46,6 +45,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.request.Literal;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
