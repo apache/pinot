@@ -28,6 +28,9 @@ import java.util.Map;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Project;
 import org.apache.commons.collections4.CollectionUtils;
 
 
@@ -88,6 +91,10 @@ public class PinotDistMapping {
       newFieldCollations.add(fieldCollation.withFieldIndex(newFieldIndices.get(0)));
     }
     return RelCollations.of(newFieldCollations);
+  }
+
+  public static boolean doesNodePreserveSortOrder(RelNode relNode) {
+    return relNode instanceof Project || relNode instanceof Filter;
   }
 
   /**
