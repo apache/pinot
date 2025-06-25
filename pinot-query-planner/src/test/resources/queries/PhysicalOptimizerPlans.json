@@ -685,6 +685,23 @@
           "\n          PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "Sub-query with group-by with no agg calls and a limit",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT DISTINCT col1, col2, ts FROM a LIMIT 100) SELECT col1, col2, RANK() OVER (PARTITION BY col2 ORDER BY ts DESC) AS rnk FROM tmp ORDER BY col2, rnk DESC",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$1], sort1=[$2], dir0=[ASC], dir1=[DESC])",
+          "\n  PhysicalProject(col1=[$0], col2=[$1], $2=[$3])",
+          "\n    PhysicalWindow(window#0=[window(partition {1} order by [2 DESC] aggs [RANK()])])",
+          "\n      PhysicalSort(sort0=[$2], dir0=[DESC])",
+          "\n        PhysicalSort(fetch=[100])",
+          "\n          PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL], limit=[100])",
+          "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n              PhysicalAggregate(group=[{0, 1, 7}], aggType=[LEAF], limit=[100])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   },
