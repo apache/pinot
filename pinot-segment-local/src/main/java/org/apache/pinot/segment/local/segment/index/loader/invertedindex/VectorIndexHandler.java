@@ -164,10 +164,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
 
     FieldIndexConfigs colIndexConf = _fieldIndexConfigs.get(columnName);
 
-    IndexCreationContext context = IndexCreationContext.builder()
+    IndexCreationContext.Builder builder = IndexCreationContext.builder()
         .withIndexDir(segmentDirectory)
-        .withColumnMetadata(columnMetadata)
-        .build();
+        .withColumnMetadata(columnMetadata);
+    if (_tableConfig != null) {
+      builder.withTableNameWithType(_tableConfig.getTableName());
+    }
+    IndexCreationContext context = builder.build();
     VectorIndexConfig config = colIndexConf.getConfig(StandardIndexes.vector());
 
     try (ForwardIndexReader forwardIndexReader = StandardIndexes.forward().getReaderFactory()
@@ -197,10 +200,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
 
-    IndexCreationContext context = IndexCreationContext.builder()
+    IndexCreationContext.Builder builder = IndexCreationContext.builder()
         .withIndexDir(segmentDirectory)
-        .withColumnMetadata(columnMetadata)
-        .build();
+        .withColumnMetadata(columnMetadata);
+    if (_tableConfig != null) {
+      builder.withTableNameWithType(_tableConfig.getTableName());
+    }
+    IndexCreationContext context = builder.build();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();

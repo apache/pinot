@@ -157,10 +157,13 @@ public class JsonIndexHandler extends BaseIndexHandler {
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    IndexCreationContext context = IndexCreationContext.builder()
+    IndexCreationContext.Builder builder = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .build();
+        .withColumnMetadata(columnMetadata);
+    if (_tableConfig != null) {
+      builder.withTableNameWithType(_tableConfig.getTableName());
+    }
+    IndexCreationContext context = builder.build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
@@ -179,10 +182,13 @@ public class JsonIndexHandler extends BaseIndexHandler {
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    IndexCreationContext context = IndexCreationContext.builder()
+    IndexCreationContext.Builder builder = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .build();
+        .withColumnMetadata(columnMetadata);
+    if (_tableConfig != null) {
+      builder.withTableNameWithType(_tableConfig.getTableName());
+    }
+    IndexCreationContext context = builder.build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
