@@ -1456,7 +1456,8 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig).withIndexTypes(null).build());
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
+            .withIndexTypes(null).withProperties(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }

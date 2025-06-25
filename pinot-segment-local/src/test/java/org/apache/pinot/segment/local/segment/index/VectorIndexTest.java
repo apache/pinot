@@ -21,44 +21,50 @@ package org.apache.pinot.segment.local.segment.index;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.stream.Collectors;
-import org.apache.pinot.segment.local.segment.index.text.TextIndexPlugin;
-import org.apache.pinot.segment.local.segment.index.text.TextIndexType;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.local.segment.index.vector.VectorIndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-public class TextIndexTest {
+public class VectorIndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     @Test
-    public void oldToNewConfConversion()
+    public void testConvertToUpdatedFormat()
         throws JsonProcessingException {
       addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexTypes\" : [\"TEXT\"]\n"
-          + " }");
+          + "  \"name\": \"studentID\",\n"
+          + "  \"encodingType\": \"DICTIONARY\",\n"
+          + "  \"indexTypes\": [\n"
+          + "    \"VECTOR\"\n"
+          + "  ],\n"
+          + "  \"properties\": {\n"
+          + "    \"vectorIndexType\": \"HNSW\",\n"
+          + "    \"vectorDimension\": 1536,\n"
+          + "    \"vectorDistanceFunction\": \"COSINE\",\n"
+          + "    \"version\": 1\n"
+          + "  },\n"
+          + "  \"tierOverwrites\": null\n"
+          + "}");
       convertToUpdatedFormat();
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
-          .filter(fc -> fc.getName().equals("dimStr")).collect(Collectors.toList()).get(0);
-      JsonNode indexConfig = fieldConfig.getIndexes().get(TextIndexType.INDEX_DISPLAY_NAME);
+          .filter(fc -> fc.getName().equals("studentID")).collect(Collectors.toList()).get(0);
+      JsonNode indexConfig = fieldConfig.getIndexes().get(VectorIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
       assertFalse(indexConfig.get("disabled").asBoolean());
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
+      Assert.assertEquals(indexConfig.toString(),
+          "{\"disabled\":false,\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"
+              + "\"version\":1,\"vectorDistanceFunction\":\"COSINE\",\"properties\":{\"vectorIndexType\":"
+              + "\"HNSW\",\"vectorDimension\":\"1536\",\"vectorDistanceFunction\":\"COSINE\",\"version\":\"1\"}}");
     }
-  }
-
-  @Test
-  public void testStandardIndex() {
-    assertEquals(StandardIndexes.text(), new TextIndexPlugin().getIndexType(),
-        "Standard index should be equal to the instance returned by the plugin");
   }
 }
