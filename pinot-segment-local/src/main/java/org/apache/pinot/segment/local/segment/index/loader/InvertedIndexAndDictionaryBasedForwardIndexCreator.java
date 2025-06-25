@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
@@ -82,6 +83,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final ForwardIndexConfig _forwardIndexConfig;
   private final SegmentDirectory.Writer _segmentWriter;
   private final boolean _isTemporaryForwardIndex;
+  private final String _tableNameWithType;
 
   // Metadata
   private final SegmentDirectory _segmentDirectory;
@@ -114,13 +116,14 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex)
+      boolean isTemporaryForwardIndex, @Nullable String tableNameWithType)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _segmentWriter = segmentWriter;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
+    _tableNameWithType = tableNameWithType;
 
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
@@ -262,13 +265,16 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         }
       }
 
-      IndexCreationContext context = IndexCreationContext.builder()
+      IndexCreationContext.Builder builder = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
-          .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .build();
+          .withLengthOfLongestEntry(lengthOfLongestEntry);
+      if (_tableNameWithType != null) {
+        builder.withTableNameWithType(_tableNameWithType);
+      }
+      IndexCreationContext context = builder.build();
 
       // note: this method closes buffers and removes files
       writeToForwardIndex(dictionary, context);
@@ -345,7 +351,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
       }
 
-      IndexCreationContext context = IndexCreationContext.builder()
+      IndexCreationContext.Builder builder = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
@@ -353,8 +359,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withTotalNumberOfEntries(_nextValueId)
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
-          .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .build();
+          .withLengthOfLongestEntry(lengthOfLongestEntry);
+      if (_tableNameWithType != null) {
+        builder.withTableNameWithType(_tableNameWithType);
+      }
+      IndexCreationContext context = builder.build();
 
       writeToForwardIndex(dictionary, context);
 
