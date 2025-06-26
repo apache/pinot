@@ -614,7 +614,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // kill all queries if heap usage exceeds this
       private final long _panicLevel = (long) (_maxHeapSize
           * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-          CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+          CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
 
       // kill the most expensive query if heap usage exceeds this
       private final long _criticalLevel = (long) (_maxHeapSize
