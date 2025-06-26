@@ -839,6 +839,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
+    _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
 
