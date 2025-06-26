@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexTy
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -100,6 +101,7 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     boolean needUpdate = shouldModifyMultiColTextIndex(_textIndexConfig, oldConfig);
     if (needUpdate) {
       List<String> newColumns = _textIndexConfig.getColumns();
+      TableConfigUtils.checkForDuplicates(newColumns);
       for (String column : newColumns) {
         ColumnMetadata columnMeta = segmentMetadata.getColumnMetadataFor(column);
         if (columnMeta != null) {
@@ -160,6 +162,8 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
+
+    TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
 
     BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
     for (String column : _textIndexConfig.getColumns()) {

@@ -305,11 +305,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
 
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -474,15 +470,11 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     ArrayList<String> newColumns = new ArrayList<>(TEXT_COLUMNS);
     newColumns.remove(TEXT_COL);
 
-    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns,
-        oldConfig.getProperties(), oldConfig.getPerColumnProperties());
+    MultiColumnTextIndexConfig newConfig =
+        new MultiColumnTextIndexConfig(newColumns, oldConfig.getProperties(), oldConfig.getPerColumnProperties());
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
 
     boolean columnDisabled = false;
 
@@ -506,19 +498,14 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         TEXT_COL_CASE_SENSITIVE)), 0);
   }
 
-  // run as last
-  @Test(priority = Integer.MAX_VALUE)
+  @Test(priority = 2)
   public void testRemoveIndex()
       throws Exception {
     setUseMultiStageQueryEngine(false);
     TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(null);
     updateTableConfig(tableConfig);
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
 
     boolean[] columnDisabled = new boolean[TEXT_COLUMNS.size()];
     long start = System.currentTimeMillis();
@@ -547,6 +534,105 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         Assert.fail(
             "Not all columns were removed from multi-column text index, flags:" + Arrays.toString(columnDisabled));
       }
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithDuplicateColumnsReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns, null, null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
+          "Cannot create TEXT index on duplicate columns: [skills]"));
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithNoColumnsReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(Collections.emptyList(), null, null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
+          "Multi-column text index's list of columns can't be empty"));
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithWrongSharedPropertyKeyReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns, Map.of("XXX", "YYY"), null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
+          "Multi-column text index doesn't allow: XXX as shared property"));
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithWrongColumnPropertyKeyReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig =
+        new MultiColumnTextIndexConfig(newColumns, null, Map.of(TEXT_COL, Map.of("XXX", "YYY")));
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
+          "Multi-column text index doesn't allow: XXX as property for column: skills"));
+    }
+
+    newConfig = new MultiColumnTextIndexConfig(newColumns, null, Map.of("bogus", Map.of("XXX", "YYY")));
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      Assert.fail();
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
+          "Multi-column text index per-column property refers to unknown column: bogus"));
+    }
+  }
+
+  private String reloadTable()
+      throws IOException {
+    if (isRealtimeTable()) {
+      return reloadRealtimeTable(getTableName());
+    } else {
+      return reloadOfflineTable(getTableName());
     }
   }
 

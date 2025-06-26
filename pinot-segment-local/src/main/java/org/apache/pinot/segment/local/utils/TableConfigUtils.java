@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,12 +51,14 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -1101,6 +1104,8 @@ public final class TableConfigUtils {
       }
     }
 
+    validateMultiColumnTextIndex(indexingConfig.getMultiColumnTextIndexConfig());
+
     // Star-tree index config is not managed by FieldIndexConfigs, and we need to validate it separately.
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs)) {
@@ -1143,6 +1148,36 @@ public final class TableConfigUtils {
           Preconditions.checkState(fieldSpec != null, "Failed to find partition column: %s in schema", column);
           Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
               column);
+        }
+      }
+    }
+  }
+
+  private static void validateMultiColumnTextIndex(MultiColumnTextIndexConfig multiColTextIndex) {
+    if (multiColTextIndex == null) {
+      return;
+    }
+
+    Preconditions.checkState(multiColTextIndex.getColumns() != null && !multiColTextIndex.getColumns().isEmpty(),
+        "Multi-column text index's list of columns can't be empty");
+
+    checkForDuplicates(multiColTextIndex.getColumns());
+
+    if (multiColTextIndex.getProperties() != null) {
+      for (String key : multiColTextIndex.getProperties().keySet()) {
+        Preconditions.checkState(MultiColumnTextMetadata.isValidSharedProperty(key),
+            "Multi-column text index doesn't allow: %s as shared property", key);
+      }
+    }
+
+    if (multiColTextIndex.getPerColumnProperties() != null) {
+      for (String column : multiColTextIndex.getPerColumnProperties().keySet()) {
+        Preconditions.checkState(multiColTextIndex.getColumns().contains(column),
+            "Multi-column text index per-column property refers to unknown column: %s", column);
+
+        for (String key : multiColTextIndex.getPerColumnProperties().get(column).keySet()) {
+          Preconditions.checkState(MultiColumnTextMetadata.isValidPerColumnProperty(key),
+              "Multi-column text index doesn't allow: %s as property for column: %s", key, column);
         }
       }
     }
@@ -1378,6 +1413,28 @@ public final class TableConfigUtils {
       throw new IllegalArgumentException(String.format(
           "Broker Tenants are different for table: %s! Offline broker tenant name: %s, Realtime broker tenant name: %s",
           rawTableName, offlineBroker, realtimeBroker));
+    }
+  }
+
+  public static void checkForDuplicates(List<String> columns) {
+    Object2LongOpenHashMap<String> map = new Object2LongOpenHashMap<>(columns.size());
+    map.defaultReturnValue(0);
+
+    for (String column : columns) {
+      map.put(column, map.getLong(column) + 1);
+    }
+
+    List<String> duplicates = new ArrayList<>();
+
+    map.forEach((k, v) -> {
+      if (v > 1) {
+        duplicates.add(k);
+      }
+    });
+
+    if (!duplicates.isEmpty()) {
+      throw new IllegalStateException(
+          "Cannot create TEXT index on duplicate columns: " + duplicates);
     }
   }
 
