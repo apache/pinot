@@ -323,7 +323,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
-    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1606164936");
+    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
     Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
@@ -349,9 +349,9 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 100000);
     Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 99992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "1606164936");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "1265679343");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877813);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877525);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
@@ -472,7 +472,7 @@ public class TablesResourceTest extends BaseResourceTest {
             V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
         RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
-    String expectedSegmentCrc = "1606164936";
+    String expectedSegmentCrc = "1265679343";
 
     // Check no type (default should be validDocIdsSnapshot)
     ValidDocIdsBitmapResponse response = _webTarget.path(snapshotPath).request().get(ValidDocIdsBitmapResponse.class);
