@@ -344,15 +344,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      AccessControl accessControl = _accessControlFactory.create();
-      for (String tableName : tables) {
-        accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
-            .ifPresent(rowFilters -> {
-              String combinedFilters =
-                  rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-              String key = RlsUtils.buildRlsFilterKey(tableName);
-              compiledQuery.getOptions().put(key, combinedFilters);
-            });
+      if (_enableRowColumnLevelAuth) {
+        AccessControl accessControl = _accessControlFactory.create();
+        for (String tableName : tables) {
+          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+              .ifPresent(rowFilters -> {
+                String combinedFilters =
+                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+                String key = RlsUtils.buildRlsFilterKey(tableName);
+                compiledQuery.getOptions().put(key, combinedFilters);
+              });
+        }
       }
     }
   }
