@@ -104,8 +104,8 @@ public class RealtimeSegmentValidationManagerTest {
     when(pauseStatus.getPauseFlag()).thenReturn(isTablePaused);
     when(pauseStatus.getReasonCode()).thenReturn(reasonCode);
     when(_llcRealtimeSegmentManager.getPauseStatusDetails(tableName)).thenReturn(pauseStatus);
-    when(_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName, false)).thenReturn(
-        !isResourceUtilizationExceeded);
+    when(_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(!isResourceUtilizationExceeded);
     when(_pinotHelixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)).thenReturn(isQuotaExceeded);
 

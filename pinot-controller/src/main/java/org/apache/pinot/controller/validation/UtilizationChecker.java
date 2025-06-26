@@ -34,9 +34,9 @@ public interface UtilizationChecker {
   /**
    * Returns true if the resource's utilization is within limits
    * @param tableNameWithType table name with type
-   * @param isForMinion should be true if called from the minion task generation framework
+   * @param purpose purpose behind calling this check
    */
-  boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion);
+  boolean isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose);
 
   /**
    * Computes the resource's utilization
@@ -45,4 +45,9 @@ public interface UtilizationChecker {
    */
   void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper);
+
+  enum CheckPurpose {
+    REALTIME_INGESTION,
+    TASK_GENERATION
+  }
 }

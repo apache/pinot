@@ -75,8 +75,8 @@ public class PrimaryKeyCountTest {
 
     Assert.assertEquals(primaryKeyCountInfo.getInstanceId(), instanceId);
     Assert.assertEquals(primaryKeyCountInfo.getNumPrimaryKeys(), 0);
-    Assert.assertNotNull(primaryKeyCountInfo.getTablesWithPrimaryKeys());
-    Assert.assertEquals(primaryKeyCountInfo.getTablesWithPrimaryKeys().size(), 0);
+    Assert.assertNotNull(primaryKeyCountInfo.getUpsertAndDedupTables());
+    Assert.assertEquals(primaryKeyCountInfo.getUpsertAndDedupTables().size(), 0);
     Assert.assertTrue(primaryKeyCountInfo.getLastUpdatedTimeInEpochMs() <= System.currentTimeMillis());
   }
 
@@ -108,8 +108,8 @@ public class PrimaryKeyCountTest {
 
     Assert.assertEquals(primaryKeyCountInfo.getInstanceId(), instanceId);
     Assert.assertEquals(primaryKeyCountInfo.getNumPrimaryKeys(), 0);
-    Assert.assertNotNull(primaryKeyCountInfo.getTablesWithPrimaryKeys());
-    Assert.assertEquals(primaryKeyCountInfo.getTablesWithPrimaryKeys().size(), 0);
+    Assert.assertNotNull(primaryKeyCountInfo.getUpsertAndDedupTables());
+    Assert.assertEquals(primaryKeyCountInfo.getUpsertAndDedupTables().size(), 0);
     Assert.assertTrue(primaryKeyCountInfo.getLastUpdatedTimeInEpochMs() <= System.currentTimeMillis());
   }
 
@@ -154,9 +154,9 @@ public class PrimaryKeyCountTest {
 
     Assert.assertEquals(primaryKeyCountInfo.getInstanceId(), instanceId);
     Assert.assertEquals(primaryKeyCountInfo.getNumPrimaryKeys(), primaryKeyCount);
-    Assert.assertNotNull(primaryKeyCountInfo.getTablesWithPrimaryKeys());
-    Assert.assertEquals(primaryKeyCountInfo.getTablesWithPrimaryKeys().size(), 1);
-    Assert.assertTrue(primaryKeyCountInfo.getTablesWithPrimaryKeys().contains("myTable_REALTIME"));
+    Assert.assertNotNull(primaryKeyCountInfo.getUpsertAndDedupTables());
+    Assert.assertEquals(primaryKeyCountInfo.getUpsertAndDedupTables().size(), 1);
+    Assert.assertTrue(primaryKeyCountInfo.getUpsertAndDedupTables().contains("myTable_REALTIME"));
     Assert.assertTrue(primaryKeyCountInfo.getLastUpdatedTimeInEpochMs() <= System.currentTimeMillis());
   }
 
@@ -201,9 +201,9 @@ public class PrimaryKeyCountTest {
 
     Assert.assertEquals(primaryKeyCountInfo.getInstanceId(), instanceId);
     Assert.assertEquals(primaryKeyCountInfo.getNumPrimaryKeys(), primaryKeyCount);
-    Assert.assertNotNull(primaryKeyCountInfo.getTablesWithPrimaryKeys());
-    Assert.assertEquals(primaryKeyCountInfo.getTablesWithPrimaryKeys().size(), 1);
-    Assert.assertTrue(primaryKeyCountInfo.getTablesWithPrimaryKeys().contains("myTable_REALTIME"));
+    Assert.assertNotNull(primaryKeyCountInfo.getUpsertAndDedupTables());
+    Assert.assertEquals(primaryKeyCountInfo.getUpsertAndDedupTables().size(), 1);
+    Assert.assertTrue(primaryKeyCountInfo.getUpsertAndDedupTables().contains("myTable_REALTIME"));
     Assert.assertTrue(primaryKeyCountInfo.getLastUpdatedTimeInEpochMs() <= System.currentTimeMillis());
   }
 
@@ -266,10 +266,10 @@ public class PrimaryKeyCountTest {
 
     Assert.assertEquals(primaryKeyCountInfo.getInstanceId(), instanceId);
     Assert.assertEquals(primaryKeyCountInfo.getNumPrimaryKeys(), primaryKeyCount);
-    Assert.assertNotNull(primaryKeyCountInfo.getTablesWithPrimaryKeys());
-    Assert.assertEquals(primaryKeyCountInfo.getTablesWithPrimaryKeys().size(), 2);
-    Assert.assertTrue(primaryKeyCountInfo.getTablesWithPrimaryKeys().contains("myTableUpsert_REALTIME"));
-    Assert.assertTrue(primaryKeyCountInfo.getTablesWithPrimaryKeys().contains("myTableDedup_REALTIME"));
+    Assert.assertNotNull(primaryKeyCountInfo.getUpsertAndDedupTables());
+    Assert.assertEquals(primaryKeyCountInfo.getUpsertAndDedupTables().size(), 2);
+    Assert.assertTrue(primaryKeyCountInfo.getUpsertAndDedupTables().contains("myTableUpsert_REALTIME"));
+    Assert.assertTrue(primaryKeyCountInfo.getUpsertAndDedupTables().contains("myTableDedup_REALTIME"));
     Assert.assertTrue(primaryKeyCountInfo.getLastUpdatedTimeInEpochMs() <= System.currentTimeMillis());
   }
 }

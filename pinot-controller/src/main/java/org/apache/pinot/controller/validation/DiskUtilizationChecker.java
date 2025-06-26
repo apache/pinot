@@ -63,7 +63,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
    * Check if disk utilization for the requested table is within the configured limits.
    */
   @Override
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, UtilizationChecker.CheckPurpose purpose) {
     if (StringUtils.isEmpty(tableNameWithType)) {
       throw new IllegalArgumentException("Table name found to be null or empty while computing disk utilization.");
     }

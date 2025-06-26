@@ -28,24 +28,24 @@ import java.util.Set;
 public class PrimaryKeyCountInfo {
   private final String _instanceId;
   private final long _numPrimaryKeys;
-  private final Set<String> _tablesWithPrimaryKeys;
+  private final Set<String> _upsertAndDedupTables;
   private final long _lastUpdatedTimeInEpochMs;
 
   public PrimaryKeyCountInfo(@JsonProperty("instanceId") String instanceId) {
     _instanceId = instanceId;
     _numPrimaryKeys = -1;
-    _tablesWithPrimaryKeys = Set.of();
+    _upsertAndDedupTables = Set.of();
     _lastUpdatedTimeInEpochMs = -1;
   }
 
   @JsonCreator
   public PrimaryKeyCountInfo(@JsonProperty("instanceId") String instanceId,
       @JsonProperty("numPrimaryKeys") long numPrimaryKeys,
-      @JsonProperty("tablesWithPrimaryKeys") Set<String> tablesWithPrimaryKeys,
+      @JsonProperty("upsertAndDedupTables") Set<String> upsertAndDedupTables,
       @JsonProperty("lastUpdatedTimeInEpochMs") long lastUpdatedTimeInEpochMs) {
     _instanceId = instanceId;
     _numPrimaryKeys = numPrimaryKeys;
-    _tablesWithPrimaryKeys = tablesWithPrimaryKeys;
+    _upsertAndDedupTables = upsertAndDedupTables;
     _lastUpdatedTimeInEpochMs = lastUpdatedTimeInEpochMs;
   }
 
@@ -57,8 +57,8 @@ public class PrimaryKeyCountInfo {
     return _numPrimaryKeys;
   }
 
-  public Set<String> getTablesWithPrimaryKeys() {
-    return _tablesWithPrimaryKeys;
+  public Set<String> getUpsertAndDedupTables() {
+    return _upsertAndDedupTables;
   }
 
   public long getLastUpdatedTimeInEpochMs() {
@@ -67,7 +67,7 @@ public class PrimaryKeyCountInfo {
 
   public String toString() {
     return "PrimaryKeyCountInfo{" + "_instanceId='" + _instanceId + ", _numPrimaryKeys=" + _numPrimaryKeys
-        + ", _tablesWithPrimaryKeys=" + _tablesWithPrimaryKeys + ", _lastUpdatedTimeInEpochMs="
+        + ", _upsertAndDedupTables=" + _upsertAndDedupTables + ", _lastUpdatedTimeInEpochMs="
         + _lastUpdatedTimeInEpochMs + '}';
   }
 }

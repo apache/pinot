@@ -38,7 +38,7 @@ public class ResourceUtilizationManager {
     _utilizationCheckers = utilizationCheckers;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, boolean isForMinion) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, UtilizationChecker.CheckPurpose purpose) {
     if (!_isResourceUtilizationCheckEnabled) {
       return true;
     }
@@ -49,9 +49,9 @@ public class ResourceUtilizationManager {
     boolean overallIsResourceUtilizationWithinLimits = true;
     for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
       boolean isResourceUtilizationWithinLimits =
-          utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, isForMinion);
-      LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, isForMinion: {}",
-          utilizationChecker.getName(), isResourceUtilizationWithinLimits, isForMinion);
+          utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, purpose);
+      LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, purpose: {}",
+          utilizationChecker.getName(), isResourceUtilizationWithinLimits, purpose);
       if (!isResourceUtilizationWithinLimits) {
         overallIsResourceUtilizationWithinLimits = false;
       }
