@@ -2274,7 +2274,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     assertTrue(responseTrailing.getNumDocsScanned() > 0, "Trailing wildcard should scan some documents");
 
     // This should fail: leading wildcard is NOT allowed with parser=STANDARD
-    // The optimizer should NOT merge these expressions because they have different options
+    // The optimizer should NOT merge these expressions because they have options
     String queryLeading =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
             + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
