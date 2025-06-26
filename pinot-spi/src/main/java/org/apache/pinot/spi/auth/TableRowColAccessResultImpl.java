@@ -22,15 +22,30 @@ import java.util.List;
 import java.util.Optional;
 
 
-/**
- * This interfaces carries the RLS/CLS filter for a particular table
- */
-public interface TableRowColAuthResult {
-  /**
-   * Returns the RLS filters associated with a particular table. RLS filters are defined as a list.
-   * @return optional of the RLS filters. Empty optional if there are no RLS filters defined on this table
-   */
-  Optional<List<String>> getRLSFilters();
+public class TableRowColAccessResultImpl implements TableRowColAccessResult {
 
-  void setRLSFilters(List<String> rlsFilters);
+  private static final TableRowColAccessResult UNRESTRICTED = new TableRowColAccessResultImpl();
+
+  private List<String> _rlsFilters;
+
+  public TableRowColAccessResultImpl() {
+  }
+
+  public TableRowColAccessResultImpl(List<String> rlsFilters) {
+    _rlsFilters = rlsFilters;
+  }
+
+  @Override
+  public void setRLSFilters(List<String> rlsFilters) {
+    _rlsFilters = rlsFilters;
+  }
+
+  @Override
+  public Optional<List<String>> getRLSFilters() {
+    return Optional.ofNullable(_rlsFilters);
+  }
+
+  public static TableRowColAccessResult unrestricted() {
+    return UNRESTRICTED;
+  }
 }

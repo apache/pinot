@@ -99,7 +99,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableRowColAuthResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -438,7 +438,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
 
-      TableRowColAuthResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
+      TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
 
       //rewrite query
       Map<String, String> queryOptions =

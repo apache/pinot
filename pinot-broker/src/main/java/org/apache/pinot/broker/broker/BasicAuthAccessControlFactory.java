@@ -35,8 +35,8 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
-import org.apache.pinot.spi.auth.TableRowColAuthResult;
-import org.apache.pinot.spi.auth.TableRowColAuthResultImpl;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -137,13 +137,13 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public TableRowColAuthResult getRowColFilters(RequesterIdentity requesterIdentity, @NotNull String table) {
+    public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, @NotNull String table) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       Preconditions.checkState(principalOpt.isPresent(), "Principal is not authorized");
       Preconditions.checkState(table != null, "Table cannot be null");
 
-      TableRowColAuthResult tableRowColAuthResult = new TableRowColAuthResultImpl();
+      TableRowColAccessResult tableRowColAccessResult = new TableRowColAccessResultImpl();
       BasicAuthPrincipal principal = principalOpt.get();
 
       //precondition: The principal should have the table.
@@ -151,9 +151,9 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
           "Principal: " + principal.getName() + " does not have access to table: " + table);
 
       Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
-      rlsFiltersMaybe.ifPresent(tableRowColAuthResult::setRLSFilters);
+      rlsFiltersMaybe.ifPresent(tableRowColAccessResult::setRLSFilters);
 
-      return tableRowColAuthResult;
+      return tableRowColAccessResult;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
