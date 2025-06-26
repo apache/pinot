@@ -172,9 +172,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   @Override
   protected void init() {
     _rightTableFuture = CompletableFuture.runAsync(this::buildRightTable);
-    super.init();
+    _leftInput.init();
     try {
-      Preconditions.checkState(_rightTableFuture != null);
       _rightTableFuture.get();
       _rightTableFuture = null;
     } catch (ExecutionException e1) {
@@ -198,6 +197,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
       LOGGER.trace("Returning eos");
       return _eos;
     }
+    Preconditions.checkState(_isRightTableBuilt);
     MseBlock mseBlock = buildJoinedDataBlock();
     LOGGER.trace("Returning {} for join operator", mseBlock);
     if (mseBlock.isEos()) {
