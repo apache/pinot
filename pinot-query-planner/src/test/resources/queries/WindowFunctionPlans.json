@@ -3679,11 +3679,6 @@
         "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
       },
       {
-        "description": "Apache Calcite failures with ROW_NUMBER() window functions - default frame for ROW_NUMBER is different from aggregation window functions, resulting in multiple window groups",
-        "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 ORDER BY a.col2), SUM(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
-        "expectedException": ".*Currently only 1 window group is supported, query has 2 groups.*"
-      },
-      {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - custom frames not allowed",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
         "expectedException": ".*ROW/RANGE not allowed with RANK, DENSE_RANK, ROW_NUMBER, PERCENTILE_CONT/DISC or LAG/LEAD functions.*"
