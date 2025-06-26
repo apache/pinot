@@ -86,4 +86,6 @@ public interface InstanceDataManagerConfig {
   Map<String, Map<String, String>> getTierConfigs();
 
   boolean isUploadSegmentToDeepStore();
+
+  boolean isSkipOriginalFieldInUnnest();
 }

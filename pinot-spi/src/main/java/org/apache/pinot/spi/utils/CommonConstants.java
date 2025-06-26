@@ -1008,6 +1008,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_RELOAD_CONSUMING_SEGMENT =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + RELOAD_CONSUMING_SEGMENT;
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
+    public static final String REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST =
+            "realtime.complex.config.skipOriginalFieldInUnnest";
+    public static final String CONFIG_OF_REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_ALLOCATION;
+    public static final boolean DEFAULT_REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST = false;
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";

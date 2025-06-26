@@ -48,20 +48,20 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Map of <prefix, replacement> so matching fields are renamed to start with the replacement")
   private final Map<String, String> _prefixesToRename;
 
-  @JsonPropertyDescription("Whether to retain original fields in unnest")
-  private boolean _retainOriginalFieldInUnnest;
+  @JsonPropertyDescription("Skip original fields in unnest")
+  private boolean _skipOriginalFieldInUnnest;
 
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
       @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
       @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename,
-      @JsonProperty("retainOriginalFieldInUnnest") boolean retainOriginalFieldInUnnest) {
+      @JsonProperty("skipOriginalFieldInUnnest") boolean skipOriginalFieldInUnnest) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
-    _retainOriginalFieldInUnnest = retainOriginalFieldInUnnest;
+    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
   }
 
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
@@ -91,11 +91,11 @@ public class ComplexTypeConfig extends BaseJsonConfig {
     return _prefixesToRename;
   }
 
-  public void setRetainOriginalFieldInUnnest(boolean retainOriginalFieldInUnnest) {
-    _retainOriginalFieldInUnnest = retainOriginalFieldInUnnest;
+  public void setSkipOriginalFieldInUnnest(boolean skipOriginalFieldInUnnest) {
+    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
   }
 
-  public boolean shouldRetainOriginalFieldInUnnest() {
-    return _retainOriginalFieldInUnnest;
+  public boolean isSkipOriginalFieldInUnnest() {
+    return _skipOriginalFieldInUnnest;
   }
 }

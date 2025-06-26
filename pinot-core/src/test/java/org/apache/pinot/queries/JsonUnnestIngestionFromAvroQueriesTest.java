@@ -280,7 +280,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
-  public void setUp(boolean retainOriginalFieldInUnnest)
+  public void setUp(boolean skipOriginalFieldInUnnest)
           throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
     createInputFile();
@@ -290,7 +290,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
             List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
                     new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")));
     ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(
-            List.of(JSON_COLUMN), null, null, null, retainOriginalFieldInUnnest));
+            List.of(JSON_COLUMN), null, null, null, skipOriginalFieldInUnnest));
     TableConfig tableConfig =
             new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
                     .setJsonIndexColumns(List.of(JSON_COLUMN)).build();
@@ -311,8 +311,8 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testComplexSelectOnJsonColumnWithoutOriginalFieldsRetained() throws Exception {
-    setUp(false);
+  public void testComplexSelectOnJsonColumnAndSkipOriginalFieldsInUnnest() throws Exception {
+    setUp(true);
     List<String> expecteds = Arrays.asList(
         "[1, daffy duck, null, 1719390721, null, 1, 2, 1719390721000, 1719390720000]",
         "[1, daffy duck, null, 1719390722, null, 2, 4, 1719390721000, 1719390720000]",
@@ -332,8 +332,8 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testComplexSelectOnJsonColumnWithOriginalFieldsRetained() throws Exception {
-    setUp(true);
+  public void testComplexSelectOnJsonColumnAndDoNotSkipOriginalFieldsInUnnest() throws Exception {
+    setUp(false);
     List<String> expecteds = Arrays.asList(
         "[1, daffy duck, [{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721},{\"data\":{\"a\":\"2\","
             + "\"b\":\"4\"},\"timestamp\":1719390722}], 1719390721, {\"a\":\"1\",\"b\":\"2\"}, 1, 2, 1719390721000, "

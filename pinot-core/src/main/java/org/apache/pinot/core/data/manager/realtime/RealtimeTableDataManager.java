@@ -76,6 +76,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -543,6 +544,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     validate(tableConfig, schema);
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     setDefaultTimeValueIfInvalid(tableConfig, schema, zkMetadata);
+    setSkipOriginalFieldInUnnest(tableConfig);
 
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
@@ -951,5 +953,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private boolean isEnforceConsumptionInOrder() {
     StreamIngestionConfig streamIngestionConfig = getStreamIngestionConfig();
     return streamIngestionConfig != null && streamIngestionConfig.isEnforceConsumptionInOrder();
+  }
+
+  /**
+   * Sets the skipOriginalFieldInUnnest field using server level config if table level config is false.
+   */
+  private void setSkipOriginalFieldInUnnest(TableConfig tableConfig) {
+    if (tableConfig.getIngestionConfig() == null) {
+      return;
+    }
+    ComplexTypeConfig complexTypeConfig = tableConfig.getIngestionConfig().getComplexTypeConfig();
+    if (complexTypeConfig != null && !complexTypeConfig.isSkipOriginalFieldInUnnest()) {
+      complexTypeConfig.setSkipOriginalFieldInUnnest(_instanceDataManagerConfig.isSkipOriginalFieldInUnnest());
+      _logger.info("Setting skipOriginalFieldInUnnest for table: {} to {}", tableConfig.getTableName(),
+              _instanceDataManagerConfig.isSkipOriginalFieldInUnnest());
+    }
   }
 }
