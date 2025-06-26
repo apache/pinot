@@ -79,7 +79,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
         // This is because the Root Exchange is added by the RootExchangeInsertRule.
         return currentNode;
       }
-      return inferPDDForLeafExchange(currentNode, liteModeWorkers);
+      return computeLeafExchange(currentNode, liteModeWorkers);
     }
     List<PRelNode> newInputs = new ArrayList<>();
     for (PRelNode input : currentNode.getPRelInputs()) {
@@ -132,7 +132,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   /**
    * Infers Exchange to be added on top of the leaf stage.
    */
-  private PhysicalExchange inferPDDForLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
+  private PhysicalExchange computeLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
     RelCollation collation = leafStageRoot.unwrap().getTraitSet().getCollation();
     PinotDataDistribution pdd;
     if (collation != null) {
