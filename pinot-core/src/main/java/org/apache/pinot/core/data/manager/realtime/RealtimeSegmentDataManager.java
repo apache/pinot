@@ -1565,7 +1565,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
     closeStreamConsumer();
-    _realtimeTableDataManager.getIngestionDelayTracker().markPartitionForVerification(_segmentNameStr);
     cleanupMetrics();
     _realtimeSegment.offload();
   }

@@ -866,6 +866,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
 
     addSegment(immutableSegment, zkMetadata);
+    _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
   }
 
