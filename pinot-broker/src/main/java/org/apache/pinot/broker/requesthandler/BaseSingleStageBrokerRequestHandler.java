@@ -438,26 +438,28 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
 
-      TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
+      if (_enableRowColumnLevelAuth) {
+        TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
 
-      //rewrite query
-      Map<String, String> queryOptions =
-          pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
+        //rewrite query
+        Map<String, String> queryOptions =
+            pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
 
-      rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
-        String combinedFilters =
-            rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-        String rowFiltersKey = RlsUtils.buildRlsFilterKey(rawTableName);
-        queryOptions.put(rowFiltersKey, combinedFilters);
-        pinotQuery.setQueryOptions(queryOptions);
-        try {
-          CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
-        } catch (Exception e) {
-          LOGGER.error(
-              "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
-              RlsFiltersRewriter.class.getName(), e);
-        }
-      });
+        rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
+          String combinedFilters =
+              rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+          String rowFiltersKey = RlsUtils.buildRlsFilterKey(rawTableName);
+          queryOptions.put(rowFiltersKey, combinedFilters);
+          pinotQuery.setQueryOptions(queryOptions);
+          try {
+            CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
+          } catch (Exception e) {
+            LOGGER.error(
+                "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
+                RlsFiltersRewriter.class.getName(), e);
+          }
+        });
+      }
 
       // Validate QPS quota
       if (!_queryQuotaManager.acquireDatabase(database)) {

@@ -71,6 +71,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty("pinot.broker.enable.row.column.level.auth", "true");
     brokerConf.setProperty("pinot.broker.access.control.class",
         "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
     brokerConf.setProperty("pinot.broker.access.control.principals", "admin, user, user2");
