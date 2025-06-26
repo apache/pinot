@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -105,16 +104,8 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
     for (List<Expression> values : textMatchMap.values()) {
       if (values.size() > 1) {
-        // Check if all expressions have the same options (third parameter)
-        if (!canOptimizeTextMatchExpressions(values)) {
-          // If options differ, add all expressions as-is without optimization
-          newChildren.addAll(values);
-        } else {
-          recreateFilter = true;
-        }
-      } else if (values.size() == 1) {
-        // Single expression, add it to newChildren
-        newChildren.add(values.get(0));
+        recreateFilter = true;
+        break;
       }
     }
     if (recreateFilter) {
@@ -138,17 +129,11 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       }
 
       List<String> literals = new ArrayList<>();
-      List<Expression> optionsList = new ArrayList<>();
       if (allNot) {
         for (Expression expression : entry.getValue()) {
           Expression operand = expression.getFunctionCall().getOperands().get(0);
-          List<Expression> textMatchOperands = operand.getFunctionCall().getOperands();
           literals.add(
-              wrapWithParentheses(textMatchOperands.get(1).getLiteral().getStringValue()));
-          // Collect options if present (third parameter)
-          if (textMatchOperands.size() > 2) {
-            optionsList.add(textMatchOperands.get(2));
-          }
+              wrapWithParentheses(operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
         }
       } else {
         for (Expression expression : entry.getValue()) {
@@ -157,31 +142,19 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
             // Lucene special case: if `OR NOT`, skip optimizing as NOT cannot be used with just one term
             if (operator.equals(FilterKind.OR.name())) {
-              List<Expression> textMatchOperands = operand.getFunctionCall().getOperands();
               Expression textMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(),
-                  textMatchOperands.get(0), textMatchOperands.get(1),
-                  textMatchOperands.size() > 2 ? textMatchOperands.get(2) : null);
+                  operand.getFunctionCall().getOperands().get(0), operand.getFunctionCall().getOperands().get(1));
               newChildren.add(RequestUtils.getFunctionExpression(FilterKind.NOT.name(), textMatchExpression));
               continue;
             }
 
-            List<Expression> textMatchOperands = operand.getFunctionCall().getOperands();
             literals.add(FilterKind.NOT.name() + SPACE + wrapWithParentheses(
-                textMatchOperands.get(1).getLiteral().getStringValue()));
-            // Collect options if present (third parameter)
-            if (textMatchOperands.size() > 2) {
-              optionsList.add(textMatchOperands.get(2));
-            }
+                operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
             continue;
           }
           assert expression.getFunctionCall().getOperator().equals(FilterKind.TEXT_MATCH.name());
-          List<Expression> textMatchOperands = expression.getFunctionCall().getOperands();
           literals.add(
-              wrapWithParentheses(textMatchOperands.get(1).getLiteral().getStringValue()));
-          // Collect options if present (third parameter)
-          if (textMatchOperands.size() > 2) {
-            optionsList.add(textMatchOperands.get(2));
-          }
+              wrapWithParentheses(expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
         }
       }
 
@@ -197,19 +170,9 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       } else {
         mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
       }
-
-      // Create the merged TEXT_MATCH expression with options if available
-      Expression mergedTextMatchExpression;
-      if (!optionsList.isEmpty()) {
-        // Preserve options from the first TEXT_MATCH expression (since we've verified they're all the same)
-        Expression preservedOptions = optionsList.get(0);
-        mergedTextMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(), entry.getKey(),
-            RequestUtils.getLiteralExpression(mergedTextMatchFilter), preservedOptions);
-      } else {
-        mergedTextMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(), entry.getKey(),
-            RequestUtils.getLiteralExpression(mergedTextMatchFilter));
-      }
-
+      Expression mergedTextMatchExpression =
+          RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(), entry.getKey(),
+              RequestUtils.getLiteralExpression(mergedTextMatchFilter));
       if (allNot) {
         newChildren.add(RequestUtils.getFunctionExpression(FilterKind.NOT.name(), mergedTextMatchExpression));
       } else {
@@ -226,62 +189,5 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
   private String wrapWithParentheses(String expression) {
     return "(" + expression + ")";
-  }
-
-  /**
-   * Check if all TEXT_MATCH expressions can be optimized by verifying they have the same options.
-   * @param expressions List of TEXT_MATCH expressions to check
-   * @return true if all expressions have the same options (or no options), false otherwise
-   */
-  private boolean canOptimizeTextMatchExpressions(List<Expression> expressions) {
-    if (expressions.size() <= 1) {
-      return true;
-    }
-
-    // Get the options from the first expression
-    Expression firstExpression = expressions.get(0);
-    String firstOptions = getTextMatchOptions(firstExpression);
-
-    // Check if all other expressions have the same options
-    for (int i = 1; i < expressions.size(); i++) {
-      String currentOptions = getTextMatchOptions(expressions.get(i));
-      if (!Objects.equals(firstOptions, currentOptions)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Extract the options string from a TEXT_MATCH expression.
-   * @param expression TEXT_MATCH expression (can be wrapped in NOT)
-   * @return options string, or null if no options
-   */
-  private String getTextMatchOptions(Expression expression) {
-    if (expression.getFunctionCall().getOperator().equals(FilterKind.NOT.name())) {
-      // For NOT expressions, get the TEXT_MATCH operand
-      Expression operand = expression.getFunctionCall().getOperands().get(0);
-      return getTextMatchOptionsFromOperands(operand.getFunctionCall().getOperands());
-    } else {
-      // Direct TEXT_MATCH expression
-      return getTextMatchOptionsFromOperands(expression.getFunctionCall().getOperands());
-    }
-  }
-
-  /**
-   * Extract options from TEXT_MATCH operands.
-   * @param operands TEXT_MATCH function operands
-   * @return options string, or null if no options
-   */
-  private String getTextMatchOptionsFromOperands(List<Expression> operands) {
-    if (operands.size() > 2) {
-      Expression optionsExpr = operands.get(2);
-      if (optionsExpr != null && optionsExpr.getLiteral() != null) {
-        return optionsExpr.getLiteral().getStringValue();
-      }
-      return null;
-    }
-    return null;
   }
 }
