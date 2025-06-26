@@ -335,18 +335,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /**
-   * Method to handle CONSUMING -> ONLINE segment state transitions:
-   * We mark partitions for verification against ideal state when we do not see a consuming segment for some time
-   * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
-   *
-   * @param segmentName name of segment which is transitioning state.
-   */
-  @Override
-  public void onConsumingToOnline(String segmentName) {
-    _ingestionDelayTracker.markPartitionForVerification(segmentName);
-  }
-
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
