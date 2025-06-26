@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -299,13 +300,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try (QueryEnvironment.CompiledQuery compiledQuery =
         compileQuery(requestId, query, sqlNodeAndOptions, httpHeaders, queryTimer)) {
-
-      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
+      AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
+      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
-        return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer);
+        BrokerResponse response =
+            query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer);
+        response.setRLSFiltersApplied(rlsFiltersApplied.get());
+        return response;
       }
     }
   }
@@ -336,7 +340,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
+      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
@@ -349,6 +353,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         for (String tableName : tables) {
           accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
               .ifPresent(rowFilters -> {
+                rlsFiltersApplied.set(true);
                 String combinedFilters =
                     rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
                 String key = RlsUtils.buildRlsFilterKey(tableName);

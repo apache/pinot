@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -404,6 +405,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     TableRouteProvider routeProvider;
 
+    AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
     if (logicalTableConfig != null) {
       Set<String> physicalTableNames = logicalTableConfig.getPhysicalTableConfigMap().keySet();
       AuthorizationResult authorizationResult =
@@ -453,6 +455,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           pinotQuery.setQueryOptions(queryOptions);
           try {
             CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
+            rlsFiltersApplied.set(true);
           } catch (Exception e) {
             LOGGER.error(
                 "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
@@ -840,6 +843,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_QUERIES, 1,
           BrokerMetrics.getTagForPreferredPool(sqlNodeAndOptions.getOptions()), String.valueOf(pool));
     }
+
+    brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
 
     // Log query and stats
     _queryLogger.log(
