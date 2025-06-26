@@ -21,6 +21,8 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -280,7 +282,13 @@ public class QueryEnvironment {
       if (plannerContext != null) {
         plannerContext.close();
       }
-      throw QueryErrorCode.SQL_PARSING.asException("Error composing query plan: " + t.getMessage(), t);
+      String message = t.getMessage();
+      if (message == null) {
+        message = "Null message from " + t.getClass().getSimpleName();
+        LOGGER.error("Query plan composing failed with null message. Exception type: {}, SQL: {}, Stack trace: {}",
+          t.getClass().getSimpleName(), sqlQuery, getStackTraceString(t));
+      }
+      throw QueryErrorCode.SQL_PARSING.asException("Error composing query plan: " + message, t);
     }
   }
 
@@ -629,6 +637,16 @@ public class QueryEnvironment {
       return _envConfig.defaultUseSpools();
     }
     return Boolean.parseBoolean(optionValue);
+  }
+
+  /**
+   * Helper method to get stack trace as string for logging
+   */
+  private static String getStackTraceString(Throwable t) {
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+    t.printStackTrace(pw);
+    return sw.toString();
   }
 
   @Value.Immutable
