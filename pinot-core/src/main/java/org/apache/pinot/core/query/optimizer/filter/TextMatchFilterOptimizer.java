@@ -276,7 +276,11 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
    */
   private String getTextMatchOptionsFromOperands(List<Expression> operands) {
     if (operands.size() > 2) {
-      return operands.get(2).getLiteral().getStringValue();
+      Expression optionsExpr = operands.get(2);
+      if (optionsExpr != null && optionsExpr.getLiteral() != null) {
+        return optionsExpr.getLiteral().getStringValue();
+      }
+      return null;
     }
     return null;
   }
