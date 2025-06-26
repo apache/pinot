@@ -440,11 +440,11 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isUseBrokerPruning(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "true"));
   }
 
   public static boolean isRunInBroker(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "false"));
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "true"));
   }
 
   @Nullable

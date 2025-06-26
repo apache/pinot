@@ -37,6 +37,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
@@ -47,6 +48,7 @@ import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 import org.apache.pinot.query.planner.physical.v2.mapping.DistMappingGenerator;
+import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 import org.slf4j.Logger;
@@ -399,8 +401,16 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       return currentNode.getPinotDataDistributionOrThrow();
     }
     PinotDataDistribution inputDistribution = currentNode.getPRelInput(0).getPinotDataDistributionOrThrow();
-    return inputDistribution.apply(DistMappingGenerator.compute(
-        currentNode.unwrap().getInput(0), currentNode.unwrap(), null));
+    PinotDataDistribution newDistribution = inputDistribution.apply(DistMappingGenerator.compute(
+        currentNode.unwrap().getInput(0), currentNode.unwrap(), null),
+        PinotDistMapping.doesDropCollation(currentNode.unwrap()));
+    if (currentNode instanceof Sort) {
+      Sort sort = (Sort) currentNode.unwrap();
+      if (!sort.getCollation().getKeys().isEmpty()) {
+        return newDistribution.withCollation(sort.getCollation());
+      }
+    }
+    return newDistribution;
   }
 
   private static boolean isLeafStageBoundary(PRelNode currentNode, @Nullable PRelNode parentNode) {
