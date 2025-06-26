@@ -97,12 +97,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   private static MaxLengthExceedStrategy _defaultJsonMaxLengthExceedStrategy = MaxLengthExceedStrategy.NO_ACTION;
   private static int _defaultJsonMaxLength = DEFAULT_MAX_LENGTH;
 
-  public static MaxLengthExceedStrategy getDefaultJsonSanitizationStrategy() {
+  public static MaxLengthExceedStrategy getDefaultJsonMaxLengthExceedStrategy() {
     return _defaultJsonMaxLengthExceedStrategy;
   }
 
-  public static void setDefaultJsonSanitizationStrategy(MaxLengthExceedStrategy defaultJsonSanitizationStrategy) {
-    _defaultJsonMaxLengthExceedStrategy = defaultJsonSanitizationStrategy;
+  public static void setDefaultJsonMaxLengthExceedStrategy(MaxLengthExceedStrategy defaultJsonMaxLengthExceedStrategy) {
+    _defaultJsonMaxLengthExceedStrategy = defaultJsonMaxLengthExceedStrategy;
   }
 
   public static int getDefaultJsonMaxLength() {
@@ -299,7 +299,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       case STRING:
         return MaxLengthExceedStrategy.TRIM_LENGTH;
       case JSON:
-        return getDefaultJsonSanitizationStrategy();
+        return getDefaultJsonMaxLengthExceedStrategy();
       default:
         return MaxLengthExceedStrategy.NO_ACTION;
     }

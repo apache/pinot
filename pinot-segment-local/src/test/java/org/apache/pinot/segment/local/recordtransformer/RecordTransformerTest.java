@@ -923,12 +923,12 @@ public class RecordTransformerTest {
   @Test
   public void testConfigurableJsonDefaults() {
     // Save original defaults
-    FieldSpec.MaxLengthExceedStrategy originalStrategy = FieldSpec.getDefaultJsonSanitizationStrategy();
+    FieldSpec.MaxLengthExceedStrategy originalStrategy = FieldSpec.getDefaultJsonMaxLengthExceedStrategy();
     int originalMaxLength = FieldSpec.getDefaultJsonMaxLength();
 
     try {
       // Test configurable default strategy
-      FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
       FieldSpec.setDefaultJsonMaxLength(1024);
 
       Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
@@ -959,7 +959,7 @@ public class RecordTransformerTest {
       assertEquals(result.getValue("explicitJsonCol"), "{\"test\": \"exceeds 2048 chars easily\"}");
 
       // Test strategy change
-      FieldSpec.setDefaultJsonSanitizationStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
       RecordTransformer finalTransformer = new SanitizationTransformer(schema);
       record.putValue("jsonCol", "{\"test\": \"exceeds 10 chars\"}");
       assertThrows(IllegalStateException.class, () -> finalTransformer.transform(record));
@@ -972,10 +972,10 @@ public class RecordTransformerTest {
 
       ServiceStartableUtils.initFieldSpecConfig(config);
       assertEquals(FieldSpec.getDefaultJsonMaxLength(), 2048);
-      assertEquals(FieldSpec.getDefaultJsonSanitizationStrategy(), FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+      assertEquals(FieldSpec.getDefaultJsonMaxLengthExceedStrategy(), FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
     } finally {
       // Restore original defaults
-      FieldSpec.setDefaultJsonSanitizationStrategy(originalStrategy);
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(originalStrategy);
       FieldSpec.setDefaultJsonMaxLength(originalMaxLength);
     }
   }

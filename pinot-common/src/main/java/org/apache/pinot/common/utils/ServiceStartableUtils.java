@@ -147,10 +147,10 @@ public class ServiceStartableUtils {
         FieldSpec.MaxLengthExceedStrategy strategy =
             FieldSpec.MaxLengthExceedStrategy.valueOf(defaultJsonSanitizationStrategy);
         LOGGER.info("Setting default JSON sanitization strategy to: {}", defaultJsonSanitizationStrategy);
-        FieldSpec.setDefaultJsonSanitizationStrategy(strategy);
+        FieldSpec.setDefaultJsonMaxLengthExceedStrategy(strategy);
       } catch (IllegalArgumentException e) {
         LOGGER.warn("Invalid default JSON sanitization strategy: {}, using default: {}",
-            defaultJsonSanitizationStrategy, FieldSpec.getDefaultJsonSanitizationStrategy());
+            defaultJsonSanitizationStrategy, FieldSpec.getDefaultJsonMaxLengthExceedStrategy());
       }
     }
 
