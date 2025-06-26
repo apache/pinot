@@ -115,6 +115,12 @@ public abstract class MultiStageOperator
     }
   }
 
+  protected void init() {
+    for (MultiStageOperator child: getChildOperators()) {
+      child.init();
+    }
+  }
+
   // Make it protected because we should always call nextBlock()
   protected abstract MseBlock getNextBlock()
       throws Exception;

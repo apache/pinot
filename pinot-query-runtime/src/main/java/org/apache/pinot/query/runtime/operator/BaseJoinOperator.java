@@ -22,7 +22,10 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
+import org.apache.arrow.util.Preconditions;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
@@ -38,6 +41,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.PinotRuntimeException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -85,6 +89,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected final JoinOverFlowMode _joinOverflowMode;
 
   protected boolean _isRightTableBuilt;
+  @Nullable
+  protected CompletableFuture<Void> _rightTableFuture;
   @Nullable
   protected MseBlock.Eos _eos;
 
@@ -159,10 +165,34 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return List.of(_leftInput, _rightInput);
   }
 
+  /**
+   * Build hash tables for this operator and child
+   * asynchronously
+   */
+  @Override
+  protected void init() {
+    _rightTableFuture = CompletableFuture.runAsync(this::buildRightTable);
+    super.init();
+    try {
+      Preconditions.checkState(_rightTableFuture != null);
+      _rightTableFuture.get();
+      _rightTableFuture = null;
+    } catch (ExecutionException e1) {
+      Throwable cause = e1.getCause();
+      if (cause instanceof PinotRuntimeException) {
+        throw (PinotRuntimeException) cause;
+      } else {
+        throw new RuntimeException("Unexpected checked exception", cause);
+      }
+    } catch (InterruptedException e2) {
+      throw new RuntimeException("Hash table build interrupted", e2);
+    }
+  }
+
   @Override
   protected MseBlock getNextBlock() {
     if (!_isRightTableBuilt) {
-      buildRightTable();
+      init();
     }
     if (_eos != null) {
       LOGGER.trace("Returning eos");
