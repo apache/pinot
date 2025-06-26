@@ -1,4 +1,154 @@
 {
+  "physical_opt_chained_subqueries": {
+    "queries": [
+      {
+        "description": "Sub-query with group-by with no agg calls and a limit",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT DISTINCT col1, col2, ts FROM a LIMIT 100) SELECT col1, col2, RANK() OVER (PARTITION BY col2 ORDER BY ts DESC) AS rnk FROM tmp ORDER BY col2, rnk DESC",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(sort0=[$1], sort1=[$2], dir0=[ASC], dir1=[DESC])",
+          "\n    PhysicalProject(col1=[$0], col2=[$1], $2=[$3])",
+          "\n      PhysicalWindow(window#0=[window(partition {1} order by [2 DESC] aggs [RANK()])])",
+          "\n        PhysicalSort(sort0=[$2], dir0=[DESC])",
+          "\n          PhysicalSort(fetch=[100])",
+          "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n              PhysicalSort(fetch=[100])",
+          "\n                PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL], limit=[100])",
+          "\n                  PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 1, 2]])",
+          "\n                    PhysicalAggregate(group=[{0, 1, 7}], aggType=[LEAF], limit=[100])",
+          "\n                      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_group_by_hint_options": {
+    "queries": [
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ col1, COUNT(DISTINCT col2) AS cnt FROM a WHERE col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], leafReturnFinalResult=[true])",
+          "\n              PhysicalFilter(condition=[>=($2, 0)])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, MAX(ts) FROM a GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[MAX($7)], aggType=[DIRECT])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n      PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n          PhysicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
+          "\n    PhysicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n          PhysicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Example of query that avoids exchanges for aggregates",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR with teamOne as (select col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select col2, percentile(sum_of_runs, 50) from all group by col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n    PhysicalUnion(all=[true])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Same query as above but with agg hints. Here the leaf stage group-by is ignored because the default optimizations in v2 optimizer already eliminate aggregation splits.",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR with teamOne as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select /*+ aggOption(is_skip_leaf_stage_group_by='true') */ col2, percentile(sum_of_runs, 50) from all group by col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n    PhysicalUnion(all=[true])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n            PhysicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Same query as above, but group-by is on the non-partitioning column col1. In this case, the hint is honored but we have to use partitioning exchange.",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR with teamOne as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, percentile(col3, 50) as sum_of_runs from a group by col1), teamTwo as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, percentile(col3, 50) as sum_of_runs from a group by col1), all as (select col1, sum_of_runs from teamOne union all select col1, sum_of_runs from teamTwo) select /*+ aggOption(is_skip_leaf_stage_group_by='true') */ col1, percentile(sum_of_runs, 50) from all group by col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n    PhysicalUnion(all=[true])",
+          "\n      PhysicalProject(col1=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalProject(col1=[$0], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalProject(col1=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n        PhysicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalProject(col1=[$0], col3=[$2], $f2=[50])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "physical_opt_join_planning_tests": {
     "queries": [
       {
@@ -531,16 +681,15 @@
         "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3) SELECT * FROM (SELECT ROW_NUMBER() OVER (PARTITION BY col2 ORDER BY col3) as rnk, col1 FROM tmp) WHERE rnk = 1",
         "output": [
           "Execution Plan",
-          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n  PhysicalProject(rnk=[$3], col1=[$0])",
-          "\n    PhysicalFilter(condition=[=($3, 1)])",
-          "\n      PhysicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n        PhysicalSort(sort0=[$2], dir0=[ASC])",
-          "\n          PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL])",
-          "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n              PhysicalAggregate(group=[{0, 1, 2}], aggType=[LEAF], limit=[100000])",
-          "\n                PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n                  PhysicalTableScan(table=[[default, a]])",
+          "\nPhysicalProject(rnk=[$3], col1=[$0])",
+          "\n  PhysicalFilter(condition=[=($3, 1)])",
+          "\n    PhysicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      PhysicalSort(sort0=[$2], dir0=[ASC])",
+          "\n        PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL])",
+          "\n          PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n            PhysicalAggregate(group=[{0, 1, 2}], aggType=[LEAF], limit=[100000])",
+          "\n              PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -549,13 +698,29 @@
         "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3 ORDER BY col2) SELECT * FROM tmp LIMIT 100,400",
         "output": [
           "Execution Plan",
-          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n  PhysicalSort(offset=[100], fetch=[400])",
-          "\n    PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
-          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n        PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
-          "\n          PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\nPhysicalSort(offset=[100], fetch=[400])",
+          "\n  PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Sub-query with group-by with no agg calls and a limit",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT DISTINCT col1, col2, ts FROM a LIMIT 100) SELECT col1, col2, RANK() OVER (PARTITION BY col2 ORDER BY ts DESC) AS rnk FROM tmp ORDER BY col2, rnk DESC",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(sort0=[$1], sort1=[$2], dir0=[ASC], dir1=[DESC])",
+          "\n  PhysicalProject(col1=[$0], col2=[$1], $2=[$3])",
+          "\n    PhysicalWindow(window#0=[window(partition {1} order by [2 DESC] aggs [RANK()])])",
+          "\n      PhysicalSort(sort0=[$2], dir0=[DESC])",
+          "\n        PhysicalSort(fetch=[100])",
+          "\n          PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL], limit=[100])",
+          "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n              PhysicalAggregate(group=[{0, 1, 7}], aggType=[LEAF], limit=[100])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       }
@@ -568,23 +733,61 @@
         "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT col2, col3 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b)",
         "output": [
           "Execution Plan",
-          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n  PhysicalJoin(condition=[=($0, $2)], joinType=[semi])",
-          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n      PhysicalSort(fetch=[100000])",
-          "\n        PhysicalProject(col2=[$1], col3=[$2])",
-          "\n          PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n            PhysicalTableScan(table=[[default, a]])",
-          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n      PhysicalSort(fetch=[100000])",
-          "\n        PhysicalProject(col1=[$0])",
-          "\n          PhysicalTableScan(table=[[default, b]])",
+          "\nPhysicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalSort(fetch=[100000])",
+          "\n      PhysicalProject(col2=[$1], col3=[$2])",
+          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalSort(fetch=[100000])",
+          "\n      PhysicalProject(col1=[$0])",
+          "\n        PhysicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
       {
         "description": "Query with single semi join and aggregation",
         "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT COUNT(*), col2 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalProject(EXPR$0=[$1], col2=[$0])",
+          "\n  PhysicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n    PhysicalJoin(condition=[=($0, $1)], joinType=[semi])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalSort(fetch=[100000])",
+          "\n          PhysicalProject(col2=[$1])",
+          "\n            PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalSort(fetch=[100000])",
+          "\n          PhysicalProject(col1=[$0])",
+          "\n            PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "physical_opt_run_in_random_server": {
+    "queries": [
+      {
+        "description": "(run-in-random-server) Pagination on group-by results",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET runInBroker=false; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3 ORDER BY col2) SELECT * FROM tmp LIMIT 100,400",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(offset=[100], fetch=[400])",
+          "\n    PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
+          "\n          PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "(run-in-random-server) Query with single semi join and aggregation",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET runInBroker=false; EXPLAIN PLAN FOR SELECT COUNT(*), col2 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b) GROUP BY col2",
         "output": [
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
@@ -600,44 +803,6 @@
           "\n          PhysicalSort(fetch=[100000])",
           "\n            PhysicalProject(col1=[$0])",
           "\n              PhysicalTableScan(table=[[default, b]])",
-          "\n"
-        ]
-      }
-    ]
-  },
-  "physical_opt_run_in_broker": {
-    "queries": [
-      {
-        "description": "(run-in-broker) Pagination on group-by results",
-        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET runInBroker=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, col2, col3, COUNT(*) FROM a WHERE col1 = 'foo' GROUP BY col1, col2, col3 ORDER BY col2) SELECT * FROM tmp LIMIT 100,400",
-        "output": [
-          "Execution Plan",
-          "\nPhysicalSort(offset=[100], fetch=[400])",
-          "\n  PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
-          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n      PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
-          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n          PhysicalTableScan(table=[[default, a]])",
-          "\n"
-        ]
-      },
-      {
-        "description": "(run-in-broker) Query with single semi join and aggregation",
-        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET runInBroker=true; EXPLAIN PLAN FOR SELECT COUNT(*), col2 FROM a WHERE col1 = 'foo' AND col2 IN (SELECT col1 FROM b) GROUP BY col2",
-        "output": [
-          "Execution Plan",
-          "\nPhysicalProject(EXPR$0=[$1], col2=[$0])",
-          "\n  PhysicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[DIRECT])",
-          "\n    PhysicalJoin(condition=[=($0, $1)], joinType=[semi])",
-          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n        PhysicalSort(fetch=[100000])",
-          "\n          PhysicalProject(col2=[$1])",
-          "\n            PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n              PhysicalTableScan(table=[[default, a]])",
-          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n        PhysicalSort(fetch=[100000])",
-          "\n          PhysicalProject(col1=[$0])",
-          "\n            PhysicalTableScan(table=[[default, b]])",
           "\n"
         ]
       }

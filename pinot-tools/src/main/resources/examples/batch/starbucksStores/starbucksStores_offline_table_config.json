@@ -6,7 +6,6 @@
     "retentionTimeValue": "1",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "starbucksStores",
     "replication": "1"
   },
   "tenants": {

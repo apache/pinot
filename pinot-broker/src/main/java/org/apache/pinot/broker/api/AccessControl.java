@@ -26,6 +26,8 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
@@ -119,5 +121,16 @@ public interface AccessControl extends FineGrainedAccessControl {
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
     return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
         : new TableAuthorizationResult(tables);
+  }
+
+
+  /**
+   * Returns RLS/CLS filters for a particular table. By default, there are no RLS/CLS filters on any table.
+   * @param requesterIdentity requested identity
+   * @param table Table used in the query. Table name can be with or without tableType.
+   * @return {@link TableRowColAccessResult} with the result of the access control check
+   */
+  default TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
+    return TableRowColAccessResultImpl.unrestricted();
   }
 }

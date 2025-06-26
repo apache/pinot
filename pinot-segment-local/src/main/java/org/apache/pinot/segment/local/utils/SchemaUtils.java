@@ -41,7 +41,6 @@ import org.apache.pinot.spi.utils.TimeUtils;
 
 /**
  * Schema utils
- * FIXME: Merge this SchemaUtils with the SchemaUtils from pinot-common when merging of modules happens
  */
 public class SchemaUtils {
   private SchemaUtils() {

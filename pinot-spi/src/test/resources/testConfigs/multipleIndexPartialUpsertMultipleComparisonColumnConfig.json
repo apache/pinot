@@ -2,7 +2,6 @@
   "tableName": "testTableUpsertMultiComparison",
   "segmentsConfig": {
     "replication": "1",
-    "schemaName": "testTable",
     "timeColumnName": "time"
   },
   "fieldConfigList": [

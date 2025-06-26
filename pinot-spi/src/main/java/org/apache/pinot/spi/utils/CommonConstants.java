@@ -74,6 +74,8 @@ public class CommonConstants {
 
   public static final String JFR = "pinot.jfr";
 
+  public static final String RLS_FILTERS = "rlsFilters";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -339,6 +341,9 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
+    public static final String CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH =
+        "pinot.broker.enable.row.column.level.auth";
+    public static final boolean DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH = false;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";

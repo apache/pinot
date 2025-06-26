@@ -93,6 +93,7 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
@@ -342,6 +343,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
+      }
+      if (_enableRowColumnLevelAuth) {
+        AccessControl accessControl = _accessControlFactory.create();
+        for (String tableName : tables) {
+          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+              .ifPresent(rowFilters -> {
+                String combinedFilters =
+                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+                String key = RlsUtils.buildRlsFilterKey(tableName);
+                compiledQuery.getOptions().put(key, combinedFilters);
+              });
+        }
       }
     }
   }

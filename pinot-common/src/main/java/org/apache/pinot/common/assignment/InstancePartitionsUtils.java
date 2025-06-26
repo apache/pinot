@@ -21,6 +21,7 @@ package org.apache.pinot.common.assignment;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
@@ -29,7 +30,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -60,7 +60,7 @@ public class InstancePartitionsUtils {
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
-InstancePartitionsType instancePartitionsType) {
+      InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
@@ -98,7 +98,6 @@ InstancePartitionsType instancePartitionsType) {
     return TableNameBuilder.extractRawTableName(tableName) + TIER_SUFFIX + tierName;
   }
 
-
   /**
    * Gets the instance partitions with the given name, and returns a re-named copy of the same.
    * This method is useful when we use a table with instancePartitionsMap since in that case
@@ -108,8 +107,8 @@ InstancePartitionsType instancePartitionsType) {
       String instancePartitionsName, String newName) {
     InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore, instancePartitionsName);
     Preconditions.checkNotNull(instancePartitions,
-        String.format("Couldn't find instance-partitions with name=%s. Cannot rename to %s",
-            instancePartitionsName, newName));
+        String.format("Couldn't find instance-partitions with name=%s. Cannot rename to %s", instancePartitionsName,
+            newName));
     return instancePartitions.withName(newName);
   }
 
@@ -171,8 +170,8 @@ InstancePartitionsType instancePartitionsType) {
    */
   public static void persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       InstancePartitions instancePartitions) {
-    String path = ZKMetadataProvider
-        .constructPropertyStorePathForInstancePartitions(instancePartitions.getInstancePartitionsName());
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        instancePartitions.getInstancePartitionsName());
     if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
     }
@@ -192,16 +191,25 @@ InstancePartitionsType instancePartitionsType) {
   public static void removeTierInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
     List<InstancePartitions> instancePartitions = ZKMetadataProvider.getAllInstancePartitions(propertyStore);
-    instancePartitions.stream().filter(instancePartition -> instancePartition.getInstancePartitionsName()
+    instancePartitions.stream()
+        .filter(instancePartition -> instancePartition.getInstancePartitionsName()
             .startsWith(TableNameBuilder.extractRawTableName(tableNameWithType) + TIER_SUFFIX))
         .forEach(instancePartition -> {
           removeInstancePartitions(propertyStore, instancePartition.getInstancePartitionsName());
         });
   }
 
+  /// Returns `true` if the table has pre-configured instance partitions of the given type.
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    Map<InstancePartitionsType, String> instancePartitionsMap = tableConfig.getInstancePartitionsMap();
+    return instancePartitionsMap != null && instancePartitionsMap.containsKey(instancePartitionsType);
+  }
+
+  /// Returns `true` if the table should use pre-configured instance partitions of the given type.
   public static boolean shouldFetchPreConfiguredInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    return TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
+    return hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
         && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
   }
 }
