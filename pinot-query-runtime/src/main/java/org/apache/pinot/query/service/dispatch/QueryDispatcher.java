@@ -168,7 +168,7 @@ public class QueryDispatcher {
     boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      QueryResult result = runReducerFromQueryThread(dispatchableSubPlan, queryOptions, _mailboxService);
+      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
         cancelled = true;
@@ -579,7 +579,10 @@ public class QueryDispatcher {
     return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
   }
 
-  private static QueryResult runReducerFromQueryThread(
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method assumes the caller thread is a query thread and therefore [QueryThreadContext] has been initialized.
+  private static QueryResult runReducer(
       DispatchableSubPlan subPlan,
       Map<String, String> queryOptions,
       MailboxService mailboxService
@@ -594,7 +597,12 @@ public class QueryDispatcher {
     );
   }
 
-  // There is no reduction happening here, results are simply concatenated.
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method should be called from a query thread and therefore using
+  /// [#runReducer(DispatchableSubPlan, Map, MailboxService)] is preferred.
+  ///
+  /// Remember that in MSE there is no actual reduce but rather a single stage that concatenates the results.
   @VisibleForTesting
   public static QueryResult runReducer(long requestId,
       DispatchableSubPlan subPlan,
