@@ -65,7 +65,6 @@ public class SelectionOperatorService {
   private final DataSchema _dataSchema;
   private final int[] _columnIndices;
   private final int _offset;
-  private int _offsetCounter;
   private final int _limit;
   private final int _numRowsToKeep;
   // TODO: consider moving this to a util class
@@ -87,7 +86,6 @@ public class SelectionOperatorService {
     _columnIndices = columnIndices;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
-    _offsetCounter = _offset;
     _limit = queryContext.getLimit();
     _numRowsToKeep = _offset + _limit;
     assert queryContext.getOrderByExpressions() != null;
@@ -114,41 +112,17 @@ public class SelectionOperatorService {
       return new ResultTable(_dataSchema, heapSortedRows);
     } // end todo
 
-    // n-way merge sorted dataTable
+    if (dataTables.size() == 1) {
+      // short circuit single table case
+      DataTable dataTable = dataTables.iterator().next();
+      List<Object[]> resultRows = processSingleDataTable(dataTable);
+      return new ResultTable(_dataSchema, resultRows);
+    }
+
+    // n-way merge sorted dataTable, we need to access dataTable by index
     List<DataTable> dataTableList = new ArrayList<>(dataTables);
     List<Object[]> mergedRows = nWayMergeDataTables(dataTableList);
     return new ResultTable(_dataSchema, mergedRows);
-  }
-
-  /** get nullBitmaps for dataTables */
-  private RoaringBitmap[][] getdataTableNullBitmaps(List<DataTable> dataTables) {
-    RoaringBitmap[][] dataTableNullBitmaps = new RoaringBitmap[dataTables.size()][];
-    if (!_queryContext.isNullHandlingEnabled()) {
-      return dataTableNullBitmaps;
-    }
-    int idx = 0;
-    for (DataTable dataTable : dataTables) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
-      for (int colId = 0; colId < nullBitmaps.length; colId++) {
-        nullBitmaps[colId] = dataTable.getNullRowIds(colId);
-      }
-      dataTableNullBitmaps[idx++] = nullBitmaps;
-    }
-    return dataTableNullBitmaps;
-  }
-
-  /** get a single row from dataTable with null handling if nullBitmaps provided */
-  private Object[] getDataTableRow(DataTable dataTable, int rowId, @Nullable RoaringBitmap[] nullBitmaps) {
-    Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-    if (nullBitmaps != null) {
-      for (int colId = 0; colId < nullBitmaps.length; colId++) {
-        if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-          row[colId] = null;
-        }
-      }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-    }
-    return row;
   }
 
   /**
@@ -184,19 +158,14 @@ public class SelectionOperatorService {
     List<Object[]> resultRows = new ArrayList<>();
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
+    int offsetCounter = _offset;
     while (resultRows.size() < _limit && !mergeSortRows.isEmpty()) {
       MergeItem item = mergeSortRows.poll();
-      if (_offsetCounter > 0) {
-        _offsetCounter--;
+      if (offsetCounter > 0) {
+        offsetCounter--;
       } else {
         Object[] row = item._row;
-        Object[] resultRow = new Object[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          Object value = row[_columnIndices[i]];
-          if (value != null) {
-            resultRow[i] = columnDataTypes[i].convertAndFormat(value);
-          }
-        }
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
         resultRows.add(resultRow);
       }
       int dataTableId = item._dataTableId;
@@ -210,6 +179,97 @@ public class SelectionOperatorService {
       mergeSortRows.add(mergeItem);
     }
     return resultRows;
+  }
+
+  private List<Object[]> processSingleDataTable(DataTable dataTable) {
+    List<Object[]> resultRows = new ArrayList<>();
+    int offsetCounter = _offset;
+    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    int numColumns = _dataSchema.size();
+    int numRows = dataTable.getNumberOfRows();
+
+    if (_queryContext.isNullHandlingEnabled()) {
+      RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        setNullsForRow(nullBitmaps, rowId, row);
+        if (offsetCounter > 0) {
+          offsetCounter--;
+        } else {
+          Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+          resultRows.add(resultRow);
+        }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        if (resultRows.size() == _limit) {
+          break;
+        }
+      }
+    } else {
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        if (offsetCounter > 0) {
+          offsetCounter--;
+        } else {
+          Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+          resultRows.add(resultRow);
+        }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        if (resultRows.size() == _limit) {
+          break;
+        }
+      }
+    }
+    return resultRows;
+  }
+
+  /** get nullBitmaps for dataTables */
+  private RoaringBitmap[][] getdataTableNullBitmaps(List<DataTable> dataTables) {
+    RoaringBitmap[][] dataTableNullBitmaps = new RoaringBitmap[dataTables.size()][];
+    if (!_queryContext.isNullHandlingEnabled()) {
+      return dataTableNullBitmaps;
+    }
+    int idx = 0;
+    for (DataTable dataTable : dataTables) {
+      dataTableNullBitmaps[idx++] = getNullBitmap(dataTable);
+    }
+    return dataTableNullBitmaps;
+  }
+
+  /** get a single row from dataTable with null handling if nullBitmaps provided */
+  private Object[] getDataTableRow(DataTable dataTable, int rowId, @Nullable RoaringBitmap[] nullBitmaps) {
+    Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+    if (nullBitmaps != null) {
+      setNullsForRow(nullBitmaps, rowId, row);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+    }
+    return row;
+  }
+
+  private static void setNullsForRow(RoaringBitmap[] nullBitmaps, int rowId, Object[] row) {
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+        row[colId] = null;
+      }
+    }
+  }
+
+  private static RoaringBitmap[] getNullBitmap(DataTable dataTable) {
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+    }
+    return nullBitmaps;
+  }
+
+  private Object[] formatRow(int numColumns, Object[] row, DataSchema.ColumnDataType[] columnDataTypes) {
+    Object[] resultRow = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      Object value = row[_columnIndices[i]];
+      if (value != null) {
+        resultRow[i] = columnDataTypes[i].convertAndFormat(value);
+      }
+    }
+    return resultRow;
   }
 
   /**
@@ -229,17 +289,10 @@ public class SelectionOperatorService {
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       if (_queryContext.isNullHandlingEnabled()) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
-        for (int colId = 0; colId < nullBitmaps.length; colId++) {
-          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
-        }
+        RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          for (int colId = 0; colId < nullBitmaps.length; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-              row[colId] = null;
-            }
-          }
+          setNullsForRow(nullBitmaps, rowId, row);
           SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
           Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
@@ -258,13 +311,7 @@ public class SelectionOperatorService {
     while (heapSortRows.size() > _offset) {
       Object[] row = heapSortRows.poll();
       assert row != null;
-      Object[] resultRow = new Object[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        Object value = row[_columnIndices[i]];
-        if (value != null) {
-          resultRow[i] = columnDataTypes[i].convertAndFormat(value);
-        }
-      }
+      Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
       resultRows.addFirst(resultRow);
     }
     return resultRows;
