@@ -807,6 +807,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
           1);
     }
+    if (brokerResponse.isGroupsTrimmed()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
+    }
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
@@ -1898,7 +1901,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: come up with other criteria for forcing a log and come up with better numbers
    */
   private boolean forceLog(BrokerResponse brokerResponse, long totalTimeMs) {
-    if (brokerResponse.isNumGroupsLimitReached()) {
+    if (brokerResponse.isNumGroupsLimitReached() || brokerResponse.isGroupsTrimmed()) {
       return true;
     }
 

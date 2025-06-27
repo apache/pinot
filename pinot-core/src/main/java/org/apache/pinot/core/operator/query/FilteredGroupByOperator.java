@@ -195,7 +195,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
+
+        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+        resultsBlock.setGroupsTrimmed(true);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;

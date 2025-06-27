@@ -152,6 +152,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS = create(
       "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
 
+  // This metric track the number of broker responses with trimmed groups (potential bad responses).
+  public static final BrokerMeter BROKER_RESPONSES_WITH_GROUPS_TRIMMED = create(
+      "BROKER_RESPONSES_WITH_GROUPS_TRIMMED", "badResponses", false);
+
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);

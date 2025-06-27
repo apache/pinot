@@ -215,6 +215,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
