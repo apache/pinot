@@ -825,5 +825,42 @@
         ]
       }
     ]
+  },
+  "physical_opt_window_functions": {
+    "queries": [
+      {
+        "description": "Multiple window groups",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject($0=[$3], $1=[$4])",
+          "\n    PhysicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2)])])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], collation=[[2]])",
+          "\n        PhysicalWindow(window#0=[window(partition {1} order by [2] aggs [MIN($2)])])",
+          "\n          PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE], collation=[[2]])",
+          "\n            PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Multiple window groups",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3), MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3) FROM a",
+        "notes": "physical optimizer currently doesn't support reorder window nodes according to the data distribution; the first window function will be processed first, i.e. the lowest window node in the plan tree",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalProject($0=[$3], $1=[$4])",
+          "\n    PhysicalWindow(window#0=[window(partition {1} order by [2] aggs [MIN($2)])])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[1]], collation=[[2]])",
+          "\n        PhysicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2)])])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]], collation=[[2]])",
+          "\n            PhysicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
   }
 }
