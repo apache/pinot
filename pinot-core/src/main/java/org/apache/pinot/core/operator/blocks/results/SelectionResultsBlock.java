@@ -85,11 +85,11 @@ public class SelectionResultsBlock extends BaseResultsBlock {
     return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
   }
 
-  // provide sorted on server metadata
+  // provide sorted metadata
   @Override
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = super.getResultsMetadata();
-    metadata.put(DataTable.MetadataKey.SORTED_ON_SERVER.getName(), "1");
+    metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
     return metadata;
   }
 }

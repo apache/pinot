@@ -94,7 +94,7 @@ public class SelectionOperatorService {
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
     for (DataTable dataTable : dataTables) {
       // dataTable is always sorted for server version >= 1.3.0
-      String sortedOnServer = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED_ON_SERVER.getName());
+      String sortedOnServer = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
       if (sortedOnServer != null && Integer.parseInt(sortedOnServer) == 1) {
         _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
         continue;

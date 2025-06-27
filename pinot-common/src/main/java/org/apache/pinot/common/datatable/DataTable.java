@@ -93,7 +93,7 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
-    INT, LONG, STRING
+    INT, LONG, STRING, BOOLEAN
   }
 
   /* The MetadataKey is used since V3, where we present metadata as Map<MetadataKey, String>
@@ -146,7 +146,7 @@ public interface DataTable {
     THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
     RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
     // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
-    SORTED_ON_SERVER(38, "sortedOnServer", MetadataValueType.INT);
+    SORTED(38, "sortedOnServer", MetadataValueType.BOOLEAN);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!

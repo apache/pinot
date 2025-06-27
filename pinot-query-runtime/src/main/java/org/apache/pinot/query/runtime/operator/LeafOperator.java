@@ -298,7 +298,7 @@ public class LeafOperator extends MultiStageOperator {
           case NUM_CONSUMING_SEGMENTS_MATCHED:
             _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
             break;
-          case SORTED_ON_SERVER:
+          case SORTED:
             break;
           default: {
             throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
